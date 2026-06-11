@@ -143,6 +143,8 @@ Moderator Commands (Prefix)
     ccp webconsent <on|off> - Enable or disable message content logging for the external web dashboard*.
 
     ccp posters - enabled propaganda posters with reactions to either earn score and yuan or lose score. at 12 UTC
+    powered by https://chineseposters.net
+
 
 
 --------------------------------
