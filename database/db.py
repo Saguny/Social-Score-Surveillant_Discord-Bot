@@ -137,6 +137,48 @@ TABLES = [
         PRIMARY KEY (guild_id, message_id)
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS propaganda_events (
+        id                SERIAL  PRIMARY KEY,
+        guild_id          BIGINT,
+        mod_id            BIGINT,
+        submit_channel_id BIGINT,
+        reveal_channel_id BIGINT,
+        closes_at         BIGINT,
+        concludes_at      BIGINT,
+        status            TEXT    DEFAULT 'open'
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS propaganda_submissions (
+        id                SERIAL  PRIMARY KEY,
+        event_id          INTEGER,
+        guild_id          BIGINT,
+        user_id           BIGINT,
+        content           TEXT,
+        timestamp         BIGINT,
+        reveal_message_id BIGINT  DEFAULT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS propaganda_event_bans (
+        event_id        INTEGER,
+        guild_id        BIGINT,
+        user_id         BIGINT,
+        matched_content TEXT,
+        PRIMARY KEY (event_id, user_id)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS guild_decrees (
+        id         SERIAL  PRIMARY KEY,
+        guild_id   BIGINT,
+        user_id    BIGINT,
+        content    TEXT,
+        won_at     BIGINT,
+        vote_count INTEGER DEFAULT 0
+    )
+    """,
 ]
 
 
@@ -151,8 +193,16 @@ class Database:
         self._flush_task: asyncio.Task | None = None
 
     async def init(self):
-        self._pool = await asyncpg.create_pool(self._dsn, min_size=2, max_size=10)
+        self._pool = await asyncpg.create_pool(self._dsn, min_size=2, max_size=20)
         await self._create_tables()
+        await self._migrate()
+
+    async def _migrate(self):
+        async with self._pool.acquire() as conn:
+            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_checkin BIGINT DEFAULT 0")
+            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS checkin_streak INTEGER DEFAULT 0")
+            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active BIGINT DEFAULT 0")
+            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS propaganda_wins INTEGER DEFAULT 0")
 
     async def _create_tables(self):
         async with self._pool.acquire() as conn:
@@ -185,22 +235,24 @@ class Database:
                 )
 
     async def tick_user(self, guild_id, user_id, yuan):
+        now = int(time.time())
         async with self._pool.acquire() as conn:
             async with conn.transaction():
                 await self._ensure_guild(conn, guild_id)
                 return await conn.fetchrow(
                     """
                     INSERT INTO users (guild_id, user_id, score, highest_score, lowest_score,
-                                       message_count, yuan, total_yuan_earned, has_chatted)
-                    VALUES ($1, $2, 750.0, 750.0, 750.0, 1, $3, $3, 1)
+                                       message_count, yuan, total_yuan_earned, has_chatted, last_active)
+                    VALUES ($1, $2, 750.0, 750.0, 750.0, 1, $3, $3, 1, $4)
                     ON CONFLICT (guild_id, user_id) DO UPDATE SET
                         message_count     = users.message_count + 1,
                         yuan              = users.yuan + $3,
                         total_yuan_earned = users.total_yuan_earned + $3,
-                        has_chatted       = 1
+                        has_chatted       = 1,
+                        last_active       = $4
                     RETURNING *
                     """,
-                    guild_id, user_id, yuan,
+                    guild_id, user_id, yuan, now,
                 )
 
     def start_flush_task(self):
@@ -583,6 +635,183 @@ class Database:
                     1 if enabled else 0, guild_name, guild_id,
                 )
         self._web_consent_cache[guild_id] = bool(enabled)
+
+    async def get_extended_leaderboard(self, guild_id):
+        top_score = await self._pool.fetch(
+            "SELECT user_id, score FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY score DESC LIMIT 3", guild_id,
+        )
+        bottom_score = await self._pool.fetch(
+            "SELECT user_id, score FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY score ASC LIMIT 3", guild_id,
+        )
+        richest = await self._pool.fetch(
+            "SELECT user_id, yuan FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY yuan DESC LIMIT 3", guild_id,
+        )
+        poorest = await self._pool.fetch(
+            "SELECT user_id, yuan FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY yuan ASC LIMIT 3", guild_id,
+        )
+        most_messages = await self._pool.fetch(
+            "SELECT user_id, message_count FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY message_count DESC LIMIT 3", guild_id,
+        )
+        most_endorsed = await self._pool.fetch(
+            "SELECT user_id, times_endorsed FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY times_endorsed DESC LIMIT 3", guild_id,
+        )
+        most_rebuked = await self._pool.fetch(
+            "SELECT user_id, times_rebuked FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY times_rebuked DESC LIMIT 3", guild_id,
+        )
+        top_snitches = await self._pool.fetch(
+            "SELECT user_id, times_filed_reports FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY times_filed_reports DESC LIMIT 3", guild_id,
+        )
+        return {
+            "top_score": top_score, "bottom_score": bottom_score,
+            "richest": richest, "poorest": poorest,
+            "most_messages": most_messages, "most_endorsed": most_endorsed,
+            "most_rebuked": most_rebuked, "top_snitches": top_snitches,
+        }
+
+    async def do_checkin(self, guild_id, user_id):
+        now = int(time.time())
+        today_start = now - (now % 86400)
+        yesterday_start = today_start - 86400
+        async with self._pool.acquire() as conn:
+            async with conn.transaction():
+                row = await conn.fetchrow(
+                    "SELECT last_checkin, checkin_streak, score FROM users WHERE guild_id = $1 AND user_id = $2",
+                    guild_id, user_id,
+                )
+                if not row:
+                    return None
+                if row["last_checkin"] >= today_start:
+                    return {"already_checked_in": True}
+                new_streak = (row["checkin_streak"] + 1) if row["last_checkin"] >= yesterday_start else 1
+                yuan_reward = min(50 + (new_streak - 1) * 10, 150)
+                score_delta = 0.2
+                old_score = row["score"]
+                new_score = min(1300.0, old_score + score_delta)
+                await conn.execute(
+                    """
+                    UPDATE users SET
+                        last_checkin   = $1,
+                        checkin_streak = $2,
+                        yuan           = yuan + $3,
+                        total_yuan_earned = total_yuan_earned + $3,
+                        score          = $4,
+                        highest_score  = GREATEST(highest_score, $4)
+                    WHERE guild_id = $5 AND user_id = $6
+                    """,
+                    now, new_streak, yuan_reward, new_score, guild_id, user_id,
+                )
+                await conn.execute(
+                    "INSERT INTO score_history (guild_id, user_id, delta, reason, timestamp) VALUES ($1, $2, $3, $4, $5)",
+                    guild_id, user_id, score_delta, f"daily check-in (streak: {new_streak})", now,
+                )
+        return {
+            "already_checked_in": False, "streak": new_streak,
+            "yuan_reward": yuan_reward, "score_delta": score_delta,
+            "old_score": old_score, "new_score": new_score,
+        }
+
+    async def apply_score_decay(self):
+        cutoff = int(time.time()) - (7 * 86400)
+        await self._pool.execute(
+            """
+            UPDATE users SET
+                score        = GREATEST(600.0, score - 0.1),
+                lowest_score = LEAST(lowest_score, GREATEST(600.0, score - 0.1))
+            WHERE has_chatted = 1
+            AND last_active > 0
+            AND last_active < $1
+            AND score > 600.0
+            """,
+            cutoff,
+        )
+
+    async def create_propaganda_event(self, guild_id, mod_id, submit_channel_id, reveal_channel_id, closes_at):
+        concludes_at = closes_at + 86400
+        row = await self._pool.fetchrow(
+            """
+            INSERT INTO propaganda_events (guild_id, mod_id, submit_channel_id, reveal_channel_id, closes_at, concludes_at)
+            VALUES ($1, $2, $3, $4, $5, $6) RETURNING id
+            """,
+            guild_id, mod_id, submit_channel_id, reveal_channel_id, closes_at, concludes_at,
+        )
+        return row["id"]
+
+    async def get_open_propaganda_event(self, guild_id):
+        return await self._pool.fetchrow(
+            "SELECT * FROM propaganda_events WHERE guild_id = $1 AND status = 'open' AND closes_at > $2",
+            guild_id, int(time.time()),
+        )
+
+    async def get_propaganda_events_ready_to_close(self, now):
+        return await self._pool.fetch(
+            "SELECT * FROM propaganda_events WHERE status = 'open' AND closes_at <= $1", now,
+        )
+
+    async def get_propaganda_events_ready_to_conclude(self, now):
+        return await self._pool.fetch(
+            "SELECT * FROM propaganda_events WHERE status = 'voting' AND concludes_at <= $1", now,
+        )
+
+    async def set_propaganda_event_status(self, event_id, status):
+        await self._pool.execute(
+            "UPDATE propaganda_events SET status = $1 WHERE id = $2", status, event_id,
+        )
+
+    async def add_propaganda_submission(self, event_id, guild_id, user_id, content):
+        now = int(time.time())
+        row = await self._pool.fetchrow(
+            "INSERT INTO propaganda_submissions (event_id, guild_id, user_id, content, timestamp) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+            event_id, guild_id, user_id, content, now,
+        )
+        return row["id"]
+
+    async def get_propaganda_submission_by_user(self, event_id, user_id):
+        return await self._pool.fetchrow(
+            "SELECT * FROM propaganda_submissions WHERE event_id = $1 AND user_id = $2",
+            event_id, user_id,
+        )
+
+    async def is_propaganda_banned(self, event_id, user_id):
+        row = await self._pool.fetchrow(
+            "SELECT 1 FROM propaganda_event_bans WHERE event_id = $1 AND user_id = $2",
+            event_id, user_id,
+        )
+        return row is not None
+
+    async def ban_from_propaganda_event(self, event_id, guild_id, user_id, matched_content):
+        await self._pool.execute(
+            "INSERT INTO propaganda_event_bans (event_id, guild_id, user_id, matched_content) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING",
+            event_id, guild_id, user_id, matched_content,
+        )
+
+    async def get_propaganda_submissions(self, event_id):
+        return await self._pool.fetch(
+            "SELECT * FROM propaganda_submissions WHERE event_id = $1 ORDER BY timestamp ASC",
+            event_id,
+        )
+
+    async def set_submission_reveal_message(self, submission_id, message_id):
+        await self._pool.execute(
+            "UPDATE propaganda_submissions SET reveal_message_id = $1 WHERE id = $2",
+            message_id, submission_id,
+        )
+
+    async def add_guild_decree(self, guild_id, user_id, content, vote_count):
+        now = int(time.time())
+        await self._pool.execute(
+            "INSERT INTO guild_decrees (guild_id, user_id, content, won_at, vote_count) VALUES ($1, $2, $3, $4, $5)",
+            guild_id, user_id, content, now, vote_count,
+        )
+        await self._pool.execute(
+            "UPDATE users SET propaganda_wins = propaganda_wins + 1 WHERE guild_id = $1 AND user_id = $2",
+            guild_id, user_id,
+        )
+
+    async def get_guild_decrees(self, guild_id, limit=10):
+        return await self._pool.fetch(
+            "SELECT * FROM guild_decrees WHERE guild_id = $1 ORDER BY won_at DESC LIMIT $2",
+            guild_id, limit,
+        )
 
     def log_message(self, guild_id, user_id, username, content, delta, reason):
         self._pending_logs.append((guild_id, user_id, username, content, round(delta, 2), reason, int(time.time())))

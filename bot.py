@@ -35,6 +35,12 @@ Console commands:
 """
 
 
+async def _decay_task(bot: commands.Bot):
+    while True:
+        await asyncio.sleep(86400)
+        await bot.db.apply_score_decay()
+
+
 async def console_loop(bot: commands.Bot):
     loop = asyncio.get_event_loop()
     while True:
@@ -133,8 +139,11 @@ class SocialCreditBot(commands.Bot):
         await self.load_extension("cogs.fundraiser")
         await self.load_extension("cogs.guide")
         await self.load_extension("cogs.posters")
+        await self.load_extension("cogs.checkin")
+        await self.load_extension("cogs.propaganda")
         from web.server import start_web_server
         asyncio.create_task(start_web_server(self))
+        asyncio.create_task(_decay_task(self))
         self.loop.create_task(console_loop(self))
 
     async def on_ready(self):

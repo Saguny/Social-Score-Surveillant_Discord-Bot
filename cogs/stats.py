@@ -79,20 +79,34 @@ class Stats(commands.Cog):
     @app_commands.command(name="leaderboard", description="View the social credit rankings")
     async def leaderboard(self, interaction: discord.Interaction):
         await interaction.response.defer()
-        data = await self.db.get_leaderboard(interaction.guild.id)
+        data = await self.db.get_extended_leaderboard(interaction.guild.id)
 
-        def fmt(rows):
-            lines = []
-            for i, row in enumerate(rows, 1):
-                member = interaction.guild.get_member(row["user_id"])
-                name = member.display_name if member else f"Unknown"
-                rank = get_rank(row["score"])
-                lines.append(f"{i}. {name} · {row['score']:.2f} ({rank['name']})")
-            return "\n".join(lines) or "No data."
+        def name(uid):
+            m = interaction.guild.get_member(uid)
+            return m.display_name if m else "Unknown"
+
+        def fmt_score(rows):
+            return "\n".join(f"{i}. {name(r['user_id'])} · {r['score']:.2f}" for i, r in enumerate(rows, 1)) or "No data."
+
+        def fmt_yuan(rows):
+            return "\n".join(f"{i}. {name(r['user_id'])} · ¥{r['yuan']}" for i, r in enumerate(rows, 1)) or "No data."
+
+        def fmt_col(rows, col):
+            return "\n".join(f"{i}. {name(r['user_id'])} · {r[col]}" for i, r in enumerate(rows, 1)) or "No data."
 
         embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 排行榜")
-        embed.add_field(name="MOST COMPLIANT", value=fmt(data["top"]), inline=False)
-        embed.add_field(name="GREATEST THREATS", value=fmt(data["bottom"]), inline=False)
+        embed.add_field(name="MOST COMPLIANT", value=fmt_score(data["top_score"]), inline=True)
+        embed.add_field(name="GREATEST THREATS", value=fmt_score(data["bottom_score"]), inline=True)
+        embed.add_field(name="​", value="​", inline=True)
+        embed.add_field(name="WEALTHIEST", value=fmt_yuan(data["richest"]), inline=True)
+        embed.add_field(name="POOREST", value=fmt_yuan(data["poorest"]), inline=True)
+        embed.add_field(name="​", value="​", inline=True)
+        embed.add_field(name="MOST ACTIVE", value=fmt_col(data["most_messages"], "message_count"), inline=True)
+        embed.add_field(name="MOST ENDORSED", value=fmt_col(data["most_endorsed"], "times_endorsed"), inline=True)
+        embed.add_field(name="​", value="​", inline=True)
+        embed.add_field(name="MOST REBUKED", value=fmt_col(data["most_rebuked"], "times_rebuked"), inline=True)
+        embed.add_field(name="TOP INFORMANTS", value=fmt_col(data["top_snitches"], "times_filed_reports"), inline=True)
+        embed.add_field(name="​", value="​", inline=True)
         embed.timestamp = discord.utils.utcnow()
         await interaction.followup.send(embed=embed)
 
@@ -176,6 +190,16 @@ class Stats(commands.Cog):
         embed.add_field(name="YUAN EARNED",  value=f"¥{user['total_yuan_earned']}", inline=True)
         embed.add_field(name="YUAN SPENT",   value=f"¥{user['total_yuan_spent']}",  inline=True)
         embed.add_field(name="ITEMS BOUGHT", value=str(user["items_bought"]),        inline=True)
+
+        streak = user.get("checkin_streak", 0)
+        wins   = user.get("propaganda_wins", 0)
+        if streak or wins:
+            embed.add_field(name="​", value="​", inline=False)
+        if streak:
+            embed.add_field(name="CHECK-IN STREAK", value=f"{streak} days", inline=True)
+        if wins:
+            embed.add_field(name="PROPAGANDA VICTORIES", value=str(wins), inline=True)
+
         embed.timestamp = discord.utils.utcnow()
         embed.set_thumbnail(url="attachment://ccpstats.png")
         file = discord.File("images/ccpstats.png", filename="ccpstats.png")

@@ -1,3 +1,4 @@
+import asyncio
 import aiohttp
 import discord
 from discord.ext import commands
@@ -5,6 +6,7 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from langdetect import detect, LangDetectException
 from config.ranks import get_rank
 from config.rules import STRUCTURAL_RULES, SENTIMENT_SCALE, SENTIMENT_NEUTRAL_THRESHOLD, YUAN_PER_MESSAGE
+from config.banned_topics import contains_banned_topic
 
 TRANSLATE_URL = "https://translate.googleapis.com/translate_a/single"
 
@@ -71,7 +73,12 @@ class Scoring(commands.Cog):
 
         english = text if lang == "en" else await self._translate_to_english(text)
 
-        compound = self._analyzer.polarity_scores(english)["compound"]
+        if contains_banned_topic(english):
+            return -SENTIMENT_SCALE, "counter-revolutionary speech"
+
+        loop = asyncio.get_event_loop()
+        scores = await loop.run_in_executor(None, self._analyzer.polarity_scores, english)
+        compound = scores["compound"]
         if abs(compound) < SENTIMENT_NEUTRAL_THRESHOLD:
             return 0.0, None
         return round(compound * SENTIMENT_SCALE, 2), "positive sentiment" if compound > 0 else "negative sentiment"

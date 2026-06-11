@@ -168,6 +168,38 @@ class Economy(commands.Cog):
             embed.set_footer(text="GLORY TO THE CCP!")
             await interaction.followup.send(embed=embed)
 
+    @app_commands.command(name="confess", description="Publicly confess your crimes to the Bureau for a score reprieve")
+    @app_commands.describe(text="Your confession (max 200 characters)")
+    async def confess(self, interaction: discord.Interaction, text: str):
+        await interaction.response.defer()
+        gid = interaction.guild.id
+        uid = interaction.user.id
+
+        if len(text) > 200:
+            await interaction.followup.send("Confession exceeds 200 characters.", ephemeral=True)
+            return
+
+        user = await self.db.get_user(gid, uid)
+        cost = max(200, int((750.0 - user["score"]) * 5))
+
+        if not await self.db.spend_yuan(gid, uid, cost):
+            await interaction.followup.send(
+                f"Insufficient funds. Confession costs ¥{cost} at your current score. Balance: ¥{user['yuan']}",
+                ephemeral=True,
+            )
+            return
+
+        await self.db.log_transaction(gid, uid, "confess", cost)
+        old, new = await self.db.update_score(gid, uid, 0.5, "public confession")
+
+        embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 公开认罪")
+        embed.add_field(name="CITIZEN", value=interaction.user.mention, inline=False)
+        embed.add_field(name="CONFESSION", value=text[:200], inline=False)
+        embed.add_field(name="COST", value=f"¥{cost}", inline=True)
+        embed.add_field(name="SCORE ADJUSTMENT", value=f"{old:.2f} → {new:.2f}", inline=True)
+        embed.timestamp = discord.utils.utcnow()
+        await interaction.followup.send(embed=embed)
+
     @buy.autocomplete("item")
     async def item_autocomplete(
         self, interaction: discord.Interaction, current: str

@@ -99,6 +99,14 @@ class Guide(commands.Cog):
             inline=False,
         )
         e2.add_field(
+            name="COUNTER-REVOLUTIONARY SPEECH",
+            value=(
+                "Messages referencing banned topics — Tiananmen, Taiwan independence, Xinjiang, Tibet, "
+                "Falun Gong, and related subjects — are flagged regardless of tone. Penalty: -0.2."
+            ),
+            inline=False,
+        )
+        e2.add_field(
             name="STRUCTURAL VIOLATIONS",
             value=(
                 "Sending the same message twice in a row: -1.0\n"
@@ -107,24 +115,30 @@ class Guide(commands.Cog):
             ),
             inline=False,
         )
+        e2.add_field(
+            name="INACTIVITY DECAY",
+            value="Citizens inactive for more than 7 days will have their score gently nudged toward 750 each day until they return.",
+            inline=False,
+        )
         e2.set_footer(text="GLORY TO THE CCP!")
         embeds.append(e2)
 
         e3 = discord.Embed(color=0xCC0000, title="SCORE AND STAT COMMANDS")
         e3.add_field(name="/score [citizen]",        value="View your score and current rank.", inline=False)
-        e3.add_field(name="/stats [citizen]",        value="Full breakdown: trends, peak/low score, messages, report history.", inline=False)
+        e3.add_field(name="/stats [citizen]",        value="Full breakdown: trends, peak/low score, messages, check-in streak, propaganda victories.", inline=False)
         e3.add_field(name="/history [citizen]",      value="Last 5 score changes. Viewing others requires mod permissions.", inline=False)
-        e3.add_field(name="/leaderboard",            value="Top 3 most compliant and top 3 greatest threats.", inline=False)
+        e3.add_field(name="/leaderboard",            value="Rankings across 8 categories: score, yuan, activity, endorsements, rebukes, and informants.", inline=False)
         e3.add_field(name="/state_report",           value="Server-wide report: biggest rise/fall, top informant, yuan in circulation, avg score.", inline=False)
+        e3.add_field(name="/checkin",                value="Perform your daily check-in. Earns Yuan and a small score bump. Streak increases daily reward (max ¥150).", inline=False)
         e3.add_field(name="/botinfo",                value="Technical information about the bot: creator, tech stack, server count, repo and invite links.", inline=False)
         e3.add_field(name="/uptime",                 value="How long the Bureau has been active since last restart.", inline=False)
         e3.add_field(name="/ping",                   value="Check the Bureau's response latency.", inline=False)
-        e3.add_field(name="/decree",                 value="Receive an official proclamation from the Bureau.", inline=False)
+        e3.add_field(name="/decree",                 value="Receive an official proclamation from the Bureau. May include decrees written by citizens.", inline=False)
         e3.add_field(name="/credits",                value="Open-source libraries powering the surveillance apparatus.", inline=False)
         embeds.append(e3)
 
         e4 = discord.Embed(color=0xCC0000, title="YUAN AND ECONOMY")
-        e4.add_field(name="Earning Yuan",  value="You earn 1 Yuan per message automatically.", inline=False)
+        e4.add_field(name="Earning Yuan",  value="You earn 1 Yuan per message automatically. Check-ins and propaganda victories are additional sources.", inline=False)
         e4.add_field(name="/yuan",         value="Check your Yuan balance and lifetime earned/spent.", inline=False)
         e4.add_field(name="/shop",         value="Browse available shop items and their costs.", inline=False)
         e4.add_field(
@@ -137,6 +151,14 @@ class Guide(commands.Cog):
                 "`expunge` (600) · Wipe your last 5 score changes from public history.\n"
                 "`freeze` (800) · Freeze your score for 1 hour. No changes will be applied.\n"
                 "`propaganda` (350) · Bot posts a state-approved commendation of you in the channel."
+            ),
+            inline=False,
+        )
+        e4.add_field(
+            name="/confess <text>",
+            value=(
+                "Publicly confess your crimes to the Bureau. Costs Yuan scaled to how far your score has fallen "
+                "(¥200 minimum · up to ¥750 at the floor). Grants +0.5 score on acceptance."
             ),
             inline=False,
         )
@@ -171,7 +193,7 @@ class Guide(commands.Cog):
         embeds.append(e6)
 
         e7 = discord.Embed(color=0x333333, title="MOD COMMANDS")
-        e7.description = "These are prefix commands. Type them directly in chat."
+        e7.description = "Prefix commands are typed directly in chat. Slash commands marked with / require mod permissions."
         e7.add_field(name="ccp initialize",                         value="Register all current server members into the system.", inline=False)
         e7.add_field(name="ccp adjust <@citizen> <delta> <reason>", value="Manually adjust a citizen's score by any amount.", inline=False)
         e7.add_field(name="ccp reset <@citizen>",                   value="Reset a citizen back to 750.", inline=False)
@@ -179,8 +201,40 @@ class Guide(commands.Cog):
         e7.add_field(name="ccp webconsent <on|off>",                value="Enable or disable message logging for the web dashboard.", inline=False)
         e7.add_field(name="ccp poster",                              value="Display a random propaganda poster.", inline=False)
         e7.add_field(name="ccp posters",                             value="Toggle daily propaganda poster broadcasts in this channel. React ❤️ for +1 credit and +20 yuan · React 😡 for -1 credit.", inline=False)
+        e7.add_field(
+            name="/propaganda start <submit_channel> <reveal_channel> <duration_hours>",
+            value=(
+                "Open a propaganda submission event. Citizens submit quotes via `/propaganda submit`. "
+                "When the submission window closes, all entries are posted in the reveal channel with reaction voting. "
+                "After 24 hours, the winning quote is enshrined as an official guild decree."
+            ),
+            inline=False,
+        )
         e7.set_footer(text="GLORY TO THE CCP!")
         embeds.append(e7)
+
+        e8 = discord.Embed(color=0xCC0000, title="PROPAGANDA EVENTS")
+        e8.add_field(
+            name="/propaganda submit <text>",
+            value=(
+                "Submit your propaganda quote to the active event (max 280 characters). One submission per citizen per event. "
+                "Submissions containing banned content result in a −5.00 score penalty and a ban from that event."
+            ),
+            inline=False,
+        )
+        e8.add_field(
+            name="EVENT LIFECYCLE",
+            value=(
+                "1. Mod starts event with a submission channel and reveal channel.\n"
+                "2. Citizens submit via `/propaganda submit` before the deadline.\n"
+                "3. On close, all submissions are posted in the reveal channel with 👍/👎 reactions.\n"
+                "4. After 24 hours, the most-approved submission becomes an official guild decree, "
+                "accessible via `/decree`. The winner's profile records a Propaganda Victory."
+            ),
+            inline=False,
+        )
+        e8.set_footer(text="GLORY TO THE CCP!")
+        embeds.append(e8)
 
         await interaction.response.send_message(embeds=embeds, ephemeral=True)
 
@@ -196,7 +250,10 @@ class Guide(commands.Cog):
 
     @app_commands.command(name="decree", description="Receive an official proclamation from the Bureau")
     async def decree(self, interaction: discord.Interaction):
-        pool = self._quotes or FALLBACK_DECREES
+        guild_decrees = await self.bot.db.get_guild_decrees(interaction.guild.id, limit=10)
+        guild_pool = [d["content"] for d in guild_decrees] if guild_decrees else []
+        xi_pool = self._quotes or FALLBACK_DECREES
+        pool = guild_pool + xi_pool
         e = discord.Embed(
             color=0xCC0000,
             title="中华人民共和国社会信用局 · OFFICIAL DECREE",
