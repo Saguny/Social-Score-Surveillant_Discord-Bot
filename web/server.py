@@ -1,10 +1,17 @@
 import os
+import hmac
+import time
+import secrets
 import asyncio
 import webbrowser
 from aiohttp import web
 
 PORT = int(os.getenv("PORT", 8080))
 _runner = None
+
+_RATE_WINDOW  = 60 * 5
+_RATE_LIMIT   = 5
+_failed_attempts: dict[str, list[float]] = {}
 
 HTML = """<!DOCTYPE html>
 <html lang="en">
@@ -15,10 +22,10 @@ HTML = """<!DOCTYPE html>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <style>
   :root {
-    --navy:  #111844;
-    --blue:  #4B5694;
-    --mid:   #7288AE;
-    --beige: #EAE0CF;
+    --navy:  #120810;
+    --blue:  #97124B;
+    --mid:   #C4849A;
+    --beige: #F5E6D3;
   }
   body { background: var(--navy); color: var(--beige); font-family: 'Segoe UI', sans-serif; }
   .navbar { background: var(--navy); border-bottom: 1px solid var(--blue); }
@@ -27,7 +34,7 @@ HTML = """<!DOCTYPE html>
   .nav-link:hover, .nav-link.active { color: var(--beige) !important; }
   h1, h2, h5 { color: var(--beige); }
   .guild-card {
-    background: #1a2356;
+    background: #1E0D16;
     border: 1px solid var(--blue);
     border-radius: 8px;
     cursor: pointer;
@@ -35,15 +42,15 @@ HTML = """<!DOCTYPE html>
   }
   .guild-card:hover { background: var(--beige); border-color: var(--beige); color: var(--navy); transform: translateY(-2px); }
   .guild-card:hover div[style*="color:var(--mid)"] { color: var(--blue) !important; }
-  .badge-positive { background: #2a5c3f; color: #7dffb3; }
-  .badge-negative { background: #5c1a1a; color: #ff7d7d; }
-  .badge-neutral  { background: #2a2f4a; color: var(--mid); }
-  .log-row td { background: #111844 !important; color: var(--beige) !important; border-color: #1e2a50 !important; font-size: .875rem; vertical-align: middle; }
+  .badge-positive { background: #3A2800; color: #F4E557; }
+  .badge-negative { background: #3D0808; color: #F5A855; }
+  .badge-neutral  { background: #2A1520; color: var(--mid); }
+  .log-row td { background: #120810 !important; color: var(--beige) !important; border-color: #3D1525 !important; font-size: .875rem; vertical-align: middle; }
   .log-row:hover td { background: var(--beige) !important; color: var(--navy) !important; }
   .log-row td[style*="color:var(--mid)"] { color: var(--mid) !important; }
   .log-row:hover td[style*="color:var(--mid)"] { color: var(--blue) !important; }
   #log-table { color: var(--beige); }
-  #log-table thead th { background: #0d1535; color: var(--mid); border-color: var(--blue) !important; font-size: .8rem; text-transform: uppercase; letter-spacing: 1px; }
+  #log-table thead th { background: #0D0509; color: var(--mid); border-color: var(--blue) !important; font-size: .8rem; text-transform: uppercase; letter-spacing: 1px; }
   .content-cell { max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .back-btn { color: var(--mid); cursor: pointer; }
   .back-btn:hover { color: var(--beige); }
@@ -258,29 +265,29 @@ ADMIN_HTML = """<!DOCTYPE html>
 <title>Admin Console · Social Credit</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <style>
-  :root { --navy:#111844; --blue:#4B5694; --mid:#7288AE; --beige:#EAE0CF; --green:#7dffb3; --red:#ff7d7d; }
+  :root { --navy:#120810; --blue:#97124B; --mid:#C4849A; --beige:#F5E6D3; --green:#F4E557; --red:#F5A855; }
   body { background:var(--navy); color:var(--beige); font-family:'Segoe UI',sans-serif; }
   .navbar { background:var(--navy); border-bottom:1px solid var(--blue); }
   .navbar-brand { color:var(--beige)!important; letter-spacing:2px; font-weight:700; }
   .nav-link { color:var(--mid)!important; font-size:.85rem; letter-spacing:1px; }
   .nav-link:hover,.nav-link.active { color:var(--beige)!important; }
-  .card-panel { background:#0d1535; border:1px solid var(--blue); border-radius:8px; }
+  .card-panel { background:#0D0509; border:1px solid var(--blue); border-radius:8px; }
   .form-control, .form-select {
-    background:#1a2356; border:1px solid var(--blue); color:var(--beige);
+    background:#1E0D16; border:1px solid var(--blue); color:var(--beige);
     font-size:.875rem;
   }
   .form-control:focus, .form-select:focus {
-    background:#1a2356; border-color:var(--beige); color:var(--beige); box-shadow:none;
+    background:#1E0D16; border-color:var(--beige); color:var(--beige); box-shadow:none;
   }
   .form-control::placeholder { color:var(--mid); }
   .form-label { color:var(--mid); font-size:.75rem; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px; }
   .btn-run { background:var(--blue); border:none; color:var(--beige); font-weight:600; letter-spacing:1px; }
-  .btn-run:hover { background:#5a67a8; color:var(--beige); }
+  .btn-run:hover { background:#DC4444; color:var(--beige); }
   .btn-run:disabled { opacity:.4; }
-  .btn-danger-soft { background:#5c1a1a; border:1px solid #8b2020; color:var(--red); }
-  .btn-danger-soft:hover { background:#7a2020; color:var(--red); }
+  .btn-danger-soft { background:#3D0808; border:1px solid #97124B; color:var(--red); }
+  .btn-danger-soft:hover { background:#5C1525; color:var(--red); }
   #terminal {
-    background:#060c20; border:1px solid var(--blue); border-radius:6px;
+    background:#080306; border:1px solid var(--blue); border-radius:6px;
     font-family:'Courier New',monospace; font-size:.8rem;
     min-height:260px; max-height:480px; overflow-y:auto;
     padding:12px 16px; color:var(--beige);
@@ -289,7 +296,7 @@ ADMIN_HTML = """<!DOCTYPE html>
   .t-out { color:var(--beige); white-space:pre-wrap; }
   .t-ok  { color:var(--green); }
   .t-err { color:var(--red); }
-  .cmd-section { border-bottom:1px solid #1e2a50; padding-bottom:16px; margin-bottom:16px; }
+  .cmd-section { border-bottom:1px solid #3D1525; padding-bottom:16px; margin-bottom:16px; }
   .cmd-section:last-child { border-bottom:none; margin-bottom:0; padding-bottom:0; }
   ::-webkit-scrollbar{width:6px} ::-webkit-scrollbar-track{background:var(--navy)} ::-webkit-scrollbar-thumb{background:var(--blue);border-radius:3px}
   #token-gate { display:none; }
@@ -432,16 +439,16 @@ LOGIN_HTML = """<!DOCTYPE html>
 <title>Login · Social Credit</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <style>
-  :root{--navy:#111844;--blue:#4B5694;--mid:#7288AE;--beige:#EAE0CF;}
+  :root{--navy:#120810;--blue:#97124B;--mid:#C4849A;--beige:#F5E6D3;}
   body{background:var(--navy);color:var(--beige);font-family:'Segoe UI',sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;}
-  .box{background:#0d1535;border:1px solid var(--blue);border-radius:8px;padding:2rem;width:100%;max-width:360px;}
+  .box{background:#0D0509;border:1px solid var(--blue);border-radius:8px;padding:2rem;width:100%;max-width:360px;}
   .brand{letter-spacing:2px;font-weight:700;font-size:.9rem;color:var(--mid);text-align:center;margin-bottom:1.5rem;}
-  .form-control{background:#1a2356;border:1px solid var(--blue);color:var(--beige);}
-  .form-control:focus{background:#1a2356;border-color:var(--beige);color:var(--beige);box-shadow:none;}
+  .form-control{background:#1E0D16;border:1px solid var(--blue);color:var(--beige);}
+  .form-control:focus{background:#1E0D16;border-color:var(--beige);color:var(--beige);box-shadow:none;}
   .form-control::placeholder{color:var(--mid);}
   .btn-login{background:var(--blue);border:none;color:var(--beige);font-weight:600;letter-spacing:1px;width:100%;}
-  .btn-login:hover{background:#5a67a8;color:var(--beige);}
-  .err{color:#ff7d7d;font-size:.8rem;margin-top:.5rem;display:none;}
+  .btn-login:hover{background:#DC4444;color:var(--beige);}
+  .err{color:#F5A855;font-size:.8rem;margin-top:.5rem;display:none;}
 </style>
 </head>
 <body>
@@ -463,7 +470,11 @@ document.getElementById("form").addEventListener("submit", async e => {
     body: JSON.stringify({token: document.getElementById("token").value})
   });
   if (res.ok) { location.href = next; }
-  else { document.getElementById("err").style.display = "block"; }
+  else {
+    const err = document.getElementById("err");
+    err.textContent = res.status === 429 ? "Too many attempts. Try again later." : "Invalid token.";
+    err.style.display = "block";
+  }
 });
 </script>
 </body>
@@ -474,7 +485,9 @@ def _is_authed(request):
     admin_token = os.getenv("ADMIN_TOKEN", "")
     if not admin_token:
         return True
-    return request.cookies.get("auth") == admin_token
+    session_id = request.app.get("session_id", "")
+    cookie = request.cookies.get("auth", "")
+    return bool(session_id) and hmac.compare_digest(cookie, session_id)
 
 
 def _require_auth(handler):
@@ -492,11 +505,29 @@ async def _handle_login(request):
 
 async def _handle_auth(request):
     admin_token = os.getenv("ADMIN_TOKEN", "")
-    body = await request.json()
-    if body.get("token") != admin_token:
+    ip = request.headers.get("X-Forwarded-For", request.remote or "").split(",")[0].strip()
+
+    now = time.time()
+    attempts = _failed_attempts.get(ip, [])
+    attempts = [t for t in attempts if now - t < _RATE_WINDOW]
+    if len(attempts) >= _RATE_LIMIT:
+        return web.Response(status=429)
+
+    try:
+        body = await request.json()
+    except Exception:
+        return web.Response(status=400)
+
+    provided = body.get("token", "")
+    if not admin_token or not hmac.compare_digest(provided, admin_token):
+        attempts.append(now)
+        _failed_attempts[ip] = attempts
         return web.Response(status=403)
+
+    _failed_attempts.pop(ip, None)
     response = web.Response(status=200)
-    response.set_cookie("auth", admin_token, httponly=True, samesite="Strict", max_age=60 * 60 * 24 * 30)
+    session_id = request.app["session_id"]
+    response.set_cookie("auth", session_id, httponly=True, secure=True, samesite="Strict", max_age=60 * 60 * 24 * 30)
     return response
 
 
@@ -615,6 +646,7 @@ async def start_web_server(bot):
 
     app = web.Application()
     app["bot"] = bot
+    app["session_id"] = secrets.token_hex(32)
     app.router.add_get("/login", _handle_login)
     app.router.add_post("/api/auth", _handle_auth)
     app.router.add_get("/", _require_auth(_handle_index))

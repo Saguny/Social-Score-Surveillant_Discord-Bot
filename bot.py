@@ -1,6 +1,7 @@
 import os
 import sys
 import asyncio
+from datetime import datetime, timezone
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
@@ -137,6 +138,7 @@ class SocialCreditBot(commands.Bot):
         self.loop.create_task(console_loop(self))
 
     async def on_ready(self):
+        self.start_time = datetime.now(timezone.utc)
         for guild in self.guilds:
             member_ids = [m.id for m in guild.members if not m.bot]
             await self.db.register_guild_members(guild.id, member_ids)

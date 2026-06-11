@@ -1,12 +1,78 @@
+import re
+import random
+from datetime import datetime, timezone
+import aiohttp
 import discord
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
 from config.ranks import RANKS
+
+REPO_URL      = "https://github.com/Saguny/Social-Score-Surveillant_Discord-Bot"
+INVITE_URL    = "https://discord.com/oauth2/authorize?client_id=856163780265902151&permissions=8&integration_type=0&scope=bot"
+WIKIQUOTE_API = "https://en.wikiquote.org/w/api.php"
+
+FALLBACK_DECREES = [
+    "The Chinese dream is an dream of the whole nation, as well as of every individual.",
+    "Power must be caged by the system.",
+    "We must make persistent efforts, press ahead with indomitable will, continue to push forward the great cause of socialism with Chinese characteristics.",
+    "To realize the great rejuvenation of the Chinese nation is the greatest dream for the Chinese nation in modern history.",
+    "Harmony is not a suggestion. It is a measurement.",
+]
+
+CREDITS_LINES = [
+    ("discord.py 2.x",    "Bot framework · https://discordpy.readthedocs.io"),
+    ("asyncpg",           "PostgreSQL driver · https://magicstack.github.io/asyncpg"),
+    ("vaderSentiment",    "Sentiment analysis · https://github.com/cjhutto/vaderSentiment"),
+    ("langdetect",        "Language detection · https://github.com/Mimino666/langdetect"),
+    ("aiohttp",           "Async HTTP · https://docs.aiohttp.org"),
+    ("python-dotenv",     "Environment config · https://github.com/theskumar/python-dotenv"),
+]
 
 
 class Guide(commands.Cog):
     def __init__(self, bot: commands.Bot):
-        self.bot = bot
+        self.bot    = bot
+        self._quotes: list[str] = []
+        self._session: aiohttp.ClientSession | None = None
+
+    async def cog_load(self):
+        self._session = aiohttp.ClientSession()
+        self._refresh_quotes.start()
+
+    async def cog_unload(self):
+        self._refresh_quotes.cancel()
+        if self._session:
+            await self._session.close()
+
+    async def _fetch_quotes(self):
+        try:
+            params = {"action": "parse", "page": "Xi_Jinping", "prop": "wikitext", "format": "json"}
+            async with self._session.get(WIKIQUOTE_API, params=params, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                data = await resp.json()
+            wikitext = data["parse"]["wikitext"]["*"]
+            quotes = []
+            for line in wikitext.splitlines():
+                if line.startswith("*") and not line.startswith("**"):
+                    q = line.lstrip("*").strip()
+                    q = re.sub(r"\[\[(?:[^|\]]*\|)?([^\]]+)\]\]", r"\1", q)
+                    q = re.sub(r"\{\{[^}]+\}\}", "", q)
+                    q = re.sub(r"'''?", "", q)
+                    q = re.sub(r"<[^>]+>", "", q)
+                    q = q.strip()
+                    if 20 < len(q) < 500:
+                        quotes.append(q)
+            if quotes:
+                self._quotes = quotes
+        except Exception:
+            pass
+
+    @tasks.loop(hours=24)
+    async def _refresh_quotes(self):
+        await self._fetch_quotes()
+
+    @_refresh_quotes.before_loop
+    async def _before_refresh(self):
+        await self.bot.wait_until_ready()
 
     @app_commands.command(name="guide", description="Full guide to the Social Credit System")
     async def guide(self, interaction: discord.Interaction):
@@ -50,6 +116,11 @@ class Guide(commands.Cog):
         e3.add_field(name="/history [citizen]",      value="Last 5 score changes. Viewing others requires mod permissions.", inline=False)
         e3.add_field(name="/leaderboard",            value="Top 3 most compliant and top 3 greatest threats.", inline=False)
         e3.add_field(name="/state_report",           value="Server-wide report: biggest rise/fall, top informant, yuan in circulation, avg score.", inline=False)
+        e3.add_field(name="/botinfo",                value="Technical information about the bot: creator, tech stack, server count, repo and invite links.", inline=False)
+        e3.add_field(name="/uptime",                 value="How long the Bureau has been active since last restart.", inline=False)
+        e3.add_field(name="/ping",                   value="Check the Bureau's response latency.", inline=False)
+        e3.add_field(name="/decree",                 value="Receive an official proclamation from the Bureau.", inline=False)
+        e3.add_field(name="/credits",                value="Open-source libraries powering the surveillance apparatus.", inline=False)
         embeds.append(e3)
 
         e4 = discord.Embed(color=0xCC0000, title="YUAN AND ECONOMY")
@@ -112,6 +183,120 @@ class Guide(commands.Cog):
         embeds.append(e7)
 
         await interaction.response.send_message(embeds=embeds, ephemeral=True)
+
+    @app_commands.command(name="ping", description="Check the Bureau's response latency")
+    async def ping(self, interaction: discord.Interaction):
+        latency_ms = round(self.bot.latency * 1000)
+        e = discord.Embed(
+            color=0xCC0000,
+            title="中华人民共和国社会信用局 · SIGNAL CHECK",
+            description=f"The Bureau responds in **{latency_ms} ms**. Your transmission has been logged.",
+        )
+        await interaction.response.send_message(embed=e, ephemeral=True)
+
+    @app_commands.command(name="decree", description="Receive an official proclamation from the Bureau")
+    async def decree(self, interaction: discord.Interaction):
+        pool = self._quotes or FALLBACK_DECREES
+        e = discord.Embed(
+            color=0xCC0000,
+            title="中华人民共和国社会信用局 · OFFICIAL DECREE",
+            description=f"*{random.choice(pool)}*",
+        )
+        await interaction.response.send_message(embed=e)
+
+    @app_commands.command(name="credits", description="Open-source libraries powering the Bureau")
+    async def credits(self, interaction: discord.Interaction):
+        e = discord.Embed(
+            color=0xCC0000,
+            title="中华人民共和国社会信用局 · ACKNOWLEDGEMENTS",
+            description="The surveillance apparatus is built on the following open-source technologies. The Party is grateful.",
+        )
+        for name, desc in CREDITS_LINES:
+            e.add_field(name=name, value=desc, inline=False)
+        e.add_field(
+            name="SOURCE CODE",
+            value=f"[{REPO_URL}]({REPO_URL})",
+            inline=False,
+        )
+        await interaction.response.send_message(embed=e, ephemeral=True)
+
+    @app_commands.command(name="uptime", description="How long the Bureau has been active")
+    async def uptime(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+
+        start_time = getattr(self.bot, "start_time", None)
+        if start_time is None:
+            await interaction.followup.send("The Bureau's records are unavailable.", ephemeral=True)
+            return
+
+        delta   = datetime.now(timezone.utc) - start_time
+        days    = delta.days
+        hours   = delta.seconds // 3600
+        minutes = (delta.seconds % 3600) // 60
+        seconds = delta.seconds % 60
+
+        parts = []
+        if days:    parts.append(f"{days}d")
+        if hours:   parts.append(f"{hours}h")
+        if minutes: parts.append(f"{minutes}m")
+        parts.append(f"{seconds}s")
+
+        e = discord.Embed(
+            color=0xCC0000,
+            title="中华人民共和国社会信用局 · BUREAU STATUS",
+            description=f"The Bureau has been vigilant for **{' '.join(parts)}**.",
+        )
+        e.add_field(name="ONLINE SINCE", value=f"<t:{int(start_time.timestamp())}:F>", inline=False)
+
+        await interaction.followup.send(embed=e, ephemeral=True)
+
+    @app_commands.command(name="botinfo", description="Information about the Social Credit Bot")
+    async def botinfo(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+
+        guild_count  = len(self.bot.guilds)
+        member_count = sum(g.member_count or 0 for g in self.bot.guilds)
+        latency_ms   = round(self.bot.latency * 1000)
+
+        e = discord.Embed(
+            color=0xCC0000,
+            title="中华人民共和国社会信用局 · BOT INFORMATION",
+            description=(
+                "An authoritative CCP-themed social credit system for Discord. "
+                "Every citizen is monitored. Every message is evaluated. Glory awaits the compliant."
+            ),
+        )
+
+        e.add_field(
+            name="CREATOR",
+            value="saguny",
+            inline=True,
+        )
+        e.add_field(
+            name="SERVERS · CITIZENS",
+            value=f"{guild_count} servers · {member_count:,} citizens",
+            inline=True,
+        )
+        e.add_field(
+            name="LATENCY",
+            value=f"{latency_ms} ms",
+            inline=True,
+        )
+        e.add_field(
+            name="TECHNOLOGY",
+            value=(
+                "discord.py 2.x · PostgreSQL (asyncpg)\n"
+                "vaderSentiment · langdetect · aiohttp"
+            ),
+            inline=False,
+        )
+        e.add_field(
+            name="LINKS",
+            value=f"[Source Code]({REPO_URL}) · [Invite to Server]({INVITE_URL})",
+            inline=False,
+        )
+
+        await interaction.followup.send(embed=e, ephemeral=True)
 
 
 async def setup(bot: commands.Bot):
