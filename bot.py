@@ -101,7 +101,7 @@ async def console_loop(bot: commands.Bot):
 
         elif cmd == "web":
             from web.server import start_web_server
-            asyncio.create_task(start_web_server(bot.db))
+            asyncio.create_task(start_web_server(bot))
 
         elif cmd == "help":
             print(HELP_TEXT)
@@ -115,8 +115,13 @@ class SocialCreditBot(commands.Bot):
         super().__init__(command_prefix="ccp ", intents=intents)
         self.db = Database()
 
+    async def close(self):
+        await self.db.stop_flush_task()
+        await super().close()
+
     async def setup_hook(self):
         await self.db.init()
+        self.db.start_flush_task()
         await self.load_extension("cogs.scoring")
         await self.load_extension("cogs.economy")
         await self.load_extension("cogs.stats")
@@ -124,8 +129,11 @@ class SocialCreditBot(commands.Bot):
         await self.load_extension("cogs.social")
         await self.load_extension("cogs.fundraiser")
         await self.load_extension("cogs.guide")
+        await self.load_extension("cogs.posters")
         await self.tree.sync()
         print("Slash commands synced.")
+        from web.server import start_web_server
+        asyncio.create_task(start_web_server(self))
         self.loop.create_task(console_loop(self))
 
     async def on_ready(self):

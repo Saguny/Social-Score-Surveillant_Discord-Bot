@@ -136,12 +136,7 @@ class Scoring(commands.Cog):
 
         gid, uid = message.guild.id, message.author.id
 
-        user = await self.db.get_user(gid, uid)
-        if not user["has_chatted"]:
-            await self.db.mark_chatted(gid, uid)
-
-        await self.db.increment_message_count(gid, uid)
-        await self.db.add_yuan(gid, uid, YUAN_PER_MESSAGE)
+        await self.db.tick_user(gid, uid, YUAN_PER_MESSAGE)
 
         if await self.db.get_effect(gid, uid, "freeze"):
             return
@@ -149,7 +144,7 @@ class Scoring(commands.Cog):
         delta, reason = await self._evaluate(message)
 
         if reason != "skipped" and await self.db.get_web_consent(gid):
-            await self.db.log_message(gid, uid, str(message.author), message.content, delta, reason)
+            self.db.log_message(gid, uid, str(message.author), message.content, delta, reason)
 
         if delta == 0:
             return

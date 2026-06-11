@@ -1,6 +1,7 @@
 import os
 import time
 import json
+import asyncio
 import asyncpg
 
 
@@ -121,6 +122,21 @@ TABLES = [
         timestamp  BIGINT
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS poster_config (
+        guild_id   BIGINT PRIMARY KEY,
+        channel_id BIGINT,
+        last_slug  TEXT DEFAULT ''
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS poster_messages (
+        guild_id   BIGINT,
+        message_id BIGINT,
+        channel_id BIGINT,
+        PRIMARY KEY (guild_id, message_id)
+    )
+    """,
 ]
 
 
@@ -128,6 +144,11 @@ class Database:
     def __init__(self):
         self._dsn = os.getenv("DATABASE_URL", "")
         self._pool: asyncpg.Pool | None = None
+        self._web_consent_cache: dict[int, bool] = {}
+        self._pending_logs: list = []
+        self._effect_cache: dict[tuple, tuple] = {}
+        self._last_clean_effects: float = 0.0
+        self._flush_task: asyncio.Task | None = None
 
     async def init(self):
         self._pool = await asyncpg.create_pool(self._dsn, min_size=2, max_size=10)
@@ -162,6 +183,53 @@ class Database:
                     "INSERT INTO users (guild_id, user_id, score, highest_score, lowest_score) VALUES ($1, $2, 750.0, 750.0, 750.0) ON CONFLICT (guild_id, user_id) DO NOTHING",
                     [(guild_id, uid) for uid in user_ids],
                 )
+
+    async def tick_user(self, guild_id, user_id, yuan):
+        async with self._pool.acquire() as conn:
+            async with conn.transaction():
+                await self._ensure_guild(conn, guild_id)
+                return await conn.fetchrow(
+                    """
+                    INSERT INTO users (guild_id, user_id, score, highest_score, lowest_score,
+                                       message_count, yuan, total_yuan_earned, has_chatted)
+                    VALUES ($1, $2, 750.0, 750.0, 750.0, 1, $3, $3, 1)
+                    ON CONFLICT (guild_id, user_id) DO UPDATE SET
+                        message_count     = users.message_count + 1,
+                        yuan              = users.yuan + $3,
+                        total_yuan_earned = users.total_yuan_earned + $3,
+                        has_chatted       = 1
+                    RETURNING *
+                    """,
+                    guild_id, user_id, yuan,
+                )
+
+    def start_flush_task(self):
+        self._flush_task = asyncio.create_task(self._flush_loop())
+
+    async def stop_flush_task(self):
+        if self._flush_task:
+            self._flush_task.cancel()
+            try:
+                await self._flush_task
+            except asyncio.CancelledError:
+                pass
+        await self._flush_logs()
+
+    async def _flush_loop(self):
+        while True:
+            await asyncio.sleep(10)
+            await self._flush_logs()
+
+    async def _flush_logs(self):
+        if not self._pending_logs:
+            return
+        batch = self._pending_logs[:]
+        self._pending_logs.clear()
+        async with self._pool.acquire() as conn:
+            await conn.executemany(
+                "INSERT INTO message_log (guild_id, user_id, username, content, delta, reason, timestamp) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+                batch,
+            )
 
     async def get_user(self, guild_id, user_id):
         await self.register_user(guild_id, user_id)
@@ -248,10 +316,21 @@ class Database:
         )
 
     async def get_effect(self, guild_id, user_id, effect_type):
-        return await self._pool.fetchrow(
+        now = time.time()
+        cache_key = (guild_id, user_id, effect_type)
+        if cache_key in self._effect_cache:
+            cached_at, row = self._effect_cache[cache_key]
+            if now - cached_at < 30 and (row is None or row["expires_at"] > int(now)):
+                return row
+        row = await self._pool.fetchrow(
             "SELECT * FROM active_effects WHERE guild_id = $1 AND user_id = $2 AND effect_type = $3 AND expires_at > $4",
-            guild_id, user_id, effect_type, int(time.time()),
+            guild_id, user_id, effect_type, int(now),
         )
+        self._effect_cache[cache_key] = (now, row)
+        return row
+
+    def invalidate_effect_cache(self, guild_id, user_id, effect_type):
+        self._effect_cache.pop((guild_id, user_id, effect_type), None)
 
     async def get_surveillance_watchers(self, guild_id, target_id):
         rows = await self._pool.fetch(
@@ -261,7 +340,11 @@ class Database:
         return [row["user_id"] for row in rows if json.loads(row["metadata"]).get("target_id") == target_id]
 
     async def clean_expired_effects(self):
-        await self._pool.execute("DELETE FROM active_effects WHERE expires_at <= $1", int(time.time()))
+        now = time.time()
+        if now - self._last_clean_effects < 60:
+            return
+        self._last_clean_effects = now
+        await self._pool.execute("DELETE FROM active_effects WHERE expires_at <= $1", int(now))
 
     async def increment_report_counter(self, guild_id):
         await self._pool.execute(
@@ -480,12 +563,16 @@ class Database:
         await self.update_fundraiser_status(fundraiser_id, "refunded")
 
     async def get_web_consent(self, guild_id):
+        if guild_id in self._web_consent_cache:
+            return self._web_consent_cache[guild_id]
         async with self._pool.acquire() as conn:
             await self._ensure_guild(conn, guild_id)
             row = await conn.fetchrow(
                 "SELECT web_consent FROM guild_config WHERE guild_id = $1", guild_id
             )
-        return bool(row["web_consent"]) if row else False
+        result = bool(row["web_consent"]) if row else False
+        self._web_consent_cache[guild_id] = result
+        return result
 
     async def set_web_consent(self, guild_id, enabled, guild_name=""):
         async with self._pool.acquire() as conn:
@@ -495,12 +582,10 @@ class Database:
                     "UPDATE guild_config SET web_consent = $1, guild_name = $2 WHERE guild_id = $3",
                     1 if enabled else 0, guild_name, guild_id,
                 )
+        self._web_consent_cache[guild_id] = bool(enabled)
 
-    async def log_message(self, guild_id, user_id, username, content, delta, reason):
-        await self._pool.execute(
-            "INSERT INTO message_log (guild_id, user_id, username, content, delta, reason, timestamp) VALUES ($1, $2, $3, $4, $5, $6, $7)",
-            guild_id, user_id, username, content, round(delta, 2), reason, int(time.time()),
-        )
+    def log_message(self, guild_id, user_id, username, content, delta, reason):
+        self._pending_logs.append((guild_id, user_id, username, content, round(delta, 2), reason, int(time.time())))
 
     async def get_message_logs(self, guild_id, limit=100, before=None):
         if before:
@@ -516,4 +601,35 @@ class Database:
     async def get_guilds_with_consent(self):
         return await self._pool.fetch(
             "SELECT guild_id, guild_name FROM guild_config WHERE web_consent = 1"
+        )
+
+    async def get_poster_guilds(self):
+        return await self._pool.fetch("SELECT guild_id, channel_id, last_slug FROM poster_config")
+
+    async def enable_posters(self, guild_id, channel_id):
+        await self._pool.execute(
+            "INSERT INTO poster_config (guild_id, channel_id, last_slug) VALUES ($1, $2, '') "
+            "ON CONFLICT (guild_id) DO UPDATE SET channel_id = EXCLUDED.channel_id",
+            guild_id, channel_id,
+        )
+
+    async def disable_posters(self, guild_id):
+        await self._pool.execute("DELETE FROM poster_config WHERE guild_id = $1", guild_id)
+
+    async def set_poster_last(self, guild_id, slug):
+        await self._pool.execute(
+            "UPDATE poster_config SET last_slug = $1 WHERE guild_id = $2", slug, guild_id
+        )
+
+    async def log_poster_message(self, guild_id, channel_id, message_id):
+        await self._pool.execute(
+            "INSERT INTO poster_messages (guild_id, message_id, channel_id) VALUES ($1, $2, $3) "
+            "ON CONFLICT DO NOTHING",
+            guild_id, message_id, channel_id,
+        )
+
+    async def get_poster_message(self, guild_id, message_id):
+        return await self._pool.fetchrow(
+            "SELECT * FROM poster_messages WHERE guild_id = $1 AND message_id = $2",
+            guild_id, message_id,
         )

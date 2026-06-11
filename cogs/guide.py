@@ -106,6 +106,8 @@ class Guide(commands.Cog):
         e7.add_field(name="ccp reset <@citizen>",                   value="Reset a citizen back to 750.", inline=False)
         e7.add_field(name="ccp threshold <n>",                      value="Set how many votes are required to resolve a fundraiser. Default is 3.", inline=False)
         e7.add_field(name="ccp webconsent <on|off>",                value="Enable or disable message logging for the web dashboard.", inline=False)
+        e7.add_field(name="ccp poster",                              value="Display a random propaganda poster.", inline=False)
+        e7.add_field(name="ccp posters",                             value="Toggle daily propaganda poster broadcasts in this channel. React ❤️ for +1 credit and +20 yuan · React 😡 for -1 credit.", inline=False)
         e7.set_footer(text="GLORY TO THE CCP!")
         embeds.append(e7)
 

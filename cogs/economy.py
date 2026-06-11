@@ -146,6 +146,7 @@ class Economy(commands.Cog):
         elif item_id == "freeze":
             expires_at = int(time.time()) + cfg["duration"]
             await self.db.add_effect(gid, uid, "freeze", expires_at)
+            self.db.invalidate_effect_cache(gid, uid, "freeze")
             embed = discord.Embed(color=0x333333, title="中华人民共和国社会信用局")
             embed.add_field(
                 name="SCORE FREEZE ACTIVE",
