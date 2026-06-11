@@ -1,0 +1,53 @@
+SHOP_ITEMS = {
+    "report": {
+        "name": "Report a Citizen",
+        "description": "File an official report. Docks target's score by 2 points.",
+        "cost": 500,
+        "requires_target": True,
+        "requires_text": False,
+    },
+    "denounce": {
+        "name": "Public Denouncement",
+        "description": "Publicly denounce a citizen with a state-issued declaration (max 100 chars).",
+        "cost": 1000,
+        "requires_target": True,
+        "requires_text": True,
+    },
+    "surveillance": {
+        "name": "Surveillance Package",
+        "description": "Receive a DM each time a target's score changes for 24 hours.",
+        "cost": 300,
+        "requires_target": True,
+        "requires_text": False,
+        "duration": 86400,
+    },
+    "rehabilitate": {
+        "name": "Rehabilitation Certificate",
+        "description": "Recover 3 score points. Cost doubles with each purchase.",
+        "cost": 400,
+        "requires_target": False,
+        "requires_text": False,
+    },
+    "expunge": {
+        "name": "Expunge Record",
+        "description": "Wipe your last 5 score changes from public history.",
+        "cost": 600,
+        "requires_target": False,
+        "requires_text": False,
+    },
+    "freeze": {
+        "name": "Score Freeze",
+        "description": "Your score cannot change for 1 hour.",
+        "cost": 800,
+        "requires_target": False,
+        "requires_text": False,
+        "duration": 3600,
+    },
+    "propaganda": {
+        "name": "Propaganda Broadcast",
+        "description": "The bureau posts a state-approved commendation of you in the channel.",
+        "cost": 350,
+        "requires_target": False,
+        "requires_text": False,
+    },
+}
