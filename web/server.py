@@ -518,7 +518,7 @@ async def _handle_admin_command(request):
     args = body.get("args", [])
     bot = request.app["bot"]
 
-    elif command == "sync":
+    if command == "sync":
         await bot.tree.sync()
         return web.json_response({"output": "Slash commands synced."})
 
