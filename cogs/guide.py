@@ -215,7 +215,7 @@ class Guide(commands.Cog):
             e.add_field(name=name, value=desc, inline=False)
         e.add_field(
             name="SOURCE CODE",
-            value=f"[{REPO_URL}]({REPO_URL})",
+            value=f"[GitHub]({REPO_URL})",
             inline=False,
         )
         await interaction.response.send_message(embed=e, ephemeral=True)
@@ -285,8 +285,8 @@ class Guide(commands.Cog):
         e.add_field(
             name="TECHNOLOGY",
             value=(
-                "discord.py 2.x · PostgreSQL (asyncpg)\n"
-                "vaderSentiment · langdetect · aiohttp"
+                "discord.py 2.x · PostgreSQL\n"
+                "vaderSentiment · langdetect · deep-translate"
             ),
             inline=False,
         )
