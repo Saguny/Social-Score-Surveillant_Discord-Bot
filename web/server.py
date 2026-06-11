@@ -307,17 +307,7 @@ ADMIN_HTML = """<!DOCTYPE html>
 
 <div class="container px-4" style="max-width:860px">
 
-  <!-- Auth gate -->
-  <div id="auth-gate" class="card-panel p-4 mb-4">
-    <div class="mb-3" style="color:var(--mid);font-size:.8rem;text-transform:uppercase;letter-spacing:1px">Admin Token</div>
-    <div class="d-flex gap-2">
-      <input type="password" id="token-input" class="form-control" placeholder="Enter ADMIN_TOKEN" style="max-width:320px">
-      <button class="btn btn-run px-4" onclick="authenticate()">UNLOCK</button>
-    </div>
-    <div id="auth-err" class="mt-2" style="color:var(--red);font-size:.8rem;display:none">Invalid token.</div>
-  </div>
-
-  <div id="token-gate">
+  <div id="token-gate" style="display:block">
 
     <!-- Terminal output -->
     <div class="mb-3">
@@ -396,33 +386,7 @@ ADMIN_HTML = """<!DOCTYPE html>
 </div>
 
 <script>
-let token = sessionStorage.getItem('admin_token') || '';
-if (token) unlockUI();
-
 function v(id) { return document.getElementById(id).value.trim(); }
-
-function unlockUI() {
-  document.getElementById('auth-gate').style.display = 'none';
-  document.getElementById('token-gate').style.display = 'block';
-}
-
-async function authenticate() {
-  const t = document.getElementById('token-input').value.trim();
-  const res = await fetch('/api/admin/command', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({token: t, command: 'ping', args: []})
-  });
-  const data = await res.json();
-  if (res.status === 403) {
-    document.getElementById('auth-err').style.display = 'block';
-    return;
-  }
-  token = t;
-  sessionStorage.setItem('admin_token', token);
-  document.getElementById('auth-err').style.display = 'none';
-  unlockUI();
-}
 
 function log(cmd, output, ok) {
   const term = document.getElementById('terminal');
@@ -445,27 +409,95 @@ async function run(command, args = []) {
   const res = await fetch('/api/admin/command', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({token, command, args})
+    body: JSON.stringify({command, args})
   });
+  if (res.status === 401 || res.status === 403) { location.href = '/login?next=/admin'; return; }
   const data = await res.json();
-  if (res.status === 403) {
-    sessionStorage.removeItem('admin_token');
-    location.reload();
-    return;
-  }
   log(command + (args.length ? ' ' + args.join(' ') : ''), data.output || data.error, res.ok && !data.error);
 }
 
 function confirmRun(command, args, msg) {
   if (confirm(msg)) run(command, args);
 }
+</script>
+</body>
+</html>"""
 
-document.getElementById('token-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter') authenticate();
+
+LOGIN_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Login · Social Credit</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+  :root{--navy:#111844;--blue:#4B5694;--mid:#7288AE;--beige:#EAE0CF;}
+  body{background:var(--navy);color:var(--beige);font-family:'Segoe UI',sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;}
+  .box{background:#0d1535;border:1px solid var(--blue);border-radius:8px;padding:2rem;width:100%;max-width:360px;}
+  .brand{letter-spacing:2px;font-weight:700;font-size:.9rem;color:var(--mid);text-align:center;margin-bottom:1.5rem;}
+  .form-control{background:#1a2356;border:1px solid var(--blue);color:var(--beige);}
+  .form-control:focus{background:#1a2356;border-color:var(--beige);color:var(--beige);box-shadow:none;}
+  .form-control::placeholder{color:var(--mid);}
+  .btn-login{background:var(--blue);border:none;color:var(--beige);font-weight:600;letter-spacing:1px;width:100%;}
+  .btn-login:hover{background:#5a67a8;color:var(--beige);}
+  .err{color:#ff7d7d;font-size:.8rem;margin-top:.5rem;display:none;}
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="brand">中华人民共和国 · SOCIAL CREDIT</div>
+  <form id="form">
+    <input type="password" id="token" class="form-control mb-3" placeholder="Access token" autofocus>
+    <button type="submit" class="btn btn-login">ENTER</button>
+    <div class="err" id="err">Invalid token.</div>
+  </form>
+</div>
+<script>
+const next = new URLSearchParams(location.search).get("next") || "/";
+document.getElementById("form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const res = await fetch("/api/auth", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({token: document.getElementById("token").value})
+  });
+  if (res.ok) { location.href = next; }
+  else { document.getElementById("err").style.display = "block"; }
 });
 </script>
 </body>
 </html>"""
+
+
+def _is_authed(request):
+    admin_token = os.getenv("ADMIN_TOKEN", "")
+    if not admin_token:
+        return True
+    return request.cookies.get("auth") == admin_token
+
+
+def _require_auth(handler):
+    async def middleware(request):
+        if not _is_authed(request):
+            next_url = str(request.rel_url)
+            raise web.HTTPFound(f"/login?next={next_url}")
+        return await handler(request)
+    return middleware
+
+
+async def _handle_login(request):
+    return web.Response(text=LOGIN_HTML, content_type="text/html")
+
+
+async def _handle_auth(request):
+    admin_token = os.getenv("ADMIN_TOKEN", "")
+    body = await request.json()
+    if body.get("token") != admin_token:
+        return web.Response(status=403)
+    response = web.Response(status=200)
+    response.set_cookie("auth", admin_token, httponly=True, samesite="Strict", max_age=60 * 60 * 24 * 30)
+    return response
 
 
 async def _handle_index(request):
@@ -477,24 +509,14 @@ async def _handle_admin(request):
 
 
 async def _handle_admin_command(request):
-    admin_token = os.getenv("ADMIN_TOKEN", "")
-    if not admin_token:
-        return web.json_response({"error": "ADMIN_TOKEN not set on server"}, status=500)
-
     try:
         body = await request.json()
     except Exception:
         return web.json_response({"error": "Invalid JSON"}, status=400)
 
-    if body.get("token") != admin_token:
-        return web.json_response({"error": "Forbidden"}, status=403)
-
     command = body.get("command", "")
     args = body.get("args", [])
     bot = request.app["bot"]
-
-    if command == "ping":
-        return web.json_response({"output": "ok"})
 
     elif command == "sync":
         await bot.tree.sync()
@@ -593,11 +615,13 @@ async def start_web_server(bot):
 
     app = web.Application()
     app["bot"] = bot
-    app.router.add_get("/", _handle_index)
-    app.router.add_get("/admin", _handle_admin)
-    app.router.add_post("/api/admin/command", _handle_admin_command)
-    app.router.add_get("/api/guilds", _handle_guilds)
-    app.router.add_get("/api/guild/{guild_id}/logs", _handle_logs)
+    app.router.add_get("/login", _handle_login)
+    app.router.add_post("/api/auth", _handle_auth)
+    app.router.add_get("/", _require_auth(_handle_index))
+    app.router.add_get("/admin", _require_auth(_handle_admin))
+    app.router.add_post("/api/admin/command", _require_auth(_handle_admin_command))
+    app.router.add_get("/api/guilds", _require_auth(_handle_guilds))
+    app.router.add_get("/api/guild/{guild_id}/logs", _require_auth(_handle_logs))
 
     _runner = web.AppRunner(app)
     await _runner.setup()
