@@ -60,7 +60,8 @@ async def console_loop(bot: commands.Bot):
 
         elif cmd == "sync":
             for guild in bot.guilds:
-                await bot.tree.sync(guild=discord.Object(id=guild.id))
+                bot.tree.copy_global_to(guild=guild)
+                await bot.tree.sync(guild=guild)
             print(f"Slash commands synced to {len(bot.guilds)} guild(s).")
 
         elif cmd == "reload":
@@ -141,7 +142,8 @@ class SocialCreditBot(commands.Bot):
         for guild in self.guilds:
             member_ids = [m.id for m in guild.members if not m.bot]
             await self.db.register_guild_members(guild.id, member_ids)
-            await self.tree.sync(guild=discord.Object(id=guild.id))
+            self.tree.copy_global_to(guild=guild)
+            await self.tree.sync(guild=guild)
         await self.change_presence(activity=discord.Activity(
             type=discord.ActivityType.watching, name="/guide"
         ))
@@ -151,7 +153,8 @@ class SocialCreditBot(commands.Bot):
     async def on_guild_join(self, guild: discord.Guild):
         member_ids = [m.id for m in guild.members if not m.bot]
         await self.db.register_guild_members(guild.id, member_ids)
-        await self.tree.sync(guild=discord.Object(id=guild.id))
+        self.tree.copy_global_to(guild=guild)
+        await self.tree.sync(guild=guild)
         print(f"Joined {guild.name} · registered {len(member_ids)} members · slash commands synced.")
 
     async def on_member_join(self, member: discord.Member):
