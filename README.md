@@ -4,6 +4,8 @@
 # Version Beta 1.0.0
 This is the first release of the Social Score Surveillant Discord Bot, a side project made for fun by ✨ me ✨
 
+Invite: https://discord.com/oauth2/authorize?client_id=856163780265902151&permissions=8&integration_type=0&scope=bot
+
 # About
 This is a fun and engaging Discord Bot made for the sole purpose of surveilling in small friend group servers and playing and trolling eachother.
 It reads and scores every single message (besides attachments and links) through the usage of vaderSentiment (https://github.com/cjhutto/vadersentiment)
