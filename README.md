@@ -1,6 +1,7 @@
 # Social Score Surveillant - A Discord Bot
 
-
+## DISCLAIMER
+This bot is MAINLY proposed for english speaking guilds since Vader is only for english. Any non english message will be translated using googles api, I will possibly update one day to support all languages
 # Version Beta 1.0.1
 This is the first release of the Social Score Surveillant Discord Bot, a side project made for fun by ✨ me ✨
 
