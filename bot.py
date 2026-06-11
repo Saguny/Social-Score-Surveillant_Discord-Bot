@@ -23,7 +23,7 @@ intents.members = True
 
 HELP_TEXT = """
 Console commands:
-  sync                        Sync slash commands globally
+  sync                        Sync slash commands to all guilds
   reload <cog>                Reload a cog (e.g. cogs.scoring)
   guilds                      List all guilds
   force_reset <gid> <uid>     Reset a user's score to 750
@@ -59,8 +59,9 @@ async def console_loop(bot: commands.Bot):
             await bot.close()
 
         elif cmd == "sync":
-            await bot.tree.sync()
-            print("Slash commands synced.")
+            for guild in bot.guilds:
+                await bot.tree.sync(guild=discord.Object(id=guild.id))
+            print(f"Slash commands synced to {len(bot.guilds)} guild(s).")
 
         elif cmd == "reload":
             if not args:
@@ -131,8 +132,6 @@ class SocialCreditBot(commands.Bot):
         await self.load_extension("cogs.fundraiser")
         await self.load_extension("cogs.guide")
         await self.load_extension("cogs.posters")
-        await self.tree.sync()
-        print("Slash commands synced.")
         from web.server import start_web_server
         asyncio.create_task(start_web_server(self))
         self.loop.create_task(console_loop(self))
@@ -142,16 +141,18 @@ class SocialCreditBot(commands.Bot):
         for guild in self.guilds:
             member_ids = [m.id for m in guild.members if not m.bot]
             await self.db.register_guild_members(guild.id, member_ids)
+            await self.tree.sync(guild=discord.Object(id=guild.id))
         await self.change_presence(activity=discord.Activity(
             type=discord.ActivityType.watching, name="/guide"
         ))
-        print(f"Online: {self.user}  |  Guilds: {len(self.guilds)}")
+        print(f"Online: {self.user}  |  Guilds: {len(self.guilds)}  |  Slash commands synced.")
         print("Type 'help' for console commands.")
 
     async def on_guild_join(self, guild: discord.Guild):
         member_ids = [m.id for m in guild.members if not m.bot]
         await self.db.register_guild_members(guild.id, member_ids)
-        print(f"Joined {guild.name} · registered {len(member_ids)} members.")
+        await self.tree.sync(guild=discord.Object(id=guild.id))
+        print(f"Joined {guild.name} · registered {len(member_ids)} members · slash commands synced.")
 
     async def on_member_join(self, member: discord.Member):
         if not member.bot:
