@@ -1,7 +1,7 @@
 # Social Score Surveillant - A Discord Bot
 
 
-# Version Beta 1.0.0
+# Version Beta 1.0.1
 This is the first release of the Social Score Surveillant Discord Bot, a side project made for fun by ✨ me ✨
 
 Invite: https://discord.com/oauth2/authorize?client_id=856163780265902151&permissions=8&integration_type=0&scope=bot
@@ -141,6 +141,8 @@ Moderator Commands (Prefix)
     ccp threshold <n> - Adjust the minimum required votes needed to resolve a fundraiser (Default is 3).
 
     ccp webconsent <on|off> - Enable or disable message content logging for the external web dashboard*.
+
+    ccp posters - enabled propaganda posters with reactions to either earn score and yuan or lose score. at 12 UTC
 
 
 --------------------------------
