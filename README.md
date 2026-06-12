@@ -89,7 +89,7 @@ A CCP-themed social credit bot for Discord. Every message is silently evaluated.
 - Posters sourced from [chineseposters.net](https://chineseposters.net)
 
 **Web Dashboard**
-- Auto-starts on port 8080. Accessible at `/` for public leaderboard (if webconsent is on) and `/admin` for server management. Protected by `ADMIN_TOKEN`.
+- Auto-starts on port 8080. Accessible at `/` for public leaderboard (if webconsent is on) and `/admin` for server management. Both Protected by `ADMIN_TOKEN`.
 
 ---
 
