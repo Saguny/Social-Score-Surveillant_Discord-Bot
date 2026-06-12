@@ -3,13 +3,15 @@ from discord import app_commands
 from discord.ext import commands
 
 
+def progress_bar(raised: int, goal: int) -> str:
+    progress = min(raised / goal, 1.0) if goal > 0 else 0
+    filled = int(progress * 10)
+    return "█" * filled + "░" * (10 - filled) + f"  ¥{raised} / ¥{goal}"
+
+
 def fundraiser_embed(fr, guild: discord.Guild, threshold: int) -> discord.Embed:
     creator = guild.get_member(fr["creator_id"])
     creator_name = creator.display_name if creator else "Unknown"
-    progress = min(fr["raised"] / fr["goal"], 1.0) if fr["goal"] > 0 else 0
-    bar_filled = int(progress * 10)
-    bar = "█" * bar_filled + "░" * (10 - bar_filled)
-
     status_colors = {
         "open":      0xCC0000,
         "funded":    0xFFD700,
@@ -26,7 +28,7 @@ def fundraiser_embed(fr, guild: discord.Guild, threshold: int) -> discord.Embed:
     embed.add_field(name="OBJECTIVE", value=fr["description"], inline=False)
     embed.add_field(
         name="PROGRESS",
-        value=f"{bar}  ¥{fr['raised']} / ¥{fr['goal']}",
+        value=progress_bar(fr["raised"], fr["goal"]),
         inline=False,
     )
     if fr["status"] == "voting":
@@ -111,7 +113,7 @@ class Fundraiser(commands.Cog):
         embed.add_field(name="DONOR", value=interaction.user.mention, inline=True)
         embed.add_field(name="AMOUNT", value=f"¥{amount}", inline=True)
         embed.add_field(name="FUNDRAISER", value=f"#{fundraiser_id} · {fr['description']}", inline=False)
-        embed.add_field(name="TOTAL RAISED", value=f"¥{new_raised} / ¥{fr['goal']}", inline=False)
+        embed.add_field(name="PROGRESS", value=progress_bar(new_raised, fr["goal"]), inline=False)
         await interaction.followup.send(embed=embed)
 
         if new_raised >= fr["goal"] and fr["status"] == "open":
@@ -254,10 +256,9 @@ class Fundraiser(commands.Cog):
         for fr in fundraisers[:10]:
             creator = interaction.guild.get_member(fr["creator_id"])
             name = creator.display_name if creator else "Unknown"
-            progress = f"¥{fr['raised']}/¥{fr['goal']}"
             embed.add_field(
                 name=f"#{fr['id']} · {fr['status'].upper()}",
-                value=f"{fr['description']}\n{progress} · by {name}",
+                value=f"{fr['description']}\n{progress_bar(fr['raised'], fr['goal'])} · by {name}",
                 inline=False,
             )
         await interaction.followup.send(embed=embed)
@@ -279,6 +280,19 @@ class Fundraiser(commands.Cog):
             confirms = sum(1 for v in votes if v["vote"] == "confirm")
             denies   = sum(1 for v in votes if v["vote"] == "deny")
             embed.add_field(name="VOTES", value=f"✓ {confirms}  ✗ {denies}  (need {threshold})", inline=False)
+
+        donations = await self.db.get_fundraiser_donations(fundraiser_id)
+        if donations:
+            totals: dict[int, int] = {}
+            for d in donations:
+                totals[d["donor_id"]] = totals.get(d["donor_id"], 0) + d["amount"]
+            top3 = sorted(totals.items(), key=lambda x: x[1], reverse=True)[:3]
+            lines = []
+            for i, (donor_id, total) in enumerate(top3, 1):
+                member = interaction.guild.get_member(donor_id)
+                name = member.display_name if member else "Unknown"
+                lines.append(f"{i}. {name} · ¥{total}")
+            embed.add_field(name="TOP DONORS", value="\n".join(lines), inline=False)
 
         await interaction.followup.send(embed=embed)
 
