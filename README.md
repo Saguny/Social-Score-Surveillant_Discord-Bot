@@ -11,7 +11,7 @@ This bot is a satirical meme project and is not affiliated with, endorsed by, or
 This is a side project made for fun by me because me and a friend are flying to china this year and i was in the midst of reviving my old bot project from 2021, so i got enough motivation and a refresh of the discordpy library enough, that I just said "fuck it, im doing a ccp bot"
 here we are
 
-**Invite:** https://discord.com/oauth2/authorize?client_id=856163780265902151&permissions=8&integration_type=0&scope=bot
+**Invite:** https://discord.com/oauth2/authorize?client_id=856163780265902151&permissions=2416438352&integration_type=0&scope=bot
 
 Built with discord.py 2.x · PostgreSQL (asyncpg) · vaderSentiment · langdetect · aiohttp · Deployed on Railway
 
@@ -35,16 +35,16 @@ A CCP-themed social credit bot for Discord. Every message is silently evaluated.
 
 **Ranks**
 
-| Range | Rank |
+| Range        | Rank                 |
 | ------------ | -------------------- |
-| 600 to 699 | Enemy of the State |
-| 700 to 774 | Person of Interest |
-| 775 to 849 | Unremarkable Citizen |
-| 850 to 924 | Compliant Citizen |
-| 925 to 999 | Model Citizen |
-| 1000 to 1099 | Party Loyalist |
-| 1100 to 1199 | Cadre Member |
-| 1200 to 1300 | General Secretary |
+| 600 to 699   | Enemy of the State   |
+| 700 to 774   | Person of Interest   |
+| 775 to 849   | Unremarkable Citizen |
+| 850 to 924   | Compliant Citizen    |
+| 925 to 999   | Model Citizen        |
+| 1000 to 1099 | Party Loyalist       |
+| 1100 to 1199 | Cadre Member         |
+| 1200 to 1300 | General Secretary    |
 
 ---
 
@@ -55,6 +55,7 @@ A CCP-themed social credit bot for Discord. Every message is silently evaluated.
 **Counter-Revolutionary Speech** - messages referencing banned topics (Tiananmen, Taiwan independence, Tibet, Xinjiang, Falun Gong, Hong Kong independence, etc.) are penalized -0.2 regardless of tone.
 
 **Structural Penalties**
+
 - Same message sent twice in a row: -1.0
 - Excessive caps on messages 10+ characters: -0.2
 
@@ -63,6 +64,7 @@ A CCP-themed social credit bot for Discord. Every message is silently evaluated.
 ## Features
 
 **Yuan Economy**
+
 - 1 Yuan earned per message automatically.
 - `/checkin` - daily check-in for bonus Yuan and +0.2 score. Streak builds up to 150 Yuan/day.
 - State Shop items purchasable with `/buy`:
@@ -75,21 +77,26 @@ A CCP-themed social credit bot for Discord. Every message is silently evaluated.
   - `propaganda` (350) - bot posts a state-approved commendation of you
 
 **Peer-to-Peer Ratings**
+
 - `/endorse` / `/rebuke` - +/-3.0 score adjustment, one use per target per 24h, optional reason.
 
 **Community Fundraisers**
+
 - Citizens propose a task in exchange for Yuan. Others donate. Once funded, the organizer fulfills the task and opens a community vote. Confirm threshold = payout; deny threshold = full refund.
 
 **Propaganda Events** (mod only)
+
 - `/propaganda start` - open a submission event with a reveal channel and duration.
 - `/propaganda submit` - citizens submit quotes. Banned content = -5.0 score + event ban.
 - After the window closes, submissions are posted with reaction voting. Winner is enshrined as a guild decree via `/decree`.
 
 **Daily Propaganda Posters**
+
 - Posted at 12:00 UTC in enabled channels. React with heart for +1 score +20 Yuan, angry for -1 score.
 - Posters sourced from [chineseposters.net](https://chineseposters.net)
 
 **Web Dashboard**
+
 - Auto-starts on port 8080. Accessible at `/` for public leaderboard (if webconsent is on) and `/admin` for server management. Both Protected by `ADMIN_TOKEN`.
 
 ---
@@ -97,6 +104,7 @@ A CCP-themed social credit bot for Discord. Every message is silently evaluated.
 ## Commands
 
 **Citizen**
+
 - `/score [citizen]` - current score and rank
 - `/stats [citizen]` - full breakdown: trends, peak/low, messages, check-in streak, propaganda wins
 - `/history [citizen]` - last 5 score changes (mod required to view others)
@@ -116,6 +124,7 @@ A CCP-themed social credit bot for Discord. Every message is silently evaluated.
 - `/botinfo` · `/uptime` · `/ping` · `/credits`
 
 **Moderator (prefix)**
+
 - `ccp initialize` - register all current members
 - `ccp adjust <@citizen> <delta> <reason>` - manual score adjustment
 - `ccp reset <@citizen>` - reset to 750
@@ -125,6 +134,6 @@ A CCP-themed social credit bot for Discord. Every message is silently evaluated.
 - `ccp posters` - toggle daily poster broadcasts in this channel
 - `/propaganda start <submit_channel> <reveal_channel> <duration_hours>` - start a propaganda event
 
-
 # Feature requests
+
 Just message me on discord under `saguny` if you have any requests or changes or additions or whatever

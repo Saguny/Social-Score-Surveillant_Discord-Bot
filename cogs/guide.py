@@ -8,7 +8,7 @@ from discord.ext import commands, tasks
 from config.ranks import RANKS
 
 REPO_URL      = "https://github.com/Saguny/Social-Score-Surveillant_Discord-Bot"
-INVITE_URL    = "https://discord.com/oauth2/authorize?client_id=856163780265902151&permissions=8&integration_type=0&scope=bot"
+INVITE_URL    = "https://discord.com/oauth2/authorize?client_id=856163780265902151&permissions=2416438352&integration_type=0&scope=bot"
 WIKIQUOTE_API = "https://en.wikiquote.org/w/api.php"
 
 FALLBACK_DECREES = [
