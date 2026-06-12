@@ -277,6 +277,23 @@ class Guide(commands.Cog):
         )
         await interaction.response.send_message(embed=e, ephemeral=True)
 
+    @app_commands.command(name="disclaimer", description="Legal and ethical disclaimer for this bot")
+    async def disclaimer(self, interaction: discord.Interaction):
+        e = discord.Embed(
+            color=0xCC0000,
+            title="中华人民共和国社会信用局 · DISCLAIMER",
+            description=(
+                "This bot is a **satirical meme project** and is not affiliated with, endorsed by, "
+                "or representative of the Chinese Communist Party or the Chinese government.\n\n"
+                "The creator does not support, condone, or endorse the human rights abuses, "
+                "authoritarian policies, or surveillance practices of the CCP — including but not "
+                "limited to the treatment of Uyghurs, Tibetans, Hong Kongers, and political dissidents, "
+                "the Tiananmen Square massacre, or real-world social credit systems.\n\n"
+                "This is a joke. The irony is the point."
+            ),
+        )
+        await interaction.response.send_message(embed=e, ephemeral=True)
+
     @app_commands.command(name="uptime", description="How long the Bureau has been active")
     async def uptime(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
