@@ -12,7 +12,7 @@ HEART_SCORE = 1.0
 RAGE_SCORE  = -1.0
 
 
-def _build_embed(poster: dict, with_reactions: bool) -> discord.Embed:
+def _build_embed(poster: dict) -> discord.Embed:
     title = poster["title_zh"] or poster["title"]
     embed = discord.Embed(color=0xCC0000, title=title, url=poster["page_url"])
 
@@ -31,14 +31,6 @@ def _build_embed(poster: dict, with_reactions: bool) -> discord.Embed:
 
     if poster["description"]:
         embed.add_field(name="Context", value=poster["description"], inline=False)
-
-    if with_reactions:
-        embed.add_field(
-            name="React",
-            value=f"{HEART} Support · +{HEART_SCORE:.0f} credit, +{HEART_YUAN} yuan\n"
-                  f"{RAGE} Resist · {RAGE_SCORE:.0f} credit",
-            inline=False,
-        )
 
     credit = poster["call_number"] or "chineseposters.net"
     if poster["collection"]:
@@ -83,7 +75,7 @@ class Posters(commands.Cog):
 
     async def _send_daily(self, channel: discord.TextChannel, guild_id: int):
         poster = self._pick_poster(self._active[guild_id].get("last_slug"))
-        msg = await channel.send(embed=_build_embed(poster, with_reactions=True))
+        msg = await channel.send(embed=_build_embed(poster))
         await msg.add_reaction(HEART)
         await msg.add_reaction(RAGE)
         await self.db.set_poster_last(guild_id, poster["slug"])
@@ -100,11 +92,15 @@ class Posters(commands.Cog):
         if not row:
             return
         emoji = str(payload.emoji)
+        if emoji not in (HEART, RAGE):
+            return
         gid, uid = payload.guild_id, payload.user_id
+        if not await self.db.record_poster_reaction(payload.message_id, uid):
+            return
         if emoji == HEART:
             await self.db.tick_user(gid, uid, HEART_YUAN)
             await self.db.update_score(gid, uid, HEART_SCORE, "propaganda poster: supported")
-        elif emoji == RAGE:
+        else:
             await self.db.update_score(gid, uid, RAGE_SCORE, "propaganda poster: resisted")
 
     @commands.command(name="poster")
@@ -112,7 +108,7 @@ class Posters(commands.Cog):
         async with ctx.typing():
             last = self._active.get(ctx.guild.id, {}).get("last_slug")
             poster = self._pick_poster(last)
-            await ctx.send(embed=_build_embed(poster, with_reactions=False))
+            await ctx.send(embed=_build_embed(poster))
 
     @commands.command(name="posters")
     @commands.has_permissions(manage_guild=True)
@@ -137,9 +133,7 @@ class Posters(commands.Cog):
                 ts = int(next_noon.timestamp())
                 embed.add_field(
                     name="PROPAGANDA BROADCAST · ENABLED",
-                    value=f"Daily posters will be sent to {channel.mention} at <t:{ts}:t> every day.\n"
-                          f"React {HEART} to support (+{HEART_SCORE:.0f} credit, +{HEART_YUAN} yuan)\n"
-                          f"React {RAGE} to resist ({RAGE_SCORE:.0f} credit)",
+                    value=f"Daily posters will be sent to {channel.mention} at <t:{ts}:t> every day.",
                     inline=False,
                 )
                 await ctx.send(embed=embed)

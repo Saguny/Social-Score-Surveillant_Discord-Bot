@@ -138,6 +138,13 @@ TABLES = [
     )
     """,
     """
+    CREATE TABLE IF NOT EXISTS poster_reactions (
+        message_id BIGINT,
+        user_id    BIGINT,
+        PRIMARY KEY (message_id, user_id)
+    )
+    """,
+    """
     CREATE TABLE IF NOT EXISTS propaganda_events (
         id                SERIAL  PRIMARY KEY,
         guild_id          BIGINT,
@@ -862,3 +869,10 @@ class Database:
             "SELECT * FROM poster_messages WHERE guild_id = $1 AND message_id = $2",
             guild_id, message_id,
         )
+
+    async def record_poster_reaction(self, message_id: int, user_id: int) -> bool:
+        result = await self._pool.execute(
+            "INSERT INTO poster_reactions (message_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+            message_id, user_id,
+        )
+        return result == "INSERT 0 1"
