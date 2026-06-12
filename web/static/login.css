@@ -1,0 +1,10 @@
+:root{--navy:#120810;--blue:#97124B;--mid:#C4849A;--beige:#F5E6D3;}
+body{background:var(--navy);color:var(--beige);font-family:'Segoe UI',sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;}
+.box{background:#0D0509;border:1px solid var(--blue);border-radius:8px;padding:2rem;width:100%;max-width:360px;}
+.brand{letter-spacing:2px;font-weight:700;font-size:.9rem;color:var(--mid);text-align:center;margin-bottom:1.5rem;}
+.form-control{background:#1E0D16;border:1px solid var(--blue);color:var(--beige);}
+.form-control:focus{background:#1E0D16;border-color:var(--beige);color:var(--beige);box-shadow:none;}
+.form-control::placeholder{color:var(--mid);}
+.btn-login{background:var(--blue);border:none;color:var(--beige);font-weight:600;letter-spacing:1px;width:100%;}
+.btn-login:hover{background:#DC4444;color:var(--beige);}
+.err{color:#F5A855;font-size:.8rem;margin-top:.5rem;display:none;}

@@ -755,111 +755,132 @@ class Database:
         )
 
     async def get_global_stats(self):
-        now = int(time.time())
-        async with self._pool.acquire() as conn:
-            total_guilds     = await conn.fetchval("SELECT COUNT(*) FROM guild_config")
-            total_users      = await conn.fetchval("SELECT COUNT(*) FROM users")
-            total_messages   = await conn.fetchval("SELECT COALESCE(SUM(message_count), 0) FROM users")
-            total_yuan       = await conn.fetchval("SELECT COALESCE(SUM(yuan), 0) FROM users")
-            total_earned     = await conn.fetchval("SELECT COALESCE(SUM(total_yuan_earned), 0) FROM users")
-            total_spent      = await conn.fetchval("SELECT COALESCE(SUM(total_yuan_spent), 0) FROM users")
-            total_items      = await conn.fetchval("SELECT COALESCE(SUM(items_bought), 0) FROM users")
-            avg_score        = await conn.fetchval("SELECT COALESCE(AVG(score), 750.0) FROM users WHERE has_chatted = 1")
-            highest_score    = await conn.fetchval("SELECT COALESCE(MAX(highest_score), 750.0) FROM users")
-            lowest_score     = await conn.fetchval("SELECT COALESCE(MIN(lowest_score), 750.0) FROM users")
-            avg_msgs         = await conn.fetchval("SELECT COALESCE(AVG(message_count), 0) FROM users WHERE has_chatted = 1")
-            endorsements     = await conn.fetchval("SELECT COALESCE(SUM(times_endorsed), 0) FROM users")
-            rebukes          = await conn.fetchval("SELECT COALESCE(SUM(times_rebuked), 0) FROM users")
-            prop_winners     = await conn.fetchval("SELECT COUNT(*) FROM guild_decrees")
-            prop_events      = await conn.fetchval("SELECT COUNT(*) FROM propaganda_events")
-            prop_subs        = await conn.fetchval("SELECT COUNT(*) FROM propaganda_submissions")
-            active_effects   = await conn.fetchval("SELECT COUNT(*) FROM active_effects WHERE expires_at > $1", now)
-            fundraiser_yuan  = await conn.fetchval("SELECT COALESCE(SUM(raised), 0) FROM fundraisers")
-            highest_streak   = await conn.fetchval("SELECT COALESCE(MAX(checkin_streak), 0) FROM users")
-            checkins_today   = await conn.fetchval("SELECT COUNT(*) FROM users WHERE last_checkin >= $1", now - 86400)
-            checkins_yday    = await conn.fetchval("SELECT COUNT(*) FROM users WHERE last_checkin >= $1 AND last_checkin < $2", now - 172800, now - 86400)
-            dau              = await conn.fetchval("SELECT COUNT(*) FROM users WHERE last_active >= $1", now - 86400)
-            wau              = await conn.fetchval("SELECT COUNT(*) FROM users WHERE last_active >= $1", now - 604800)
-            history_row      = await conn.fetchrow("""
+        now      = int(time.time())
+        day_ago  = now - 86400
+        two_days = now - 172800
+        week_ago = now - 604800
+
+        (
+            users_row,
+            hist_row,
+            misc_row,
+            daily_7d,
+            top_reasons,
+            top_guild,
+        ) = await asyncio.gather(
+            self._pool.fetchrow("""
                 SELECT
-                    COUNT(CASE WHEN delta > 0 THEN 1 END)  AS positive_events,
-                    COUNT(CASE WHEN delta < 0 THEN 1 END)  AS negative_events,
-                    COALESCE(AVG(delta), 0)                AS avg_delta
+                    COUNT(*)                                                                        AS total_users,
+                    COALESCE(SUM(message_count), 0)                                                AS total_messages,
+                    COALESCE(SUM(yuan), 0)                                                         AS total_yuan,
+                    COALESCE(SUM(total_yuan_earned), 0)                                            AS total_earned,
+                    COALESCE(SUM(total_yuan_spent), 0)                                             AS total_spent,
+                    COALESCE(SUM(items_bought), 0)                                                 AS total_items,
+                    COALESCE(AVG(score) FILTER (WHERE has_chatted = 1), 750.0)                     AS avg_score,
+                    COALESCE(MAX(highest_score), 750.0)                                            AS highest_score,
+                    COALESCE(MIN(lowest_score), 750.0)                                             AS lowest_score,
+                    COALESCE(AVG(message_count) FILTER (WHERE has_chatted = 1), 0)                 AS avg_msgs,
+                    COALESCE(SUM(times_endorsed), 0)                                               AS endorsements,
+                    COALESCE(SUM(times_rebuked), 0)                                                AS rebukes,
+                    COALESCE(MAX(checkin_streak), 0)                                               AS highest_streak,
+                    COUNT(*) FILTER (WHERE last_checkin >= $1)                                     AS checkins_today,
+                    COUNT(*) FILTER (WHERE last_checkin >= $2 AND last_checkin < $1)               AS checkins_yday,
+                    COUNT(*) FILTER (WHERE last_active >= $1)                                      AS dau,
+                    COUNT(*) FILTER (WHERE last_active >= $3)                                      AS wau,
+                    COUNT(*) FILTER (WHERE has_chatted = 1 AND score < 650)                        AS t1,
+                    COUNT(*) FILTER (WHERE has_chatted = 1 AND score >= 650 AND score < 700)       AS t2,
+                    COUNT(*) FILTER (WHERE has_chatted = 1 AND score >= 700 AND score < 750)       AS t3,
+                    COUNT(*) FILTER (WHERE has_chatted = 1 AND score >= 750 AND score < 800)       AS t4,
+                    COUNT(*) FILTER (WHERE has_chatted = 1 AND score >= 800 AND score < 850)       AS t5,
+                    COUNT(*) FILTER (WHERE has_chatted = 1 AND score >= 850 AND score < 900)       AS t6,
+                    COUNT(*) FILTER (WHERE has_chatted = 1 AND score >= 900 AND score < 1000)      AS t7,
+                    COUNT(*) FILTER (WHERE has_chatted = 1 AND score >= 1000)                      AS t8
+                FROM users
+            """, day_ago, two_days, week_ago),
+
+            self._pool.fetchrow("""
+                SELECT
+                    COUNT(*) FILTER (WHERE delta > 0)                                              AS positive_events,
+                    COUNT(*) FILTER (WHERE delta < 0)                                              AS negative_events,
+                    COALESCE(AVG(delta), 0)                                                        AS avg_delta,
+                    COUNT(*) FILTER (WHERE timestamp >= $1)                                        AS events_24h,
+                    COUNT(*) FILTER (WHERE timestamp >= $2 AND timestamp < $1)                     AS events_prev_24h,
+                    COUNT(*) FILTER (WHERE delta > 0 AND timestamp >= $1)                          AS pos_24h,
+                    COUNT(*) FILTER (WHERE delta < 0 AND timestamp >= $1)                          AS neg_24h,
+                    COUNT(*) FILTER (WHERE delta > 0 AND timestamp >= $2 AND timestamp < $1)       AS pos_prev_24h,
+                    COUNT(*) FILTER (WHERE delta < 0 AND timestamp >= $2 AND timestamp < $1)       AS neg_prev_24h,
+                    COALESCE(SUM(delta) FILTER (WHERE timestamp >= $3), 0)                         AS net_delta_7d
                 FROM score_history
-            """)
-            events_24h       = await conn.fetchval("SELECT COUNT(*) FROM score_history WHERE timestamp >= $1", now - 86400)
-            events_prev_24h  = await conn.fetchval("SELECT COUNT(*) FROM score_history WHERE timestamp >= $1 AND timestamp < $2", now - 172800, now - 86400)
-            pos_24h          = await conn.fetchval("SELECT COUNT(*) FROM score_history WHERE delta > 0 AND timestamp >= $1", now - 86400)
-            neg_24h          = await conn.fetchval("SELECT COUNT(*) FROM score_history WHERE delta < 0 AND timestamp >= $1", now - 86400)
-            pos_prev_24h     = await conn.fetchval("SELECT COUNT(*) FROM score_history WHERE delta > 0 AND timestamp >= $1 AND timestamp < $2", now - 172800, now - 86400)
-            neg_prev_24h     = await conn.fetchval("SELECT COUNT(*) FROM score_history WHERE delta < 0 AND timestamp >= $1 AND timestamp < $2", now - 172800, now - 86400)
-            net_delta_7d     = await conn.fetchval("SELECT COALESCE(SUM(delta), 0) FROM score_history WHERE timestamp >= $1", now - 604800)
-            daily_7d         = await conn.fetch("""
+            """, day_ago, two_days, week_ago),
+
+            self._pool.fetchrow("""
+                SELECT
+                    (SELECT COUNT(*) FROM guild_config)                              AS total_guilds,
+                    (SELECT COUNT(*) FROM guild_decrees)                             AS prop_winners,
+                    (SELECT COUNT(*) FROM propaganda_events)                         AS prop_events,
+                    (SELECT COUNT(*) FROM propaganda_submissions)                    AS prop_subs,
+                    (SELECT COUNT(*) FROM active_effects WHERE expires_at > $1)      AS active_effects,
+                    (SELECT COALESCE(SUM(raised), 0) FROM fundraisers)               AS fundraiser_yuan
+            """, now),
+
+            self._pool.fetch("""
                 SELECT FLOOR(timestamp::float / 86400)::bigint AS day_num, COUNT(*) AS cnt
                 FROM score_history WHERE timestamp >= $1
                 GROUP BY day_num ORDER BY day_num
-            """, now - 604800)
-            top_reasons      = await conn.fetch("""
+            """, week_ago),
+
+            self._pool.fetch("""
                 SELECT reason, COUNT(*) AS cnt, AVG(delta) AS avg_delta
                 FROM score_history
                 GROUP BY reason
                 ORDER BY cnt DESC
                 LIMIT 10
-            """)
-            top_guild        = await conn.fetchrow("""
+            """),
+
+            self._pool.fetchrow("""
                 SELECT u.guild_id, COALESCE(gc.guild_name, '') AS guild_name, SUM(u.message_count) AS total
                 FROM users u
                 LEFT JOIN guild_config gc ON u.guild_id = gc.guild_id
                 GROUP BY u.guild_id, gc.guild_name
                 ORDER BY total DESC
                 LIMIT 1
-            """)
-            dist             = await conn.fetchrow("""
-                SELECT
-                    COUNT(CASE WHEN score < 650 THEN 1 END)                   AS t1,
-                    COUNT(CASE WHEN score >= 650 AND score < 700 THEN 1 END)  AS t2,
-                    COUNT(CASE WHEN score >= 700 AND score < 750 THEN 1 END)  AS t3,
-                    COUNT(CASE WHEN score >= 750 AND score < 800 THEN 1 END)  AS t4,
-                    COUNT(CASE WHEN score >= 800 AND score < 850 THEN 1 END)  AS t5,
-                    COUNT(CASE WHEN score >= 850 AND score < 900 THEN 1 END)  AS t6,
-                    COUNT(CASE WHEN score >= 900 AND score < 1000 THEN 1 END) AS t7,
-                    COUNT(CASE WHEN score >= 1000 THEN 1 END)                 AS t8
-                FROM users WHERE has_chatted = 1
-            """)
+            """),
+        )
+
         return {
-            "total_guilds":      int(total_guilds),
-            "total_users":       int(total_users),
-            "total_messages":    int(total_messages),
-            "total_yuan":        int(total_yuan),
-            "total_earned":      int(total_earned),
-            "total_spent":       int(total_spent),
-            "total_items":       int(total_items),
-            "avg_score":         round(float(avg_score), 2),
-            "highest_score":     round(float(highest_score), 2),
-            "lowest_score":      round(float(lowest_score), 2),
-            "avg_msgs_per_user": round(float(avg_msgs), 1),
-            "endorsements":      int(endorsements),
-            "rebukes":           int(rebukes),
-            "prop_winners":      int(prop_winners),
-            "prop_events":       int(prop_events),
-            "prop_subs":         int(prop_subs),
-            "active_effects":    int(active_effects),
-            "fundraiser_yuan":   int(fundraiser_yuan),
-            "highest_streak":    int(highest_streak),
-            "checkins_today":    int(checkins_today),
-            "checkins_yday":     int(checkins_yday),
-            "dau":               int(dau),
-            "wau":               int(wau),
-            "positive_events":   int(history_row["positive_events"]),
-            "negative_events":   int(history_row["negative_events"]),
-            "avg_delta":         round(float(history_row["avg_delta"]), 4),
-            "events_24h":        int(events_24h),
-            "events_prev_24h":   int(events_prev_24h),
-            "pos_24h":           int(pos_24h),
-            "neg_24h":           int(neg_24h),
-            "pos_prev_24h":      int(pos_prev_24h),
-            "neg_prev_24h":      int(neg_prev_24h),
-            "net_delta_7d":      round(float(net_delta_7d), 2),
+            "total_guilds":      int(misc_row["total_guilds"]),
+            "total_users":       int(users_row["total_users"]),
+            "total_messages":    int(users_row["total_messages"]),
+            "total_yuan":        int(users_row["total_yuan"]),
+            "total_earned":      int(users_row["total_earned"]),
+            "total_spent":       int(users_row["total_spent"]),
+            "total_items":       int(users_row["total_items"]),
+            "avg_score":         round(float(users_row["avg_score"]), 2),
+            "highest_score":     round(float(users_row["highest_score"]), 2),
+            "lowest_score":      round(float(users_row["lowest_score"]), 2),
+            "avg_msgs_per_user": round(float(users_row["avg_msgs"]), 1),
+            "endorsements":      int(users_row["endorsements"]),
+            "rebukes":           int(users_row["rebukes"]),
+            "prop_winners":      int(misc_row["prop_winners"]),
+            "prop_events":       int(misc_row["prop_events"]),
+            "prop_subs":         int(misc_row["prop_subs"]),
+            "active_effects":    int(misc_row["active_effects"]),
+            "fundraiser_yuan":   int(misc_row["fundraiser_yuan"]),
+            "highest_streak":    int(users_row["highest_streak"]),
+            "checkins_today":    int(users_row["checkins_today"]),
+            "checkins_yday":     int(users_row["checkins_yday"]),
+            "dau":               int(users_row["dau"]),
+            "wau":               int(users_row["wau"]),
+            "positive_events":   int(hist_row["positive_events"]),
+            "negative_events":   int(hist_row["negative_events"]),
+            "avg_delta":         round(float(hist_row["avg_delta"]), 4),
+            "events_24h":        int(hist_row["events_24h"]),
+            "events_prev_24h":   int(hist_row["events_prev_24h"]),
+            "pos_24h":           int(hist_row["pos_24h"]),
+            "neg_24h":           int(hist_row["neg_24h"]),
+            "pos_prev_24h":      int(hist_row["pos_prev_24h"]),
+            "neg_prev_24h":      int(hist_row["neg_prev_24h"]),
+            "net_delta_7d":      round(float(hist_row["net_delta_7d"]), 2),
             "daily_7d":          [[int(r["day_num"]), int(r["cnt"])] for r in daily_7d],
             "top_reasons":       [{"reason": r["reason"], "cnt": int(r["cnt"]), "avg_delta": round(float(r["avg_delta"]), 4)} for r in top_reasons],
             "most_active_guild": {
@@ -867,7 +888,12 @@ class Database:
                 "guild_name": top_guild["guild_name"] if top_guild else "",
                 "total":      int(top_guild["total"]) if top_guild else 0,
             },
-            "score_dist": {k: int(v) for k, v in dict(dist).items()} if dist else {},
+            "score_dist": {
+                "t1": int(users_row["t1"]), "t2": int(users_row["t2"]),
+                "t3": int(users_row["t3"]), "t4": int(users_row["t4"]),
+                "t5": int(users_row["t5"]), "t6": int(users_row["t6"]),
+                "t7": int(users_row["t7"]), "t8": int(users_row["t8"]),
+            },
         }
 
     async def get_poster_guilds(self):

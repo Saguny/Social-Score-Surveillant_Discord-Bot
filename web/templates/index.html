@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Social Credit Dashboard</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="/static/dashboard.css">
+</head>
+<body>
+
+<nav class="navbar px-4 py-3 mb-3">
+  <span class="navbar-brand">中华人民共和国 &nbsp;&middot;&nbsp; SOCIAL CREDIT DASHBOARD</span>
+  <div class="d-flex gap-3 align-items-center">
+    <a class="nav-link active" href="/">STATS</a>
+    <a class="nav-link" href="/admin">ADMIN</a>
+    <span class="refresh-meta" id="last-updated"></span>
+  </div>
+</nav>
+
+<div class="container-fluid px-4" id="main" style="display:none">
+
+  <div id="anomaly-wrap"></div>
+
+  <div class="shdr">Mission Control</div>
+  <div class="row g-3 mb-2">
+    <div class="col-md-4">
+      <div class="sc hero">
+        <div class="lbl">Servers</div>
+        <div class="val xl" id="mc-guilds">—</div>
+        <div class="sub" id="mc-guilds-sub"></div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="sc hero">
+        <div class="lbl">Citizens</div>
+        <div class="val xl" id="mc-users">—</div>
+        <div class="sub" id="mc-users-sub"></div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="sc hero">
+        <div class="lbl">Most Active Guild</div>
+        <div class="val" style="font-size:1.3rem;word-break:break-word" id="mc-mag">—</div>
+        <div class="sub" id="mc-mag-sub"></div>
+      </div>
+    </div>
+  </div>
+  <div class="row g-3 mb-1">
+    <div class="col-6 col-sm-4 col-lg-2"><div class="sc">
+      <div class="lbl">Uptime</div><div class="val" id="mc-uptime">—</div>
+    </div></div>
+    <div class="col-6 col-sm-4 col-lg-2"><div class="sc">
+      <div class="lbl">Msgs / sec</div><div class="val" id="mc-mps">—</div><div class="sub">lifetime avg</div>
+    </div></div>
+    <div class="col-6 col-sm-4 col-lg-2"><div class="sc">
+      <div class="lbl">Discord Ping</div><div class="val" id="mc-ping">—</div>
+    </div></div>
+    <div class="col-6 col-sm-4 col-lg-2"><div class="sc">
+      <div class="lbl">DB Query</div><div class="val" id="mc-db">—</div>
+    </div></div>
+    <div class="col-6 col-sm-4 col-lg-2"><div class="sc">
+      <div class="lbl">DAU</div><div class="val" id="mc-dau">—</div>
+    </div></div>
+    <div class="col-6 col-sm-4 col-lg-2"><div class="sc">
+      <div class="lbl">WAU</div><div class="val" id="mc-wau">—</div>
+    </div></div>
+  </div>
+
+  <div class="shdr">Activity · Last 24h vs Prior 24h</div>
+  <div class="row g-3 mb-1">
+    <div class="col-6 col-md-3"><div class="sc">
+      <div class="lbl">Score Events</div><div class="val" id="act-ev">—</div><div class="sub" id="act-ev-t"></div>
+    </div></div>
+    <div class="col-6 col-md-3"><div class="sc">
+      <div class="lbl">Positive</div><div class="val trend-up" id="act-pos">—</div><div class="sub" id="act-pos-t"></div>
+    </div></div>
+    <div class="col-6 col-md-3"><div class="sc">
+      <div class="lbl">Negative</div><div class="val trend-down" id="act-neg">—</div><div class="sub" id="act-neg-t"></div>
+    </div></div>
+    <div class="col-6 col-md-3"><div class="sc">
+      <div class="lbl">Net Delta · 7 Days</div>
+      <div class="val" id="act-net7">—</div>
+      <div id="sparkline-wrap" class="mt-2"></div>
+    </div></div>
+  </div>
+
+  <div class="shdr">Economy</div>
+  <div class="row g-3 mb-1">
+    <div class="col-6 col-sm-4 col-md-2"><div class="sc">
+      <div class="lbl">In Circulation</div><div class="val" id="ec-circ">—</div>
+    </div></div>
+    <div class="col-6 col-sm-4 col-md-2"><div class="sc">
+      <div class="lbl">Total Earned</div><div class="val" id="ec-earn">—</div>
+    </div></div>
+    <div class="col-6 col-sm-4 col-md-2"><div class="sc">
+      <div class="lbl">Total Spent</div><div class="val" id="ec-spent">—</div>
+    </div></div>
+    <div class="col-6 col-sm-4 col-md-2"><div class="sc">
+      <div class="lbl">Items Purchased</div><div class="val" id="ec-items">—</div>
+    </div></div>
+    <div class="col-6 col-sm-4 col-md-2"><div class="sc">
+      <div class="lbl">Active Effects</div><div class="val" id="ec-fx">—</div>
+    </div></div>
+    <div class="col-6 col-sm-4 col-md-2"><div class="sc">
+      <div class="lbl">Fundraiser Yuan</div><div class="val" id="ec-fr">—</div><div class="sub">total raised</div>
+    </div></div>
+  </div>
+
+  <div class="shdr">Scores</div>
+  <div class="row g-3 mb-1">
+    <div class="col-md-5"><div class="sc h-100">
+      <div class="lbl" style="margin-bottom:.7rem">Distribution</div>
+      <div id="dist-chart"></div>
+    </div></div>
+    <div class="col-md-3">
+      <div class="row g-3">
+        <div class="col-12"><div class="sc">
+          <div class="lbl">Avg Score</div><div class="val" id="sc-avg">—</div>
+        </div></div>
+        <div class="col-12"><div class="sc">
+          <div class="lbl">All-time High</div><div class="val trend-up" id="sc-high">—</div>
+        </div></div>
+        <div class="col-12"><div class="sc">
+          <div class="lbl">All-time Low</div><div class="val trend-down" id="sc-low">—</div>
+        </div></div>
+      </div>
+    </div>
+    <div class="col-md-4"><div class="sc h-100">
+      <div class="lbl">Messages Rated</div>
+      <div class="val" id="sc-msgs">—</div>
+      <div class="sub" style="margin-bottom:.7rem">all-time</div>
+      <div class="lbl">Avg Msgs / User</div>
+      <div class="val" style="font-size:1.2rem" id="sc-ampu">—</div>
+      <hr style="border-color:var(--border);margin:.8rem 0">
+      <div class="row g-2">
+        <div class="col-6">
+          <div class="lbl">Endorsements</div>
+          <div class="val trend-up" style="font-size:1.2rem" id="sc-end">—</div>
+        </div>
+        <div class="col-6">
+          <div class="lbl">Rebukes</div>
+          <div class="val trend-down" style="font-size:1.2rem" id="sc-reb">—</div>
+        </div>
+      </div>
+      <div class="sub mt-1" id="sc-er"></div>
+    </div></div>
+  </div>
+
+  <div class="shdr">Top Scoring Reasons</div>
+  <div class="row g-3 mb-1">
+    <div class="col-md-6"><div class="sc h-100">
+      <div class="lbl" style="margin-bottom:.6rem;color:var(--green)">▲ Positive</div>
+      <div id="reasons-pos"></div>
+    </div></div>
+    <div class="col-md-6"><div class="sc h-100">
+      <div class="lbl" style="margin-bottom:.6rem;color:var(--red)">▼ Negative</div>
+      <div id="reasons-neg"></div>
+    </div></div>
+  </div>
+
+  <div class="shdr">Check-ins &amp; Propaganda</div>
+  <div class="row g-3 mb-1">
+    <div class="col-6 col-sm-3"><div class="sc">
+      <div class="lbl">Check-ins Today</div><div class="val" id="ci-today">—</div><div class="sub" id="ci-t"></div>
+    </div></div>
+    <div class="col-6 col-sm-3"><div class="sc">
+      <div class="lbl">Highest Streak</div><div class="val" id="ci-streak">—</div><div class="sub">days</div>
+    </div></div>
+    <div class="col-6 col-sm-3"><div class="sc">
+      <div class="lbl">Events Run</div><div class="val" id="pr-ev">—</div>
+    </div></div>
+    <div class="col-6 col-sm-3"><div class="sc">
+      <div class="lbl">Submissions</div><div class="val" id="pr-subs">—</div><div class="sub" id="pr-avg"></div>
+    </div></div>
+  </div>
+
+  <div class="shdr">
+    <details>
+      <summary>Advanced Metrics</summary>
+      <div class="row g-3 mt-2">
+        <div class="col-6 col-sm-4 col-md-2"><div class="sc">
+          <div class="lbl">+Events All-time</div><div class="val" style="font-size:1.2rem" id="adv-pos">—</div>
+        </div></div>
+        <div class="col-6 col-sm-4 col-md-2"><div class="sc">
+          <div class="lbl">-Events All-time</div><div class="val" style="font-size:1.2rem" id="adv-neg">—</div>
+        </div></div>
+        <div class="col-6 col-sm-4 col-md-2"><div class="sc">
+          <div class="lbl">Avg Delta / Event</div><div class="val" style="font-size:1.2rem" id="adv-avd">—</div>
+        </div></div>
+        <div class="col-6 col-sm-4 col-md-2"><div class="sc">
+          <div class="lbl">Propaganda Winners</div><div class="val" style="font-size:1.2rem" id="adv-pw">—</div>
+        </div></div>
+        <div class="col-6 col-sm-4 col-md-2"><div class="sc">
+          <div class="lbl">Avg Subs / Event</div><div class="val" style="font-size:1.2rem" id="adv-pe">—</div>
+        </div></div>
+        <div class="col-6 col-sm-4 col-md-2"><div class="sc">
+          <div class="lbl">E/R Ratio</div><div class="val" style="font-size:1.2rem" id="adv-er">—</div>
+          <div class="sub">% endorsements</div>
+        </div></div>
+      </div>
+    </details>
+  </div>
+
+  <div style="height:2rem"></div>
+</div>
+
+<div class="spinner-wrapper" id="spinner">
+  <div class="spinner-border" style="color:var(--mid)" role="status"></div>
+</div>
+
+<script src="/static/dashboard.js"></script>
+</body>
+</html>
