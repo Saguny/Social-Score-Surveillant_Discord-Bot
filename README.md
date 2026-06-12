@@ -2,6 +2,13 @@
 
 ## DISCLAIMER
 This bot is MAINLY proposed for english speaking guilds since Vader is only for english. Any non english message will be translated using googles api, I will possibly update one day to support all languages
+
+This bot is a satirical meme project and is not affiliated with, endorsed by, or representative of the Chinese Communist Party or the Chinese government.
+
+The creator, I, does not support, condone, or endorse the human rights abuses, authoritarian policies, or surveillance practices of the CCP — including but not limited to the treatment of Uyghurs, Tibetans, Hong Kongers, and political dissidents, the Tiananmen Square massacre, or real-world social credit systems.
+
+This is a joke. The irony is the point.
+
 # Version Beta 1.0.1
 This is the first release of the Social Score Surveillant Discord Bot, a side project made for fun by ✨ me ✨
 
@@ -150,3 +157,7 @@ Moderator Commands (Prefix)
 
 --------------------------------
 *This is a deprecated local use feature for me to debug the message scoring, will be removed in future updates
+
+
+
+
