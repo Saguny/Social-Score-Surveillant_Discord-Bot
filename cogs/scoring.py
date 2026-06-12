@@ -150,9 +150,6 @@ class Scoring(commands.Cog):
 
         delta, reason = await self._evaluate(message)
 
-        if reason != "skipped" and await self.db.get_web_consent(gid):
-            self.db.log_message(gid, uid, str(message.author), message.content, delta, reason)
-
         if delta == 0:
             return
 

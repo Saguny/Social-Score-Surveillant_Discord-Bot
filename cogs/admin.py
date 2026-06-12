@@ -57,25 +57,6 @@ class Admin(commands.Cog):
             embed.add_field(name="THRESHOLD UPDATED", value=f"Fundraiser verification now requires {n} votes.", inline=False)
         await ctx.send(embed=embed)
 
-    @commands.command(name="webconsent")
-    @commands.has_permissions(manage_guild=True)
-    async def webconsent(self, ctx, toggle: str):
-        toggle = toggle.lower()
-        if toggle not in ("on", "off"):
-            await ctx.send("Usage: `ccp webconsent on` or `ccp webconsent off`")
-            return
-        async with ctx.typing():
-            enabled = toggle == "on"
-            await self.db.set_web_consent(ctx.guild.id, enabled, ctx.guild.name)
-            status = "ENABLED" if enabled else "DISABLED"
-            embed = discord.Embed(color=0x4B5694, title="中华人民共和国社会信用局 · 网络监控")
-            embed.add_field(
-                name=f"WEB DASHBOARD {status}",
-                value="Message logs will now be visible in the owner dashboard." if enabled else "Message logs will no longer be collected for this server.",
-                inline=False,
-            )
-        await ctx.send(embed=embed)
-
     async def cog_command_error(self, ctx, error):
         if isinstance(error, commands.MissingPermissions):
             await ctx.send("Insufficient clearance.")

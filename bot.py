@@ -125,12 +125,10 @@ class SocialCreditBot(commands.Bot):
         self.db = Database()
 
     async def close(self):
-        await self.db.stop_flush_task()
         await super().close()
 
     async def setup_hook(self):
         await self.db.init()
-        self.db.start_flush_task()
         await self.load_extension("cogs.scoring")
         await self.load_extension("cogs.economy")
         await self.load_extension("cogs.stats")

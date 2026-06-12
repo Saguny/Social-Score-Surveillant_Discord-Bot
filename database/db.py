@@ -11,7 +11,6 @@ TABLES = [
         guild_id          BIGINT  PRIMARY KEY,
         report_counter    INTEGER DEFAULT 0,
         confirm_threshold INTEGER DEFAULT 3,
-        web_consent       INTEGER DEFAULT 0,
         guild_name        TEXT    DEFAULT ''
     )
     """,
@@ -111,18 +110,6 @@ TABLES = [
     )
     """,
     """
-    CREATE TABLE IF NOT EXISTS message_log (
-        id         SERIAL PRIMARY KEY,
-        guild_id   BIGINT,
-        user_id    BIGINT,
-        username   TEXT,
-        content    TEXT,
-        delta      DOUBLE PRECISION,
-        reason     TEXT,
-        timestamp  BIGINT
-    )
-    """,
-    """
     CREATE TABLE IF NOT EXISTS poster_config (
         guild_id   BIGINT PRIMARY KEY,
         channel_id BIGINT,
@@ -193,11 +180,8 @@ class Database:
     def __init__(self):
         self._dsn = os.getenv("DATABASE_URL", "")
         self._pool: asyncpg.Pool | None = None
-        self._web_consent_cache: dict[int, bool] = {}
-        self._pending_logs: list = []
         self._effect_cache: dict[tuple, tuple] = {}
         self._last_clean_effects: float = 0.0
-        self._flush_task: asyncio.Task | None = None
 
     async def init(self):
         self._pool = await asyncpg.create_pool(self._dsn, min_size=2, max_size=20)
@@ -261,34 +245,6 @@ class Database:
                     """,
                     guild_id, user_id, yuan, now,
                 )
-
-    def start_flush_task(self):
-        self._flush_task = asyncio.create_task(self._flush_loop())
-
-    async def stop_flush_task(self):
-        if self._flush_task:
-            self._flush_task.cancel()
-            try:
-                await self._flush_task
-            except asyncio.CancelledError:
-                pass
-        await self._flush_logs()
-
-    async def _flush_loop(self):
-        while True:
-            await asyncio.sleep(10)
-            await self._flush_logs()
-
-    async def _flush_logs(self):
-        if not self._pending_logs:
-            return
-        batch = self._pending_logs[:]
-        self._pending_logs.clear()
-        async with self._pool.acquire() as conn:
-            await conn.executemany(
-                "INSERT INTO message_log (guild_id, user_id, username, content, delta, reason, timestamp) VALUES ($1, $2, $3, $4, $5, $6, $7)",
-                batch,
-            )
 
     async def get_user(self, guild_id, user_id):
         await self.register_user(guild_id, user_id)
@@ -621,28 +577,6 @@ class Database:
             await self.add_yuan(fr["guild_id"], d["donor_id"], d["amount"])
         await self.update_fundraiser_status(fundraiser_id, "refunded")
 
-    async def get_web_consent(self, guild_id):
-        if guild_id in self._web_consent_cache:
-            return self._web_consent_cache[guild_id]
-        async with self._pool.acquire() as conn:
-            await self._ensure_guild(conn, guild_id)
-            row = await conn.fetchrow(
-                "SELECT web_consent FROM guild_config WHERE guild_id = $1", guild_id
-            )
-        result = bool(row["web_consent"]) if row else False
-        self._web_consent_cache[guild_id] = result
-        return result
-
-    async def set_web_consent(self, guild_id, enabled, guild_name=""):
-        async with self._pool.acquire() as conn:
-            async with conn.transaction():
-                await self._ensure_guild(conn, guild_id)
-                await conn.execute(
-                    "UPDATE guild_config SET web_consent = $1, guild_name = $2 WHERE guild_id = $3",
-                    1 if enabled else 0, guild_name, guild_id,
-                )
-        self._web_consent_cache[guild_id] = bool(enabled)
-
     async def get_extended_leaderboard(self, guild_id):
         top_score = await self._pool.fetch(
             "SELECT user_id, score FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY score DESC LIMIT 3", guild_id,
@@ -820,24 +754,99 @@ class Database:
             guild_id, limit,
         )
 
-    def log_message(self, guild_id, user_id, username, content, delta, reason):
-        self._pending_logs.append((guild_id, user_id, username, content, round(delta, 2), reason, int(time.time())))
-
-    async def get_message_logs(self, guild_id, limit=100, before=None):
-        if before:
-            return await self._pool.fetch(
-                "SELECT * FROM message_log WHERE guild_id = $1 AND id < $2 ORDER BY id DESC LIMIT $3",
-                guild_id, before, limit,
-            )
-        return await self._pool.fetch(
-            "SELECT * FROM message_log WHERE guild_id = $1 ORDER BY id DESC LIMIT $2",
-            guild_id, limit,
-        )
-
-    async def get_guilds_with_consent(self):
-        return await self._pool.fetch(
-            "SELECT guild_id, guild_name FROM guild_config WHERE web_consent = 1"
-        )
+    async def get_global_stats(self):
+        now = int(time.time())
+        async with self._pool.acquire() as conn:
+            total_guilds    = await conn.fetchval("SELECT COUNT(*) FROM guild_config")
+            total_users     = await conn.fetchval("SELECT COUNT(*) FROM users")
+            total_messages  = await conn.fetchval("SELECT COALESCE(SUM(message_count), 0) FROM users")
+            total_yuan      = await conn.fetchval("SELECT COALESCE(SUM(yuan), 0) FROM users")
+            total_earned    = await conn.fetchval("SELECT COALESCE(SUM(total_yuan_earned), 0) FROM users")
+            total_spent     = await conn.fetchval("SELECT COALESCE(SUM(total_yuan_spent), 0) FROM users")
+            total_items     = await conn.fetchval("SELECT COALESCE(SUM(items_bought), 0) FROM users")
+            avg_score       = await conn.fetchval("SELECT COALESCE(AVG(score), 750.0) FROM users WHERE has_chatted = 1")
+            highest_score   = await conn.fetchval("SELECT COALESCE(MAX(highest_score), 750.0) FROM users")
+            lowest_score    = await conn.fetchval("SELECT COALESCE(MIN(lowest_score), 750.0) FROM users")
+            avg_msgs        = await conn.fetchval("SELECT COALESCE(AVG(message_count), 0) FROM users WHERE has_chatted = 1")
+            endorsements    = await conn.fetchval("SELECT COALESCE(SUM(times_endorsed), 0) FROM users")
+            rebukes         = await conn.fetchval("SELECT COALESCE(SUM(times_rebuked), 0) FROM users")
+            prop_winners    = await conn.fetchval("SELECT COUNT(*) FROM guild_decrees")
+            prop_events     = await conn.fetchval("SELECT COUNT(*) FROM propaganda_events")
+            prop_subs       = await conn.fetchval("SELECT COUNT(*) FROM propaganda_submissions")
+            active_effects  = await conn.fetchval("SELECT COUNT(*) FROM active_effects WHERE expires_at > $1", now)
+            fundraiser_yuan = await conn.fetchval("SELECT COALESCE(SUM(raised), 0) FROM fundraisers")
+            highest_streak  = await conn.fetchval("SELECT COALESCE(MAX(checkin_streak), 0) FROM users")
+            checkins_today  = await conn.fetchval("SELECT COUNT(*) FROM users WHERE last_checkin >= $1", now - 86400)
+            dau             = await conn.fetchval("SELECT COUNT(*) FROM users WHERE last_active >= $1", now - 86400)
+            wau             = await conn.fetchval("SELECT COUNT(*) FROM users WHERE last_active >= $1", now - 604800)
+            history_row     = await conn.fetchrow("""
+                SELECT
+                    COUNT(CASE WHEN delta > 0 THEN 1 END)  AS positive_events,
+                    COUNT(CASE WHEN delta < 0 THEN 1 END)  AS negative_events,
+                    COALESCE(AVG(delta), 0)                AS avg_delta
+                FROM score_history
+            """)
+            top_reasons     = await conn.fetch("""
+                SELECT reason, COUNT(*) AS cnt
+                FROM score_history
+                GROUP BY reason
+                ORDER BY cnt DESC
+                LIMIT 8
+            """)
+            top_guild       = await conn.fetchrow("""
+                SELECT u.guild_id, COALESCE(gc.guild_name, '') AS guild_name, SUM(u.message_count) AS total
+                FROM users u
+                LEFT JOIN guild_config gc ON u.guild_id = gc.guild_id
+                GROUP BY u.guild_id, gc.guild_name
+                ORDER BY total DESC
+                LIMIT 1
+            """)
+            dist            = await conn.fetchrow("""
+                SELECT
+                    COUNT(CASE WHEN score < 650 THEN 1 END)                   AS t1,
+                    COUNT(CASE WHEN score >= 650 AND score < 700 THEN 1 END)  AS t2,
+                    COUNT(CASE WHEN score >= 700 AND score < 750 THEN 1 END)  AS t3,
+                    COUNT(CASE WHEN score >= 750 AND score < 800 THEN 1 END)  AS t4,
+                    COUNT(CASE WHEN score >= 800 AND score < 850 THEN 1 END)  AS t5,
+                    COUNT(CASE WHEN score >= 850 AND score < 900 THEN 1 END)  AS t6,
+                    COUNT(CASE WHEN score >= 900 AND score < 1000 THEN 1 END) AS t7,
+                    COUNT(CASE WHEN score >= 1000 THEN 1 END)                 AS t8
+                FROM users WHERE has_chatted = 1
+            """)
+        return {
+            "total_guilds":       int(total_guilds),
+            "total_users":        int(total_users),
+            "total_messages":     int(total_messages),
+            "total_yuan":         int(total_yuan),
+            "total_earned":       int(total_earned),
+            "total_spent":        int(total_spent),
+            "total_items":        int(total_items),
+            "avg_score":          round(float(avg_score), 2),
+            "highest_score":      round(float(highest_score), 2),
+            "lowest_score":       round(float(lowest_score), 2),
+            "avg_msgs_per_user":  round(float(avg_msgs), 1),
+            "endorsements":       int(endorsements),
+            "rebukes":            int(rebukes),
+            "prop_winners":       int(prop_winners),
+            "prop_events":        int(prop_events),
+            "prop_subs":          int(prop_subs),
+            "active_effects":     int(active_effects),
+            "fundraiser_yuan":    int(fundraiser_yuan),
+            "highest_streak":     int(highest_streak),
+            "checkins_today":     int(checkins_today),
+            "dau":                int(dau),
+            "wau":                int(wau),
+            "positive_events":    int(history_row["positive_events"]),
+            "negative_events":    int(history_row["negative_events"]),
+            "avg_delta":          round(float(history_row["avg_delta"]), 4),
+            "top_reasons":        [{"reason": r["reason"], "cnt": int(r["cnt"])} for r in top_reasons],
+            "most_active_guild":  {
+                "guild_id":   str(top_guild["guild_id"]) if top_guild else "",
+                "guild_name": top_guild["guild_name"] if top_guild else "",
+                "total":      int(top_guild["total"]) if top_guild else 0,
+            },
+            "score_dist": {k: int(v) for k, v in dict(dist).items()} if dist else {},
+        }
 
     async def get_poster_guilds(self):
         return await self._pool.fetch("SELECT guild_id, channel_id, last_slug FROM poster_config")
