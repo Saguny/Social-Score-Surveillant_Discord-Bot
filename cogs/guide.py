@@ -236,7 +236,9 @@ class Guide(commands.Cog):
         e8.set_footer(text="Disclaimer: see /disclaimer · GLORY TO THE CCP!")
         embeds.append(e8)
 
-        await interaction.response.send_message(embeds=embeds, ephemeral=True)
+        await interaction.response.defer(ephemeral=True)
+        await interaction.followup.send(embeds=embeds[:4], ephemeral=True)
+        await interaction.followup.send(embeds=embeds[4:], ephemeral=True)
 
     @app_commands.command(name="ping", description="Check the Bureau's response latency")
     async def ping(self, interaction: discord.Interaction):
