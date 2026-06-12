@@ -233,7 +233,7 @@ class Guide(commands.Cog):
             ),
             inline=False,
         )
-        e8.set_footer(text="GLORY TO THE CCP!")
+        e8.set_footer(text="Disclaimer: see /disclaimer · GLORY TO THE CCP!")
         embeds.append(e8)
 
         await interaction.response.send_message(embeds=embeds, ephemeral=True)
@@ -370,6 +370,7 @@ class Guide(commands.Cog):
             inline=False,
         )
 
+        e.set_footer(text="Disclaimer: see /disclaimer")
         await interaction.followup.send(embed=e, ephemeral=True)
 
 
