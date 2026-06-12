@@ -106,12 +106,15 @@ class Fundraiser(commands.Cog):
             await interaction.followup.send(f"Insufficient funds. Balance: ¥{balance}", ephemeral=True)
             return
 
+        remaining = fr["goal"] - fr["raised"]
         new_raised = await self.db.donate_to_fundraiser(fundraiser_id, gid, uid, amount)
         fr = await self.db.get_fundraiser(fundraiser_id)
 
         embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局 · 公民捐款")
         embed.add_field(name="DONOR", value=interaction.user.mention, inline=True)
         embed.add_field(name="AMOUNT", value=f"¥{amount}", inline=True)
+        if amount > remaining:
+            embed.add_field(name="OVERSHOT THE GOAL BY", value=f"¥{amount - remaining}", inline=True)
         embed.add_field(name="FUNDRAISER", value=f"#{fundraiser_id} · {fr['description']}", inline=False)
         embed.add_field(name="PROGRESS", value=progress_bar(new_raised, fr["goal"]), inline=False)
         await interaction.followup.send(embed=embed)
