@@ -292,7 +292,7 @@ class Guide(commands.Cog):
                 "This is a joke. The irony is the point."
             ),
         )
-        await interaction.response.send_message(embed=e, ephemeral=True)
+        await interaction.response.send_message(embed=e)
 
     @app_commands.command(name="uptime", description="How long the Bureau has been active")
     async def uptime(self, interaction: discord.Interaction):
