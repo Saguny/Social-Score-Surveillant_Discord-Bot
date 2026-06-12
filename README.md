@@ -8,7 +8,8 @@ This bot is a satirical meme project and is not affiliated with, endorsed by, or
 
 # Version Beta 1.0.2
 
-This is a side project made for fun by me
+This is a side project made for fun by me because me and a friend are flying to china this year and i was in the midst of reviving my old bot project from 2021, so i got enough motivation and a refresh of the discordpy library enough, that I just said "fuck it, im doing a ccp bot"
+here we are
 
 **Invite:** https://discord.com/oauth2/authorize?client_id=856163780265902151&permissions=8&integration_type=0&scope=bot
 
@@ -22,7 +23,7 @@ Prefix: `ccp `
 
 A CCP-themed social credit bot for Discord. Every message is silently evaluated. Rank changes trigger official bureau notifications. Made for fun in small friend group servers.
 
-`/guide` will be your best friend — it contains all information needed.
+`/guide` will be your best friend! it contains all information needed.
 
 ---
 
@@ -89,7 +90,7 @@ A CCP-themed social credit bot for Discord. Every message is silently evaluated.
 - Posters sourced from [chineseposters.net](https://chineseposters.net)
 
 **Web Dashboard**
-- Auto-starts on port 8080. Accessible at `/` for public leaderboard (if webconsent is on) and `/admin` for server management. Protected by `ADMIN_TOKEN`.
+- Auto-starts on port 8080. Accessible at `/` for public leaderboard (if webconsent is on) and `/admin` for server management. Both Protected by `ADMIN_TOKEN`.
 
 ---
 
@@ -123,3 +124,7 @@ A CCP-themed social credit bot for Discord. Every message is silently evaluated.
 - `ccp poster` - display a random propaganda poster
 - `ccp posters` - toggle daily poster broadcasts in this channel
 - `/propaganda start <submit_channel> <reveal_channel> <duration_hours>` - start a propaganda event
+
+
+# Feature requests
+Just message me on discord under `saguny` if you have any requests or changes or additions or whatever
