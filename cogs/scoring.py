@@ -6,7 +6,7 @@ import aiohttp
 import discord
 from discord.ext import commands
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
-from config.ranks import get_rank
+from config.ranks import get_rank, get_rank_index, RANKS, EXECUTION_THRESHOLD, RANK_YUAN
 from config.rules import STRUCTURAL_RULES, SENTIMENT_SCALE, SENTIMENT_NEUTRAL_THRESHOLD, YUAN_PER_MESSAGE
 from config.banned_topics import contains_banned_topic
 
@@ -154,33 +154,91 @@ class Scoring(commands.Cog):
 
     async def _handle_rank_change(self, message: discord.Message, old: float, new: float):
         old_rank = get_rank(old)
-        new_rank = get_rank(new)
+        new_rank = get_rank(new) if new >= old else get_rank(new + 0.5)
         if old_rank["name"] == new_rank["name"]:
             return
 
         promoted = new > old
+        old_idx = get_rank_index(old_rank["name"])
+        new_idx = get_rank_index(new_rank["name"])
+        yuan_amount = RANK_YUAN[new_idx] if promoted else RANK_YUAN[old_idx]
+        await self.db.adjust_yuan(message.guild.id, message.author.id, yuan_amount if promoted else -yuan_amount)
 
         try:
             old_role = discord.utils.get(message.guild.roles, name=old_rank["name"])
-            new_role = await self._get_or_create_role(message.guild, new_rank["name"])
             if old_role and old_role in message.author.roles:
                 await message.author.remove_roles(old_role)
-            await message.author.add_roles(new_role)
+            if new > EXECUTION_THRESHOLD:
+                new_role = await self._get_or_create_role(message.guild, new_rank["name"])
+                await message.author.add_roles(new_role)
         except discord.Forbidden:
             pass
 
         color = 0xFFD700 if promoted else 0xCC0000
         status = "PROMOTED" if promoted else "DEMOTED"
+        yuan_label = f"+¥{yuan_amount:,}" if promoted else f"-¥{yuan_amount:,}"
 
         embed = discord.Embed(color=color, title="中华人民共和国社会信用局")
         embed.add_field(name="CITIZEN", value=str(message.author), inline=False)
         embed.add_field(
             name=f"STATUS CHANGE: {status}",
-            value=f"{old_rank['name']} → {new_rank['name']}\nScore: {new:.2f}",
+            value=f"{old_rank['name']} → {new_rank['name']}\nScore: {new:.2f} · {yuan_label}",
             inline=False,
         )
         embed.timestamp = discord.utils.utcnow()
         await message.channel.send(embed=embed)
+
+    async def _handle_execution_status(self, message: discord.Message, old: float, new: float):
+        entered = old > EXECUTION_THRESHOLD and new <= EXECUTION_THRESHOLD
+        recovered = old <= EXECUTION_THRESHOLD and new > EXECUTION_THRESHOLD
+        if not entered and not recovered:
+            return
+
+        exec_role_name = "Execution Date: Tomorrow"
+        try:
+            if entered:
+                exec_role = await self._get_or_create_role(message.guild, exec_role_name)
+                for rank in RANKS:
+                    r = discord.utils.get(message.guild.roles, name=rank["name"])
+                    if r and r in message.author.roles:
+                        await message.author.remove_roles(r)
+                await message.author.add_roles(exec_role)
+
+                confiscated = await self.db.confiscate_yuan(message.guild.id, message.author.id)
+
+                exec_channel_id = await self.db.get_execution_channel(message.guild.id)
+                channel = message.guild.get_channel(exec_channel_id) if exec_channel_id else None
+                target = channel or message.channel
+
+                embed = discord.Embed(color=0x8B0000, title="中华人民共和国社会信用局 · 处决名单")
+                embed.add_field(name="CITIZEN", value=str(message.author), inline=False)
+                embed.add_field(
+                    name="STATUS",
+                    value="Placed on the Execution List\nExecution Date: Tomorrow",
+                    inline=False,
+                )
+                embed.add_field(name="SCORE", value=f"{new:.2f}", inline=False)
+                if confiscated > 0:
+                    embed.add_field(
+                        name="ASSETS CONFISCATED",
+                        value=f"¥{confiscated:,} seized and redistributed to the people.",
+                        inline=False,
+                    )
+                embed.timestamp = discord.utils.utcnow()
+                if not exec_channel_id:
+                    embed.set_footer(text="Use `ccp executions #channel` to configure a dedicated channel.")
+                await target.send(embed=embed)
+
+            else:
+                exec_role = discord.utils.get(message.guild.roles, name=exec_role_name)
+                if exec_role and exec_role in message.author.roles:
+                    await message.author.remove_roles(exec_role)
+                correct_rank = get_rank(new)
+                correct_role = await self._get_or_create_role(message.guild, correct_rank["name"])
+                await message.author.add_roles(correct_role)
+
+        except discord.Forbidden:
+            pass
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
@@ -216,6 +274,7 @@ class Scoring(commands.Cog):
                     pass
 
         await self._handle_rank_change(message, old_score, new_score)
+        await self._handle_execution_status(message, old_score, new_score)
         await self.db.clean_expired_effects()
 
 

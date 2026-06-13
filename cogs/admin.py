@@ -45,6 +45,16 @@ class Admin(commands.Cog):
             embed.add_field(name="CITIZEN RESET", value=f"{citizen.mention} has been returned to baseline.", inline=False)
         await ctx.send(embed=embed)
 
+    @commands.command(name="executions")
+    @commands.has_permissions(manage_guild=True)
+    async def set_execution_channel(self, ctx, channel: discord.TextChannel = None):
+        async with ctx.typing():
+            await self.db.set_execution_channel(ctx.guild.id, channel.id if channel else None)
+            msg = f"Execution notices will be posted in {channel.mention}." if channel else "Execution channel cleared · notices will post in message channel."
+            embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")
+            embed.add_field(name="EXECUTION CHANNEL", value=msg, inline=False)
+        await ctx.send(embed=embed)
+
     @commands.command(name="threshold")
     @commands.has_permissions(manage_guild=True)
     async def set_threshold(self, ctx, n: int):

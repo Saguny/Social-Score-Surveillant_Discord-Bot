@@ -6,6 +6,7 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 from database.db import Database
+from config.ranks import RANKS
 
 _orig_embed_init = discord.Embed.__init__
 
@@ -146,11 +147,50 @@ class SocialCreditBot(commands.Bot):
 
     async def on_ready(self):
         self.start_time = datetime.now(timezone.utc)
+        rank_names = {r["name"] for r in RANKS}
+        exec_role_name = "Execution Date: Tomorrow"
         for guild in self.guilds:
             member_ids = [m.id for m in guild.members if not m.bot]
             await self.db.register_guild_members(guild.id, member_ids)
             self.tree.copy_global_to(guild=guild)
             await self.tree.sync(guild=guild)
+            condemned = await self.db.get_condemned_users(guild.id)
+            for row in condemned:
+                member = guild.get_member(row["user_id"])
+                if not member:
+                    continue
+                try:
+                    exec_role = discord.utils.get(guild.roles, name=exec_role_name)
+                    if not exec_role:
+                        exec_role = await guild.create_role(name=exec_role_name)
+                    for rname in rank_names:
+                        r = discord.utils.get(guild.roles, name=rname)
+                        if r and r in member.roles:
+                            await member.remove_roles(r)
+                    if exec_role not in member.roles:
+                        await member.add_roles(exec_role)
+                except discord.Forbidden:
+                    pass
+                confiscated = await self.db.confiscate_yuan(guild.id, row["user_id"])
+                exec_channel_id = await self.db.get_execution_channel(guild.id)
+                channel = guild.get_channel(exec_channel_id) if exec_channel_id else None
+                if channel:
+                    embed = discord.Embed(color=0x8B0000, title="中华人民共和国社会信用局 · 处决名单")
+                    embed.add_field(name="CITIZEN", value=str(member), inline=False)
+                    embed.add_field(name="STATUS", value="Placed on the Execution List\nExecution Date: Tomorrow", inline=False)
+                    if confiscated > 0:
+                        embed.add_field(name="ASSETS CONFISCATED", value=f"¥{confiscated:,} seized and redistributed to the people.", inline=False)
+                    embed.timestamp = discord.utils.utcnow()
+                    try:
+                        await channel.send(embed=embed)
+                    except discord.Forbidden:
+                        pass
+        _global_cmds = self.tree.get_commands(guild=None)
+        self.tree.clear_commands(guild=None)
+        await self.tree.sync()
+        for cmd in _global_cmds:
+            self.tree.add_command(cmd)
+
         await self.change_presence(activity=discord.Activity(
             type=discord.ActivityType.watching, name="/guide"
         ))

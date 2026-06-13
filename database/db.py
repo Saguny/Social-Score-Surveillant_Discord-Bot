@@ -199,6 +199,7 @@ class Database:
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_users_last_active ON users (last_active)")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_users_last_checkin ON users (last_checkin)")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_users_has_chatted_guild ON users (has_chatted, guild_id)")
+            await conn.execute("ALTER TABLE guild_config ADD COLUMN IF NOT EXISTS execution_channel_id BIGINT")
 
     async def _create_tables(self):
         async with self._pool.acquire() as conn:
@@ -257,6 +258,60 @@ class Database:
             "SELECT * FROM users WHERE guild_id = $1 AND user_id = $2",
             guild_id, user_id,
         )
+
+    async def confiscate_yuan(self, guild_id, user_id):
+        async with self._pool.acquire() as conn:
+            async with conn.transaction():
+                row = await conn.fetchrow(
+                    "SELECT yuan FROM users WHERE guild_id = $1 AND user_id = $2",
+                    guild_id, user_id,
+                )
+                if not row or row["yuan"] <= 0:
+                    return 0
+                total = row["yuan"]
+                count = await conn.fetchval(
+                    "SELECT COUNT(*) FROM users WHERE guild_id = $1 AND user_id != $2",
+                    guild_id, user_id,
+                )
+                if count and count > 0:
+                    share = total // count
+                    if share > 0:
+                        await conn.execute(
+                            "UPDATE users SET yuan = yuan + $3 WHERE guild_id = $1 AND user_id != $2",
+                            guild_id, user_id, share,
+                        )
+                await conn.execute(
+                    "UPDATE users SET yuan = 0 WHERE guild_id = $1 AND user_id = $2",
+                    guild_id, user_id,
+                )
+                return total
+
+    async def get_condemned_users(self, guild_id):
+        return await self._pool.fetch(
+            "SELECT user_id, yuan FROM users WHERE guild_id = $1 AND score <= 610",
+            guild_id,
+        )
+
+    async def adjust_yuan(self, guild_id, user_id, amount):
+        await self._pool.execute(
+            "UPDATE users SET yuan = GREATEST(0, yuan + $3) WHERE guild_id = $1 AND user_id = $2",
+            guild_id, user_id, amount,
+        )
+
+    async def get_execution_channel(self, guild_id):
+        row = await self._pool.fetchrow(
+            "SELECT execution_channel_id FROM guild_config WHERE guild_id = $1",
+            guild_id,
+        )
+        return row["execution_channel_id"] if row else None
+
+    async def set_execution_channel(self, guild_id, channel_id):
+        async with self._pool.acquire() as conn:
+            await self._ensure_guild(conn, guild_id)
+            await conn.execute(
+                "UPDATE guild_config SET execution_channel_id = $2 WHERE guild_id = $1",
+                guild_id, channel_id,
+            )
 
     async def mark_chatted(self, guild_id, user_id):
         await self._pool.execute(

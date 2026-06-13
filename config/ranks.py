@@ -9,9 +9,11 @@ RANKS = [
     {"name": "General Secretary",     "min": 1200, "max": 1300},
 ]
 
-SCORE_FLOOR    = 600
-SCORE_CEILING  = 1300
-STARTING_SCORE = 750.0
+SCORE_FLOOR        = 600
+SCORE_CEILING      = 1300
+STARTING_SCORE     = 750.0
+EXECUTION_THRESHOLD = 610
+RANK_YUAN          = [round(1000 * (1.1 ** i)) for i in range(len(RANKS))]
 
 
 def get_rank(score: float) -> dict:
@@ -20,3 +22,10 @@ def get_rank(score: float) -> dict:
         if rank["min"] <= s <= rank["max"]:
             return rank
     return RANKS[-1] if score >= 1200 else RANKS[0]
+
+
+def get_rank_index(rank_name: str) -> int:
+    for i, r in enumerate(RANKS):
+        if r["name"] == rank_name:
+            return i
+    return 0

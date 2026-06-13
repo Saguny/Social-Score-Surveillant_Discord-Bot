@@ -86,6 +86,22 @@ class Guide(commands.Cog):
         )
         rank_lines = "\n".join(f"{r['min']} to {r['max']}   {r['name']}" for r in RANKS)
         e1.add_field(name="RANKS", value=f"```\n{rank_lines}\n```", inline=False)
+        e1.add_field(
+            name="EXECUTION LIST",
+            value=(
+                "Citizens whose score falls to 610 or below are placed on the Execution List "
+                "and assigned the role **Execution Date: Tomorrow**. Recover above 610 to be removed."
+            ),
+            inline=False,
+        )
+        e1.add_field(
+            name="RANK CHANGE REWARDS",
+            value=(
+                "Promotions award Yuan based on the rank you enter. Demotions deduct Yuan based on the rank you leave. "
+                "Amounts scale with rank tier — higher tiers carry larger rewards and steeper penalties."
+            ),
+            inline=False,
+        )
         embeds.append(e1)
 
         e2 = discord.Embed(color=0xCC0000, title="SCORING RULES")
@@ -198,6 +214,7 @@ class Guide(commands.Cog):
         e7.add_field(name="ccp adjust <@citizen> <delta> <reason>", value="Manually adjust a citizen's score by any amount.", inline=False)
         e7.add_field(name="ccp reset <@citizen>",                   value="Reset a citizen back to 750.", inline=False)
         e7.add_field(name="ccp threshold <n>",                      value="Set how many votes are required to resolve a fundraiser. Default is 3.", inline=False)
+        e7.add_field(name="ccp executions [#channel]",              value="Set a dedicated channel for Execution List notices. Omit the channel to clear and revert to posting in the message channel.", inline=False)
         e7.add_field(name="ccp poster",                              value="Display a random propaganda poster.", inline=False)
         e7.add_field(name="ccp posters",                             value="Toggle daily propaganda poster broadcasts in this channel. React ❤️ for +1 credit and +20 yuan · React 😡 for -1 credit.", inline=False)
         e7.add_field(

@@ -127,7 +127,7 @@ class Economy(commands.Cog):
             embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局")
             embed.add_field(
                 name="REHABILITATION APPROVED",
-                value=f"Score adjusted: {old:.2f} → {new:.2f}",
+                value=f"Score adjusted: {old:.2f} -> {new:.2f}",
                 inline=False,
             )
             embed.set_footer(text="GLORY TO THE CCP!")
@@ -196,7 +196,7 @@ class Economy(commands.Cog):
         embed.add_field(name="CITIZEN", value=interaction.user.mention, inline=False)
         embed.add_field(name="CONFESSION", value=text[:200], inline=False)
         embed.add_field(name="COST", value=f"¥{cost}", inline=True)
-        embed.add_field(name="SCORE ADJUSTMENT", value=f"{old:.2f} → {new:.2f}", inline=True)
+        embed.add_field(name="SCORE ADJUSTMENT", value=f"{old:.2f} -> {new:.2f}", inline=True)
         embed.timestamp = discord.utils.utcnow()
         await interaction.followup.send(embed=embed)
 

@@ -56,7 +56,7 @@ class Social(commands.Cog):
 
         embed = discord.Embed(color=color, title="中华人民共和国社会信用局")
         embed.add_field(name=title_action, value=target.mention, inline=False)
-        embed.add_field(name="SCORE IMPACT", value=f"{delta:+.2f}  →  {new_score:.2f}", inline=True)
+        embed.add_field(name="SCORE IMPACT", value=f"{delta:+.2f}  ->  {new_score:.2f}", inline=True)
         if reason:
             embed.add_field(name="REASON", value=reason[:200], inline=False)
         embed.set_footer(text=footer)
