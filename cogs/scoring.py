@@ -1,14 +1,40 @@
 import asyncio
+import concurrent.futures
+import os
+import time
 import aiohttp
 import discord
 from discord.ext import commands
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
-from langdetect import detect, LangDetectException
 from config.ranks import get_rank
 from config.rules import STRUCTURAL_RULES, SENTIMENT_SCALE, SENTIMENT_NEUTRAL_THRESHOLD, YUAN_PER_MESSAGE
 from config.banned_topics import contains_banned_topic
 
 TRANSLATE_URL = "https://translate.googleapis.com/translate_a/single"
+_LANG_CACHE_TTL = 3600
+
+_module_analyzer = SentimentIntensityAnalyzer()
+_worker_analyzer: SentimentIntensityAnalyzer | None = None
+
+
+def _init_worker():
+    global _worker_analyzer
+    _worker_analyzer = SentimentIntensityAnalyzer()
+
+
+def _run_in_worker(text: str) -> tuple[str, float]:
+    from langdetect import detect, LangDetectException
+    try:
+        lang = detect(text)
+    except LangDetectException:
+        lang = "en"
+    a = _worker_analyzer if _worker_analyzer is not None else _module_analyzer
+    return lang, a.polarity_scores(text)["compound"]
+
+
+def _vader_only(text: str) -> float:
+    a = _worker_analyzer if _worker_analyzer is not None else _module_analyzer
+    return a.polarity_scores(text)["compound"]
 
 
 class Scoring(commands.Cog):
@@ -16,16 +42,24 @@ class Scoring(commands.Cog):
         self.bot = bot
         self.db = bot.db
         self._last_messages: dict[tuple, str] = {}
-        self._analyzer = SentimentIntensityAnalyzer()
         self._session: aiohttp.ClientSession | None = None
+        self._executor: concurrent.futures.ProcessPoolExecutor | None = None
+        self._lang_cache: dict[tuple, tuple[str, float]] = {}
 
     async def cog_load(self):
         self._session = aiohttp.ClientSession()
+        self._executor = concurrent.futures.ProcessPoolExecutor(
+            max_workers=min(4, max(2, os.cpu_count() or 2)),
+            initializer=_init_worker,
+        )
 
     async def cog_unload(self):
         if self._session:
             await self._session.close()
             self._session = None
+        if self._executor:
+            self._executor.shutdown(wait=False)
+            self._executor = None
 
     async def _translate_to_english(self, text: str) -> str:
         try:
@@ -63,22 +97,30 @@ class Scoring(commands.Cog):
         self._last_messages[key] = content
         return total, reasons
 
-    async def _sentiment_score(self, text: str) -> tuple[float, str | None]:
+    async def _sentiment_score(self, guild_id: int, user_id: int, text: str) -> tuple[float, str | None]:
         if len(text.strip()) < 4:
             return 0.0, None
-        try:
-            lang = detect(text)
-        except LangDetectException:
-            return 0.0, None
-
-        english = text if lang == "en" else await self._translate_to_english(text)
-
-        if contains_banned_topic(english):
-            return -SENTIMENT_SCALE, "counter-revolutionary speech"
 
         loop = asyncio.get_event_loop()
-        scores = await loop.run_in_executor(None, self._analyzer.polarity_scores, english)
-        compound = scores["compound"]
+        now = time.time()
+        cache_key = (guild_id, user_id)
+        cached = self._lang_cache.get(cache_key)
+
+        if cached and now - cached[1] < _LANG_CACHE_TTL:
+            lang = cached[0]
+            english = text if lang == "en" else await self._translate_to_english(text)
+            if contains_banned_topic(english):
+                return -SENTIMENT_SCALE, "counter-revolutionary speech"
+            compound = await loop.run_in_executor(self._executor, _vader_only, english)
+        else:
+            lang, compound = await loop.run_in_executor(self._executor, _run_in_worker, text)
+            self._lang_cache[cache_key] = (lang, now)
+            english = text if lang == "en" else await self._translate_to_english(text)
+            if contains_banned_topic(english):
+                return -SENTIMENT_SCALE, "counter-revolutionary speech"
+            if lang != "en":
+                compound = await loop.run_in_executor(self._executor, _vader_only, english)
+
         if abs(compound) < SENTIMENT_NEUTRAL_THRESHOLD:
             return 0.0, None
         return round(compound * SENTIMENT_SCALE, 2), "positive sentiment" if compound > 0 else "negative sentiment"
@@ -92,7 +134,9 @@ class Scoring(commands.Cog):
             return 0.0, "skipped"
 
         struct_delta, reasons = self._structural_score(message)
-        sent_delta, sent_reason = await self._sentiment_score(message.content)
+        sent_delta, sent_reason = await self._sentiment_score(
+            message.guild.id, message.author.id, message.content
+        )
 
         if sent_reason:
             reasons.append(sent_reason)
