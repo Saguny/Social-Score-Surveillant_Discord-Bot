@@ -173,7 +173,9 @@ class SocialCreditBot(commands.Bot):
                     pass
                 confiscated = await self.db.confiscate_yuan(guild.id, row["user_id"])
                 exec_channel_id = await self.db.get_execution_channel(guild.id)
-                channel = guild.get_channel(exec_channel_id) if exec_channel_id else None
+                channel = guild.get_channel(exec_channel_id) if exec_channel_id else next(
+                    (c for c in guild.text_channels if c.permissions_for(guild.me).send_messages), None
+                )
                 if channel:
                     embed = discord.Embed(color=0x8B0000, title="中华人民共和国社会信用局 · 处决名单")
                     embed.add_field(name="CITIZEN", value=str(member), inline=False)
@@ -181,6 +183,8 @@ class SocialCreditBot(commands.Bot):
                     if confiscated > 0:
                         embed.add_field(name="ASSETS CONFISCATED", value=f"¥{confiscated:,} seized and redistributed to the people.", inline=False)
                     embed.timestamp = discord.utils.utcnow()
+                    if not exec_channel_id:
+                        embed.set_footer(text="Use `ccp executions #channel` to configure a dedicated channel.")
                     try:
                         await channel.send(embed=embed)
                     except discord.Forbidden:
