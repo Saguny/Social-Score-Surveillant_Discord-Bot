@@ -129,7 +129,7 @@ A CCP-themed social credit bot for Discord. Every message is silently evaluated.
 - `ccp adjust <@citizen> <delta> <reason>` - manual score adjustment
 - `ccp reset <@citizen>` - reset to 750
 - `ccp threshold <n>` - set fundraiser vote threshold (default 3)
-- `ccp webconsent <on|off>` - enable/disable message logging for the web dashboard
+
 - `ccp poster` - display a random propaganda poster
 - `ccp posters` - toggle daily poster broadcasts in this channel
 - `/propaganda start <submit_channel> <reveal_channel> <duration_hours>` - start a propaganda event
