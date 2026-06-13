@@ -184,7 +184,7 @@ class Database:
         self._last_clean_effects: float = 0.0
 
     async def init(self):
-        self._pool = await asyncpg.create_pool(self._dsn, min_size=2, max_size=20)
+        self._pool = await asyncpg.create_pool(self._dsn, min_size=2, max_size=40)
         await self._create_tables()
         await self._migrate()
 
@@ -194,6 +194,11 @@ class Database:
             await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS checkin_streak INTEGER DEFAULT 0")
             await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active BIGINT DEFAULT 0")
             await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS propaganda_wins INTEGER DEFAULT 0")
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_score_history_timestamp ON score_history (timestamp)")
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_score_history_reason ON score_history (reason)")
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_users_last_active ON users (last_active)")
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_users_last_checkin ON users (last_checkin)")
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_users_has_chatted_guild ON users (has_chatted, guild_id)")
 
     async def _create_tables(self):
         async with self._pool.acquire() as conn:
@@ -266,27 +271,36 @@ class Database:
         )
 
     async def update_score(self, guild_id, user_id, delta, reason):
+        now = int(time.time())
         async with self._pool.acquire() as conn:
             async with conn.transaction():
-                await conn.execute(
-                    "INSERT INTO users (guild_id, user_id, score, highest_score, lowest_score) VALUES ($1, $2, 750.0, 750.0, 750.0) ON CONFLICT (guild_id, user_id) DO NOTHING",
-                    guild_id, user_id,
-                )
                 row = await conn.fetchrow(
-                    "SELECT score FROM users WHERE guild_id = $1 AND user_id = $2",
-                    guild_id, user_id,
+                    """
+                    WITH old AS (
+                        SELECT score FROM users WHERE guild_id = $1 AND user_id = $2
+                    ), ensure AS (
+                        INSERT INTO users (guild_id, user_id, score, highest_score, lowest_score)
+                        VALUES ($1, $2, 750.0, 750.0, 750.0)
+                        ON CONFLICT DO NOTHING
+                    ), updated AS (
+                        UPDATE users SET
+                            score         = GREATEST(600.0, LEAST(1300.0, score + $3)),
+                            highest_score = GREATEST(highest_score, GREATEST(600.0, LEAST(1300.0, score + $3))),
+                            lowest_score  = LEAST(lowest_score,     GREATEST(600.0, LEAST(1300.0, score + $3)))
+                        WHERE guild_id = $1 AND user_id = $2
+                        RETURNING score
+                    ), history AS (
+                        INSERT INTO score_history (guild_id, user_id, delta, reason, timestamp)
+                        SELECT $1, $2, ROUND($3::numeric, 2), $4, $5
+                        FROM updated
+                    )
+                    SELECT
+                        COALESCE((SELECT score FROM old), 750.0) AS old_score,
+                        (SELECT score FROM updated)              AS new_score
+                    """,
+                    guild_id, user_id, delta, reason, now,
                 )
-                old_score = row["score"]
-                new_score = max(600.0, min(1300.0, old_score + delta))
-                await conn.execute(
-                    "UPDATE users SET score = $1, highest_score = GREATEST(highest_score, $1), lowest_score = LEAST(lowest_score, $1) WHERE guild_id = $2 AND user_id = $3",
-                    new_score, guild_id, user_id,
-                )
-                await conn.execute(
-                    "INSERT INTO score_history (guild_id, user_id, delta, reason, timestamp) VALUES ($1, $2, $3, $4, $5)",
-                    guild_id, user_id, round(delta, 2), reason, int(time.time()),
-                )
-        return old_score, new_score
+        return row["old_score"], row["new_score"]
 
     async def add_yuan(self, guild_id, user_id, amount):
         await self._pool.execute(

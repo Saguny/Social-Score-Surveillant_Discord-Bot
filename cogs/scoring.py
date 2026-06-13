@@ -18,8 +18,10 @@ _worker_analyzer: SentimentIntensityAnalyzer | None = None
 
 
 def _init_worker():
+    import os
     global _worker_analyzer
     _worker_analyzer = SentimentIntensityAnalyzer()
+    print(f"[scoring] worker pid={os.getpid()} ready", flush=True)
 
 
 def _run_in_worker(text: str) -> tuple[str, float]:
