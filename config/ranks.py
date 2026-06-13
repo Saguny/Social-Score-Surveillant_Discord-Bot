@@ -13,7 +13,7 @@ SCORE_FLOOR        = 600
 SCORE_CEILING      = 1300
 STARTING_SCORE     = 750.0
 EXECUTION_THRESHOLD = 610
-RANK_YUAN          = [round(1000 * (1.1 ** i)) for i in range(len(RANKS))]
+RANK_YUAN          = [1000 * (i + 1) ** 2 for i in range(len(RANKS))]
 
 
 def get_rank(score: float) -> dict:

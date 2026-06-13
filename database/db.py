@@ -194,6 +194,7 @@ class Database:
             await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS checkin_streak INTEGER DEFAULT 0")
             await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active BIGINT DEFAULT 0")
             await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS propaganda_wins INTEGER DEFAULT 0")
+            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS rank_entered_at BIGINT DEFAULT 0")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_score_history_timestamp ON score_history (timestamp)")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_score_history_reason ON score_history (reason)")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_users_last_active ON users (last_active)")
@@ -297,6 +298,51 @@ class Database:
             "UPDATE users SET yuan = GREATEST(0, yuan + $3) WHERE guild_id = $1 AND user_id = $2",
             guild_id, user_id, amount,
         )
+
+    async def handle_rank_promotion(self, guild_id: int, user_id: int, new_rank_idx: int, yuan_amount: int) -> int:
+        now = int(time.time())
+        item_id = f"rank_promotion_{new_rank_idx}"
+        async with self._pool.acquire() as conn:
+            async with conn.transaction():
+                row = await conn.fetchrow(
+                    "SELECT rank_entered_at FROM users WHERE guild_id = $1 AND user_id = $2",
+                    guild_id, user_id,
+                )
+                prior = await conn.fetchval(
+                    "SELECT COUNT(*) FROM transactions WHERE guild_id = $1 AND user_id = $2 AND item_id = $3",
+                    guild_id, user_id, item_id,
+                )
+                rank_entered_at = (row["rank_entered_at"] or 0) if row else 0
+                eligible = prior == 0 or (now - rank_entered_at) >= 30 * 86400
+                if eligible:
+                    await conn.execute(
+                        "UPDATE users SET yuan = GREATEST(0, yuan + $1), total_yuan_earned = total_yuan_earned + $1 WHERE guild_id = $2 AND user_id = $3",
+                        yuan_amount, guild_id, user_id,
+                    )
+                    await conn.execute(
+                        "INSERT INTO transactions (guild_id, user_id, item_id, cost, timestamp) VALUES ($1, $2, $3, $4, $5)",
+                        guild_id, user_id, item_id, yuan_amount, now,
+                    )
+                await conn.execute(
+                    "UPDATE users SET rank_entered_at = $1 WHERE guild_id = $2 AND user_id = $3",
+                    now, guild_id, user_id,
+                )
+        return yuan_amount if eligible else 0
+
+    async def set_rank_entered_at(self, guild_id: int, user_id: int):
+        await self._pool.execute(
+            "UPDATE users SET rank_entered_at = $1 WHERE guild_id = $2 AND user_id = $3",
+            int(time.time()), guild_id, user_id,
+        )
+
+    async def consume_effect(self, guild_id: int, user_id: int, effect_type: str) -> bool:
+        row = await self._pool.fetchrow(
+            "DELETE FROM active_effects WHERE id = (SELECT id FROM active_effects WHERE guild_id = $1 AND user_id = $2 AND effect_type = $3 AND expires_at > $4 LIMIT 1) RETURNING id",
+            guild_id, user_id, effect_type, int(time.time()),
+        )
+        if row:
+            self._effect_cache.pop((guild_id, user_id, effect_type), None)
+        return row is not None
 
     async def get_execution_channel(self, guild_id):
         row = await self._pool.fetchrow(
@@ -416,12 +462,32 @@ class Database:
     def invalidate_effect_cache(self, guild_id, user_id, effect_type):
         self._effect_cache.pop((guild_id, user_id, effect_type), None)
 
-    async def get_surveillance_watchers(self, guild_id, target_id):
+    async def consume_surveillance_for_target(self, guild_id: int, user_id: int, target_id: int) -> bool:
         rows = await self._pool.fetch(
-            "SELECT user_id, metadata FROM active_effects WHERE guild_id = $1 AND effect_type = 'surveillance' AND expires_at > $2",
-            guild_id, int(time.time()),
+            "SELECT id, metadata FROM active_effects WHERE guild_id = $1 AND user_id = $2 AND effect_type = 'surveillance' AND expires_at > $3",
+            guild_id, user_id, int(time.time()),
         )
-        return [row["user_id"] for row in rows if json.loads(row["metadata"]).get("target_id") == target_id]
+        effect_id = next(
+            (row["id"] for row in rows if json.loads(row["metadata"]).get("target_id") == target_id),
+            None,
+        )
+        if effect_id is None:
+            return False
+        await self._pool.execute("DELETE FROM active_effects WHERE id = $1", effect_id)
+        return True
+
+    async def get_surveillance_report(self, guild_id: int, target_id: int) -> dict:
+        since = int(time.time()) - 30 * 86400
+        async with self._pool.acquire() as conn:
+            user = await conn.fetchrow(
+                "SELECT score, yuan, highest_score, lowest_score, checkin_streak, propaganda_wins FROM users WHERE guild_id = $1 AND user_id = $2",
+                guild_id, target_id,
+            )
+            history = await conn.fetch(
+                "SELECT delta, reason, timestamp FROM score_history WHERE guild_id = $1 AND user_id = $2 AND timestamp > $3 ORDER BY timestamp DESC LIMIT 500",
+                guild_id, target_id, since,
+            )
+        return {"user": user, "history": history}
 
     async def clean_expired_effects(self):
         now = time.time()

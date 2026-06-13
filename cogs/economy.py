@@ -90,6 +90,17 @@ class Economy(commands.Cog):
         uid = interaction.user.id
 
         if item_id == "report":
+            bribed = await self.db.consume_effect(gid, target.id, "bribe")
+            if bribed:
+                embed = discord.Embed(color=0x333333, title="中华人民共和国社会信用局")
+                embed.add_field(
+                    name="REPORT NULLIFIED",
+                    value=f"{target.mention} had a pending bribe. Your report was silently discarded.",
+                    inline=False,
+                )
+                await interaction.followup.send(embed=embed, ephemeral=True)
+                return
+
             await self.db.update_score(gid, target.id, -2.0, "official citizen report")
             await self.db.increment_reported(gid, target.id)
             await self.db.increment_filed_reports(gid, uid)
@@ -103,10 +114,13 @@ class Economy(commands.Cog):
             await interaction.followup.send(embed=embed)
 
         elif item_id == "denounce":
+            await self.db.update_score(gid, target.id, -20.0, "public denouncement")
+            await self.db.increment_reported(gid, target.id)
             report_num = await self.db.increment_report_counter(gid)
             embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 公开谴责")
             embed.add_field(name="SUBJECT", value=target.mention, inline=False)
             embed.add_field(name="STATED CRIME", value=text[:100], inline=False)
+            embed.add_field(name="SCORE IMPACT", value="−20.0", inline=True)
             embed.set_footer(text=f"Report #{report_num:05d} · GLORY TO THE CCP!")
             embed.timestamp = discord.utils.utcnow()
             await interaction.followup.send(embed=embed)
@@ -116,8 +130,8 @@ class Economy(commands.Cog):
             await self.db.add_effect(gid, uid, "surveillance", expires_at, {"target_id": target.id})
             embed = discord.Embed(color=0x333333, title="中华人民共和国社会信用局")
             embed.add_field(
-                name="SURVEILLANCE ACTIVE",
-                value=f"Monitoring {target.mention} for 24 hours.\nScore changes will be reported to your inbox.",
+                name="INTELLIGENCE PACKAGE ACQUIRED",
+                value=f"Dossier on {target.mention} is ready.\nUse `/surveillance_report` within 30 days to redeem your one-time report.",
                 inline=False,
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
@@ -150,23 +164,117 @@ class Economy(commands.Cog):
             embed = discord.Embed(color=0x333333, title="中华人民共和国社会信用局")
             embed.add_field(
                 name="SCORE FREEZE ACTIVE",
-                value="Your social credit score is frozen for 1 hour.",
+                value="Your social credit score is frozen for 2 hours.",
                 inline=False,
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
 
-        elif item_id == "propaganda":
-            embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局 · 国家公告")
+        elif item_id == "bribe":
+            expires_at = int(time.time()) + cfg["duration"]
+            await self.db.add_effect(gid, uid, "bribe", expires_at)
+            embed = discord.Embed(color=0x2d5a27, title="中华人民共和国社会信用局")
             embed.add_field(
-                name="STATE COMMENDATION",
-                value=(
-                    f"The bureau formally commends citizen {interaction.user.mention} "
-                    f"for their outstanding contributions to social harmony and the collective good."
-                ),
+                name="BRIBE ACCEPTED",
+                value="The bureau has noted your generosity. The next report filed against you within 24 hours will be silently discarded.",
                 inline=False,
             )
-            embed.set_footer(text="GLORY TO THE CCP!")
+            await interaction.followup.send(embed=embed, ephemeral=True)
+
+        elif item_id == "gulag":
+            if await self.db.get_effect(gid, target.id, "freeze"):
+                await interaction.followup.send(
+                    f"{target.mention} is already score-frozen.", ephemeral=True
+                )
+                return
+            expires_at = int(time.time()) + cfg["duration"]
+            await self.db.add_effect(gid, target.id, "freeze", expires_at)
+            self.db.invalidate_effect_cache(gid, target.id, "freeze")
+            embed = discord.Embed(color=0x8B0000, title="中华人民共和国社会信用局 · 劳改营")
+            embed.add_field(
+                name="GULAG SENTENCE ISSUED",
+                value=f"{target.mention}'s social credit score is frozen for 2 hours by order of the bureau.",
+                inline=False,
+            )
             await interaction.followup.send(embed=embed)
+
+    @app_commands.command(name="surveillance_report", description="Redeem your surveillance package for a full 30-day intelligence dossier")
+    @app_commands.describe(target="The citizen to pull the dossier on")
+    async def surveillance_report(self, interaction: discord.Interaction, target: discord.Member):
+        await interaction.response.defer(ephemeral=True)
+        gid = interaction.guild.id
+        uid = interaction.user.id
+
+        if target.bot or target.id == uid:
+            await interaction.followup.send("Invalid target.", ephemeral=True)
+            return
+
+        consumed = await self.db.consume_surveillance_for_target(gid, uid, target.id)
+        if not consumed:
+            await interaction.followup.send(
+                "No active surveillance package on file for this citizen. Purchase one via `/buy surveillance`.",
+                ephemeral=True,
+            )
+            return
+
+        report = await self.db.get_surveillance_report(gid, target.id)
+        user_data = report["user"]
+        history = report["history"]
+
+        if not user_data:
+            await interaction.followup.send("No data on file for this citizen.", ephemeral=True)
+            return
+
+        from config.ranks import get_rank, EXECUTION_THRESHOLD
+        current_score = float(user_data["score"])
+        rank = get_rank(current_score)
+
+        total_events = len(history)
+        positive_events = sum(1 for h in history if h["delta"] > 0)
+        negative_events = sum(1 for h in history if h["delta"] < 0)
+        net_delta = sum(h["delta"] for h in history)
+
+        reason_counts: dict[str, int] = {}
+        for h in history:
+            r = h["reason"] or "unknown"
+            reason_counts[r] = reason_counts.get(r, 0) + 1
+        top_reasons = sorted(reason_counts.items(), key=lambda x: -x[1])[:5]
+
+        delta_str = f"+{net_delta:.2f}" if net_delta >= 0 else f"{net_delta:.2f}"
+
+        if current_score <= EXECUTION_THRESHOLD:
+            risk = "CRITICAL · EXECUTION IMMINENT"
+        elif current_score < 650:
+            risk = "HIGH"
+        elif current_score < 700:
+            risk = "ELEVATED"
+        elif current_score < 750:
+            risk = "MODERATE"
+        else:
+            risk = "LOW"
+
+        embed = discord.Embed(color=0x1a1a2e, title="中华人民共和国社会信用局 · 机密档案")
+        embed.add_field(name="SUBJECT", value=str(target), inline=True)
+        embed.add_field(name="CURRENT SCORE", value=f"{current_score:.2f}", inline=True)
+        embed.add_field(name="RANK", value=rank["name"], inline=True)
+        embed.add_field(name="YUAN BALANCE", value=f"¥{user_data['yuan']:,}", inline=True)
+        embed.add_field(name="ALL-TIME HIGH", value=f"{float(user_data['highest_score']):.2f}", inline=True)
+        embed.add_field(name="ALL-TIME LOW", value=f"{float(user_data['lowest_score']):.2f}", inline=True)
+        embed.add_field(name="CHECKIN STREAK", value=str(user_data["checkin_streak"] or 0), inline=True)
+        embed.add_field(name="PROPAGANDA WINS", value=str(user_data["propaganda_wins"] or 0), inline=True)
+        embed.add_field(name="THREAT LEVEL", value=risk, inline=True)
+        embed.add_field(
+            name="30-DAY NET CHANGE",
+            value=f"{delta_str} across {total_events} events · {positive_events} positive · {negative_events} negative",
+            inline=False,
+        )
+        if top_reasons:
+            embed.add_field(
+                name="TOP ACTIVITY (30 DAYS)",
+                value="\n".join(f"`{r}` × {c}" for r, c in top_reasons),
+                inline=False,
+            )
+        embed.timestamp = discord.utils.utcnow()
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
     @app_commands.command(name="confess", description="Publicly confess your crimes to the Bureau for a score reprieve")
     @app_commands.describe(text="Your confession (max 200 characters)")

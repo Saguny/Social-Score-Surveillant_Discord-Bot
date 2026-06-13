@@ -160,14 +160,20 @@ class Guide(commands.Cog):
         e4.add_field(
             name="/buy <item> [target] [text]",
             value=(
-                "`report` (500) · Dock a citizen 2 score points. Files an official report.\n"
-                "`denounce` (1000) · Post a public denouncement with a custom message (100 char max).\n"
-                "`surveillance` (300) · Get a DM every time a target's score changes for 24 hours.\n"
-                "`rehabilitate` (400+) · Recover 3 score points. Cost doubles each time you use it.\n"
-                "`expunge` (600) · Wipe your last 5 score changes from public history.\n"
-                "`freeze` (800) · Freeze your score for 1 hour. No changes will be applied.\n"
-                "`propaganda` (350) · Bot posts a state-approved commendation of you in the channel."
+                "`report` (¥2,500) · Dock a citizen 2 score points. Files an official report.\n"
+                "`denounce` (¥6,000) · Public denouncement with a custom message. Docks 20 score points.\n"
+                "`surveillance` (¥2,000) · Unlocks one use of `/surveillance_report` on a target (30-day dossier, expires in 30 days).\n"
+                "`rehabilitate` (¥3,000+) · Recover 3 score points. Cost doubles each time you use it.\n"
+                "`expunge` (¥4,000) · Wipe your last 5 score changes from public history.\n"
+                "`freeze` (¥5,000) · Freeze your score for 2 hours. No changes will be applied.\n"
+                "`bribe` (¥12,000) · The next report filed against you within 24 hours is silently nullified.\n"
+                "`gulag` (¥20,000) · Freeze a target's score for 2 hours."
             ),
+            inline=False,
+        )
+        e4.add_field(
+            name="/surveillance_report <target>",
+            value="Redeem a purchased surveillance package. Shows a full 30-day intelligence dossier: score trend, yuan, all-time high/low, threat assessment, and top activity breakdown.",
             inline=False,
         )
         e4.add_field(

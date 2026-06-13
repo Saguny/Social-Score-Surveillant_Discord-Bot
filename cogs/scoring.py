@@ -84,7 +84,8 @@ class Scoring(commands.Cog):
             t = rule["type"]
 
             if t == "spam":
-                if self._last_messages.get(key) == content:
+                min_len = rule.get("min_length", 0)
+                if len(content) >= min_len and self._last_messages.get(key) == content:
                     total += rule["delta"]
                     reasons.append(rule["reason"])
 
@@ -154,15 +155,24 @@ class Scoring(commands.Cog):
 
     async def _handle_rank_change(self, message: discord.Message, old: float, new: float):
         old_rank = get_rank(old)
-        new_rank = get_rank(new) if new >= old else get_rank(new + 0.5)
+        new_rank = get_rank(new) if new >= old else get_rank(new + 1.0)
         if old_rank["name"] == new_rank["name"]:
             return
 
         promoted = new > old
         old_idx = get_rank_index(old_rank["name"])
         new_idx = get_rank_index(new_rank["name"])
-        yuan_amount = RANK_YUAN[new_idx] if promoted else RANK_YUAN[old_idx]
-        await self.db.adjust_yuan(message.guild.id, message.author.id, yuan_amount if promoted else -yuan_amount)
+
+        if promoted:
+            yuan_earned = await self.db.handle_rank_promotion(
+                message.guild.id, message.author.id, new_idx, RANK_YUAN[new_idx]
+            )
+            yuan_label = f"+¥{yuan_earned:,}" if yuan_earned > 0 else "¥0 · reward already claimed"
+        else:
+            penalty = RANK_YUAN[old_idx]
+            await self.db.adjust_yuan(message.guild.id, message.author.id, -penalty)
+            await self.db.set_rank_entered_at(message.guild.id, message.author.id)
+            yuan_label = f"-¥{penalty:,}"
 
         try:
             old_role = discord.utils.get(message.guild.roles, name=old_rank["name"])
@@ -176,7 +186,6 @@ class Scoring(commands.Cog):
 
         color = 0xFFD700 if promoted else 0xCC0000
         status = "PROMOTED" if promoted else "DEMOTED"
-        yuan_label = f"+¥{yuan_amount:,}" if promoted else f"-¥{yuan_amount:,}"
 
         embed = discord.Embed(color=color, title="中华人民共和国社会信用局")
         embed.add_field(name="CITIZEN", value=str(message.author), inline=False)
@@ -190,7 +199,7 @@ class Scoring(commands.Cog):
 
     async def _handle_execution_status(self, message: discord.Message, old: float, new: float):
         entered = old > EXECUTION_THRESHOLD and new <= EXECUTION_THRESHOLD
-        recovered = old <= EXECUTION_THRESHOLD and new > EXECUTION_THRESHOLD
+        recovered = old <= EXECUTION_THRESHOLD and new > EXECUTION_THRESHOLD + 1.0
         if not entered and not recovered:
             return
 
@@ -258,20 +267,6 @@ class Scoring(commands.Cog):
             return
 
         old_score, new_score = await self.db.update_score(gid, uid, delta, reason)
-
-        watchers = await self.db.get_surveillance_watchers(gid, uid)
-        for watcher_id in watchers:
-            watcher = message.guild.get_member(watcher_id)
-            if watcher:
-                try:
-                    direction = "▲" if delta > 0 else "▼"
-                    await watcher.send(
-                        f"**[SURVEILLANCE REPORT]**\n"
-                        f"Citizen {message.author} · {direction} {abs(delta):.2f}\n"
-                        f"Current score: {new_score:.2f}"
-                    )
-                except Exception:
-                    pass
 
         await self._handle_rank_change(message, old_score, new_score)
         await self._handle_execution_status(message, old_score, new_score)

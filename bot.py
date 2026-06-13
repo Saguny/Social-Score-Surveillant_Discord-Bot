@@ -159,15 +159,17 @@ class SocialCreditBot(commands.Bot):
                 member = guild.get_member(row["user_id"])
                 if not member:
                     continue
+                already_condemned = False
                 try:
                     exec_role = discord.utils.get(guild.roles, name=exec_role_name)
                     if not exec_role:
                         exec_role = await guild.create_role(name=exec_role_name)
+                    already_condemned = exec_role in member.roles
                     for rname in rank_names:
                         r = discord.utils.get(guild.roles, name=rname)
                         if r and r in member.roles:
                             await member.remove_roles(r)
-                    if exec_role not in member.roles:
+                    if not already_condemned:
                         await member.add_roles(exec_role)
                 except discord.Forbidden:
                     pass
@@ -176,7 +178,7 @@ class SocialCreditBot(commands.Bot):
                 channel = guild.get_channel(exec_channel_id) if exec_channel_id else next(
                     (c for c in guild.text_channels if c.permissions_for(guild.me).send_messages), None
                 )
-                if channel:
+                if channel and not already_condemned:
                     embed = discord.Embed(color=0x8B0000, title="中华人民共和国社会信用局 · 处决名单")
                     embed.add_field(name="CITIZEN", value=str(member), inline=False)
                     embed.add_field(name="STATUS", value="Placed on the Execution List\nExecution Date: Tomorrow", inline=False)
