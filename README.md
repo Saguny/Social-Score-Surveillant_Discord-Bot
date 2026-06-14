@@ -11,7 +11,7 @@ This bot is a satirical meme project and is not affiliated with, endorsed by, or
 This is a side project made for fun by me because me and a friend are flying to china this year and i was in the midst of reviving my old bot project from 2021, so i got enough motivation and a refresh of the discordpy library enough, that I just said "fuck it, im doing a ccp bot"
 here we are
 
-**Invite:** https://discord.com/oauth2/authorize?client_id=856163780265902151&permissions=2416438352&integration_type=0&scope=bot
+**Invite:** [https://discord.com/oauth2/authorize?client_id=856163780265902151&permissions=2416438352&integration_type=0&scope=bot](https://discord.com/oauth2/authorize?client_id=856163780265902151&permissions=2416036928&integration_type=0&scope=bot)
 
 Built with discord.py 2.x · PostgreSQL (asyncpg) · vaderSentiment · langdetect · aiohttp · Deployed on Railway
 
