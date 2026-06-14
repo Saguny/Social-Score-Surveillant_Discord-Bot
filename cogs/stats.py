@@ -208,7 +208,7 @@ class Stats(commands.Cog):
         wins   = user.get("propaganda_wins", 0)
         author_name = await self.bot.format_user_full(target, gid)
 
-        def build_overview() -> discord.Embed:
+        def build_overview(thumb_url: str | None) -> discord.Embed:
             e = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 公民档案")
             e.set_author(name=author_name, icon_url=target.display_avatar.url)
             e.add_field(name="SCORE",      value=f"{user['score']:.2f}",        inline=True)
@@ -219,11 +219,12 @@ class Stats(commands.Cog):
             e.add_field(name="MESSAGES",   value=str(user["message_count"]),     inline=True)
             e.add_field(name="PEAK",       value=f"{user['highest_score']:.2f}", inline=True)
             e.add_field(name="LOW",        value=f"{user['lowest_score']:.2f}",  inline=True)
-            e.set_thumbnail(url="attachment://ccpstats.png")
+            if thumb_url:
+                e.set_thumbnail(url=thumb_url)
             e.timestamp = discord.utils.utcnow()
             return e
 
-        def build_social() -> discord.Embed:
+        def build_social(thumb_url: str | None) -> discord.Embed:
             e = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 公民档案")
             e.set_author(name=author_name, icon_url=target.display_avatar.url)
             e.add_field(name="ENDORSED (recv)",  value=str(user["times_endorsed"]),      inline=True)
@@ -232,19 +233,23 @@ class Stats(commands.Cog):
             e.add_field(name="REBUKED (given)",  value=str(user["rebukes_given"]),       inline=True)
             e.add_field(name="REPORTS RECEIVED", value=str(user["times_reported"]),      inline=True)
             e.add_field(name="REPORTS FILED",    value=str(user["times_filed_reports"]), inline=True)
+            if thumb_url:
+                e.set_thumbnail(url=thumb_url)
             e.timestamp = discord.utils.utcnow()
             return e
 
-        def build_economy() -> discord.Embed:
+        def build_economy(thumb_url: str | None) -> discord.Embed:
             e = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 公民档案")
             e.set_author(name=author_name, icon_url=target.display_avatar.url)
             e.add_field(name="YUAN EARNED",  value=f"¥{user['total_yuan_earned']}", inline=True)
             e.add_field(name="YUAN SPENT",   value=f"¥{user['total_yuan_spent']}",  inline=True)
             e.add_field(name="ITEMS BOUGHT", value=str(user["items_bought"]),        inline=True)
             if streak:
-                e.add_field(name="CHECK-IN STREAK",     value=f"{streak} days", inline=True)
+                e.add_field(name="CHECK-IN STREAK",      value=f"{streak} days", inline=True)
             if wins:
-                e.add_field(name="PROPAGANDA VICTORIES", value=str(wins),        inline=True)
+                e.add_field(name="PROPAGANDA VICTORIES", value=str(wins),         inline=True)
+            if thumb_url:
+                e.set_thumbnail(url=thumb_url)
             e.timestamp = discord.utils.utcnow()
             return e
 
@@ -252,9 +257,9 @@ class Stats(commands.Cog):
         labels   = {"overview": "OVERVIEW", "social": "SOCIAL", "economy": "ECONOMY"}
 
         class StatsView(discord.ui.View):
-            def __init__(self, current: str):
+            def __init__(self, current: str, thumb_url: str | None):
                 super().__init__(timeout=60)
-                self.current = current
+                self.thumb_url = thumb_url
                 for page_id, label in labels.items():
                     btn = discord.ui.Button(
                         label=label,
@@ -266,7 +271,10 @@ class Stats(commands.Cog):
 
             def make_callback(self, page_id: str):
                 async def callback(btn_interaction: discord.Interaction):
-                    await btn_interaction.response.edit_message(embed=builders[page_id](), view=StatsView(page_id))
+                    await btn_interaction.response.edit_message(
+                        embed=builders[page_id](self.thumb_url),
+                        view=StatsView(page_id, self.thumb_url),
+                    )
                 return callback
 
             async def on_timeout(self):
@@ -274,7 +282,10 @@ class Stats(commands.Cog):
                     item.disabled = True
 
         file = discord.File("images/ccpstats.png", filename="ccpstats.png")
-        await interaction.followup.send(embed=build_overview(), view=StatsView("overview"), file=file)
+        msg = await interaction.followup.send(embed=build_overview("attachment://ccpstats.png"), view=StatsView("overview", None), file=file, wait=True)
+        thumb_url = msg.attachments[0].url if msg.attachments else None
+        if thumb_url:
+            await msg.edit(embed=build_overview(thumb_url), view=StatsView("overview", thumb_url))
 
     @app_commands.command(name="state_report", description="View the official state report for this server")
     async def state_report(self, interaction: discord.Interaction):
