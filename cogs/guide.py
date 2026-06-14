@@ -98,7 +98,16 @@ class Guide(commands.Cog):
             name="RANK CHANGE REWARDS",
             value=(
                 "Promotions award Yuan based on the rank you enter. Demotions deduct Yuan based on the rank you leave. "
-                "Amounts scale with rank tier — higher tiers carry larger rewards and steeper penalties."
+                "Amounts scale with rank tier. Higher tiers carry larger rewards and steeper penalties."
+            ),
+            inline=False,
+        )
+        e1.add_field(
+            name="RANK ROLES",
+            value=(
+                "By default the bot automatically creates and assigns a Discord server role for each rank tier, "
+                "keeping it in sync with your score. Mods can disable this with `ccp roles off` if the server "
+                "does not want role clutter. The Execution List role is always active regardless of this setting."
             ),
             inline=False,
         )
@@ -109,7 +118,7 @@ class Guide(commands.Cog):
             name="SENTIMENT",
             value=(
                 "Each message is analyzed for tone. Positive messages nudge your score up, "
-                "negative ones nudge it down. Max impact per message is +0.2 or -0.2. "
+                "negative ones nudge it down. Max impact per message is +0.3 or -0.3. "
                 "Neutral messages do nothing."
             ),
             inline=False,
@@ -117,17 +126,16 @@ class Guide(commands.Cog):
         e2.add_field(
             name="COUNTER-REVOLUTIONARY SPEECH",
             value=(
-                "Messages referencing banned topics — Tiananmen, Taiwan independence, Xinjiang, Tibet, "
-                "Falun Gong, and related subjects — are flagged regardless of tone. Penalty: -0.2."
+                "Messages referencing banned topics (Tiananmen, Taiwan independence, Xinjiang, Tibet, "
+                "Falun Gong, and related subjects) are flagged regardless of tone. Penalty: -0.3."
             ),
             inline=False,
         )
         e2.add_field(
             name="STRUCTURAL VIOLATIONS",
             value=(
-                "Sending the same message twice in a row: -1.0\n"
-                "Excessive caps on longer messages: -0.2\n"
-                "Messages under 4 characters: -0.1"
+                "Sending the same message twice in a row (10+ characters): -0.7\n"
+                "Excessive caps (16+ character messages, 80%+ uppercase): -0.4"
             ),
             inline=False,
         )
@@ -145,7 +153,7 @@ class Guide(commands.Cog):
         e3.add_field(name="/history [citizen]",      value="Last 5 score changes. Viewing others requires mod permissions.", inline=False)
         e3.add_field(name="/leaderboard",            value="Rankings across 8 categories: score, yuan, activity, endorsements, rebukes, and informants.", inline=False)
         e3.add_field(name="/state_report",           value="Server-wide report: biggest rise/fall, top informant, yuan in circulation, avg score.", inline=False)
-        e3.add_field(name="/checkin",                value="Perform your daily check-in. Earns Yuan and a small score bump. Streak increases daily reward (max ¥150).", inline=False)
+        e3.add_field(name="/checkin",                value="Perform your daily check-in. Earns Yuan and a small score bump. Streak increases daily reward up to ¥750.", inline=False)
         e3.add_field(name="/botinfo",                value="Technical information about the bot: creator, tech stack, server count, repo and invite links.", inline=False)
         e3.add_field(name="/uptime",                 value="How long the Bureau has been active since last restart.", inline=False)
         e3.add_field(name="/ping",                   value="Check the Bureau's response latency.", inline=False)
@@ -154,20 +162,29 @@ class Guide(commands.Cog):
         embeds.append(e3)
 
         e4 = discord.Embed(color=0xCC0000, title="YUAN AND ECONOMY")
-        e4.add_field(name="Earning Yuan",  value="You earn 1 Yuan per message automatically. Check-ins and propaganda victories are additional sources.", inline=False)
+        e4.add_field(name="Earning Yuan",  value="You earn ¥10 per message automatically. Check-ins and propaganda victories are additional sources.", inline=False)
         e4.add_field(name="/yuan",         value="Check your Yuan balance and lifetime earned/spent.", inline=False)
-        e4.add_field(name="/shop",         value="Browse available shop items and their costs.", inline=False)
+        e4.add_field(
+            name="/shop",
+            value=(
+                "Browse the full catalogue across 4 categories. Also displays all rank tiers and their promotion yuan rewards.\n"
+                "Categories: **Core** (reports, defense, rehabilitation) · **Economy** (lottery, bounties, disputes) · "
+                "**Chaos** (inspection, legal cover, fabricated evidence) · **Cosmetic** (prestige badges, Winnie the Pooh)"
+            ),
+            inline=False,
+        )
         e4.add_field(
             name="/buy <item> [target] [text]",
             value=(
-                "`report` (¥2,500) · Dock a citizen 2 score points. Files an official report.\n"
-                "`denounce` (¥6,000) · Public denouncement with a custom message. Docks 20 score points.\n"
-                "`surveillance` (¥2,000) · Unlocks one use of `/surveillance_report` on a target (30-day dossier, expires in 30 days).\n"
-                "`rehabilitate` (¥3,000+) · Recover 3 score points. Cost doubles each time you use it.\n"
-                "`expunge` (¥4,000) · Wipe your last 5 score changes from public history.\n"
-                "`freeze` (¥5,000) · Freeze your score for 2 hours. No changes will be applied.\n"
-                "`bribe` (¥12,000) · The next report filed against you within 24 hours is silently nullified.\n"
-                "`gulag` (¥20,000) · Freeze a target's score for 2 hours."
+                "Purchase any item by its ID. Key items:\n"
+                "`report` (¥2,500) · Dock a target 2 score points.\n"
+                "`denounce` (¥6,000) · Public denouncement. Docks target 20 score points.\n"
+                "`surveillance` (¥2,000) · Unlocks one `/surveillance_report` use on a target.\n"
+                "`rehabilitate` (¥3,000+) · Recover +3 score. Cost doubles each use.\n"
+                "`appeal` (¥4,000) · Next incoming penalty reduced 50% within 12 hours.\n"
+                "`exception` (¥12,000) · Completely cancels the next negative action against you.\n"
+                "`reeducation` (¥20,000) · Freeze a target's score for 2 hours.\n"
+                "See `/shop` for all 30 items."
             ),
             inline=False,
         )
@@ -221,6 +238,7 @@ class Guide(commands.Cog):
         e7.add_field(name="ccp reset <@citizen>",                   value="Reset a citizen back to 750.", inline=False)
         e7.add_field(name="ccp threshold <n>",                      value="Set how many votes are required to resolve a fundraiser. Default is 3.", inline=False)
         e7.add_field(name="ccp executions [#channel]",              value="Set a dedicated channel for Execution List notices. Omit the channel to clear and revert to posting in the message channel.", inline=False)
+        e7.add_field(name="ccp roles [on|off]",                     value="Toggle whether rank tier changes assign real Discord server roles. On by default. Execution List role is unaffected.", inline=False)
         e7.add_field(name="ccp poster",                              value="Display a random propaganda poster.", inline=False)
         e7.add_field(name="ccp posters",                             value="Toggle daily propaganda poster broadcasts in this channel. React ❤️ for +1 credit and +20 yuan · React 😡 for -1 credit.", inline=False)
         e7.add_field(
@@ -310,7 +328,7 @@ class Guide(commands.Cog):
                 "This bot is a **satirical meme project** and is not affiliated with, endorsed by, "
                 "or representative of the Chinese Communist Party or the Chinese government.\n\n"
                 "The creator does not support, condone, or endorse the human rights abuses, "
-                "authoritarian policies, or surveillance practices of the CCP — including but not "
+                "authoritarian policies, or surveillance practices of the CCP, including but not "
                 "limited to the treatment of Uyghurs, Tibetans, Hong Kongers, and political dissidents, "
                 "the Tiananmen Square massacre, or real-world social credit systems.\n\n"
                 "This is a joke. The irony is the point."

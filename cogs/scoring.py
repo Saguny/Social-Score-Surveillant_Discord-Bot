@@ -174,15 +174,16 @@ class Scoring(commands.Cog):
             await self.db.set_rank_entered_at(message.guild.id, message.author.id)
             yuan_label = f"-¥{penalty:,}"
 
-        try:
-            old_role = discord.utils.get(message.guild.roles, name=old_rank["name"])
-            if old_role and old_role in message.author.roles:
-                await message.author.remove_roles(old_role)
-            if new > EXECUTION_THRESHOLD:
-                new_role = await self._get_or_create_role(message.guild, new_rank["name"])
-                await message.author.add_roles(new_role)
-        except discord.Forbidden:
-            pass
+        if await self.db.get_assign_rank_roles(message.guild.id):
+            try:
+                old_role = discord.utils.get(message.guild.roles, name=old_rank["name"])
+                if old_role and old_role in message.author.roles:
+                    await message.author.remove_roles(old_role)
+                if new > EXECUTION_THRESHOLD:
+                    new_role = await self._get_or_create_role(message.guild, new_rank["name"])
+                    await message.author.add_roles(new_role)
+            except discord.Forbidden:
+                pass
 
         color = 0xFFD700 if promoted else 0xCC0000
         status = "PROMOTED" if promoted else "DEMOTED"
@@ -242,9 +243,10 @@ class Scoring(commands.Cog):
                 exec_role = discord.utils.get(message.guild.roles, name=exec_role_name)
                 if exec_role and exec_role in message.author.roles:
                     await message.author.remove_roles(exec_role)
-                correct_rank = get_rank(new)
-                correct_role = await self._get_or_create_role(message.guild, correct_rank["name"])
-                await message.author.add_roles(correct_role)
+                if await self.db.get_assign_rank_roles(message.guild.id):
+                    correct_rank = get_rank(new)
+                    correct_role = await self._get_or_create_role(message.guild, correct_rank["name"])
+                    await message.author.add_roles(correct_role)
 
         except discord.Forbidden:
             pass
@@ -266,7 +268,23 @@ class Scoring(commands.Cog):
         if delta == 0:
             return
 
+        broadcast_media = False
+        if delta > 0 and await self.db.get_effect(gid, uid, "media_coverage"):
+            await self.db.consume_effect(gid, uid, "media_coverage")
+            delta = round(delta * 2, 2)
+            broadcast_media = True
+
         old_score, new_score = await self.db.update_score(gid, uid, delta, reason)
+
+        if broadcast_media:
+            embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局 · 国家媒体报道")
+            embed.add_field(
+                name="STATE MEDIA SPOTLIGHT",
+                value=f"{self.bot.format_user(message.author)} · +{delta:.2f} score · DOUBLED BY STATE MEDIA",
+                inline=False,
+            )
+            embed.timestamp = discord.utils.utcnow()
+            await message.channel.send(embed=embed)
 
         await self._handle_rank_change(message, old_score, new_score)
         await self._handle_execution_status(message, old_score, new_score)

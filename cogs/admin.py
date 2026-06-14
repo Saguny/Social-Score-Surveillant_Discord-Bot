@@ -55,6 +55,31 @@ class Admin(commands.Cog):
             embed.add_field(name="EXECUTION CHANNEL", value=msg, inline=False)
         await ctx.send(embed=embed)
 
+    @commands.command(name="roles")
+    @commands.has_permissions(manage_guild=True)
+    async def toggle_rank_roles(self, ctx, state: str = None):
+        async with ctx.typing():
+            current = await self.db.get_assign_rank_roles(ctx.guild.id)
+            if state is None:
+                enabled = not current
+            elif state.lower() in ("on", "enable", "true", "yes"):
+                enabled = True
+            elif state.lower() in ("off", "disable", "false", "no"):
+                enabled = False
+            else:
+                await ctx.send("Usage: `ccp roles [on|off]`")
+                return
+            await self.db.set_assign_rank_roles(ctx.guild.id, enabled)
+            status = "ENABLED" if enabled else "DISABLED"
+            note = (
+                "The bot will automatically create and assign Discord server roles matching each rank tier."
+                if enabled else
+                "Rank tiers are tracked internally only. No Discord roles will be created or assigned."
+            )
+            embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")
+            embed.add_field(name=f"RANK ROLES · {status}", value=note, inline=False)
+        await ctx.send(embed=embed)
+
     @commands.command(name="threshold")
     @commands.has_permissions(manage_guild=True)
     async def set_threshold(self, ctx, n: int):

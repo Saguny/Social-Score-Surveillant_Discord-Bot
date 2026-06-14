@@ -173,6 +173,21 @@ TABLES = [
         vote_count INTEGER DEFAULT 0
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS cosmetic_badges (
+        guild_id     BIGINT,
+        user_id      BIGINT,
+        badge        TEXT,
+        purchased_at BIGINT,
+        PRIMARY KEY (guild_id, user_id, badge)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS eternal_chairmen (
+        user_id      BIGINT PRIMARY KEY,
+        purchased_at BIGINT
+    )
+    """,
 ]
 
 
@@ -201,6 +216,7 @@ class Database:
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_users_last_checkin ON users (last_checkin)")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_users_has_chatted_guild ON users (has_chatted, guild_id)")
             await conn.execute("ALTER TABLE guild_config ADD COLUMN IF NOT EXISTS execution_channel_id BIGINT")
+            await conn.execute("ALTER TABLE guild_config ADD COLUMN IF NOT EXISTS assign_rank_roles BOOLEAN NOT NULL DEFAULT TRUE")
 
     async def _create_tables(self):
         async with self._pool.acquire() as conn:
@@ -359,6 +375,21 @@ class Database:
                 guild_id, channel_id,
             )
 
+    async def get_assign_rank_roles(self, guild_id) -> bool:
+        row = await self._pool.fetchrow(
+            "SELECT assign_rank_roles FROM guild_config WHERE guild_id = $1",
+            guild_id,
+        )
+        return row["assign_rank_roles"] if row else True
+
+    async def set_assign_rank_roles(self, guild_id, enabled: bool):
+        async with self._pool.acquire() as conn:
+            await self._ensure_guild(conn, guild_id)
+            await conn.execute(
+                "UPDATE guild_config SET assign_rank_roles = $2 WHERE guild_id = $1",
+                guild_id, enabled,
+            )
+
     async def mark_chatted(self, guild_id, user_id):
         await self._pool.execute(
             "UPDATE users SET has_chatted = 1 WHERE guild_id = $1 AND user_id = $2",
@@ -488,6 +519,66 @@ class Database:
                 guild_id, target_id, since,
             )
         return {"user": user, "history": history}
+
+    async def get_score_history_brief(self, guild_id: int, user_id: int, limit: int = 20):
+        return await self._pool.fetch(
+            "SELECT delta, reason, timestamp FROM score_history WHERE guild_id = $1 AND user_id = $2 ORDER BY timestamp DESC LIMIT $3",
+            guild_id, user_id, limit,
+        )
+
+    async def get_last_attacker(self, guild_id: int, user_id: int) -> int | None:
+        row = await self._pool.fetchrow(
+            "SELECT user_id FROM transactions WHERE guild_id = $1 AND target_user_id = $2 AND item_id IN ('report', 'denounce') ORDER BY timestamp DESC LIMIT 1",
+            guild_id, user_id,
+        )
+        return row["user_id"] if row else None
+
+    async def get_random_active_user(self, guild_id: int, exclude_id: int) -> int | None:
+        row = await self._pool.fetchrow(
+            "SELECT user_id FROM users WHERE guild_id = $1 AND user_id != $2 ORDER BY RANDOM() LIMIT 1",
+            guild_id, exclude_id,
+        )
+        return row["user_id"] if row else None
+
+    async def consume_investigation_bounty(self, guild_id: int, target_id: int) -> dict | None:
+        rows = await self._pool.fetch(
+            "SELECT id, metadata FROM active_effects WHERE guild_id = $1 AND user_id = $2 AND effect_type = 'investigation' AND expires_at > $3",
+            guild_id, target_id, int(time.time()),
+        )
+        if not rows:
+            return None
+        row = rows[0]
+        await self._pool.execute("DELETE FROM active_effects WHERE id = $1", row["id"])
+        return json.loads(row["metadata"])
+
+    async def add_fabricated_history(self, guild_id: int, user_id: int, reason: str):
+        await self._pool.execute(
+            "INSERT INTO score_history (guild_id, user_id, delta, reason, timestamp) VALUES ($1, $2, 0, $3, $4)",
+            guild_id, user_id, f"[UNVERIFIED REPORT] {reason[:80]}", int(time.time()),
+        )
+
+    async def add_cosmetic_badge(self, guild_id: int, user_id: int, badge: str):
+        await self._pool.execute(
+            "INSERT INTO cosmetic_badges (guild_id, user_id, badge, purchased_at) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING",
+            guild_id, user_id, badge, int(time.time()),
+        )
+
+    async def get_cosmetic_badges(self, guild_id: int, user_id: int) -> list[str]:
+        rows = await self._pool.fetch(
+            "SELECT badge FROM cosmetic_badges WHERE guild_id = $1 AND user_id = $2",
+            guild_id, user_id,
+        )
+        return [row["badge"] for row in rows]
+
+    async def add_eternal_chairman(self, user_id: int):
+        await self._pool.execute(
+            "INSERT INTO eternal_chairmen (user_id, purchased_at) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+            user_id, int(time.time()),
+        )
+
+    async def get_all_eternal_chairmen(self) -> set[int]:
+        rows = await self._pool.fetch("SELECT user_id FROM eternal_chairmen")
+        return {row["user_id"] for row in rows}
 
     async def clean_expired_effects(self):
         now = time.time()
@@ -759,7 +850,7 @@ class Database:
                 if row["last_checkin"] >= today_start:
                     return {"already_checked_in": True}
                 new_streak = (row["checkin_streak"] + 1) if row["last_checkin"] >= yesterday_start else 1
-                yuan_reward = min(50 + (new_streak - 1) * 10, 150)
+                yuan_reward = min(250 + (new_streak - 1) * 50, 750)
                 score_delta = 0.2
                 old_score = row["score"]
                 new_score = min(1300.0, old_score + score_delta)

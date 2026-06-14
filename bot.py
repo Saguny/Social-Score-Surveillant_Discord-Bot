@@ -18,6 +18,19 @@ discord.Embed.__init__ = _embed_init
 
 load_dotenv()
 
+
+def _fullwidth(text: str) -> str:
+    out = []
+    for ch in text:
+        code = ord(ch)
+        if 0x21 <= code <= 0x7E:
+            out.append(chr(code + 0xFEE0))
+        elif ch == ' ':
+            out.append('　')
+        else:
+            out.append(ch)
+    return ''.join(out)
+
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
@@ -124,12 +137,20 @@ class SocialCreditBot(commands.Bot):
     def __init__(self):
         super().__init__(command_prefix="ccp ", intents=intents)
         self.db = Database()
+        self.ec_users: set[int] = set()
+
+    def format_user(self, user) -> str:
+        name = str(user)
+        if hasattr(user, 'id') and user.id in self.ec_users:
+            return f"{name} 【{_fullwidth('Winnie the Pooh')}】"
+        return name
 
     async def close(self):
         await super().close()
 
     async def setup_hook(self):
         await self.db.init()
+        self.ec_users = await self.db.get_all_eternal_chairmen()
         await self.load_extension("cogs.scoring")
         await self.load_extension("cogs.economy")
         await self.load_extension("cogs.stats")
