@@ -280,7 +280,7 @@ class Scoring(commands.Cog):
             embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局 · 国家媒体报道")
             embed.add_field(
                 name="STATE MEDIA SPOTLIGHT",
-                value=f"{self.bot.format_user(message.author)} · +{delta:.2f} score · DOUBLED BY STATE MEDIA",
+                value=f"{await self.bot.format_user_full(message.author, message.guild.id)} · +{delta:.2f} score · DOUBLED BY STATE MEDIA",
                 inline=False,
             )
             embed.timestamp = discord.utils.utcnow()

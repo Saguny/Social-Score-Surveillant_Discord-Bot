@@ -199,8 +199,8 @@ SHOP_ITEMS = {
     },
     # --- Cosmetics / prestige ---
     "verified": {
-        "name": "Verified Citizen",
-        "description": "Cosmetic badge. Displays verified status on your profile.",
+        "name": "Certified Normal",
+        "description": "Cosmetic badge. The bureau certifies you are, at minimum, normal.",
         "cost": 30000,
         "requires_target": False,
         "requires_text": False,
@@ -208,8 +208,8 @@ SHOP_ITEMS = {
         "cosmetic": True,
     },
     "figure": {
-        "name": "Community Figure",
-        "description": "Cosmetic badge. Profile highlighted in leaderboard lists.",
+        "name": "Neighbourhood Snitch",
+        "description": "Cosmetic badge. Your dedication to informing on others has been recognised.",
         "cost": 50000,
         "requires_target": False,
         "requires_text": False,
@@ -217,8 +217,8 @@ SHOP_ITEMS = {
         "cosmetic": True,
     },
     "influencer": {
-        "name": "Regional Influencer",
-        "description": "Cosmetic badge. Larger profile presence.",
+        "name": "Propaganda Mouthpiece",
+        "description": "Cosmetic badge. The bureau has selected you as an official voice.",
         "cost": 100000,
         "requires_target": False,
         "requires_text": False,
@@ -226,8 +226,8 @@ SHOP_ITEMS = {
         "cosmetic": True,
     },
     "associate": {
-        "name": "Party Associate",
-        "description": "Rare cosmetic status title. Prestige only.",
+        "name": "Sycophant Elite",
+        "description": "Cosmetic badge. Your loyalty has elevated you above ordinary citizens.",
         "cost": 150000,
         "requires_target": False,
         "requires_text": False,
@@ -235,8 +235,8 @@ SHOP_ITEMS = {
         "cosmetic": True,
     },
     "asset": {
-        "name": "National Asset",
-        "description": "Top-tier cosmetic. Permanent leaderboard styling.",
+        "name": "State-Owned",
+        "description": "Cosmetic badge. You are no longer a person. You are property of the People's Republic.",
         "cost": 250000,
         "requires_target": False,
         "requires_text": False,
@@ -264,10 +264,10 @@ BADGE_DISPLAY = {
 }
 
 COSMETIC_META = {
-    "verified":         {"color": 0x5DADE2, "label": "VERIFIED CITIZEN",    "note": "Your identity has been verified by the bureau. Server-wide status."},
-    "figure":           {"color": 0x27AE60, "label": "COMMUNITY FIGURE",    "note": "Your community standing has been formally recognized. Server-wide status."},
-    "influencer":       {"color": 0x8E44AD, "label": "REGIONAL INFLUENCER", "note": "The bureau acknowledges your regional influence. Server-wide status."},
-    "associate":        {"color": 0xCC0000, "label": "PARTY ASSOCIATE",     "note": "Your association with the Party has been formalized. Server-wide status."},
-    "asset":            {"color": 0xF39C12, "label": "NATIONAL ASSET",      "note": "You have been designated a National Asset of the People's Republic. Server-wide status."},
-    "eternal_chairman": {"color": 0xFFB347, "label": "WINNIE THE POOH",     "note": "Forbidden in 1.4 billion territories. Your name now renders in the sacred fullwidth script across every server the bureau inhabits. Global status."},
+    "verified":         {"color": 0x5DADE2, "label": "CERTIFIED NORMAL",       "suffix": "【 𝖢𝖾𝗋𝗍𝗂𝖿𝗂𝖾𝖽 𝖭𝗈𝗋𝗆𝖺𝗅 】",                          "note": "You have been certified normal by the bureau. Server-wide status."},
+    "figure":           {"color": 0x27AE60, "label": "NEIGHBOURHOOD SNITCH",   "suffix": "〖 𝘕𝘦𝘪𝘨𝘩𝘣𝘰𝘶𝘳𝘩𝘰𝘰𝘥 𝘚𝘯𝘪𝘵𝘤𝘩 〗",                      "note": "Your dedication to reporting neighbours has been recognised. Server-wide status."},
+    "influencer":       {"color": 0x8E44AD, "label": "PROPAGANDA MOUTHPIECE",  "suffix": "〔  ▰▰  𝙋𝙍𝙊𝙋𝘼𝙂𝘼𝙉𝘿𝘼 𝙈𝙊𝙐𝙏𝙃𝙋𝙄𝙀𝘾𝙀  ▰▰  〕",         "note": "The bureau has selected you as an official voice of the Party. Server-wide status."},
+    "associate":        {"color": 0xCC0000, "label": "SYCOPHANT ELITE",         "suffix": "【 𝘚𝘺𝘤𝘰𝘱𝘩𝘢𝘯𝘵 𝘌𝘭𝘪𝘵𝘦 】",                              "note": "Your loyalty has elevated you above ordinary citizens. Server-wide status."},
+    "asset":            {"color": 0xF39C12, "label": "STATE-OWNED",             "suffix": "╠══ 𝙎𝙏𝘼𝙏𝙀-𝙊𝙒𝙉𝙀𝘿 ══╣",                                "note": "You are no longer a person. You are an asset of the People's Republic. Server-wide status."},
+    "eternal_chairman": {"color": 0xFFB347, "label": "WINNIE THE POOH",         "suffix": "▓▒░【 𝙒𝙞𝙣𝙣𝙞𝙚 𝙩𝙝𝙚 𝙋𝙤𝙤𝙝 】░▒▓",                        "note": "Forbidden in 1.4 billion territories. Your name now renders in the sacred fullwidth script across every server the bureau inhabits. Global status."},
 }

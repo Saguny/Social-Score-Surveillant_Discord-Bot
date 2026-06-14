@@ -145,6 +145,20 @@ class SocialCreditBot(commands.Bot):
             return f"{name} 【{_fullwidth('Winnie the Pooh')}】"
         return name
 
+    async def format_user_full(self, user, guild_id: int) -> str:
+        if hasattr(user, 'id') and user.id in self.ec_users:
+            return f"{str(user)} 【{_fullwidth('Winnie the Pooh')}】"
+        if hasattr(user, 'id'):
+            from config.shop import COSMETIC_META
+            _ORDER = ["verified", "figure", "influencer", "associate", "asset"]
+            badges = await self.db.get_cosmetic_badges(guild_id, user.id)
+            badge_set = set(badges)
+            for badge_id in reversed(_ORDER):
+                if badge_id in badge_set:
+                    suffix = COSMETIC_META[badge_id]["suffix"]
+                    return f"{str(user)} {suffix}"
+        return str(user)
+
     async def close(self):
         await super().close()
 

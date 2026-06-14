@@ -4,12 +4,10 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from config.shop import SHOP_ITEMS, BADGE_DISPLAY, COSMETIC_META
-from config.ranks import RANKS, RANK_YUAN
 
 _INVESTIGATION_BOUNTY_REWARD = 2500
 
 _CATEGORY_TITLES = {
-    "ranks":    "中华人民共和国社会信用局 · 社会信用等级",
     "core":     "中华人民共和国社会信用局 · 核心项目",
     "economy":  "中华人民共和国社会信用局 · 经济 · 互动",
     "chaos":    "中华人民共和国社会信用局 · 混乱 · 系统压力",
@@ -17,39 +15,40 @@ _CATEGORY_TITLES = {
 }
 
 _CATEGORY_LABELS = {
-    "ranks":    "Rank Tiers",
+    "cosmetic": "Cosmetic",
     "core":     "Core",
     "economy":  "Economy",
     "chaos":    "Chaos",
-    "cosmetic": "Cosmetic",
 }
 
+_COSMETIC_ORDER = ["verified", "figure", "influencer", "associate", "asset", "eternal_chairman"]
 
-def _build_shop_embeds() -> dict[str, discord.Embed]:
-    rank_lines = "\n".join(
-        f"{r['name']:<22} {r['min']:>4} - {r['max']:<4}  ¥{RANK_YUAN[i]:>7,}  on promotion"
-        for i, r in enumerate(RANKS)
-    )
-    e_ranks = discord.Embed(color=0xCC0000, title=_CATEGORY_TITLES["ranks"])
-    e_ranks.add_field(name="RANK TIERS", value=f"```\n{rank_lines}\n```", inline=False)
-    e_ranks.add_field(
-        name="DEMOTION PENALTY",
-        value="Losing a rank deducts the promotion yuan of the rank you fall from. Yuan floors at ¥0.",
-        inline=False,
-    )
-    e_ranks.add_field(
-        name="DISCORD ROLES",
-        value="Each rank tier is backed by a real Discord server role, auto-assigned when your score changes. Mods can disable this with `ccp roles off`.",
-        inline=False,
-    )
-    embeds: dict[str, discord.Embed] = {"ranks": e_ranks}
+
+def _build_shop_embeds(username: str = "yourname") -> dict[str, discord.Embed]:
+    e_cosmetic = discord.Embed(color=0xFFB347, title=_CATEGORY_TITLES["cosmetic"])
+    for item_id in _COSMETIC_ORDER:
+        item = SHOP_ITEMS.get(item_id)
+        if not item:
+            continue
+        meta = COSMETIC_META.get(item_id, {})
+        label = meta.get("label", item["name"].upper())
+        suffix = meta.get("suffix", "")
+        scope = "Global · all servers" if item.get("global") else "Server-wide"
+        preview = f"{username} {suffix}" if suffix else username
+        e_cosmetic.add_field(
+            name=f"{label}  ·  ¥{item['cost']:,}  ·  {scope}",
+            value=f"{preview}\n{item['description']}",
+            inline=False,
+        )
 
     by_cat: dict[str, list] = {}
     for item_id, item in SHOP_ITEMS.items():
         cat = item.get("category", "core")
-        by_cat.setdefault(cat, []).append((item_id, item))
+        if cat != "cosmetic":
+            by_cat.setdefault(cat, []).append((item_id, item))
 
-    for cat in ("core", "economy", "chaos", "cosmetic"):
+    embeds: dict[str, discord.Embed] = {"cosmetic": e_cosmetic}
+    for cat in ("core", "economy", "chaos"):
         embed = discord.Embed(color=0xCC0000, title=_CATEGORY_TITLES[cat])
         for item_id, item in by_cat.get(cat, []):
             embed.add_field(
@@ -63,7 +62,7 @@ def _build_shop_embeds() -> dict[str, discord.Embed]:
 
 
 class ShopView(discord.ui.View):
-    def __init__(self, embeds: dict[str, discord.Embed], active: str = "ranks"):
+    def __init__(self, embeds: dict[str, discord.Embed], active: str = "core"):
         super().__init__(timeout=300)
         self.embeds = embeds
         self.active = active
@@ -93,16 +92,16 @@ class Economy(commands.Cog):
     @app_commands.command(name="shop", description="Browse the Social Credit Bureau's shop")
     async def shop(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
-        embeds = _build_shop_embeds()
-        view = ShopView(embeds)
-        await interaction.followup.send(embed=embeds["ranks"], view=view, ephemeral=True)
+        embeds = _build_shop_embeds(username=str(interaction.user))
+        view = ShopView(embeds, active="core")
+        await interaction.followup.send(embed=embeds["core"], view=view)
 
     @app_commands.command(name="yuan", description="Check your Yuan balance")
     async def yuan(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         user = await self.db.get_user(interaction.guild.id, interaction.user.id)
         embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")
-        embed.add_field(name="CITIZEN", value=self.bot.format_user(interaction.user), inline=False)
+        embed.add_field(name="CITIZEN", value=await self.bot.format_user_full(interaction.user, interaction.guild.id), inline=False)
         embed.add_field(name="BALANCE", value=f"¥{user['yuan']:,}", inline=True)
         embed.add_field(name="TOTAL EARNED", value=f"¥{user['total_yuan_earned']:,}", inline=True)
         embed.add_field(name="TOTAL SPENT", value=f"¥{user['total_yuan_spent']:,}", inline=True)
@@ -202,7 +201,7 @@ class Economy(commands.Cog):
             if bounty:
                 await self.db.adjust_yuan(gid, uid, bounty.get("reward", _INVESTIGATION_BOUNTY_REWARD))
 
-            reporter_name = "Unknown Citizen" if is_anon else self.bot.format_user(interaction.user)
+            reporter_name = "Unknown Citizen" if is_anon else await self.bot.format_user_full(interaction.user, gid)
             embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")
             embed.add_field(name="OFFICIAL REPORT FILED", value=target.mention, inline=False)
             embed.add_field(name="FILED BY", value=reporter_name, inline=True)
@@ -230,7 +229,7 @@ class Economy(commands.Cog):
             old, new = await self.db.update_score(gid, target.id, delta, "public denouncement")
             await self.db.increment_reported(gid, target.id)
             report_num = await self.db.increment_report_counter(gid)
-            denouncer_name = "Unknown Citizen" if is_anon else self.bot.format_user(interaction.user)
+            denouncer_name = "Unknown Citizen" if is_anon else await self.bot.format_user_full(interaction.user, gid)
             embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 公开谴责")
             embed.add_field(name="SUBJECT", value=target.mention, inline=False)
             embed.add_field(name="DENOUNCED BY", value=denouncer_name, inline=True)
@@ -343,9 +342,13 @@ class Economy(commands.Cog):
             await self.db.update_score(gid, winner.id, 2.0, "dispute resolution victory")
             await self.db.update_score(gid, loser.id, -2.0, "dispute resolution loss")
             embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 争议裁决")
-            embed.add_field(name="CHALLENGER", value=self.bot.format_user(interaction.user), inline=True)
-            embed.add_field(name="DEFENDANT", value=self.bot.format_user(target), inline=True)
-            embed.add_field(name="OUTCOME", value=f"{self.bot.format_user(winner)} wins +2.00 · {self.bot.format_user(loser)} loses -2.00", inline=False)
+            challenger_name = await self.bot.format_user_full(interaction.user, gid)
+            defendant_name = await self.bot.format_user_full(target, gid)
+            winner_name = await self.bot.format_user_full(winner, gid)
+            loser_name = await self.bot.format_user_full(loser, gid)
+            embed.add_field(name="CHALLENGER", value=challenger_name, inline=True)
+            embed.add_field(name="DEFENDANT", value=defendant_name, inline=True)
+            embed.add_field(name="OUTCOME", value=f"{winner_name} wins +2.00 · {loser_name} loses -2.00", inline=False)
             embed.timestamp = discord.utils.utcnow()
             await interaction.followup.send(embed=embed)
 
@@ -376,7 +379,7 @@ class Economy(commands.Cog):
             embed = discord.Embed(color=0x1a1a2e, title="中华人民共和国社会信用局 · 内部调查")
             if attacker_id:
                 attacker = interaction.guild.get_member(attacker_id)
-                attacker_name = self.bot.format_user(attacker) if attacker else f"User {attacker_id}"
+                attacker_name = await self.bot.format_user_full(attacker, gid) if attacker else f"User {attacker_id}"
                 embed.add_field(name="LAST KNOWN AGGRESSOR", value=attacker_name, inline=False)
             else:
                 embed.add_field(name="RESULT", value="No reports or denouncements on file against you.", inline=False)
@@ -402,7 +405,7 @@ class Economy(commands.Cog):
                 return
             old, new = await self.db.update_score(gid, victim_id, -1.0, "compliance inspection")
             victim = interaction.guild.get_member(victim_id)
-            victim_name = self.bot.format_user(victim) if victim else f"Citizen {victim_id}"
+            victim_name = await self.bot.format_user_full(victim, gid) if victim else f"Citizen {victim_id}"
             embed = discord.Embed(color=0x8B0000, title="中华人民共和国社会信用局 · 合规检查")
             embed.add_field(name="SELECTED CITIZEN", value=victim_name, inline=False)
             embed.add_field(name="RESULT", value=f"Score: {old:.2f} → {new:.2f}", inline=True)
@@ -412,7 +415,7 @@ class Economy(commands.Cog):
         elif item_id == "history_review":
             history = await self.db.get_score_history_brief(gid, target.id, limit=20)
             embed = discord.Embed(color=0x1a1a2e, title="中华人民共和国社会信用局 · 历史审查")
-            embed.add_field(name="SUBJECT", value=self.bot.format_user(target), inline=False)
+            embed.add_field(name="SUBJECT", value=await self.bot.format_user_full(target, gid), inline=False)
             if history:
                 lines = []
                 for h in history:
@@ -562,7 +565,7 @@ class Economy(commands.Cog):
             risk = "LOW"
 
         embed = discord.Embed(color=0x1a1a2e, title="中华人民共和国社会信用局 · 机密档案")
-        embed.add_field(name="SUBJECT", value=self.bot.format_user(target), inline=True)
+        embed.add_field(name="SUBJECT", value=await self.bot.format_user_full(target, gid), inline=True)
         embed.add_field(name="CURRENT SCORE", value=f"{current_score:.2f}", inline=True)
         embed.add_field(name="RANK", value=rank["name"], inline=True)
         embed.add_field(name="YUAN BALANCE", value=f"¥{user_data['yuan']:,}", inline=True)
@@ -610,7 +613,7 @@ class Economy(commands.Cog):
         old, new = await self.db.update_score(gid, uid, 0.5, "public confession")
 
         embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 公开认罪")
-        embed.add_field(name="CITIZEN", value=self.bot.format_user(interaction.user), inline=False)
+        embed.add_field(name="CITIZEN", value=await self.bot.format_user_full(interaction.user, gid), inline=False)
         embed.add_field(name="CONFESSION", value=text[:200], inline=False)
         embed.add_field(name="COST", value=f"¥{cost:,}", inline=True)
         embed.add_field(name="SCORE ADJUSTMENT", value=f"{old:.2f} → {new:.2f}", inline=True)
