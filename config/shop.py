@@ -95,7 +95,7 @@ SHOP_ITEMS = {
     },
     "investigation": {
         "name": "Special Investigation",
-        "description": "24h bounty on target. Your ¥8,000 becomes the reward — add text to put up extra yuan.",
+        "description": "24h bounty on target. Your ¥8,000 becomes the reward · add text to put up extra yuan.",
         "cost": 8000,
         "requires_target": True,
         "requires_text": False,
@@ -104,11 +104,10 @@ SHOP_ITEMS = {
     },
     "protection": {
         "name": "Political Protection",
-        "description": "Ally's first incoming attack is halved. Expires 24h.",
+        "description": "Ally's first incoming attack is halved. Lasts until triggered. One active per target.",
         "cost": 7000,
         "requires_target": True,
         "requires_text": False,
-        "duration": 86400,
         "category": "economy",
     },
     "inquiry": {

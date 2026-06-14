@@ -58,7 +58,7 @@ def _build_shop_embeds(username: str = "yourname") -> dict[str, discord.Embed]:
             embed.add_field(
                 name=f"/buy {item_id}  ·  ¥{item['cost']:,}",
                 value=item['description'],
-                inline=True,
+                inline=False,
             )
         embeds[cat] = embed
 
@@ -149,6 +149,12 @@ class Economy(commands.Cog):
             return
 
         await interaction.response.defer(ephemeral=True)
+
+        if item == "protection" and target and await self.db.get_effect(interaction.guild.id, target.id, "protection"):
+            await interaction.followup.send(
+                f"{target.mention} already has active Political Protection.", ephemeral=True
+            )
+            return
 
         cost = cfg["cost"]
         if item == "rehabilitate":
@@ -386,12 +392,12 @@ class Economy(commands.Cog):
             await interaction.followup.send(embed=embed, ephemeral=True)
 
         elif item_id == "protection":
-            expires_at = int(time.time()) + cfg["duration"]
+            expires_at = int(time.time()) + 315360000
             await self.db.add_effect(gid, target.id, "protection", expires_at)
             embed = discord.Embed(color=0x2d5a27, title="中华人民共和国社会信用局")
             embed.add_field(
                 name="POLITICAL PROTECTION GRANTED",
-                value=f"{target.mention} is under your protection for 24 hours.\nThe first negative action against them will be reduced by 50%.",
+                value=f"{target.mention} is under political protection.\nThe first negative action against them will be reduced by 50%. Lasts until triggered.",
                 inline=False,
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
