@@ -113,12 +113,8 @@ class Stats(commands.Cog):
     @app_commands.command(name="daily_report", description="View today's score and yuan activity for a citizen")
     @app_commands.describe(citizen="Citizen to look up (defaults to yourself)")
     async def daily_report(self, interaction: discord.Interaction, citizen: discord.Member = None):
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer()
         target = citizen or interaction.user
-
-        if target.id != interaction.user.id and not interaction.user.guild_permissions.manage_guild:
-            await interaction.followup.send("Insufficient clearance to view another citizen's record.", ephemeral=True)
-            return
 
         data = await self.db.get_daily_stats(interaction.guild.id, target.id)
 
@@ -142,7 +138,7 @@ class Stats(commands.Cog):
             yuan_str += f"\n{'▲ +' if yuan_change >= 0 else '▼ '}¥{yuan_change:,} vs yesterday"
         embed.add_field(name="YUAN",        value=yuan_str, inline=True)
         embed.timestamp = discord.utils.utcnow()
-        await interaction.followup.send(embed=embed, ephemeral=True)
+        await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="stats", description="View detailed statistics for a citizen")
     @app_commands.describe(citizen="Citizen to look up (defaults to yourself)")
