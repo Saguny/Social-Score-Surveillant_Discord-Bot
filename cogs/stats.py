@@ -18,7 +18,7 @@ class Stats(commands.Cog):
         rank = get_rank(user["score"])
 
         embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")
-        embed.set_author(name=str(target), icon_url=target.display_avatar.url)
+        embed.set_author(name=await self.bot.format_user_full(target, interaction.guild.id), icon_url=target.display_avatar.url)
         embed.add_field(name="SCORE", value=f"{user['score']:.2f}", inline=True)
         embed.add_field(name="RANK", value=rank["name"], inline=True)
         await interaction.followup.send(embed=embed)
@@ -29,7 +29,7 @@ class Stats(commands.Cog):
             target = citizen or ctx.author
             user = await self.db.get_user(ctx.guild.id, target.id)
             embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")
-            embed.set_author(name=str(target), icon_url=target.display_avatar.url)
+            embed.set_author(name=await self.bot.format_user_full(target, ctx.guild.id), icon_url=target.display_avatar.url)
             embed.add_field(name="BALANCE", value=f"¥{user['yuan']}", inline=True)
             embed.add_field(name="TOTAL EARNED", value=f"¥{user['total_yuan_earned']}", inline=True)
             embed.add_field(name="TOTAL SPENT", value=f"¥{user['total_yuan_spent']}", inline=True)
@@ -51,7 +51,7 @@ class Stats(commands.Cog):
                 return "= 0.00"
 
             embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 公民档案")
-            embed.set_author(name=str(target), icon_url=target.display_avatar.url)
+            embed.set_author(name=await self.bot.format_user_full(target, gid), icon_url=target.display_avatar.url)
             embed.add_field(name="SCORE",     value=f"{user['score']:.2f}", inline=True)
             embed.add_field(name="RANK",      value=rank["name"],            inline=True)
             embed.add_field(name="YUAN",      value=f"¥{user['yuan']}",     inline=True)
@@ -71,7 +71,7 @@ class Stats(commands.Cog):
             user = await self.db.get_user(ctx.guild.id, target.id)
             rank = get_rank(user["score"])
             embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")
-            embed.set_author(name=str(target), icon_url=target.display_avatar.url)
+            embed.set_author(name=await self.bot.format_user_full(target, ctx.guild.id), icon_url=target.display_avatar.url)
             embed.add_field(name="SCORE", value=f"{user['score']:.2f}", inline=True)
             embed.add_field(name="RANK", value=rank["name"], inline=True)
         await ctx.send(embed=embed)
@@ -124,7 +124,7 @@ class Stats(commands.Cog):
 
         rows = await self.db.get_score_history(interaction.guild.id, target.id, limit=5)
         embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 档案记录")
-        embed.add_field(name="CITIZEN", value=str(target), inline=False)
+        embed.add_field(name="CITIZEN", value=await self.bot.format_user_full(target, interaction.guild.id), inline=False)
 
         if not rows:
             embed.add_field(name="RECORD", value="No entries on file.", inline=False)
@@ -157,7 +157,7 @@ class Stats(commands.Cog):
             return "= 0.00"
 
         embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 公民档案")
-        embed.set_author(name=str(target), icon_url=target.display_avatar.url)
+        embed.set_author(name=await self.bot.format_user_full(target, gid), icon_url=target.display_avatar.url)
 
         embed.add_field(name="SCORE",  value=f"{user['score']:.2f}", inline=True)
         embed.add_field(name="RANK",   value=rank["name"],            inline=True)

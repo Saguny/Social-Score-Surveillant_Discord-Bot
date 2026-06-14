@@ -1,6 +1,7 @@
 import os
 import sys
 import asyncio
+from contextvars import ContextVar
 from datetime import datetime, timezone
 import discord
 from discord.ext import commands
@@ -8,13 +9,27 @@ from dotenv import load_dotenv
 from database.db import Database
 from config.ranks import RANKS
 
+OWNER_ID = 544810950952353823
+OWNER_BADGE = " | 𝔻𝕖𝕧𝕖𝕝𝕠𝕡𝕖𝕣 "
+OWNER_COLOR = 0xE6E6FA
+
+_current_user_id: ContextVar[int | None] = ContextVar("current_user_id", default=None)
+
 _orig_embed_init = discord.Embed.__init__
 
 def _embed_init(self, **kwargs):
+    if _current_user_id.get() == OWNER_ID and "color" not in kwargs and "colour" not in kwargs:
+        kwargs["color"] = OWNER_COLOR
     _orig_embed_init(self, **kwargs)
     self.set_footer(text="GLORY TO THE CCP!")
 
 discord.Embed.__init__ = _embed_init
+
+
+class CreditCommandTree(discord.app_commands.CommandTree):
+    async def call(self, interaction: discord.Interaction) -> None:
+        _current_user_id.set(interaction.user.id)
+        await super().call(interaction)
 
 load_dotenv()
 
@@ -135,20 +150,25 @@ async def console_loop(bot: commands.Bot):
 
 class SocialCreditBot(commands.Bot):
     def __init__(self):
-        super().__init__(command_prefix="ccp ", intents=intents)
+        super().__init__(command_prefix="ccp ", intents=intents, tree_cls=CreditCommandTree)
         self.db = Database()
         self.ec_users: set[int] = set()
 
     def format_user(self, user) -> str:
         name = str(user)
-        if hasattr(user, 'id') and user.id in self.ec_users:
-            return f"{name} 【{_fullwidth('Winnie the Pooh')}】"
+        if hasattr(user, 'id'):
+            if user.id == OWNER_ID:
+                return f"{name}{OWNER_BADGE}"
+            if user.id in self.ec_users:
+                return f"{name} 【{_fullwidth('Winnie the Pooh')}】"
         return name
 
     async def format_user_full(self, user, guild_id: int) -> str:
-        if hasattr(user, 'id') and user.id in self.ec_users:
-            return f"{str(user)} 【{_fullwidth('Winnie the Pooh')}】"
         if hasattr(user, 'id'):
+            if user.id == OWNER_ID:
+                return f"{str(user)}{OWNER_BADGE}"
+            if user.id in self.ec_users:
+                return f"{str(user)} 【{_fullwidth('Winnie the Pooh')}】"
             from config.shop import COSMETIC_META
             _ORDER = ["verified", "figure", "influencer", "associate", "asset"]
             badges = await self.db.get_cosmetic_badges(guild_id, user.id)
@@ -158,6 +178,10 @@ class SocialCreditBot(commands.Bot):
                     suffix = COSMETIC_META[badge_id]["suffix"]
                     return f"{str(user)} {suffix}"
         return str(user)
+
+    async def process_commands(self, message: discord.Message) -> None:
+        _current_user_id.set(message.author.id)
+        await super().process_commands(message)
 
     async def close(self):
         await super().close()
