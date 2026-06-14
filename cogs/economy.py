@@ -10,7 +10,7 @@ _INVESTIGATION_BOUNTY_REWARD = 2500
 _CATEGORY_TITLES = {
     "core":     "中华人民共和国社会信用局 · 核心项目",
     "economy":  "中华人民共和国社会信用局 · 经济 · 互动",
-    "chaos":    "中华人民共和国社会信用局 · 混乱 · 系统压力",
+    "misc":     "中华人民共和国社会信用局 · 杂项",
     "cosmetic": "中华人民共和国社会信用局 · 装饰品 · 声望",
 }
 
@@ -18,14 +18,17 @@ _CATEGORY_LABELS = {
     "cosmetic": "Cosmetic",
     "core":     "Core",
     "economy":  "Economy",
-    "chaos":    "Chaos",
+    "misc":     "Misc",
 }
+
+_THUMBNAIL = "attachment://market.png"
 
 _COSMETIC_ORDER = ["verified", "figure", "influencer", "associate", "asset", "eternal_chairman"]
 
 
 def _build_shop_embeds(username: str = "yourname") -> dict[str, discord.Embed]:
     e_cosmetic = discord.Embed(color=0xFFB347, title=_CATEGORY_TITLES["cosmetic"])
+    e_cosmetic.set_thumbnail(url=_THUMBNAIL)
     for item_id in _COSMETIC_ORDER:
         item = SHOP_ITEMS.get(item_id)
         if not item:
@@ -33,10 +36,10 @@ def _build_shop_embeds(username: str = "yourname") -> dict[str, discord.Embed]:
         meta = COSMETIC_META.get(item_id, {})
         label = meta.get("label", item["name"].upper())
         suffix = meta.get("suffix", "")
-        scope = "Global · all servers" if item.get("global") else "Server-wide"
+        scope = "Global" if item.get("global") else "Server-wide"
         preview = f"{username} {suffix}" if suffix else username
         e_cosmetic.add_field(
-            name=f"{label}  ·  ¥{item['cost']:,}  ·  {scope}",
+            name=f"/buy {item_id}  ·  ¥{item['cost']:,}  ·  {scope}",
             value=f"{preview}\n{item['description']}",
             inline=False,
         )
@@ -48,13 +51,14 @@ def _build_shop_embeds(username: str = "yourname") -> dict[str, discord.Embed]:
             by_cat.setdefault(cat, []).append((item_id, item))
 
     embeds: dict[str, discord.Embed] = {"cosmetic": e_cosmetic}
-    for cat in ("core", "economy", "chaos"):
+    for cat in ("core", "economy", "misc"):
         embed = discord.Embed(color=0xCC0000, title=_CATEGORY_TITLES[cat])
+        embed.set_thumbnail(url=_THUMBNAIL)
         for item_id, item in by_cat.get(cat, []):
             embed.add_field(
-                name=f"{item['name']}  ·  ¥{item['cost']:,}",
-                value=f"`{item_id}` · {item['description']}",
-                inline=False,
+                name=f"/buy {item_id}  ·  ¥{item['cost']:,}",
+                value=item['description'],
+                inline=True,
             )
         embeds[cat] = embed
 
@@ -94,7 +98,11 @@ class Economy(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         embeds = _build_shop_embeds(username=str(interaction.user))
         view = ShopView(embeds, active="core")
-        await interaction.followup.send(embed=embeds["core"], view=view)
+        await interaction.followup.send(
+            embed=embeds["core"],
+            view=view,
+            file=discord.File("images/market.png", filename="market.png"),
+        )
 
     @app_commands.command(name="yuan", description="Check your Yuan balance")
     async def yuan(self, interaction: discord.Interaction):

@@ -2,7 +2,7 @@ SHOP_ITEMS = {
     # --- Core system ---
     "report": {
         "name": "Citizen Report",
-        "description": "Docks a target 2 score points. Files an official report.",
+        "description": "Docks target -2.00 score. Logged in their official record.",
         "cost": 2500,
         "requires_target": True,
         "requires_text": False,
@@ -10,7 +10,7 @@ SHOP_ITEMS = {
     },
     "denounce": {
         "name": "Public Denouncement",
-        "description": "Posts a public denouncement. Docks target 20 score points.",
+        "description": "Public post shaming a target. Docks them -20.00 score.",
         "cost": 6000,
         "requires_target": True,
         "requires_text": True,
@@ -18,7 +18,7 @@ SHOP_ITEMS = {
     },
     "surveillance": {
         "name": "Surveillance Dossier",
-        "description": "Unlocks one use of /surveillance_report on a target within 30 days.",
+        "description": "Unlocks one `/surveillance_report` on a target. Valid 30 days.",
         "cost": 2000,
         "requires_target": True,
         "requires_text": False,
@@ -35,7 +35,7 @@ SHOP_ITEMS = {
     },
     "appeal": {
         "name": "Appeal Process",
-        "description": "Next incoming report or penalty is reduced 50% within 12 hours. Single use.",
+        "description": "Next incoming penalty is halved. Single use, expires 12h.",
         "cost": 4000,
         "requires_target": False,
         "requires_text": False,
@@ -44,7 +44,7 @@ SHOP_ITEMS = {
     },
     "exception": {
         "name": "Administrative Exception",
-        "description": "Completely cancels the next negative score action against you within 24 hours.",
+        "description": "Fully cancels the next negative action against you. Single use, expires 24h.",
         "cost": 12000,
         "requires_target": False,
         "requires_text": False,
@@ -53,7 +53,7 @@ SHOP_ITEMS = {
     },
     "reeducation": {
         "name": "Re-Education Camp",
-        "description": "Freezes a target's score for 2 hours. No gains or losses from any source.",
+        "description": "Freezes target's score for 2h. No gains or losses.",
         "cost": 20000,
         "requires_target": True,
         "requires_text": False,
@@ -63,7 +63,7 @@ SHOP_ITEMS = {
     # --- Economy / interaction ---
     "lottery": {
         "name": "State Lottery",
-        "description": "50% lose entry · 40% gain 500-1000 · 10% gain 2000+. RNG yuan sink.",
+        "description": "50% lose · 40% win ¥2,000-5,000 · 10% jackpot ¥10,000-25,000.",
         "cost": 500,
         "requires_target": False,
         "requires_text": False,
@@ -71,7 +71,7 @@ SHOP_ITEMS = {
     },
     "tip": {
         "name": "Anonymous Tip",
-        "description": "Posts a public message about a target appearing from Unknown Citizen.",
+        "description": "Posts a public message about a target as Unknown Citizen.",
         "cost": 750,
         "requires_target": True,
         "requires_text": True,
@@ -79,7 +79,7 @@ SHOP_ITEMS = {
     },
     "model_citizen": {
         "name": "Model Citizen Award",
-        "description": "Instantly adds +1 score to yourself.",
+        "description": "Instantly gain +1.00 score.",
         "cost": 1000,
         "requires_target": False,
         "requires_text": False,
@@ -87,7 +87,7 @@ SHOP_ITEMS = {
     },
     "dispute": {
         "name": "Dispute Resolution",
-        "description": "Challenges a citizen to a coin flip. Winner gains +2 score, loser loses -2.",
+        "description": "Coin flip vs target. Winner +2.00, loser -2.00 score.",
         "cost": 1500,
         "requires_target": True,
         "requires_text": False,
@@ -95,7 +95,7 @@ SHOP_ITEMS = {
     },
     "investigation": {
         "name": "Special Investigation",
-        "description": "Places a 24h bounty on a target. Next person to report them earns ¥2,500 bonus.",
+        "description": "24h bounty on target. Next reporter earns ¥2,500 bonus.",
         "cost": 8000,
         "requires_target": True,
         "requires_text": False,
@@ -104,7 +104,7 @@ SHOP_ITEMS = {
     },
     "protection": {
         "name": "Political Protection",
-        "description": "Shields an ally for 24h. First negative action against them is reduced by 50%.",
+        "description": "Ally's first incoming attack is halved. Expires 24h.",
         "cost": 7000,
         "requires_target": True,
         "requires_text": False,
@@ -113,7 +113,7 @@ SHOP_ITEMS = {
     },
     "inquiry": {
         "name": "Internal Inquiry",
-        "description": "Reveals the last citizen who filed a report or denouncement against you.",
+        "description": "Reveals who last filed a report or denouncement against you.",
         "cost": 4000,
         "requires_target": False,
         "requires_text": False,
@@ -121,7 +121,7 @@ SHOP_ITEMS = {
     },
     "criticism": {
         "name": "Coordinated Criticism",
-        "description": "For 24h, all negative score actions against a target deal double score loss.",
+        "description": "All score penalties against target are doubled for 24h.",
         "cost": 10000,
         "requires_target": True,
         "requires_text": False,
@@ -131,71 +131,71 @@ SHOP_ITEMS = {
     # --- Chaos / system pressure ---
     "inspection": {
         "name": "Compliance Inspection",
-        "description": "Randomly selects a citizen and applies -1 score. Outcome is unpredictable.",
+        "description": "Randomly docks a citizen -1.00 score. Target unknown until it fires.",
         "cost": 3500,
         "requires_target": False,
         "requires_text": False,
-        "category": "chaos",
+        "category": "misc",
     },
     "history_review": {
         "name": "Historical Review",
-        "description": "Shows the last 20 score events for a target. Pure information advantage.",
+        "description": "View a target's last 20 score events.",
         "cost": 9000,
         "requires_target": True,
         "requires_text": False,
-        "category": "chaos",
+        "category": "misc",
     },
     "legal_rep": {
         "name": "Legal Representation",
-        "description": "For 12h, all negative score actions against you deal 50% less score loss.",
+        "description": "All incoming score penalties halved for 12h.",
         "cost": 8000,
         "requires_target": False,
         "requires_text": False,
         "duration": 43200,
-        "category": "chaos",
+        "category": "misc",
     },
     "anon_identity": {
         "name": "Alternate Identity",
-        "description": "Your next report or denouncement appears as Unknown Citizen. Single use.",
+        "description": "Next report or denouncement appears as Unknown Citizen.",
         "cost": 10000,
         "requires_target": False,
         "requires_text": False,
         "duration": 86400,
-        "category": "chaos",
+        "category": "misc",
     },
     "immunity": {
         "name": "Citizen Immunity",
-        "description": "50% chance to completely block the next negative action against you. Single use.",
+        "description": "50% chance to fully block the next negative action against you.",
         "cost": 7500,
         "requires_target": False,
         "requires_text": False,
-        "category": "chaos",
+        "category": "misc",
     },
     "pact": {
         "name": "Mutual Assistance Pact",
-        "description": "You and an ally both receive a 50% reduction shield on your next incoming penalty.",
+        "description": "You and an ally both receive a 50% shield on the next incoming penalty.",
         "cost": 6000,
         "requires_target": True,
         "requires_text": False,
         "duration": 86400,
-        "category": "chaos",
+        "category": "misc",
     },
     "media_coverage": {
         "name": "State Media Coverage",
-        "description": "Your next organic positive score gain is doubled and broadcast publicly.",
+        "description": "Next organic score gain doubled and broadcast publicly.",
         "cost": 15000,
         "requires_target": False,
         "requires_text": False,
         "duration": 86400,
-        "category": "chaos",
+        "category": "misc",
     },
     "fabricated_evidence": {
         "name": "Fabricated Evidence",
-        "description": "Inserts a fake event into a target's score history. Psychological disruption only.",
+        "description": "Inserts a fake event into a target's score history.",
         "cost": 3000,
         "requires_target": True,
         "requires_text": True,
-        "category": "chaos",
+        "category": "misc",
     },
     # --- Cosmetics / prestige ---
     "verified": {
