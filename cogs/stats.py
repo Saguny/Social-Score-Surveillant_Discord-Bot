@@ -118,25 +118,48 @@ class Stats(commands.Cog):
 
         data = await self.db.get_daily_stats(interaction.guild.id, target.id)
 
-        def diff(today, yesterday):
-            d = round(today - yesterday, 2)
-            if d > 0: return f"▲ +{d:.2f} vs yesterday"
-            if d < 0: return f"▼ {d:.2f} vs yesterday"
-            return "= same as yesterday"
-
         net_today     = round(data["pos_today"] + data["neg_today"], 2)
         net_yesterday = round(data["pos_yesterday"] + data["neg_yesterday"], 2)
+        net_diff      = round(net_today - net_yesterday, 2)
         yuan_change   = data["yuan"] - data["prev_day_yuan"]
+
+        if net_diff > 0:   net_vs = f"▲ +{net_diff:.2f} better than yesterday"
+        elif net_diff < 0: net_vs = f"▼ {net_diff:.2f} worse than yesterday"
+        else:              net_vs = "= same as yesterday"
+
+        yuan_vs = ""
+        if data["prev_day_yuan"]:
+            yuan_vs = f"  {'▲ +' if yuan_change >= 0 else '▼ '}¥{yuan_change:,} vs yesterday"
+
+        RESET = "[0m"
+        GREEN = "[32m"
+        RED   = "[31m"
+        GRAY  = "[2;37m"
+
+        ESC   = "\x1b"
+        RESET = f"{ESC}[0m"
+        GREEN = f"{ESC}[32m"
+        RED   = f"{ESC}[31m"
+        GRAY  = f"{ESC}[2;37m"
+
+        net_color  = GREEN if net_today >= 0 else RED
+        yuan_color = GREEN if yuan_change >= 0 else RED
+
+        pos  = f"+{data['pos_today']:.2f}"
+        neg  = f"{data['neg_today']:.2f}"
+        net  = f"{net_today:+.2f}"
+        yuan = f"¥{data['yuan']:,}"
+        table = (
+            f"{GREEN}SCORE GAINED  {pos:>8}{RESET}\n"
+            f"{RED}SCORE LOST    {neg:>8}{RESET}\n"
+            f"{net_color}NET TODAY     {net:>8}{RESET}  {GRAY}{net_vs}{RESET}\n"
+            f"\n"
+            f"{yuan_color}YUAN          {yuan:>8}{RESET}{GRAY}{yuan_vs}{RESET}"
+        )
 
         embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 日报告")
         embed.set_author(name=await self.bot.format_user_full(target, interaction.guild.id), icon_url=target.display_avatar.url)
-        embed.add_field(name="POSITIVE",    value=f"+{data['pos_today']:.2f}\n{diff(data['pos_today'], data['pos_yesterday'])}", inline=True)
-        embed.add_field(name="NEGATIVE",    value=f"{data['neg_today']:.2f}\n{diff(data['neg_today'], data['neg_yesterday'])}", inline=True)
-        embed.add_field(name="NET CHANGE",  value=f"{net_today:+.2f}\n{diff(net_today, net_yesterday)}", inline=True)
-        yuan_str = f"¥{data['yuan']:,}"
-        if data["prev_day_yuan"]:
-            yuan_str += f"\n{'▲ +' if yuan_change >= 0 else '▼ '}¥{yuan_change:,} vs yesterday"
-        embed.add_field(name="YUAN",        value=yuan_str, inline=True)
+        embed.add_field(name="", value=f"```ansi\n{table}\n```", inline=False)
         embed.timestamp = discord.utils.utcnow()
         await interaction.followup.send(embed=embed)
 
