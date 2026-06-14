@@ -7,8 +7,8 @@ from config.poster_data import POSTERS
 HEART = "❤️"
 RAGE  = "😡"
 
-HEART_YUAN  = 20
-HEART_SCORE = 1.0
+HEART_YUAN  = 250
+HEART_SCORE = 3.0
 RAGE_SCORE  = -1.0
 
 

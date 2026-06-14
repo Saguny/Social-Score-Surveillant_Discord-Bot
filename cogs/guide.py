@@ -154,7 +154,7 @@ class Guide(commands.Cog):
         e3 = discord.Embed(color=0xCC0000, title="SCORE AND STAT COMMANDS")
         e3.add_field(name="/score [citizen]",        value="View your score and current rank.", inline=False)
         e3.add_field(name="/stats [citizen]",        value="Full breakdown: trends, peak/low score, messages, check-in streak, propaganda victories.", inline=False)
-        e3.add_field(name="/history [citizen]",      value="Last 5 score changes. Viewing others requires mod permissions.", inline=False)
+        e3.add_field(name="/daily_report [citizen]",  value="Today's score activity: positive, negative, net change, and yuan — compared to yesterday.", inline=False)
         e3.add_field(name="/leaderboard",            value="Rankings across 8 categories: score, yuan, activity, endorsements, rebukes, and informants.", inline=False)
         e3.add_field(name="/state_report",           value="Server-wide report: biggest rise/fall, top informant, yuan in circulation, avg score.", inline=False)
         e3.add_field(name="/checkin",                value="Perform your daily check-in. Earns Yuan and a small score bump. Streak increases daily reward up to ¥750.", inline=False)

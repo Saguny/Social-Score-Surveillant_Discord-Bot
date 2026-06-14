@@ -110,31 +110,38 @@ class Stats(commands.Cog):
         embed.timestamp = discord.utils.utcnow()
         await interaction.followup.send(embed=embed)
 
-    @app_commands.command(name="history", description="View score change history")
-    @app_commands.describe(citizen="Citizen to look up (mod-only for others)")
-    async def history(self, interaction: discord.Interaction, citizen: discord.Member = None):
+    @app_commands.command(name="daily_report", description="View today's score and yuan activity for a citizen")
+    @app_commands.describe(citizen="Citizen to look up (defaults to yourself)")
+    async def daily_report(self, interaction: discord.Interaction, citizen: discord.Member = None):
         await interaction.response.defer(ephemeral=True)
         target = citizen or interaction.user
 
         if target.id != interaction.user.id and not interaction.user.guild_permissions.manage_guild:
-            await interaction.followup.send(
-                "Insufficient clearance to view another citizen's record.", ephemeral=True
-            )
+            await interaction.followup.send("Insufficient clearance to view another citizen's record.", ephemeral=True)
             return
 
-        rows = await self.db.get_score_history(interaction.guild.id, target.id, limit=5)
-        embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 档案记录")
-        embed.add_field(name="CITIZEN", value=await self.bot.format_user_full(target, interaction.guild.id), inline=False)
+        data = await self.db.get_daily_stats(interaction.guild.id, target.id)
 
-        if not rows:
-            embed.add_field(name="RECORD", value="No entries on file.", inline=False)
-        else:
-            lines = []
-            for row in rows:
-                arrow = "▲" if row["delta"] > 0 else "▼"
-                lines.append(f"{arrow} {abs(row['delta']):.2f} · {row['reason']} · <t:{row['timestamp']}:R>")
-            embed.add_field(name="RECENT ENTRIES", value="\n".join(lines), inline=False)
+        def diff(today, yesterday):
+            d = round(today - yesterday, 2)
+            if d > 0: return f"▲ +{d:.2f} vs yesterday"
+            if d < 0: return f"▼ {d:.2f} vs yesterday"
+            return "= same as yesterday"
 
+        net_today     = round(data["pos_today"] + data["neg_today"], 2)
+        net_yesterday = round(data["pos_yesterday"] + data["neg_yesterday"], 2)
+        yuan_change   = data["yuan"] - data["prev_day_yuan"]
+
+        embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 日报告")
+        embed.set_author(name=await self.bot.format_user_full(target, interaction.guild.id), icon_url=target.display_avatar.url)
+        embed.add_field(name="POSITIVE",    value=f"+{data['pos_today']:.2f}\n{diff(data['pos_today'], data['pos_yesterday'])}", inline=True)
+        embed.add_field(name="NEGATIVE",    value=f"{data['neg_today']:.2f}\n{diff(data['neg_today'], data['neg_yesterday'])}", inline=True)
+        embed.add_field(name="NET CHANGE",  value=f"{net_today:+.2f}\n{diff(net_today, net_yesterday)}", inline=True)
+        yuan_str = f"¥{data['yuan']:,}"
+        if data["prev_day_yuan"]:
+            yuan_str += f"\n{'▲ +' if yuan_change >= 0 else '▼ '}¥{yuan_change:,} vs yesterday"
+        embed.add_field(name="YUAN",        value=yuan_str, inline=True)
+        embed.timestamp = discord.utils.utcnow()
         await interaction.followup.send(embed=embed, ephemeral=True)
 
     @app_commands.command(name="stats", description="View detailed statistics for a citizen")

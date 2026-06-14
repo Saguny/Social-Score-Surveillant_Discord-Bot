@@ -7,7 +7,7 @@ import discord
 from discord.ext import commands
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from config.ranks import get_rank, get_rank_index, RANKS, EXECUTION_THRESHOLD, RANK_YUAN
-from config.rules import STRUCTURAL_RULES, SENTIMENT_SCALE, SENTIMENT_NEUTRAL_THRESHOLD, YUAN_PER_MESSAGE
+from config.rules import STRUCTURAL_RULES, SENTIMENT_SCALE, SENTIMENT_NEUTRAL_THRESHOLD, NEUTRAL_BONUS, YUAN_PER_MESSAGE
 from config.banned_topics import contains_banned_topic
 
 TRANSLATE_URL = "https://translate.googleapis.com/translate_a/single"
@@ -47,6 +47,7 @@ class Scoring(commands.Cog):
         self._session: aiohttp.ClientSession | None = None
         self._executor: concurrent.futures.ProcessPoolExecutor | None = None
         self._lang_cache: dict[tuple, tuple[str, float]] = {}
+        self._pos_streaks: dict[tuple[int, int], int] = {}
 
     async def cog_load(self):
         self._session = aiohttp.ClientSession()
@@ -124,9 +125,21 @@ class Scoring(commands.Cog):
             if lang != "en":
                 compound = await loop.run_in_executor(self._executor, _vader_only, english)
 
+        key = (guild_id, user_id)
         if abs(compound) < SENTIMENT_NEUTRAL_THRESHOLD:
-            return 0.0, None
-        return round(compound * SENTIMENT_SCALE, 2), "positive sentiment" if compound > 0 else "negative sentiment"
+            self._pos_streaks.pop(key, None)
+            return NEUTRAL_BONUS, "civic participation"
+
+        delta = round(compound * SENTIMENT_SCALE, 2)
+        if delta > 0:
+            streak = self._pos_streaks.get(key, 0) + 1
+            self._pos_streaks[key] = streak
+            if streak >= 3:
+                multiplier = 1.0 + min(streak // 3, 5) * 0.1
+                delta = round(delta * multiplier, 2)
+        else:
+            self._pos_streaks.pop(key, None)
+        return delta, "positive sentiment" if compound > 0 else "negative sentiment"
 
     async def _evaluate(self, message: discord.Message) -> tuple[float, str]:
         content = message.content.lower().strip()

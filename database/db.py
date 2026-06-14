@@ -210,6 +210,7 @@ class Database:
             await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active BIGINT DEFAULT 0")
             await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS propaganda_wins INTEGER DEFAULT 0")
             await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS rank_entered_at BIGINT DEFAULT 0")
+            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS prev_day_yuan BIGINT DEFAULT 0")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_score_history_timestamp ON score_history (timestamp)")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_score_history_reason ON score_history (reason)")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_users_last_active ON users (last_active)")
@@ -891,6 +892,35 @@ class Database:
             """,
             cutoff,
         )
+        await self._pool.execute("UPDATE users SET prev_day_yuan = yuan")
+
+    async def get_daily_stats(self, guild_id: int, user_id: int) -> dict:
+        now = int(time.time())
+        today_start = now - (now % 86400)
+        yesterday_start = today_start - 86400
+        row = await self._pool.fetchrow(
+            """
+            SELECT
+                COALESCE(SUM(delta) FILTER (WHERE delta > 0 AND timestamp >= $3), 0)                         AS pos_today,
+                COALESCE(SUM(delta) FILTER (WHERE delta < 0 AND timestamp >= $3), 0)                         AS neg_today,
+                COALESCE(SUM(delta) FILTER (WHERE delta > 0 AND timestamp >= $4 AND timestamp < $3), 0)      AS pos_yesterday,
+                COALESCE(SUM(delta) FILTER (WHERE delta < 0 AND timestamp >= $4 AND timestamp < $3), 0)      AS neg_yesterday
+            FROM score_history WHERE guild_id = $1 AND user_id = $2
+            """,
+            guild_id, user_id, today_start, yesterday_start,
+        )
+        user = await self._pool.fetchrow(
+            "SELECT yuan, prev_day_yuan FROM users WHERE guild_id = $1 AND user_id = $2",
+            guild_id, user_id,
+        )
+        return {
+            "pos_today":      round(float(row["pos_today"]), 2),
+            "neg_today":      round(float(row["neg_today"]), 2),
+            "pos_yesterday":  round(float(row["pos_yesterday"]), 2),
+            "neg_yesterday":  round(float(row["neg_yesterday"]), 2),
+            "yuan":           user["yuan"] if user else 0,
+            "prev_day_yuan":  user["prev_day_yuan"] if user else 0,
+        }
 
     async def create_propaganda_event(self, guild_id, mod_id, submit_channel_id, reveal_channel_id, closes_at):
         concludes_at = closes_at + 86400
