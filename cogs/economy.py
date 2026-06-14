@@ -95,7 +95,7 @@ class Economy(commands.Cog):
 
     @app_commands.command(name="shop", description="Browse the Social Credit Bureau's shop")
     async def shop(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer(thinking=True)
         embeds = _build_shop_embeds(username=str(interaction.user))
         view = ShopView(embeds, active="core")
         await interaction.followup.send(
