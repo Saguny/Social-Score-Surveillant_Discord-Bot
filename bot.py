@@ -1,6 +1,7 @@
 import os
 import sys
 import asyncio
+import time
 from contextvars import ContextVar
 from datetime import datetime, timezone
 import discord
@@ -26,9 +27,18 @@ def _embed_init(self, **kwargs):
 discord.Embed.__init__ = _embed_init
 
 
+CMD_COOLDOWN = 2.0
+
 class CreditCommandTree(discord.app_commands.CommandTree):
     async def call(self, interaction: discord.Interaction) -> None:
         _current_user_id.set(interaction.user.id)
+        cooldowns: dict[int, float] = self.client._cmd_cooldowns
+        now = time.time()
+        uid = interaction.user.id
+        if uid != OWNER_ID and now - cooldowns.get(uid, 0) < CMD_COOLDOWN:
+            await interaction.response.send_message("Slow down, citizen.", ephemeral=True)
+            return
+        cooldowns[uid] = now
         await super().call(interaction)
 
 load_dotenv()
@@ -153,6 +163,7 @@ class SocialCreditBot(commands.Bot):
         super().__init__(command_prefix="ccp ", intents=intents, tree_cls=CreditCommandTree)
         self.db = Database()
         self.ec_users: set[int] = set()
+        self._cmd_cooldowns: dict[int, float] = {}
 
     def format_user(self, user) -> str:
         name = str(user)
@@ -181,6 +192,11 @@ class SocialCreditBot(commands.Bot):
 
     async def process_commands(self, message: discord.Message) -> None:
         _current_user_id.set(message.author.id)
+        uid = message.author.id
+        now = time.time()
+        if uid != OWNER_ID and now - self._cmd_cooldowns.get(uid, 0) < CMD_COOLDOWN:
+            return
+        self._cmd_cooldowns[uid] = now
         await super().process_commands(message)
 
     async def close(self):

@@ -153,7 +153,7 @@ class Guide(commands.Cog):
 
         e3 = discord.Embed(color=0xCC0000, title="SCORE AND STAT COMMANDS")
         e3.add_field(name="/score [citizen]",        value="View your score and current rank.", inline=False)
-        e3.add_field(name="/stats [citizen]",        value="Full breakdown: trends, peak/low score, messages, check-in streak, propaganda victories.", inline=False)
+        e3.add_field(name="/stats [citizen]",        value="Full breakdown across 3 pages: Overview (score, rank, trends), Social (endorsements, rebukes, reports), Economy (yuan, items, streak).", inline=False)
         e3.add_field(name="/daily_report [citizen]",  value="Today's score activity for any citizen: positive, negative, net change, and yuan compared to yesterday.", inline=False)
         e3.add_field(name="/leaderboard",            value="Rankings across 8 categories: score, yuan, activity, endorsements, rebukes, and informants.", inline=False)
         e3.add_field(name="/state_report",           value="Server-wide report: biggest rise/fall, top informant, yuan in circulation, avg score.", inline=False)

@@ -94,21 +94,46 @@ class Stats(commands.Cog):
         def fmt_col(rows, col):
             return "\n".join(f"{i}. {name(r['user_id'])} · {r[col]}" for i, r in enumerate(rows, 1)) or "No data."
 
-        embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 排行榜")
-        embed.add_field(name="MOST COMPLIANT", value=fmt_score(data["top_score"]), inline=True)
-        embed.add_field(name="GREATEST THREATS", value=fmt_score(data["bottom_score"]), inline=True)
-        embed.add_field(name="​", value="​", inline=True)
-        embed.add_field(name="WEALTHIEST", value=fmt_yuan(data["richest"]), inline=True)
-        embed.add_field(name="POOREST", value=fmt_yuan(data["poorest"]), inline=True)
-        embed.add_field(name="​", value="​", inline=True)
-        embed.add_field(name="MOST ACTIVE", value=fmt_col(data["most_messages"], "message_count"), inline=True)
-        embed.add_field(name="MOST ENDORSED", value=fmt_col(data["most_endorsed"], "times_endorsed"), inline=True)
-        embed.add_field(name="​", value="​", inline=True)
-        embed.add_field(name="MOST REBUKED", value=fmt_col(data["most_rebuked"], "times_rebuked"), inline=True)
-        embed.add_field(name="TOP INFORMANTS", value=fmt_col(data["top_snitches"], "times_filed_reports"), inline=True)
-        embed.add_field(name="​", value="​", inline=True)
-        embed.timestamp = discord.utils.utcnow()
-        await interaction.followup.send(embed=embed)
+        pages = {
+            "score":    ("MOST COMPLIANT",  fmt_score(data["top_score"]),                         "GREATEST THREATS", fmt_score(data["bottom_score"])),
+            "economy":  ("WEALTHIEST",       fmt_yuan(data["richest"]),                            "POOREST",          fmt_yuan(data["poorest"])),
+            "activity": ("MOST ACTIVE",      fmt_col(data["most_messages"], "message_count"),      "MOST ENDORSED",    fmt_col(data["most_endorsed"], "times_endorsed")),
+            "social":   ("MOST REBUKED",     fmt_col(data["most_rebuked"], "times_rebuked"),       "TOP INFORMANTS",   fmt_col(data["top_snitches"], "times_filed_reports")),
+        }
+
+        def build_embed(page: str) -> discord.Embed:
+            left_name, left_val, right_name, right_val = pages[page]
+            embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 排行榜")
+            embed.add_field(name=left_name,  value=left_val,  inline=True)
+            embed.add_field(name=right_name, value=right_val, inline=True)
+            embed.timestamp = discord.utils.utcnow()
+            return embed
+
+        labels = {"score": "SCORE", "economy": "ECONOMY", "activity": "ACTIVITY", "social": "SOCIAL"}
+
+        class LeaderboardView(discord.ui.View):
+            def __init__(self, current: str):
+                super().__init__(timeout=60)
+                self.current = current
+                for page_id, label in labels.items():
+                    btn = discord.ui.Button(
+                        label=label,
+                        style=discord.ButtonStyle.primary if page_id == current else discord.ButtonStyle.secondary,
+                        custom_id=page_id,
+                    )
+                    btn.callback = self.make_callback(page_id)
+                    self.add_item(btn)
+
+            def make_callback(self, page_id: str):
+                async def callback(btn_interaction: discord.Interaction):
+                    await btn_interaction.response.edit_message(embed=build_embed(page_id), view=LeaderboardView(page_id))
+                return callback
+
+            async def on_timeout(self):
+                for item in self.children:
+                    item.disabled = True
+
+        await interaction.followup.send(embed=build_embed("score"), view=LeaderboardView("score"))
 
     @app_commands.command(name="daily_report", description="View today's score and yuan activity for a citizen")
     @app_commands.describe(citizen="Citizen to look up (defaults to yourself)")
@@ -171,65 +196,85 @@ class Stats(commands.Cog):
         gid = interaction.guild.id
         user = await self.db.get_user(gid, target.id)
         rank = get_rank(user["score"])
-
         trend_7d  = await self.db.get_score_trend(gid, target.id, 7)
         trend_30d = await self.db.get_score_trend(gid, target.id, 30)
 
         def trend_str(val: float) -> str:
-            if val > 0:
-                return f"▲ +{val:.2f}"
-            elif val < 0:
-                return f"▼ {val:.2f}"
+            if val > 0: return f"▲ +{val:.2f}"
+            if val < 0: return f"▼ {val:.2f}"
             return "= 0.00"
-
-        embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 公民档案")
-        embed.set_author(name=await self.bot.format_user_full(target, gid), icon_url=target.display_avatar.url)
-
-        embed.add_field(name="SCORE",  value=f"{user['score']:.2f}", inline=True)
-        embed.add_field(name="RANK",   value=rank["name"],            inline=True)
-        embed.add_field(name="YUAN",   value=f"¥{user['yuan']}",      inline=True)
-
-        embed.add_field(name="7D TREND",  value=trend_str(trend_7d),  inline=True)
-        embed.add_field(name="30D TREND", value=trend_str(trend_30d), inline=True)
-        embed.add_field(name="​", value="​", inline=True)
-
-        embed.add_field(name="PEAK",     value=f"{user['highest_score']:.2f}",  inline=True)
-        embed.add_field(name="LOW",      value=f"{user['lowest_score']:.2f}",   inline=True)
-        embed.add_field(name="MESSAGES", value=str(user["message_count"]),       inline=True)
-
-        embed.add_field(name="​", value="​", inline=False)
-
-        embed.add_field(name="ENDORSED (recv)",  value=str(user["times_endorsed"]),     inline=True)
-        embed.add_field(name="REBUKED (recv)",   value=str(user["times_rebuked"]),      inline=True)
-        embed.add_field(name="​",          value="​",                        inline=True)
-
-        embed.add_field(name="ENDORSED (given)", value=str(user["endorsements_given"]), inline=True)
-        embed.add_field(name="REBUKED (given)",  value=str(user["rebukes_given"]),      inline=True)
-        embed.add_field(name="​",          value="​",                        inline=True)
-
-        embed.add_field(name="REPORTS RECEIVED", value=str(user["times_reported"]),      inline=True)
-        embed.add_field(name="REPORTS FILED",    value=str(user["times_filed_reports"]), inline=True)
-        embed.add_field(name="​",          value="​",                        inline=True)
-
-        embed.add_field(name="​", value="​", inline=False)
-
-        embed.add_field(name="YUAN EARNED",  value=f"¥{user['total_yuan_earned']}", inline=True)
-        embed.add_field(name="YUAN SPENT",   value=f"¥{user['total_yuan_spent']}",  inline=True)
-        embed.add_field(name="ITEMS BOUGHT", value=str(user["items_bought"]),        inline=True)
 
         streak = user.get("checkin_streak", 0)
         wins   = user.get("propaganda_wins", 0)
-        if streak or wins:
-            embed.add_field(name="​", value="​", inline=False)
-        if streak:
-            embed.add_field(name="CHECK-IN STREAK", value=f"{streak} days", inline=True)
-        if wins:
-            embed.add_field(name="PROPAGANDA VICTORIES", value=str(wins), inline=True)
+        author_name = await self.bot.format_user_full(target, gid)
 
-        embed.timestamp = discord.utils.utcnow()
-        embed.set_thumbnail(url="attachment://ccpstats.png")
+        def build_overview() -> discord.Embed:
+            e = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 公民档案")
+            e.set_author(name=author_name, icon_url=target.display_avatar.url)
+            e.add_field(name="SCORE",      value=f"{user['score']:.2f}",        inline=True)
+            e.add_field(name="RANK",       value=rank["name"],                   inline=True)
+            e.add_field(name="YUAN",       value=f"¥{user['yuan']}",             inline=True)
+            e.add_field(name="7D TREND",   value=trend_str(trend_7d),            inline=True)
+            e.add_field(name="30D TREND",  value=trend_str(trend_30d),           inline=True)
+            e.add_field(name="MESSAGES",   value=str(user["message_count"]),     inline=True)
+            e.add_field(name="PEAK",       value=f"{user['highest_score']:.2f}", inline=True)
+            e.add_field(name="LOW",        value=f"{user['lowest_score']:.2f}",  inline=True)
+            e.set_thumbnail(url="attachment://ccpstats.png")
+            e.timestamp = discord.utils.utcnow()
+            return e
+
+        def build_social() -> discord.Embed:
+            e = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 公民档案")
+            e.set_author(name=author_name, icon_url=target.display_avatar.url)
+            e.add_field(name="ENDORSED (recv)",  value=str(user["times_endorsed"]),      inline=True)
+            e.add_field(name="ENDORSED (given)", value=str(user["endorsements_given"]),  inline=True)
+            e.add_field(name="REBUKED (recv)",   value=str(user["times_rebuked"]),       inline=True)
+            e.add_field(name="REBUKED (given)",  value=str(user["rebukes_given"]),       inline=True)
+            e.add_field(name="REPORTS RECEIVED", value=str(user["times_reported"]),      inline=True)
+            e.add_field(name="REPORTS FILED",    value=str(user["times_filed_reports"]), inline=True)
+            e.timestamp = discord.utils.utcnow()
+            return e
+
+        def build_economy() -> discord.Embed:
+            e = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 公民档案")
+            e.set_author(name=author_name, icon_url=target.display_avatar.url)
+            e.add_field(name="YUAN EARNED",  value=f"¥{user['total_yuan_earned']}", inline=True)
+            e.add_field(name="YUAN SPENT",   value=f"¥{user['total_yuan_spent']}",  inline=True)
+            e.add_field(name="ITEMS BOUGHT", value=str(user["items_bought"]),        inline=True)
+            if streak:
+                e.add_field(name="CHECK-IN STREAK",     value=f"{streak} days", inline=True)
+            if wins:
+                e.add_field(name="PROPAGANDA VICTORIES", value=str(wins),        inline=True)
+            e.timestamp = discord.utils.utcnow()
+            return e
+
+        builders = {"overview": build_overview, "social": build_social, "economy": build_economy}
+        labels   = {"overview": "OVERVIEW", "social": "SOCIAL", "economy": "ECONOMY"}
+
+        class StatsView(discord.ui.View):
+            def __init__(self, current: str):
+                super().__init__(timeout=60)
+                self.current = current
+                for page_id, label in labels.items():
+                    btn = discord.ui.Button(
+                        label=label,
+                        style=discord.ButtonStyle.primary if page_id == current else discord.ButtonStyle.secondary,
+                        custom_id=page_id,
+                    )
+                    btn.callback = self.make_callback(page_id)
+                    self.add_item(btn)
+
+            def make_callback(self, page_id: str):
+                async def callback(btn_interaction: discord.Interaction):
+                    await btn_interaction.response.edit_message(embed=builders[page_id](), view=StatsView(page_id))
+                return callback
+
+            async def on_timeout(self):
+                for item in self.children:
+                    item.disabled = True
+
         file = discord.File("images/ccpstats.png", filename="ccpstats.png")
-        await interaction.followup.send(embed=embed, file=file)
+        await interaction.followup.send(embed=build_overview(), view=StatsView("overview"), file=file)
 
     @app_commands.command(name="state_report", description="View the official state report for this server")
     async def state_report(self, interaction: discord.Interaction):
