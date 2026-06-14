@@ -3,6 +3,8 @@ from discord import app_commands
 from discord.ext import commands
 from config.ranks import get_rank
 
+STATS_THUMBNAIL = "https://cdn.discordapp.com/attachments/820666374652690474/1515856700849258618/image.png?ex=6a308710&is=6a2f3590&hm=92d1940e87776c619102ac691747d4c45d0637c5db6e0fa6fb1f883ee43b4e2f&"
+
 
 class Stats(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -281,11 +283,7 @@ class Stats(commands.Cog):
                 for item in self.children:
                     item.disabled = True
 
-        file = discord.File("images/ccpstats.png", filename="ccpstats.png")
-        msg = await interaction.followup.send(embed=build_overview("attachment://ccpstats.png"), view=StatsView("overview", None), file=file, wait=True)
-        thumb_url = msg.attachments[0].url if msg.attachments else None
-        if thumb_url:
-            await msg.edit(embed=build_overview(thumb_url), view=StatsView("overview", thumb_url))
+        await interaction.followup.send(embed=build_overview(STATS_THUMBNAIL), view=StatsView("overview", STATS_THUMBNAIL))
 
     @app_commands.command(name="state_report", description="View the official state report for this server")
     async def state_report(self, interaction: discord.Interaction):
@@ -332,10 +330,9 @@ class Stats(commands.Cog):
         embed.add_field(name="YUAN IN CIRCULATION", value=f"¥{data['total_yuan']}",      inline=True)
         embed.add_field(name="AVERAGE SCORE",       value=f"{data['avg_score']:.2f}",   inline=True)
         embed.add_field(name="ACTIVE CITIZENS",     value=str(data["active_count"]),     inline=True)
+        embed.set_thumbnail(url=STATS_THUMBNAIL)
         embed.timestamp = discord.utils.utcnow()
-        embed.set_thumbnail(url="attachment://ccpstats.png")
-        file = discord.File("images/ccpstats.png", filename="ccpstats.png")
-        await interaction.followup.send(embed=embed, file=file)
+        await interaction.followup.send(embed=embed)
 
 
 async def setup(bot: commands.Bot):
