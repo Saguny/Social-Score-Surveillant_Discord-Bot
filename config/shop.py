@@ -2,7 +2,7 @@ SHOP_ITEMS = {
     # --- Core system ---
     "report": {
         "name": "Citizen Report",
-        "description": "Docks target -2.00 score. Logged in their official record.",
+        "description": "Silently docks target -2.00 score. Logged in their record.",
         "cost": 2500,
         "requires_target": True,
         "requires_text": False,
@@ -10,7 +10,7 @@ SHOP_ITEMS = {
     },
     "denounce": {
         "name": "Public Denouncement",
-        "description": "Public post shaming a target. Docks them -20.00 score.",
+        "description": "Public post docking target -20.00 score. Claims any active investigation bounty.",
         "cost": 6000,
         "requires_target": True,
         "requires_text": True,
@@ -95,7 +95,7 @@ SHOP_ITEMS = {
     },
     "investigation": {
         "name": "Special Investigation",
-        "description": "24h bounty on target. Next reporter earns ¥2,500 bonus.",
+        "description": "24h bounty on target. Your ¥8,000 becomes the reward — add text to put up extra yuan.",
         "cost": 8000,
         "requires_target": True,
         "requires_text": False,

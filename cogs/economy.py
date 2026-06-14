@@ -5,7 +5,7 @@ from discord import app_commands
 from discord.ext import commands
 from config.shop import SHOP_ITEMS, BADGE_DISPLAY, COSMETIC_META
 
-_INVESTIGATION_BOUNTY_REWARD = 2500
+_INVESTIGATION_BOUNTY_REWARD = 8000
 
 _CATEGORY_TITLES = {
     "core":     "中华人民共和国社会信用局 · 核心项目",
@@ -205,17 +205,11 @@ class Economy(commands.Cog):
             await self.db.increment_reported(gid, target.id)
             await self.db.increment_filed_reports(gid, uid)
             report_num = await self.db.increment_report_counter(gid)
-            bounty = await self.db.consume_investigation_bounty(gid, target.id)
-            if bounty:
-                await self.db.adjust_yuan(gid, uid, bounty.get("reward", _INVESTIGATION_BOUNTY_REWARD))
-
             reporter_name = "Unknown Citizen" if is_anon else await self.bot.format_user_full(interaction.user, gid)
             embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")
             embed.add_field(name="OFFICIAL REPORT FILED", value=target.mention, inline=False)
             embed.add_field(name="FILED BY", value=reporter_name, inline=True)
             embed.add_field(name="SCORE IMPACT", value=f"{delta:.2f}", inline=True)
-            if bounty:
-                embed.add_field(name="INVESTIGATION BONUS", value=f"+¥{bounty.get('reward', _INVESTIGATION_BOUNTY_REWARD):,} awarded to reporter", inline=False)
             embed.set_footer(text=f"Report #{report_num:05d} · GLORY TO THE CCP!")
             embed.timestamp = discord.utils.utcnow()
             await interaction.followup.send(embed=embed)
@@ -237,12 +231,17 @@ class Economy(commands.Cog):
             old, new = await self.db.update_score(gid, target.id, delta, "public denouncement")
             await self.db.increment_reported(gid, target.id)
             report_num = await self.db.increment_report_counter(gid)
+            bounty = await self.db.consume_investigation_bounty(gid, target.id)
+            if bounty:
+                await self.db.adjust_yuan(gid, uid, bounty.get("reward", _INVESTIGATION_BOUNTY_REWARD))
             denouncer_name = "Unknown Citizen" if is_anon else await self.bot.format_user_full(interaction.user, gid)
             embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 公开谴责")
             embed.add_field(name="SUBJECT", value=target.mention, inline=False)
             embed.add_field(name="DENOUNCED BY", value=denouncer_name, inline=True)
             embed.add_field(name="STATED CRIME", value=text[:100], inline=False)
             embed.add_field(name="SCORE IMPACT", value=f"{delta:.2f}", inline=True)
+            if bounty:
+                embed.add_field(name="INVESTIGATION BOUNTY CLAIMED", value=f"+¥{bounty.get('reward', _INVESTIGATION_BOUNTY_REWARD):,}", inline=False)
             embed.set_footer(text=f"Report #{report_num:05d} · GLORY TO THE CCP!")
             embed.timestamp = discord.utils.utcnow()
             await interaction.followup.send(embed=embed)
@@ -361,12 +360,27 @@ class Economy(commands.Cog):
             await interaction.followup.send(embed=embed)
 
         elif item_id == "investigation":
+            extra_bounty = 0
+            if text:
+                try:
+                    extra_bounty = max(0, int(text.replace(",", "").strip()))
+                except ValueError:
+                    pass
+            if extra_bounty > 0 and not await self.db.spend_yuan(gid, uid, extra_bounty):
+                balance = (await self.db.get_user(gid, uid))["yuan"]
+                await interaction.followup.send(
+                    f"Insufficient funds for ¥{extra_bounty:,} extra bounty (balance: ¥{balance:,}). Base bounty applied.",
+                    ephemeral=True,
+                )
+                extra_bounty = 0
+            total_bounty = _INVESTIGATION_BOUNTY_REWARD + extra_bounty
             expires_at = int(time.time()) + cfg["duration"]
-            await self.db.add_effect(gid, target.id, "investigation", expires_at, {"buyer_id": uid, "reward": _INVESTIGATION_BOUNTY_REWARD})
+            await self.db.add_effect(gid, target.id, "investigation", expires_at, {"buyer_id": uid, "reward": total_bounty})
             embed = discord.Embed(color=0x8B0000, title="中华人民共和国社会信用局")
+            bounty_line = f"¥{total_bounty:,} bounty" + (f" (¥{_INVESTIGATION_BOUNTY_REWARD:,} base + ¥{extra_bounty:,} added)" if extra_bounty else "")
             embed.add_field(
                 name="SPECIAL INVESTIGATION OPENED",
-                value=f"A ¥{_INVESTIGATION_BOUNTY_REWARD:,} bounty has been placed on {target.mention}.\nThe next citizen to file a report on them will receive the reward.",
+                value=f"{bounty_line} placed on {target.mention}.\nThe next citizen to file a report on them will receive the reward.",
                 inline=False,
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
