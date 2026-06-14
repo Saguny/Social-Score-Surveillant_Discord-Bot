@@ -3,7 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 from config.ranks import get_rank
 
-STATS_THUMBNAIL = "https://cdn.discordapp.com/attachments/820666374652690474/1515856700849258618/image.png?ex=6a308710&is=6a2f3590&hm=92d1940e87776c619102ac691747d4c45d0637c5db6e0fa6fb1f883ee43b4e2f&"
+STATS_THUMBNAIL = "attachment://ccpstats.png"
 
 
 class Stats(commands.Cog):
@@ -283,7 +283,8 @@ class Stats(commands.Cog):
                 for item in self.children:
                     item.disabled = True
 
-        await interaction.followup.send(embed=build_overview(STATS_THUMBNAIL), view=StatsView("overview", STATS_THUMBNAIL))
+        file = discord.File("images/ccpstats.png", filename="ccpstats.png")
+        await interaction.followup.send(embed=build_overview(STATS_THUMBNAIL), view=StatsView("overview", STATS_THUMBNAIL), file=file)
 
     @app_commands.command(name="state_report", description="View the official state report for this server")
     async def state_report(self, interaction: discord.Interaction):
@@ -332,7 +333,8 @@ class Stats(commands.Cog):
         embed.add_field(name="ACTIVE CITIZENS",     value=str(data["active_count"]),     inline=True)
         embed.set_thumbnail(url=STATS_THUMBNAIL)
         embed.timestamp = discord.utils.utcnow()
-        await interaction.followup.send(embed=embed)
+        file = discord.File("images/ccpstats.png", filename="ccpstats.png")
+        await interaction.followup.send(embed=embed, file=file)
 
 
 async def setup(bot: commands.Bot):
