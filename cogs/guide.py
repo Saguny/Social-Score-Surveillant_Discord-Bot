@@ -277,8 +277,12 @@ class Guide(commands.Cog):
         embeds.append(e8)
 
         await interaction.response.defer(ephemeral=True)
-        await interaction.followup.send(embeds=embeds[:4], ephemeral=True)
-        await interaction.followup.send(embeds=embeds[4:], ephemeral=True)
+        try:
+            await interaction.user.send(embeds=embeds[:4])
+            await interaction.user.send(embeds=embeds[4:])
+            await interaction.followup.send("The Bureau's orientation package has been dispatched to your private channel.", ephemeral=True)
+        except discord.Forbidden:
+            await interaction.followup.send("Could not send you a DM. Please enable direct messages from server members and try again.", ephemeral=True)
 
     @app_commands.command(name="ping", description="Check the Bureau's response latency")
     async def ping(self, interaction: discord.Interaction):

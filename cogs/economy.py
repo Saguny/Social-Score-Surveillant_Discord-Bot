@@ -156,6 +156,17 @@ class Economy(commands.Cog):
             )
             return
 
+        if cfg.get("cosmetic"):
+            if cfg.get("global"):
+                if uid in self.bot.ec_users:
+                    await interaction.followup.send("You have already purchased this global cosmetic.", ephemeral=True)
+                    return
+            else:
+                owned = await self.db.get_cosmetic_badges(gid, uid)
+                if item in owned:
+                    await interaction.followup.send("You already have this cosmetic on this server.", ephemeral=True)
+                    return
+
         cost = cfg["cost"]
         if item == "rehabilitate":
             rehab_count = await self.db.get_rehabilitation_count(gid, uid)
@@ -313,22 +324,29 @@ class Economy(commands.Cog):
             await interaction.followup.send(embed=embed)
 
         elif item_id == "lottery":
+            buyer_name = await self.bot.format_user_full(interaction.user, gid)
             roll = random.random()
             if roll < 0.5:
                 embed = discord.Embed(color=0x333333, title="中华人民共和国社会信用局 · 国家彩票")
-                embed.add_field(name="RESULT", value="Better luck next time, citizen. The Party keeps your entry.", inline=False)
+                embed.add_field(name="CITIZEN", value=buyer_name, inline=False)
+                embed.add_field(name="RESULT", value="Better luck next time. The Party keeps your entry.", inline=False)
+                embed.add_field(name="YUAN CHANGE", value=f"-¥{cost:,}", inline=False)
             elif roll < 0.9:
                 winnings = random.randint(2000, 5000)
                 await self.db.adjust_yuan(gid, uid, winnings)
                 embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局 · 国家彩票")
-                embed.add_field(name="WINNER", value=f"The Party smiles upon you. +¥{winnings:,}", inline=False)
+                embed.add_field(name="CITIZEN", value=buyer_name, inline=False)
+                embed.add_field(name="WINNER", value="The Party smiles upon you.", inline=False)
+                embed.add_field(name="YUAN CHANGE", value=f"+¥{winnings:,} · net +¥{winnings - cost:,}", inline=False)
             else:
                 winnings = random.randint(10000, 25000)
                 await self.db.adjust_yuan(gid, uid, winnings)
                 embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局 · 国家彩票")
-                embed.add_field(name="JACKPOT", value=f"Extraordinary fortune, citizen. The state bestows +¥{winnings:,}.", inline=False)
+                embed.add_field(name="CITIZEN", value=buyer_name, inline=False)
+                embed.add_field(name="JACKPOT", value="Extraordinary fortune. The state bestows its blessing.", inline=False)
+                embed.add_field(name="YUAN CHANGE", value=f"+¥{winnings:,} · net +¥{winnings - cost:,}", inline=False)
             embed.timestamp = discord.utils.utcnow()
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            await interaction.followup.send(embed=embed)
 
         elif item_id == "tip":
             embed = discord.Embed(color=0x555555, title="中华人民共和国社会信用局 · 匿名举报")
@@ -653,7 +671,7 @@ class Economy(commands.Cog):
         self, interaction: discord.Interaction, current: str
     ) -> list[app_commands.Choice[str]]:
         return [
-            app_commands.Choice(name=f"[{v.get('category','?')}] {v['name']} (¥{v['cost']:,})", value=k)
+            app_commands.Choice(name=f"{v['name']} · ¥{v['cost']:,}", value=k)
             for k, v in SHOP_ITEMS.items()
             if current.lower() in k or current.lower() in v["name"].lower()
         ][:25]
