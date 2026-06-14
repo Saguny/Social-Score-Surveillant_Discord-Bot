@@ -78,43 +78,12 @@ class Guide(commands.Cog):
     async def guide(self, interaction: discord.Interaction):
         embeds = []
 
-        e1 = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · CITIZEN GUIDE")
+        e1 = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · SCORING RULES")
         e1.description = (
-            "Your social credit score is tracked silently. Every message you send is evaluated. "
-            "Score changes accumulate slowly over time. Rank changes trigger an official bureau notification.\n\n"
-            "Score range: 600 (floor) to 1300 (ceiling). Everyone starts at 750."
-        )
-        rank_lines = "\n".join(f"{r['min']} to {r['max']}   {r['name']}" for r in RANKS)
-        e1.add_field(name="RANKS", value=f"```\n{rank_lines}\n```", inline=False)
-        e1.add_field(
-            name="EXECUTION LIST",
-            value=(
-                "Citizens whose score falls to 610 or below are placed on the Execution List "
-                "and assigned the role **Execution Date: Tomorrow**. Recover above 610 to be removed."
-            ),
-            inline=False,
+            "Every message you send is evaluated by the Bureau. "
+            "Score changes are silent and accumulate over time. The Bureau will notify you when something significant happens."
         )
         e1.add_field(
-            name="RANK CHANGE REWARDS",
-            value=(
-                "Promotions award Yuan based on the rank you enter. Demotions deduct Yuan based on the rank you leave. "
-                "Amounts scale with rank tier. Higher tiers carry larger rewards and steeper penalties."
-            ),
-            inline=False,
-        )
-        e1.add_field(
-            name="RANK ROLES",
-            value=(
-                "By default the bot automatically creates and assigns a Discord server role for each rank tier, "
-                "keeping it in sync with your score. Mods can disable this with `ccp roles off` if the server "
-                "does not want role clutter. The Execution List role is always active regardless of this setting."
-            ),
-            inline=False,
-        )
-        embeds.append(e1)
-
-        e2 = discord.Embed(color=0xCC0000, title="SCORING RULES")
-        e2.add_field(
             name="SENTIMENT",
             value=(
                 "Each message is analyzed for tone. Positive messages nudge your score up, "
@@ -123,7 +92,7 @@ class Guide(commands.Cog):
             ),
             inline=False,
         )
-        e2.add_field(
+        e1.add_field(
             name="COUNTER-REVOLUTIONARY SPEECH",
             value=(
                 "Messages referencing banned topics (Tiananmen, Taiwan independence, Xinjiang, Tibet, "
@@ -131,7 +100,7 @@ class Guide(commands.Cog):
             ),
             inline=False,
         )
-        e2.add_field(
+        e1.add_field(
             name="STRUCTURAL VIOLATIONS",
             value=(
                 "Sending the same message twice in a row (10+ characters): -0.7\n"
@@ -139,12 +108,47 @@ class Guide(commands.Cog):
             ),
             inline=False,
         )
-        e2.add_field(
+        e1.add_field(
             name="INACTIVITY DECAY",
             value="Citizens inactive for more than 7 days will have their score gently nudged toward 750 each day until they return.",
             inline=False,
         )
-        e2.set_footer(text="GLORY TO THE CCP!")
+        e1.set_footer(text="Disclaimer: see /disclaimer · GLORY TO THE CCP!")
+        embeds.append(e1)
+
+        e2 = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · CITIZEN GUIDE")
+        e2.description = (
+            "Score range: 600 (floor) to 1300 (ceiling). Everyone starts at 750. "
+            "Rank changes trigger an official bureau notification."
+        )
+        rank_lines = "\n".join(f"{r['min']} to {r['max']}   {r['name']}" for r in RANKS)
+        e2.add_field(name="RANKS", value=f"```\n{rank_lines}\n```", inline=False)
+        e2.add_field(
+            name="EXECUTION LIST",
+            value=(
+                "Citizens whose score falls to 610 or below are placed on the Execution List "
+                "and assigned the role **Execution Date: Tomorrow**. Their Yuan balance is confiscated and distributed to other citizens. "
+                "Check your score regularly with `/score` — recovery above 610 removes the role."
+            ),
+            inline=False,
+        )
+        e2.add_field(
+            name="RANK CHANGE REWARDS",
+            value=(
+                "Promotions award Yuan based on the rank you enter. Demotions deduct Yuan based on the rank you leave. "
+                "Amounts scale with rank tier. Higher tiers carry larger rewards and steeper penalties."
+            ),
+            inline=False,
+        )
+        e2.add_field(
+            name="RANK ROLES",
+            value=(
+                "By default the bot automatically creates and assigns a Discord server role for each rank tier, "
+                "keeping it in sync with your score. Mods can disable this with `ccp roles off` if the server "
+                "does not want role clutter. The Execution List role is always active regardless of this setting."
+            ),
+            inline=False,
+        )
         embeds.append(e2)
 
         e3 = discord.Embed(color=0xCC0000, title="SCORE AND STAT COMMANDS")
@@ -167,9 +171,9 @@ class Guide(commands.Cog):
         e4.add_field(
             name="/shop",
             value=(
-                "Browse the full catalogue across 4 categories. Also displays all rank tiers and their promotion yuan rewards.\n"
+                "Browse the full catalogue across 4 categories. Run `/shop` first to see what you can afford at your current balance.\n"
                 "Categories: **Core** (reports, defense, rehabilitation) · **Economy** (lottery, bounties, disputes) · "
-                "**Chaos** (inspection, legal cover, fabricated evidence) · **Cosmetic** (prestige badges, Winnie the Pooh)"
+                "**Misc** (inspection, legal cover, fabricated evidence) · **Cosmetic** (prestige badges, Winnie the Pooh)"
             ),
             inline=False,
         )
@@ -218,10 +222,16 @@ class Guide(commands.Cog):
         embeds.append(e5)
 
         e6 = discord.Embed(color=0xCC0000, title="FUNDRAISERS")
-        e6.description = (
-            "A citizen proposes to do something in exchange for Yuan. Others donate. "
-            "When the goal is hit, the organizer must follow through, then open a vote. "
-            "If enough citizens confirm, they receive the funds. If enough deny, donors are refunded."
+        e6.add_field(
+            name="LIFECYCLE",
+            value=(
+                "1. Organizer creates a fundraiser with a Yuan goal and a description of what they will do.\n"
+                "2. Citizens donate Yuan. Donated funds are held in escrow.\n"
+                "3. When the goal is reached, the organizer must follow through, then mark it complete.\n"
+                "4. Citizens vote to confirm or deny. If enough confirm, the organizer receives the funds. "
+                "If enough deny, all donors are refunded."
+            ),
+            inline=False,
         )
         e6.add_field(name="/fundraise create <goal> <description>", value="Start a fundraiser. Set a Yuan goal and describe what you will do.", inline=False)
         e6.add_field(name="/fundraise donate <id> <amount>",        value="Donate Yuan to an open fundraiser. Cannot donate to your own.", inline=False)
