@@ -316,6 +316,12 @@ class Database:
             guild_id, user_id, amount,
         )
 
+    async def set_yuan(self, guild_id: int, user_id: int, amount: int):
+        await self._pool.execute(
+            "UPDATE users SET yuan = GREATEST(0, $3) WHERE guild_id = $1 AND user_id = $2",
+            guild_id, user_id, amount,
+        )
+
     async def handle_rank_promotion(self, guild_id: int, user_id: int, new_rank_idx: int, yuan_amount: int) -> int:
         now = int(time.time())
         item_id = f"rank_promotion_{new_rank_idx}"

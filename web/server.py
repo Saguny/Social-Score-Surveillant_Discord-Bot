@@ -118,6 +118,16 @@ async def _handle_admin_command(request):
         except Exception as e:
             return web.json_response({"error": str(e)})
 
+    elif command == "force_yuan":
+        if len(args) < 3:
+            return web.json_response({"error": "Usage: force_yuan <guild_id> <user_id> <amount>"})
+        try:
+            gid, uid, amount = int(args[0]), int(args[1]), int(args[2])
+            await bot.db.set_yuan(gid, uid, amount)
+            return web.json_response({"output": f"User {uid} in guild {gid} yuan set to {amount}."})
+        except Exception as e:
+            return web.json_response({"error": str(e)})
+
     elif command == "db_reset":
         if not args:
             return web.json_response({"error": "Usage: db_reset <guild_id>"})

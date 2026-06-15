@@ -66,6 +66,7 @@ Console commands:
   reload <cog>                Reload a cog (e.g. cogs.scoring)
   guilds                      List all guilds
   force_reset <gid> <uid>     Reset a user's score to 750
+  force_yuan <gid> <uid> <n>  Set a user's Yuan balance to n
   db_reset <gid>              Wipe all data for a guild
   web                         Start web dashboard and open browser
   restart  (or r)             Restart the bot
@@ -133,6 +134,17 @@ async def console_loop(bot: commands.Bot):
                 delta = 750.0 - user["score"]
                 await bot.db.update_score(gid, uid, delta, "owner force reset")
                 print(f"User {uid} in guild {gid} reset to 750.")
+            except Exception as e:
+                print(f"Error: {e}")
+
+        elif cmd == "force_yuan":
+            if len(args) < 3:
+                print("Usage: force_yuan <guild_id> <user_id> <amount>")
+                continue
+            try:
+                gid, uid, amount = int(args[0]), int(args[1]), int(args[2])
+                await bot.db.set_yuan(gid, uid, amount)
+                print(f"User {uid} in guild {gid} yuan set to {amount}.")
             except Exception as e:
                 print(f"Error: {e}")
 
