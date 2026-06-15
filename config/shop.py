@@ -63,7 +63,7 @@ SHOP_ITEMS = {
     # --- Economy / interaction ---
     "lottery": {
         "name": "State Lottery",
-        "description": "50% lose · 40% win ¥2,000-5,000 · 10% jackpot ¥10,000-25,000.",
+        "description": "70% lose · 20% win ¥400-700 · 10% jackpot ¥2,000-4,000.",
         "cost": 500,
         "requires_target": False,
         "requires_text": False,

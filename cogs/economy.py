@@ -337,25 +337,25 @@ class Economy(commands.Cog):
         elif item_id == "lottery":
             buyer_name = await self.bot.format_user_full(interaction.user, gid)
             roll = random.random()
-            if roll < 0.5:
+            if roll < 0.7:
                 embed = discord.Embed(color=0x333333, title="中华人民共和国社会信用局 · 国家彩票")
                 embed.add_field(name="CITIZEN", value=buyer_name, inline=False)
                 embed.add_field(name="RESULT", value="Better luck next time. The Party keeps your entry.", inline=False)
                 embed.add_field(name="YUAN CHANGE", value=f"-¥{cost:,}", inline=False)
             elif roll < 0.9:
-                winnings = random.randint(2000, 5000)
+                winnings = random.randint(400, 700)
                 await self.db.adjust_yuan(gid, uid, winnings)
                 embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局 · 国家彩票")
                 embed.add_field(name="CITIZEN", value=buyer_name, inline=False)
                 embed.add_field(name="WINNER", value="The Party smiles upon you.", inline=False)
-                embed.add_field(name="YUAN CHANGE", value=f"+¥{winnings:,} · net +¥{winnings - cost:,}", inline=False)
+                embed.add_field(name="YUAN CHANGE", value=f"+¥{winnings:,} · net {winnings - cost:+,}", inline=False)
             else:
-                winnings = random.randint(10000, 25000)
+                winnings = random.randint(2000, 4000)
                 await self.db.adjust_yuan(gid, uid, winnings)
                 embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局 · 国家彩票")
                 embed.add_field(name="CITIZEN", value=buyer_name, inline=False)
                 embed.add_field(name="JACKPOT", value="Extraordinary fortune. The state bestows its blessing.", inline=False)
-                embed.add_field(name="YUAN CHANGE", value=f"+¥{winnings:,} · net +¥{winnings - cost:,}", inline=False)
+                embed.add_field(name="YUAN CHANGE", value=f"+¥{winnings:,} · net {winnings - cost:+,}", inline=False)
             embed.timestamp = discord.utils.utcnow()
             await interaction.followup.send(embed=embed)
 
