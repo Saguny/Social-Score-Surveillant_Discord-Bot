@@ -311,10 +311,16 @@ class Database:
         )
 
     async def adjust_yuan(self, guild_id, user_id, amount):
-        await self._pool.execute(
-            "UPDATE users SET yuan = GREATEST(0, yuan + $3) WHERE guild_id = $1 AND user_id = $2",
-            guild_id, user_id, amount,
-        )
+        if amount > 0:
+            await self._pool.execute(
+                "UPDATE users SET yuan = GREATEST(0, yuan + $3), total_yuan_earned = total_yuan_earned + $3 WHERE guild_id = $1 AND user_id = $2",
+                guild_id, user_id, amount,
+            )
+        else:
+            await self._pool.execute(
+                "UPDATE users SET yuan = GREATEST(0, yuan + $3) WHERE guild_id = $1 AND user_id = $2",
+                guild_id, user_id, amount,
+            )
 
     async def set_yuan(self, guild_id: int, user_id: int, amount: int):
         await self._pool.execute(
