@@ -172,6 +172,17 @@ class Economy(commands.Cog):
             rehab_count = await self.db.get_rehabilitation_count(gid, uid)
             cost = cfg["cost"] * (2 ** rehab_count)
 
+        if item == "denounce" and target:
+            last_denounce = await self.db.get_last_action_time(gid, uid, "denounce", target.id)
+            if last_denounce and int(time.time()) - last_denounce < 172800:
+                remaining = 172800 - (int(time.time()) - last_denounce)
+                hours = remaining // 3600
+                await interaction.followup.send(
+                    f"Denouncement cooldown active. You may target this citizen again in {hours}h.",
+                    ephemeral=True,
+                )
+                return
+
         if not await self.db.spend_yuan(gid, uid, cost):
             balance = (await self.db.get_user(gid, uid))["yuan"]
             await interaction.followup.send(

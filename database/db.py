@@ -604,6 +604,13 @@ class Database:
             guild_id, user_id, item_id, cost, target_user_id, int(time.time()),
         )
 
+    async def get_last_action_time(self, guild_id: int, user_id: int, item_id: str, target_user_id: int) -> int | None:
+        row = await self._pool.fetchrow(
+            "SELECT timestamp FROM transactions WHERE guild_id = $1 AND user_id = $2 AND item_id = $3 AND target_user_id = $4 ORDER BY timestamp DESC LIMIT 1",
+            guild_id, user_id, item_id, target_user_id,
+        )
+        return row["timestamp"] if row else None
+
     async def increment_reported(self, guild_id, user_id):
         await self._pool.execute(
             "UPDATE users SET times_reported = times_reported + 1 WHERE guild_id = $1 AND user_id = $2",

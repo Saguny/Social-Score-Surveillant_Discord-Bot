@@ -7,7 +7,10 @@ import discord
 from discord.ext import commands
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from config.ranks import get_rank, get_rank_index, RANKS, EXECUTION_THRESHOLD, RANK_YUAN
-from config.rules import STRUCTURAL_RULES, SENTIMENT_SCALE, SENTIMENT_NEUTRAL_THRESHOLD, NEUTRAL_BONUS, YUAN_PER_MESSAGE
+from config.rules import (
+    STRUCTURAL_RULES, SENTIMENT_SCALE, SENTIMENT_NEUTRAL_THRESHOLD, NEUTRAL_BONUS, YUAN_PER_MESSAGE,
+    DAILY_MSG_SCORE_CAP, DAILY_MSG_DIMINISHING_THRESHOLD, DAILY_MSG_DIMINISHING_FACTOR,
+)
 from config.banned_topics import contains_banned_topic
 
 TRANSLATE_URL = "https://translate.googleapis.com/translate_a/single"
@@ -48,6 +51,7 @@ class Scoring(commands.Cog):
         self._executor: concurrent.futures.ProcessPoolExecutor | None = None
         self._lang_cache: dict[tuple, tuple[str, float]] = {}
         self._pos_streaks: dict[tuple[int, int], int] = {}
+        self._daily_tracking: dict[tuple[int, int], tuple[int, float, int]] = {}
 
     async def cog_load(self):
         self._session = aiohttp.ClientSession()
@@ -277,6 +281,29 @@ class Scoring(commands.Cog):
             return
 
         delta, reason = await self._evaluate(message)
+
+        if delta == 0:
+            return
+
+        key = (gid, uid)
+        today_start = int(time.time()) // 86400 * 86400
+        tracking = self._daily_tracking.get(key)
+        if tracking is None or tracking[0] != today_start:
+            daily_net, msg_count = 0.0, 0
+        else:
+            _, daily_net, msg_count = tracking
+
+        if delta > 0:
+            if msg_count >= DAILY_MSG_DIMINISHING_THRESHOLD:
+                delta = round(delta * DAILY_MSG_DIMINISHING_FACTOR, 2)
+            headroom = DAILY_MSG_SCORE_CAP - daily_net
+            if headroom <= 0.0:
+                self._daily_tracking[key] = (today_start, daily_net, msg_count)
+                return
+            delta = round(min(delta, headroom), 2)
+            self._daily_tracking[key] = (today_start, daily_net + delta, msg_count + 1)
+        else:
+            self._daily_tracking[key] = (today_start, daily_net + delta, msg_count)
 
         if delta == 0:
             return

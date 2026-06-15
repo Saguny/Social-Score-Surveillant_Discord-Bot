@@ -87,8 +87,19 @@ class Guide(commands.Cog):
             name="SENTIMENT",
             value=(
                 "Each message is analyzed for tone. Positive messages nudge your score up, "
-                "negative ones nudge it down. Max impact per message is +0.3 or -0.3. "
-                "Neutral messages do nothing."
+                "negative ones nudge it down. Max impact per message is +0.30 or -0.30. "
+                "Neutral messages grant a small +0.03 bonus for civic participation.\n"
+                "Consecutive positive messages build a streak multiplier (up to 1.5x at streak 15+)."
+            ),
+            inline=False,
+        )
+        e1.add_field(
+            name="DAILY MESSAGE LIMITS",
+            value=(
+                "Score gains from messages are capped at **+8.00 net per day**. "
+                "Once reached, further positive messages yield nothing until penalties bring you below the cap.\n"
+                "After your first 25 positive messages in a day, each additional positive message contributes at 25% effectiveness. "
+                "Negative penalties are always full strength regardless of message count."
             ),
             inline=False,
         )
@@ -96,7 +107,7 @@ class Guide(commands.Cog):
             name="COUNTER-REVOLUTIONARY SPEECH",
             value=(
                 "Messages referencing banned topics (Tiananmen, Taiwan independence, Xinjiang, Tibet, "
-                "Falun Gong, and related subjects) are flagged regardless of tone. Penalty: -0.3."
+                "Falun Gong, and related subjects) are flagged regardless of tone. Penalty: -0.30."
             ),
             inline=False,
         )
@@ -182,7 +193,7 @@ class Guide(commands.Cog):
             value=(
                 "Purchase any item by its ID. Key items:\n"
                 "`report` (¥2,500) · Dock a target 2 score points.\n"
-                "`denounce` (¥6,000) · Public denouncement. Docks target 20 score points.\n"
+                "`denounce` (¥12,000) · Public denouncement. Docks target 20 score points. 48h cooldown per target.\n"
                 "`surveillance` (¥2,000) · Unlocks one `/surveillance_report` use on a target.\n"
                 "`rehabilitate` (¥3,000+) · Recover +3 score. Cost doubles each use.\n"
                 "`appeal` (¥4,000) · Next incoming penalty reduced 50% within 12 hours.\n"
@@ -210,12 +221,12 @@ class Guide(commands.Cog):
         e5 = discord.Embed(color=0xCC0000, title="SOCIAL RATING")
         e5.add_field(
             name="/endorse <citizen> [reason]",
-            value="Grant a citizen a positive rating. Adjusts their score by +3.0. One use per citizen per 24 hours. Optional reason is displayed in the embed and logged.",
+            value="Grant a citizen a positive rating. Adjusts their score by +1.5. One use per citizen per 24 hours. Optional reason is displayed in the embed and logged.",
             inline=False,
         )
         e5.add_field(
             name="/rebuke <citizen> [reason]",
-            value="Issue a negative rating against a citizen. Adjusts their score by -3.0. One use per citizen per 24 hours. Optional reason is displayed in the embed and logged.",
+            value="Issue a negative rating against a citizen. Adjusts their score by -1.5. One use per citizen per 24 hours. Optional reason is displayed in the embed and logged.",
             inline=False,
         )
         e5.set_footer(text="GLORY TO THE CCP!")
@@ -250,7 +261,7 @@ class Guide(commands.Cog):
         e7.add_field(name="ccp executions [#channel]",              value="Set a dedicated channel for Execution List notices. Omit the channel to clear and revert to posting in the message channel.", inline=False)
         e7.add_field(name="ccp roles [on|off]",                     value="Toggle whether rank tier changes assign real Discord server roles. On by default. Execution List role is unaffected.", inline=False)
         e7.add_field(name="ccp poster",                              value="Display a random propaganda poster.", inline=False)
-        e7.add_field(name="ccp posters",                             value="Toggle daily propaganda poster broadcasts in this channel. React ❤️ for +1 credit and +20 yuan · React 😡 for -1 credit.", inline=False)
+        e7.add_field(name="ccp posters",                             value="Toggle daily propaganda poster broadcasts in this channel. React ❤️ for +3 score and ¥250 · React 😡 for -1 score.", inline=False)
         e7.add_field(
             name="/propaganda start <submit_channel> <reveal_channel> <duration_hours>",
             value=(

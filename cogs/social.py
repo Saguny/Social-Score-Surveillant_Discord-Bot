@@ -4,8 +4,8 @@ from discord import app_commands
 from discord.ext import commands
 
 COOLDOWN_SECONDS = 86400
-ENDORSE_DELTA = 3.0
-REBUKE_DELTA = -3.0
+ENDORSE_DELTA = 1.5
+REBUKE_DELTA = -1.5
 
 
 class Social(commands.Cog):

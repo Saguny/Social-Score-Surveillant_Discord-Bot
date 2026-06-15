@@ -10,8 +10,8 @@ SHOP_ITEMS = {
     },
     "denounce": {
         "name": "Public Denouncement",
-        "description": "Public post docking target -20.00 score. Claims any active investigation bounty.",
-        "cost": 6000,
+        "description": "Public post docking target -20.00 score. Claims any active investigation bounty. 48h cooldown per target.",
+        "cost": 12000,
         "requires_target": True,
         "requires_text": True,
         "category": "core",
