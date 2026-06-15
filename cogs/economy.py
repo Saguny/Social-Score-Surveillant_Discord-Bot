@@ -148,7 +148,8 @@ class Economy(commands.Cog):
             await interaction.response.send_message("Invalid target.", ephemeral=True)
             return
 
-        await interaction.response.defer(ephemeral=True)
+        _public_items = {"lottery", "dispute", "denounce", "inspection", "criticism", "tip", "pact"}
+        await interaction.response.defer(ephemeral=item not in _public_items)
 
         if item == "protection" and target and await self.db.get_effect(interaction.guild.id, target.id, "protection"):
             await interaction.followup.send(
