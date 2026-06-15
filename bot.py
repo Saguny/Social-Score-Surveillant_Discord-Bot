@@ -29,6 +29,16 @@ discord.Embed.__init__ = _embed_init
 
 CMD_COOLDOWN = 2.0
 
+_REQUIRED_PERMISSIONS = {
+    "send_messages":      "Send Messages",
+    "embed_links":        "Embed Links",
+    "manage_roles":       "Manage Roles",
+    "manage_channels":    "Manage Channels",
+    "add_reactions":      "Add Reactions",
+    "attach_files":       "Attach Files",
+    "read_message_history": "Read Message History",
+}
+
 class CreditCommandTree(discord.app_commands.CommandTree):
     async def call(self, interaction: discord.Interaction) -> None:
         _current_user_id.set(interaction.user.id)
@@ -40,6 +50,29 @@ class CreditCommandTree(discord.app_commands.CommandTree):
             return
         cooldowns[uid] = now
         await super().call(interaction)
+
+    async def on_error(self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError) -> None:
+        cause = getattr(error, "__cause__", error)
+        if isinstance(cause, discord.Forbidden):
+            missing = []
+            if interaction.guild:
+                perms = interaction.guild.me.guild_permissions
+                for attr, label in _REQUIRED_PERMISSIONS.items():
+                    if not getattr(perms, attr, True):
+                        missing.append(label)
+            if missing:
+                msg = f"Missing permissions: {', '.join(missing)}"
+            else:
+                msg = "The bot lacks a required permission for this action."
+            try:
+                if interaction.response.is_done():
+                    await interaction.followup.send(msg, ephemeral=True)
+                else:
+                    await interaction.response.send_message(msg, ephemeral=True)
+            except Exception:
+                pass
+        else:
+            raise error
 
 load_dotenv()
 
@@ -296,6 +329,28 @@ class SocialCreditBot(commands.Bot):
         self.tree.copy_global_to(guild=guild)
         await self.tree.sync(guild=guild)
         print(f"Joined {guild.name} · registered {len(member_ids)} members · slash commands synced.")
+
+    async def on_command_error(self, ctx: commands.Context, error: commands.CommandError) -> None:
+        cause = getattr(error, "__cause__", error)
+        if isinstance(cause, discord.Forbidden) or isinstance(error, commands.BotMissingPermissions):
+            missing = []
+            if ctx.guild:
+                perms = ctx.guild.me.guild_permissions
+                for attr, label in _REQUIRED_PERMISSIONS.items():
+                    if not getattr(perms, attr, True):
+                        missing.append(label)
+            if missing:
+                msg = f"Missing permissions: {', '.join(missing)}"
+            else:
+                msg = "The bot lacks a required permission for this action."
+            try:
+                await ctx.send(msg)
+            except discord.Forbidden:
+                pass
+        elif isinstance(error, commands.MissingPermissions):
+            await ctx.send("You do not have permission to use this command.")
+        elif not isinstance(error, commands.CommandNotFound):
+            raise error
 
     async def on_member_join(self, member: discord.Member):
         if not member.bot:

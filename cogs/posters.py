@@ -75,9 +75,15 @@ class Posters(commands.Cog):
 
     async def _send_daily(self, channel: discord.TextChannel, guild_id: int):
         poster = self._pick_poster(self._active[guild_id].get("last_slug"))
-        msg = await channel.send(embed=_build_embed(poster))
-        await msg.add_reaction(HEART)
-        await msg.add_reaction(RAGE)
+        try:
+            msg = await channel.send(embed=_build_embed(poster))
+        except discord.Forbidden:
+            return
+        try:
+            await msg.add_reaction(HEART)
+            await msg.add_reaction(RAGE)
+        except discord.Forbidden:
+            pass
         await self.db.set_poster_last(guild_id, poster["slug"])
         self._active[guild_id]["last_slug"] = poster["slug"]
         await self.db.log_poster_message(guild_id, channel.id, msg.id)

@@ -213,7 +213,10 @@ class Scoring(commands.Cog):
             inline=False,
         )
         embed.timestamp = discord.utils.utcnow()
-        await message.channel.send(embed=embed)
+        try:
+            await message.channel.send(embed=embed)
+        except discord.Forbidden:
+            pass
 
     async def _handle_execution_status(self, message: discord.Message, old: float, new: float):
         entered = old > EXECUTION_THRESHOLD and new <= EXECUTION_THRESHOLD
