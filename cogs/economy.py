@@ -760,8 +760,8 @@ class Economy(commands.Cog):
         await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
     @app_commands.command(name="requestyuan", description="Request Yuan from another citizen")
-    @app_commands.describe(citizen="The citizen to request Yuan from", amount="Amount of Yuan to request")
-    async def requestyuan(self, interaction: discord.Interaction, citizen: discord.Member, amount: int):
+    @app_commands.describe(citizen="The citizen to request Yuan from", amount="Amount of Yuan to request", reason="Optional reason for the request")
+    async def requestyuan(self, interaction: discord.Interaction, citizen: discord.Member, amount: int, reason: str = None):
         await interaction.response.defer()
         gid = interaction.guild.id
         uid = interaction.user.id
@@ -778,6 +778,8 @@ class Economy(commands.Cog):
         embed.add_field(name="FROM", value=citizen.mention, inline=True)
         embed.add_field(name="TO", value=interaction.user.mention, inline=True)
         embed.add_field(name="AMOUNT", value=f"¥{amount:,}", inline=True)
+        if reason:
+            embed.add_field(name="REASON", value=reason[:200], inline=False)
         embed.timestamp = discord.utils.utcnow()
 
         view = RequestView(interaction.user, citizen, amount)
