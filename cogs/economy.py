@@ -167,6 +167,85 @@ class TransferView(discord.ui.View):
         self.clear_items()
 
 
+class RequestView(discord.ui.View):
+    def __init__(self, requester: discord.Member, target: discord.Member, amount: int):
+        super().__init__(timeout=300)
+        self.requester = requester
+        self.target = target
+        self.amount = amount
+        self.done = False
+
+    async def _finish(self, interaction: discord.Interaction, accepted: bool):
+        if self.done:
+            await interaction.response.defer()
+            return
+        self.done = True
+        self.clear_items()
+
+        if accepted:
+            db = interaction.client.db
+            gid = interaction.guild.id
+            if not await db.spend_yuan(gid, self.target.id, self.amount):
+                user = await db.get_user(gid, self.target.id)
+                embed = discord.Embed(color=0x8B0000, title="中华人民共和国社会信用局 · 资金申请")
+                embed.add_field(
+                    name="REQUEST FAILED",
+                    value=f"Insufficient funds. {self.target.mention} has ¥{user['yuan']:,} · Required: ¥{self.amount:,}",
+                    inline=False,
+                )
+                await interaction.response.edit_message(embed=embed, view=self)
+                return
+
+            await db.adjust_yuan(gid, self.requester.id, self.amount)
+            target_data = await db.get_user(gid, self.target.id)
+            requester_data = await db.get_user(gid, self.requester.id)
+            target_new = target_data["yuan"]
+            requester_new = requester_data["yuan"]
+
+            embed = discord.Embed(color=0x2d5a27, title="中华人民共和国社会信用局 · 资金申请")
+            embed.add_field(name="REQUEST FULFILLED", value=f"{self.target.mention} paid {self.requester.mention}", inline=False)
+            embed.add_field(name="AMOUNT", value=f"¥{self.amount:,}", inline=False)
+            embed.add_field(
+                name=self.target.display_name,
+                value=f"¥{target_new + self.amount:,} -> ¥{target_new:,}",
+                inline=True,
+            )
+            embed.add_field(
+                name=self.requester.display_name,
+                value=f"¥{requester_new - self.amount:,} -> ¥{requester_new:,}",
+                inline=True,
+            )
+            embed.timestamp = discord.utils.utcnow()
+        else:
+            embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 资金申请")
+            embed.add_field(
+                name="REQUEST DECLINED",
+                value=f"{self.target.mention} refused {self.requester.mention}'s request of ¥{self.amount:,}.",
+                inline=False,
+            )
+            embed.timestamp = discord.utils.utcnow()
+
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    @discord.ui.button(label="Accept", style=discord.ButtonStyle.success)
+    async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.target.id:
+            await interaction.response.send_message("This request is not addressed to you.", ephemeral=True)
+            return
+        await self._finish(interaction, accepted=True)
+
+    @discord.ui.button(label="Decline", style=discord.ButtonStyle.danger)
+    async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.target.id:
+            await interaction.response.send_message("This request is not addressed to you.", ephemeral=True)
+            return
+        await self._finish(interaction, accepted=False)
+
+    async def on_timeout(self):
+        self.done = True
+        self.clear_items()
+
+
 class Economy(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -679,6 +758,30 @@ class Economy(commands.Cog):
 
         view = TransferView(interaction.user, recipient, amount, user["yuan"])
         await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+
+    @app_commands.command(name="requestyuan", description="Request Yuan from another citizen")
+    @app_commands.describe(citizen="The citizen to request Yuan from", amount="Amount of Yuan to request")
+    async def requestyuan(self, interaction: discord.Interaction, citizen: discord.Member, amount: int):
+        await interaction.response.defer()
+        gid = interaction.guild.id
+        uid = interaction.user.id
+
+        if citizen.bot or citizen.id == uid:
+            await interaction.followup.send("Invalid target.", ephemeral=True)
+            return
+        if amount <= 0:
+            await interaction.followup.send("Amount must be greater than zero.", ephemeral=True)
+            return
+
+        embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 资金申请")
+        embed.add_field(name="YUAN REQUEST", value=f"{interaction.user.mention} is requesting ¥{amount:,} from {citizen.mention}", inline=False)
+        embed.add_field(name="FROM", value=citizen.mention, inline=True)
+        embed.add_field(name="TO", value=interaction.user.mention, inline=True)
+        embed.add_field(name="AMOUNT", value=f"¥{amount:,}", inline=True)
+        embed.timestamp = discord.utils.utcnow()
+
+        view = RequestView(interaction.user, citizen, amount)
+        await interaction.followup.send(embed=embed, view=view)
 
     @app_commands.command(name="surveillance_report", description="Redeem your surveillance package for a full 30-day intelligence dossier")
     @app_commands.describe(target="The citizen to pull the dossier on")

@@ -180,6 +180,7 @@ class Guide(commands.Cog):
         e4.add_field(name="Earning Yuan",  value="You earn ¥10 per message automatically. Check-ins and propaganda victories are additional sources.", inline=False)
         e4.add_field(name="/yuan",         value="Check your Yuan balance and lifetime earned/spent.", inline=False)
         e4.add_field(name="/transfer <citizen> <amount>", value="Send Yuan directly to another citizen. A confirmation prompt shows the amount and your balance after transfer before executing.", inline=False)
+        e4.add_field(name="/requestyuan <citizen> <amount>", value="Request Yuan from another citizen. Posts a public embed they can Accept or Decline. Expires after 5 minutes.", inline=False)
         e4.add_field(
             name="/shop",
             value=(
