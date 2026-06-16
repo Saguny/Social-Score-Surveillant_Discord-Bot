@@ -26,7 +26,7 @@ function setHtml(id,v){const e=document.getElementById(id);if(e)e.innerHTML=v;}
 function trendHtml(now, prev) {
   if (!prev) return '';
   const pct = (now - prev) / prev * 100;
-  if (Math.abs(pct) < 2) return '<span class="trend-flat">→ stable</span>';
+  if (Math.abs(pct) < 2) return '<span class="trend-flat">-> stable</span>';
   const arrow = pct > 0 ? '↑' : '↓';
   const cls   = pct > 0 ? 'trend-up' : 'trend-down';
   return `<span class="${cls}">${arrow} ${Math.abs(pct).toFixed(0)}% vs prev 24h</span>`;

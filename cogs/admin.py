@@ -27,9 +27,9 @@ class Admin(commands.Cog):
             embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 手动调整")
             embed.add_field(name="CITIZEN",    value=str(citizen),             inline=False)
             embed.add_field(name="ADJUSTMENT", value=f"{delta:+.2f}",          inline=True)
-            embed.add_field(name="SCORE",      value=f"{old:.2f} → {new:.2f}", inline=True)
+            embed.add_field(name="SCORE",      value=f"{old:.2f} -> {new:.2f}", inline=True)
             if old_rank["name"] != new_rank["name"]:
-                embed.add_field(name="RANK CHANGE", value=f"{old_rank['name']} → {new_rank['name']}", inline=False)
+                embed.add_field(name="RANK CHANGE", value=f"{old_rank['name']} -> {new_rank['name']}", inline=False)
             embed.add_field(name="REASON", value=reason, inline=False)
         await ctx.send(embed=embed)
 

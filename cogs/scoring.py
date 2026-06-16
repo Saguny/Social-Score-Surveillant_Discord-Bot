@@ -170,7 +170,7 @@ class Scoring(commands.Cog):
             role = await guild.create_role(name=name)
         return role
 
-    async def _handle_rank_change(self, message: discord.Message, old: float, new: float):
+    async def _handle_rank_change(self, guild: discord.Guild, member: discord.Member, channel: discord.TextChannel, old: float, new: float):
         old_rank = get_rank(old)
         new_rank = get_rank(new) if new >= old else get_rank(new + 1.0)
         if old_rank["name"] == new_rank["name"]:
@@ -182,23 +182,23 @@ class Scoring(commands.Cog):
 
         if promoted:
             yuan_earned = await self.db.handle_rank_promotion(
-                message.guild.id, message.author.id, new_idx, RANK_YUAN[new_idx]
+                guild.id, member.id, new_idx, RANK_YUAN[new_idx]
             )
             yuan_label = f"+¥{yuan_earned:,}" if yuan_earned > 0 else "¥0 · reward already claimed"
         else:
             penalty = RANK_YUAN[old_idx]
-            await self.db.adjust_yuan(message.guild.id, message.author.id, -penalty)
-            await self.db.set_rank_entered_at(message.guild.id, message.author.id)
+            await self.db.adjust_yuan(guild.id, member.id, -penalty)
+            await self.db.set_rank_entered_at(guild.id, member.id)
             yuan_label = f"-¥{penalty:,}"
 
-        if await self.db.get_assign_rank_roles(message.guild.id):
+        if await self.db.get_assign_rank_roles(guild.id):
             try:
-                old_role = discord.utils.get(message.guild.roles, name=old_rank["name"])
-                if old_role and old_role in message.author.roles:
-                    await message.author.remove_roles(old_role)
+                old_role = discord.utils.get(guild.roles, name=old_rank["name"])
+                if old_role and old_role in member.roles:
+                    await member.remove_roles(old_role)
                 if new > EXECUTION_THRESHOLD:
-                    new_role = await self._get_or_create_role(message.guild, new_rank["name"])
-                    await message.author.add_roles(new_role)
+                    new_role = await self._get_or_create_role(guild, new_rank["name"])
+                    await member.add_roles(new_role)
             except discord.Forbidden:
                 pass
 
@@ -206,19 +206,19 @@ class Scoring(commands.Cog):
         status = "PROMOTED" if promoted else "DEMOTED"
 
         embed = discord.Embed(color=color, title="中华人民共和国社会信用局")
-        embed.add_field(name="CITIZEN", value=str(message.author), inline=False)
+        embed.add_field(name="CITIZEN", value=str(member), inline=False)
         embed.add_field(
             name=f"STATUS CHANGE: {status}",
-            value=f"{old_rank['name']} → {new_rank['name']}\nScore: {new:.2f} · {yuan_label}",
+            value=f"{old_rank['name']} -> {new_rank['name']}\nScore: {new:.2f} · {yuan_label}",
             inline=False,
         )
         embed.timestamp = discord.utils.utcnow()
         try:
-            await message.channel.send(embed=embed)
+            await channel.send(embed=embed)
         except discord.Forbidden:
             pass
 
-    async def _handle_execution_status(self, message: discord.Message, old: float, new: float):
+    async def _handle_execution_status(self, guild: discord.Guild, member: discord.Member, channel: discord.TextChannel, old: float, new: float):
         entered = old > EXECUTION_THRESHOLD and new <= EXECUTION_THRESHOLD
         recovered = old <= EXECUTION_THRESHOLD and new > EXECUTION_THRESHOLD + 1.0
         if not entered and not recovered:
@@ -227,21 +227,21 @@ class Scoring(commands.Cog):
         exec_role_name = "Execution Date: Tomorrow"
         try:
             if entered:
-                exec_role = await self._get_or_create_role(message.guild, exec_role_name)
+                exec_role = await self._get_or_create_role(guild, exec_role_name)
                 for rank in RANKS:
-                    r = discord.utils.get(message.guild.roles, name=rank["name"])
-                    if r and r in message.author.roles:
-                        await message.author.remove_roles(r)
-                await message.author.add_roles(exec_role)
+                    r = discord.utils.get(guild.roles, name=rank["name"])
+                    if r and r in member.roles:
+                        await member.remove_roles(r)
+                await member.add_roles(exec_role)
 
-                confiscated = await self.db.confiscate_yuan(message.guild.id, message.author.id)
+                confiscated = await self.db.confiscate_yuan(guild.id, member.id)
 
-                exec_channel_id = await self.db.get_execution_channel(message.guild.id)
-                channel = message.guild.get_channel(exec_channel_id) if exec_channel_id else None
-                target = channel or message.channel
+                exec_channel_id = await self.db.get_execution_channel(guild.id)
+                exec_channel = guild.get_channel(exec_channel_id) if exec_channel_id else None
+                target = exec_channel or channel
 
                 embed = discord.Embed(color=0x8B0000, title="中华人民共和国社会信用局 · 处决名单")
-                embed.add_field(name="CITIZEN", value=str(message.author), inline=False)
+                embed.add_field(name="CITIZEN", value=str(member), inline=False)
                 embed.add_field(
                     name="STATUS",
                     value="Placed on the Execution List\nExecution Date: Tomorrow",
@@ -260,13 +260,13 @@ class Scoring(commands.Cog):
                 await target.send(embed=embed)
 
             else:
-                exec_role = discord.utils.get(message.guild.roles, name=exec_role_name)
-                if exec_role and exec_role in message.author.roles:
-                    await message.author.remove_roles(exec_role)
-                if await self.db.get_assign_rank_roles(message.guild.id):
+                exec_role = discord.utils.get(guild.roles, name=exec_role_name)
+                if exec_role and exec_role in member.roles:
+                    await member.remove_roles(exec_role)
+                if await self.db.get_assign_rank_roles(guild.id):
                     correct_rank = get_rank(new)
-                    correct_role = await self._get_or_create_role(message.guild, correct_rank["name"])
-                    await message.author.add_roles(correct_role)
+                    correct_role = await self._get_or_create_role(guild, correct_rank["name"])
+                    await member.add_roles(correct_role)
 
         except discord.Forbidden:
             pass
@@ -329,8 +329,8 @@ class Scoring(commands.Cog):
             embed.timestamp = discord.utils.utcnow()
             await message.channel.send(embed=embed)
 
-        await self._handle_rank_change(message, old_score, new_score)
-        await self._handle_execution_status(message, old_score, new_score)
+        await self._handle_rank_change(message.guild, message.author, message.channel, old_score, new_score)
+        await self._handle_execution_status(message.guild, message.author, message.channel, old_score, new_score)
         await self.db.clean_expired_effects()
 
 

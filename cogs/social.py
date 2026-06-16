@@ -42,8 +42,13 @@ class Social(commands.Cog):
         await self.db.set_endorsement(gid, uid, target.id, etype)
         delta = ENDORSE_DELTA if etype == "endorse" else REBUKE_DELTA
         score_reason = f"citizen {etype}ment" + (f": {reason}" if reason else "")
-        _, new_score = await self.db.update_score(gid, target.id, delta, score_reason)
+        old_score, new_score = await self.db.update_score(gid, target.id, delta, score_reason)
         await self.db.update_social_counts(gid, target.id, uid, etype)
+
+        scoring = self.bot.cogs.get("Scoring")
+        if scoring:
+            await scoring._handle_rank_change(interaction.guild, target, interaction.channel, old_score, new_score)
+            await scoring._handle_execution_status(interaction.guild, target, interaction.channel, old_score, new_score)
 
         if etype == "endorse":
             color = 0xFFD700

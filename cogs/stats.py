@@ -155,8 +155,11 @@ class Stats(commands.Cog):
         else:              net_vs = "= same as yesterday"
 
         yuan_vs = ""
-        if data["prev_day_yuan"]:
-            yuan_vs = f"  {'▲ +' if yuan_change >= 0 else '▼ '}¥{yuan_change:,} vs yesterday"
+        if data["prev_day_yuan"] is not None:
+            if yuan_change >= 0:
+                yuan_vs = f"  ▲ +¥{yuan_change:,} vs yesterday"
+            else:
+                yuan_vs = f"  ▼ -¥{abs(yuan_change):,} vs yesterday"
 
         RESET = "[0m"
         GREEN = "[32m"

@@ -128,16 +128,16 @@ class TransferView(discord.ui.View):
             await interaction.response.edit_message(embed=ack, view=self)
 
             public = discord.Embed(color=0x2d5a27, title="中华人民共和国社会信用局 · 转账")
-            public.add_field(name="YUAN TRANSFER", value=f"{self.sender.mention} → {self.recipient.mention}", inline=False)
+            public.add_field(name="YUAN TRANSFER", value=f"{self.sender.mention} -> {self.recipient.mention}", inline=False)
             public.add_field(name="AMOUNT", value=f"¥{self.amount:,}", inline=False)
             public.add_field(
                 name=f"{self.sender.display_name}",
-                value=f"¥{self.sender_balance:,} → ¥{sender_new:,}",
+                value=f"¥{self.sender_balance:,} -> ¥{sender_new:,}",
                 inline=True,
             )
             public.add_field(
                 name=f"{self.recipient.display_name}",
-                value=f"¥{recipient_new - self.amount:,} → ¥{recipient_new:,}",
+                value=f"¥{recipient_new - self.amount:,} -> ¥{recipient_new:,}",
                 inline=True,
             )
             public.timestamp = discord.utils.utcnow()
@@ -227,7 +227,7 @@ class Economy(commands.Cog):
             await interaction.response.send_message("Invalid target.", ephemeral=True)
             return
 
-        _public_items = {"lottery", "dispute", "denounce", "inspection", "criticism", "tip", "pact"}
+        _public_items = {"lottery", "dispute", "inspection", "criticism", "pact"}
         await interaction.response.defer(ephemeral=item not in _public_items)
 
         if item == "protection" and target and await self.db.get_effect(interaction.guild.id, target.id, "protection"):
@@ -352,7 +352,8 @@ class Economy(commands.Cog):
                 embed.add_field(name="INVESTIGATION BOUNTY CLAIMED", value=f"+¥{bounty.get('reward', _INVESTIGATION_BOUNTY_REWARD):,}", inline=False)
             embed.set_footer(text=f"Report #{report_num:05d} · GLORY TO THE CCP!")
             embed.timestamp = discord.utils.utcnow()
-            await interaction.followup.send(embed=embed)
+            await interaction.channel.send(embed=embed)
+            await interaction.followup.send("Your denouncement has been filed.", ephemeral=True)
 
         elif item_id == "surveillance":
             expires_at = int(time.time()) + cfg["duration"]
@@ -370,7 +371,7 @@ class Economy(commands.Cog):
             embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局")
             embed.add_field(
                 name="REHABILITATION APPROVED",
-                value=f"Score adjusted: {old:.2f} → {new:.2f}",
+                value=f"Score adjusted: {old:.2f} -> {new:.2f}",
                 inline=False,
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
@@ -445,14 +446,15 @@ class Economy(commands.Cog):
             embed.add_field(name="SUBMITTED BY", value="Unknown Citizen", inline=True)
             embed.add_field(name="TIP", value=text[:200], inline=False)
             embed.timestamp = discord.utils.utcnow()
-            await interaction.followup.send(embed=embed)
+            await interaction.channel.send(embed=embed)
+            await interaction.followup.send("Your tip has been submitted anonymously.", ephemeral=True)
 
         elif item_id == "model_citizen":
             old, new = await self.db.update_score(gid, uid, 1.0, "model citizen commendation")
             embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局")
             embed.add_field(
                 name="MODEL CITIZEN AWARD",
-                value=f"The Party commends your loyalty. Score: {old:.2f} → {new:.2f}",
+                value=f"The Party commends your loyalty. Score: {old:.2f} -> {new:.2f}",
                 inline=False,
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
@@ -545,7 +547,7 @@ class Economy(commands.Cog):
             victim_name = await self.bot.format_user_full(victim, gid) if victim else f"Citizen {victim_id}"
             embed = discord.Embed(color=0x8B0000, title="中华人民共和国社会信用局 · 合规检查")
             embed.add_field(name="SELECTED CITIZEN", value=victim_name, inline=False)
-            embed.add_field(name="RESULT", value=f"Score: {old:.2f} → {new:.2f}", inline=True)
+            embed.add_field(name="RESULT", value=f"Score: {old:.2f} -> {new:.2f}", inline=True)
             embed.timestamp = discord.utils.utcnow()
             await interaction.followup.send(embed=embed)
 
@@ -785,7 +787,7 @@ class Economy(commands.Cog):
         embed.add_field(name="CITIZEN", value=await self.bot.format_user_full(interaction.user, gid), inline=False)
         embed.add_field(name="CONFESSION", value=text[:200], inline=False)
         embed.add_field(name="COST", value=f"¥{cost:,}", inline=True)
-        embed.add_field(name="SCORE ADJUSTMENT", value=f"{old:.2f} → {new:.2f}", inline=True)
+        embed.add_field(name="SCORE ADJUSTMENT", value=f"{old:.2f} -> {new:.2f}", inline=True)
         embed.timestamp = discord.utils.utcnow()
         await interaction.followup.send(embed=embed)
 
