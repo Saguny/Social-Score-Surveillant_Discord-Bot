@@ -179,6 +179,7 @@ class Guide(commands.Cog):
         e4 = discord.Embed(color=0xCC0000, title="YUAN AND ECONOMY")
         e4.add_field(name="Earning Yuan",  value="You earn ¥10 per message automatically. Check-ins and propaganda victories are additional sources.", inline=False)
         e4.add_field(name="/yuan",         value="Check your Yuan balance and lifetime earned/spent.", inline=False)
+        e4.add_field(name="/transfer <citizen> <amount>", value="Send Yuan directly to another citizen. A confirmation prompt shows the amount and your balance after transfer before executing.", inline=False)
         e4.add_field(
             name="/shop",
             value=(

@@ -88,6 +88,85 @@ class ShopView(discord.ui.View):
         return callback
 
 
+class TransferView(discord.ui.View):
+    def __init__(self, sender: discord.Member, recipient: discord.Member, amount: int, sender_balance: int):
+        super().__init__(timeout=60)
+        self.sender = sender
+        self.recipient = recipient
+        self.amount = amount
+        self.sender_balance = sender_balance
+        self.done = False
+
+    async def _finish(self, interaction: discord.Interaction, confirmed: bool):
+        if self.done:
+            await interaction.response.defer()
+            return
+        self.done = True
+        self.clear_items()
+
+        if confirmed:
+            db = interaction.client.db
+            gid = interaction.guild.id
+            if not await db.spend_yuan(gid, self.sender.id, self.amount):
+                user = await db.get_user(gid, self.sender.id)
+                embed = discord.Embed(color=0x8B0000, title="中华人民共和国社会信用局 · 转账")
+                embed.add_field(
+                    name="TRANSFER FAILED",
+                    value=f"Insufficient funds. Balance: ¥{user['yuan']:,} · Required: ¥{self.amount:,}",
+                    inline=False,
+                )
+                await interaction.response.edit_message(embed=embed, view=self)
+                return
+
+            await db.adjust_yuan(gid, self.recipient.id, self.amount)
+            recipient_data = await db.get_user(gid, self.recipient.id)
+            sender_new = self.sender_balance - self.amount
+            recipient_new = recipient_data["yuan"]
+
+            ack = discord.Embed(color=0x2d5a27, title="中华人民共和国社会信用局 · 转账")
+            ack.add_field(name="TRANSFER SENT", value=f"¥{self.amount:,} dispatched to {self.recipient.mention}.", inline=False)
+            await interaction.response.edit_message(embed=ack, view=self)
+
+            public = discord.Embed(color=0x2d5a27, title="中华人民共和国社会信用局 · 转账")
+            public.add_field(name="YUAN TRANSFER", value=f"{self.sender.mention} → {self.recipient.mention}", inline=False)
+            public.add_field(name="AMOUNT", value=f"¥{self.amount:,}", inline=False)
+            public.add_field(
+                name=f"{self.sender.display_name}",
+                value=f"¥{self.sender_balance:,} → ¥{sender_new:,}",
+                inline=True,
+            )
+            public.add_field(
+                name=f"{self.recipient.display_name}",
+                value=f"¥{recipient_new - self.amount:,} → ¥{recipient_new:,}",
+                inline=True,
+            )
+            public.timestamp = discord.utils.utcnow()
+            await interaction.followup.send(embed=public)
+            return
+        else:
+            embed = discord.Embed(color=0x333333, title="中华人民共和国社会信用局 · 转账")
+            embed.add_field(name="TRANSFER CANCELLED", value="The transaction has been voided.", inline=False)
+            await interaction.response.edit_message(embed=embed, view=self)
+
+    @discord.ui.button(label="Confirm", style=discord.ButtonStyle.success)
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.sender.id:
+            await interaction.response.send_message("This is not your transfer.", ephemeral=True)
+            return
+        await self._finish(interaction, confirmed=True)
+
+    @discord.ui.button(label="Nevermind", style=discord.ButtonStyle.danger)
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.sender.id:
+            await interaction.response.send_message("This is not your transfer.", ephemeral=True)
+            return
+        await self._finish(interaction, confirmed=False)
+
+    async def on_timeout(self):
+        self.done = True
+        self.clear_items()
+
+
 class Economy(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -566,6 +645,38 @@ class Economy(commands.Cog):
             embed = discord.Embed(color=color, title="中华人民共和国社会信用局")
             embed.add_field(name=f"STATUS GRANTED: {label}", value=note, inline=False)
             await interaction.followup.send(embed=embed, ephemeral=True)
+
+    @app_commands.command(name="transfer", description="Transfer Yuan to another citizen")
+    @app_commands.describe(recipient="The citizen to send Yuan to", amount="Amount of Yuan to transfer")
+    async def transfer(self, interaction: discord.Interaction, recipient: discord.Member, amount: int):
+        await interaction.response.defer(ephemeral=True)
+        gid = interaction.guild.id
+        uid = interaction.user.id
+
+        if recipient.bot or recipient.id == uid:
+            await interaction.followup.send("Invalid recipient.", ephemeral=True)
+            return
+        if amount <= 0:
+            await interaction.followup.send("Amount must be greater than zero.", ephemeral=True)
+            return
+
+        user = await self.db.get_user(gid, uid)
+        if user["yuan"] < amount:
+            await interaction.followup.send(
+                f"Insufficient funds. Balance: ¥{user['yuan']:,} · Requested: ¥{amount:,}", ephemeral=True
+            )
+            return
+
+        embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 转账")
+        embed.add_field(name="TRANSFER REQUEST", value=f"Send ¥{amount:,} to {recipient.mention}?", inline=False)
+        embed.add_field(name="FROM", value=interaction.user.mention, inline=True)
+        embed.add_field(name="TO", value=recipient.mention, inline=True)
+        embed.add_field(name="AMOUNT", value=f"¥{amount:,}", inline=True)
+        embed.add_field(name="YOUR BALANCE AFTER", value=f"¥{user['yuan'] - amount:,}", inline=False)
+        embed.timestamp = discord.utils.utcnow()
+
+        view = TransferView(interaction.user, recipient, amount, user["yuan"])
+        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
     @app_commands.command(name="surveillance_report", description="Redeem your surveillance package for a full 30-day intelligence dossier")
     @app_commands.describe(target="The citizen to pull the dossier on")
