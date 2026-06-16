@@ -32,6 +32,7 @@ class Admin(commands.Cog):
                 embed.add_field(name="RANK CHANGE", value=f"{old_rank['name']} -> {new_rank['name']}", inline=False)
             embed.add_field(name="REASON", value=reason, inline=False)
         await ctx.send(embed=embed)
+        self.bot.dispatch("score_change", ctx.guild, citizen, ctx.channel, old, new)
 
     @commands.command(name="reset")
     @commands.has_permissions(manage_guild=True)
@@ -40,10 +41,11 @@ class Admin(commands.Cog):
             gid = ctx.guild.id
             user = await self.db.get_user(gid, citizen.id)
             delta = 750.0 - user["score"]
-            await self.db.update_score(gid, citizen.id, delta, "bureau-mandated reset")
+            old, new = await self.db.update_score(gid, citizen.id, delta, "bureau-mandated reset")
             embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")
             embed.add_field(name="CITIZEN RESET", value=f"{citizen.mention} has been returned to baseline.", inline=False)
         await ctx.send(embed=embed)
+        self.bot.dispatch("score_change", ctx.guild, citizen, ctx.channel, old, new)
 
     @commands.command(name="executions")
     @commands.has_permissions(manage_guild=True)

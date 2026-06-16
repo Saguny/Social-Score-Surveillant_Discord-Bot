@@ -45,10 +45,7 @@ class Social(commands.Cog):
         old_score, new_score = await self.db.update_score(gid, target.id, delta, score_reason)
         await self.db.update_social_counts(gid, target.id, uid, etype)
 
-        scoring = self.bot.cogs.get("Scoring")
-        if scoring:
-            await scoring._handle_rank_change(interaction.guild, target, interaction.channel, old_score, new_score)
-            await scoring._handle_execution_status(interaction.guild, target, interaction.channel, old_score, new_score)
+        self.bot.dispatch("score_change", interaction.guild, target, interaction.channel, old_score, new_score)
 
         if etype == "endorse":
             color = 0xFFD700

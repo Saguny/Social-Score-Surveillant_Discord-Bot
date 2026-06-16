@@ -103,11 +103,16 @@ class Posters(commands.Cog):
         gid, uid = payload.guild_id, payload.user_id
         if not await self.db.record_poster_reaction(payload.message_id, uid):
             return
+        guild = self.bot.get_guild(gid)
+        member = guild.get_member(uid) if guild else None
+        channel = guild.get_channel(payload.channel_id) if guild else None
         if emoji == HEART:
             await self.db.tick_user(gid, uid, HEART_YUAN)
-            await self.db.update_score(gid, uid, HEART_SCORE, "propaganda poster: supported")
+            old, new = await self.db.update_score(gid, uid, HEART_SCORE, "propaganda poster: supported")
         else:
-            await self.db.update_score(gid, uid, RAGE_SCORE, "propaganda poster: resisted")
+            old, new = await self.db.update_score(gid, uid, RAGE_SCORE, "propaganda poster: resisted")
+        if member and channel:
+            self.bot.dispatch("score_change", guild, member, channel, old, new)
 
     @commands.command(name="poster")
     async def show_poster(self, ctx: commands.Context):

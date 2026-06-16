@@ -251,6 +251,9 @@ class Economy(commands.Cog):
         self.bot = bot
         self.db = bot.db
 
+    def _post_score(self, interaction: discord.Interaction, member: discord.Member, old: float, new: float):
+        self.bot.dispatch("score_change", interaction.guild, member, interaction.channel, old, new)
+
     @app_commands.command(name="shop", description="Browse the Social Credit Bureau's shop")
     async def shop(self, interaction: discord.Interaction):
         await interaction.response.defer(thinking=True)
@@ -400,6 +403,7 @@ class Economy(commands.Cog):
             embed.set_footer(text=f"Report #{report_num:05d} · GLORY TO THE CCP!")
             embed.timestamp = discord.utils.utcnow()
             await interaction.followup.send(embed=embed)
+            await self._post_score(interaction, target, old, new)
 
         elif item_id == "denounce":
             is_anon = await self.db.consume_effect(gid, uid, "anon_identity")
@@ -433,6 +437,7 @@ class Economy(commands.Cog):
             embed.timestamp = discord.utils.utcnow()
             await interaction.channel.send(embed=embed)
             await interaction.followup.send("Your denouncement has been filed.", ephemeral=True)
+            await self._post_score(interaction, target, old, new)
 
         elif item_id == "surveillance":
             expires_at = int(time.time()) + cfg["duration"]
@@ -454,6 +459,7 @@ class Economy(commands.Cog):
                 inline=False,
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
+            await self._post_score(interaction, interaction.user, old, new)
 
         elif item_id == "appeal":
             expires_at = int(time.time()) + cfg["duration"]
@@ -537,13 +543,14 @@ class Economy(commands.Cog):
                 inline=False,
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
+            await self._post_score(interaction, interaction.user, old, new)
 
         elif item_id == "dispute":
             buyer_wins = random.random() < 0.5
             winner = interaction.user if buyer_wins else target
             loser = target if buyer_wins else interaction.user
-            await self.db.update_score(gid, winner.id, 2.0, "dispute resolution victory")
-            await self.db.update_score(gid, loser.id, -2.0, "dispute resolution loss")
+            w_old, w_new = await self.db.update_score(gid, winner.id, 2.0, "dispute resolution victory")
+            l_old, l_new = await self.db.update_score(gid, loser.id, -2.0, "dispute resolution loss")
             embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 争议裁决")
             challenger_name = await self.bot.format_user_full(interaction.user, gid)
             defendant_name = await self.bot.format_user_full(target, gid)
@@ -554,6 +561,8 @@ class Economy(commands.Cog):
             embed.add_field(name="OUTCOME", value=f"{winner_name} wins +2.00 · {loser_name} loses -2.00", inline=False)
             embed.timestamp = discord.utils.utcnow()
             await interaction.followup.send(embed=embed)
+            await self._post_score(interaction, winner, w_old, w_new)
+            await self._post_score(interaction, loser, l_old, l_new)
 
         elif item_id == "investigation":
             extra_bounty = 0
@@ -629,6 +638,8 @@ class Economy(commands.Cog):
             embed.add_field(name="RESULT", value=f"Score: {old:.2f} -> {new:.2f}", inline=True)
             embed.timestamp = discord.utils.utcnow()
             await interaction.followup.send(embed=embed)
+            if victim:
+                await self._post_score(interaction, victim, old, new)
 
         elif item_id == "history_review":
             history = await self.db.get_score_history_brief(gid, target.id, limit=20)
@@ -895,6 +906,7 @@ class Economy(commands.Cog):
         embed.add_field(name="SCORE ADJUSTMENT", value=f"{old:.2f} -> {new:.2f}", inline=True)
         embed.timestamp = discord.utils.utcnow()
         await interaction.followup.send(embed=embed)
+        await self._post_score(interaction, interaction.user, old, new)
 
     @buy.autocomplete("item")
     async def item_autocomplete(

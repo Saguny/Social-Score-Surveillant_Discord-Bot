@@ -285,6 +285,12 @@ class Scoring(commands.Cog):
 
         delta, reason = await self._evaluate(message)
 
+        if reason == "counter-revolutionary speech" and random.random() < 0.0001:
+            try:
+                await message.channel.send("https://tenor.com/view/social-credit-gif-3627510818063303442")
+            except discord.Forbidden:
+                pass
+
         if delta == 0:
             return
 
@@ -329,9 +335,13 @@ class Scoring(commands.Cog):
             embed.timestamp = discord.utils.utcnow()
             await message.channel.send(embed=embed)
 
-        await self._handle_rank_change(message.guild, message.author, message.channel, old_score, new_score)
-        await self._handle_execution_status(message.guild, message.author, message.channel, old_score, new_score)
+        self.bot.dispatch("score_change", message.guild, message.author, message.channel, old_score, new_score)
         await self.db.clean_expired_effects()
+
+    @commands.Cog.listener()
+    async def on_score_change(self, guild: discord.Guild, member: discord.Member, channel, old: float, new: float):
+        await self._handle_rank_change(guild, member, channel, old, new)
+        await self._handle_execution_status(guild, member, channel, old, new)
 
 
 async def setup(bot: commands.Bot):

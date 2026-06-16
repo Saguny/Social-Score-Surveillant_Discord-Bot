@@ -47,6 +47,8 @@ class CheckIn(commands.Cog):
         embed.timestamp = discord.utils.utcnow()
         await interaction.followup.send(embed=embed, ephemeral=True)
 
+        self.bot.dispatch("score_change", interaction.guild, interaction.user, interaction.channel, old, new)
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(CheckIn(bot))
