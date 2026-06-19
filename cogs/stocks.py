@@ -92,7 +92,21 @@ def _render_chart(
     entry_price: float | None = None,
     knockout: float | None = None,
     direction: str | None = None,
+    timestamps: list | None = None,
 ) -> bytes:
+    # Drop NaN rows (yfinance sometimes returns them at period boundaries)
+    clean = [
+        (o, h, l, c, (timestamps[i] if timestamps else None))
+        for i, (o, h, l, c) in enumerate(zip(opens, highs, lows, closes))
+        if not (math.isnan(float(c)) or math.isnan(float(o)) or math.isnan(float(h)) or math.isnan(float(l)))
+    ]
+    if clean:
+        opens  = [r[0] for r in clean]
+        highs  = [r[1] for r in clean]
+        lows   = [r[2] for r in clean]
+        closes = [r[3] for r in clean]
+        timestamps = [r[4] for r in clean] if timestamps else None
+
     if ticker in ADR_STOCKS:
         bg_path = ADR_STOCKS[ticker]["bg"]
     elif ticker == ETF_TICKER:
@@ -122,7 +136,7 @@ def _render_chart(
         ax_bg.add_patch(Rectangle((0, 0), 1, 1, transform=ax_bg.transAxes,
                                   color="#8B0000", alpha=0.18, zorder=1))
 
-    ax = fig.add_axes([0.09, 0.10, 0.87, 0.82], zorder=2)
+    ax = fig.add_axes([0.09, 0.14, 0.87, 0.78], zorder=2)
     ax.set_facecolor("none")
     ax.set_zorder(2)
     ax.margins(x=0.01)
@@ -154,7 +168,17 @@ def _render_chart(
         ax.text(0.01, knockout, "KO", transform=ax.get_yaxis_transform(),
                 color="#ff6b35", fontsize=7, va="bottom")
 
-    ax.set_xticks([])
+    if timestamps and n > 0:
+        num_ticks = min(6, n)
+        step      = max(1, n // num_ticks)
+        positions = list(range(0, n, step))[:num_ticks]
+        labels    = [timestamps[i] for i in positions]
+        ax.set_xticks(positions)
+        ax.set_xticklabels(labels, color="#aaaaaa", fontsize=7.5, rotation=0)
+        ax.tick_params(axis="x", length=0, pad=3)
+    else:
+        ax.set_xticks([])
+
     ax.tick_params(axis="y", colors="#dddddd", labelsize=9, length=0, pad=3)
     for spine in ax.spines.values():
         spine.set_visible(False)
@@ -474,28 +498,35 @@ class StocksCog(commands.Cog, name="Stocks"):
                 del self._chart_cache[k]
 
         loop = asyncio.get_running_loop()
+        ts_fmt = "%H:%M" if period == "1D" else ("%a %H:%M" if period == "5D" else ("%b %d" if period in ("1M", "3M") else "%b '%y"))
+
         if ticker in ADR_TICKERS:
             yf_period, yf_interval = _YF_PERIOD_MAP[period]
             df = await loop.run_in_executor(None, _yf_history, ticker, yf_period, yf_interval)
             if df is None or df.empty:
                 raise ValueError("No data from yfinance")
-            opens  = df["Open"].tolist()
-            highs  = df["High"].tolist()
-            lows   = df["Low"].tolist()
-            closes = df["Close"].tolist()
+            opens      = [float(v) for v in df["Open"]]
+            highs      = [float(v) for v in df["High"]]
+            lows       = [float(v) for v in df["Low"]]
+            closes     = [float(v) for v in df["Close"]]
+            try:
+                timestamps = [t.strftime(ts_fmt) for t in df.index]
+            except Exception:
+                timestamps = None
         else:
             since = int(time.time()) - _PERIOD_SECONDS[period]
             rows  = await self.bot.db.get_price_history(ticker, since)
             if not rows:
                 raise ValueError("No price history yet for this period.")
-            opens  = [float(r["open"])  for r in rows]
-            highs  = [float(r["high"])  for r in rows]
-            lows   = [float(r["low"])   for r in rows]
-            closes = [float(r["close"]) for r in rows]
+            opens      = [float(r["open"])  for r in rows]
+            highs      = [float(r["high"])  for r in rows]
+            lows       = [float(r["low"])   for r in rows]
+            closes     = [float(r["close"]) for r in rows]
+            timestamps = [datetime.datetime.utcfromtimestamp(int(r["ts"])).strftime(ts_fmt) for r in rows]
 
         png = await loop.run_in_executor(
             None, _render_chart, ticker, opens, highs, lows, closes,
-            chart_type, entry_price, knockout, direction,
+            chart_type, entry_price, knockout, direction, timestamps,
         )
         self._chart_cache[cache_key] = (png, now)
         return io.BytesIO(png)
@@ -712,9 +743,10 @@ class StocksCog(commands.Cog, name="Stocks"):
         if not positions and not tp_rows:
             return await interaction.followup.send("You have no open positions.", ephemeral=True)
 
-        total_value = 0.0
-        stock_lines = []
-        chart_data  = []
+        total_value   = 0.0
+        unrealized    = 0
+        stock_lines   = []
+        chart_data    = []
 
         for pos in positions:
             ticker = pos["ticker"]
@@ -726,6 +758,7 @@ class StocksCog(commands.Cog, name="Stocks"):
             sign   = "+" if pnl >= 0 else ""
             pct    = (price - avg) / avg * 100 if avg > 0 else 0.0
             total_value += value
+            unrealized  += pnl
             stock_lines.append(
                 f"`{ticker:<4}` {shares:g} sh · {_fmt_price(price)} · "
                 f"¥{int(value):,} ({sign}¥{abs(pnl):,} / {_fmt_pct(pct)})"
@@ -746,6 +779,7 @@ class StocksCog(commands.Cog, name="Stocks"):
             pnl       = value - cost
             sign      = "+" if pnl >= 0 else ""
             total_value += value
+            unrealized  += pnl
             sym = "🟢" if direction == "LONG" else "🔴"
             turbo_lines.append(
                 f"{sym} **#{pos['position_id']}** {direction} {leverage}x `{t_ticker}` "
@@ -753,7 +787,11 @@ class StocksCog(commands.Cog, name="Stocks"):
             )
             chart_data.append((f"#{pos['position_id']} {t_ticker}", value, pnl))
 
-        realized = (user_row.get("stock_profit", 0) or 0) + (user_row.get("turbo_profit", 0) or 0)
+        realized   = (user_row.get("stock_profit", 0) or 0) + (user_row.get("turbo_profit", 0) or 0)
+        unr_sign   = "+" if unrealized >= 0 else ""
+        unr_color  = "🟢" if unrealized >= 0 else "🔴"
+        real_sign  = "+" if realized  >= 0 else ""
+        real_color = "🟢" if realized  >= 0 else "🔴"
         chart_data.sort(key=lambda x: x[1], reverse=True)
 
         display_name = await self.bot.format_user_full(interaction.user, interaction.guild_id)
@@ -762,8 +800,9 @@ class StocksCog(commands.Cog, name="Stocks"):
             embed.add_field(name="Stocks", value="\n".join(stock_lines), inline=False)
         if turbo_lines:
             embed.add_field(name="Turbo Certificates", value="\n".join(turbo_lines), inline=False)
-        embed.add_field(name="Total Value",  value=f"¥{int(total_value):,}", inline=True)
-        embed.add_field(name="Realized P&L", value=f"¥{realized:,}",         inline=True)
+        embed.add_field(name="Total Value",    value=f"¥{int(total_value):,}",                    inline=True)
+        embed.add_field(name="Unrealized P&L", value=f"{unr_color} {unr_sign}¥{abs(unrealized):,}",  inline=True)
+        embed.add_field(name="Realized P&L",   value=f"{real_color} {real_sign}¥{abs(realized):,}",  inline=True)
 
         loop     = asyncio.get_running_loop()
         port_png = await loop.run_in_executor(None, _render_portfolio_chart, chart_data)
