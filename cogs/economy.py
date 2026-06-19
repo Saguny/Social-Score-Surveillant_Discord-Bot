@@ -142,11 +142,17 @@ class TransferView(discord.ui.View):
 
     async def _finish(self, interaction: discord.Interaction, confirmed: bool):
         if self.done:
-            await interaction.response.defer()
+            try:
+                await interaction.response.defer()
+            except discord.HTTPException:
+                pass
             return
         self.done = True
         self.clear_items()
-        await interaction.response.defer()
+        try:
+            await interaction.response.defer()
+        except discord.HTTPException:
+            pass
 
         if confirmed:
             db = interaction.client.db
@@ -159,7 +165,7 @@ class TransferView(discord.ui.View):
                     value=f"Insufficient funds. Balance: ¥{user['yuan']:,} · Required: ¥{self.amount:,}",
                     inline=False,
                 )
-                await interaction.message.edit(embed=embed, view=self)
+                await interaction.edit_original_response(embed=embed, view=self)
                 return
 
             await db.adjust_yuan(gid, self.recipient.id, self.amount)
@@ -169,7 +175,7 @@ class TransferView(discord.ui.View):
 
             ack = discord.Embed(color=0x2d5a27, title="中华人民共和国社会信用局 · 转账")
             ack.add_field(name="TRANSFER SENT", value=f"¥{self.amount:,} dispatched to {self.recipient.mention}.", inline=False)
-            await interaction.message.edit(embed=ack, view=self)
+            await interaction.edit_original_response(embed=ack, view=self)
 
             public = discord.Embed(color=0x2d5a27, title="中华人民共和国社会信用局 · 转账")
             public.add_field(name="YUAN TRANSFER", value=f"{self.sender.mention} -> {self.recipient.mention}", inline=False)
@@ -190,7 +196,7 @@ class TransferView(discord.ui.View):
         else:
             embed = discord.Embed(color=0x333333, title="中华人民共和国社会信用局 · 转账")
             embed.add_field(name="TRANSFER CANCELLED", value="The transaction has been voided.", inline=False)
-            await interaction.message.edit(embed=embed, view=self)
+            await interaction.edit_original_response(embed=embed, view=self)
 
     @discord.ui.button(label="Confirm", style=discord.ButtonStyle.success)
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -221,11 +227,17 @@ class RequestView(discord.ui.View):
 
     async def _finish(self, interaction: discord.Interaction, accepted: bool):
         if self.done:
-            await interaction.response.defer()
+            try:
+                await interaction.response.defer()
+            except discord.HTTPException:
+                pass
             return
         self.done = True
         self.clear_items()
-        await interaction.response.defer()
+        try:
+            await interaction.response.defer()
+        except discord.HTTPException:
+            pass
 
         if accepted:
             db = interaction.client.db
@@ -238,7 +250,7 @@ class RequestView(discord.ui.View):
                     value=f"Insufficient funds. {self.target.mention} has ¥{user['yuan']:,} · Required: ¥{self.amount:,}",
                     inline=False,
                 )
-                await interaction.message.edit(embed=embed, view=self)
+                await interaction.edit_original_response(embed=embed, view=self)
                 return
 
             await db.adjust_yuan(gid, self.requester.id, self.amount)
@@ -272,7 +284,7 @@ class RequestView(discord.ui.View):
             )
             embed.timestamp = discord.utils.utcnow()
 
-        await interaction.message.edit(embed=embed, view=self)
+        await interaction.edit_original_response(embed=embed, view=self)
 
     @discord.ui.button(label="Accept", style=discord.ButtonStyle.success)
     async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
