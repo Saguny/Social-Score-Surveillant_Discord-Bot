@@ -1,10 +1,18 @@
-:root{--navy:#120810;--blue:#97124B;--mid:#C4849A;--beige:#F5E6D3;}
-body{background:var(--navy);color:var(--beige);font-family:'Segoe UI',sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;}
-.box{background:#0D0509;border:1px solid var(--blue);border-radius:8px;padding:2rem;width:100%;max-width:360px;}
-.brand{letter-spacing:2px;font-weight:700;font-size:.9rem;color:var(--mid);text-align:center;margin-bottom:1.5rem;}
-.form-control{background:#1E0D16;border:1px solid var(--blue);color:var(--beige);}
-.form-control:focus{background:#1E0D16;border-color:var(--beige);color:var(--beige);box-shadow:none;}
-.form-control::placeholder{color:var(--mid);}
-.btn-login{background:var(--blue);border:none;color:var(--beige);font-weight:600;letter-spacing:1px;width:100%;}
-.btn-login:hover{background:#DC4444;color:var(--beige);}
-.err{color:#F5A855;font-size:.8rem;margin-top:.5rem;display:none;}
+:root {
+  --black:#272829; --grey:#61677A; --light-grey:#D8D9DA; --cream:#FFF6E0;
+  --bg:var(--black); --bg-panel:#1E1F20; --bg-recessed:#161718;
+  --text:var(--cream); --text-muted:var(--light-grey); --text-faint:var(--grey);
+  --border-strong:var(--grey);
+  --accent:var(--grey); --accent-hover:#767C8F; --accent-soft:rgba(97,103,122,.16);
+  --orange:#F5A855;
+}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;}
+.box{background:var(--bg-panel);border:1px solid var(--border-strong);border-radius:8px;padding:2rem;width:100%;max-width:360px;}
+.brand{letter-spacing:2px;font-weight:700;font-size:.9rem;color:var(--text-muted);text-align:center;margin-bottom:1.5rem;}
+.form-control{background:var(--bg-recessed);border:1px solid var(--border-strong);color:var(--text);}
+.form-control:focus{background:var(--bg-recessed);border-color:var(--text);color:var(--text);box-shadow:0 0 0 3px var(--accent-soft);}
+.form-control::placeholder{color:var(--text-faint);}
+.btn-login{background:var(--accent);border:none;color:var(--cream);font-weight:600;letter-spacing:1px;width:100%;}
+.btn-login:hover{background:var(--accent-hover);color:var(--cream);}
+.btn-login:focus-visible{outline:2px solid var(--light-grey);outline-offset:2px;}
+.err{color:var(--orange);font-size:.8rem;margin-top:.5rem;display:none;}

@@ -273,7 +273,7 @@ class RequestView(discord.ui.View):
                 name=self.requester.display_name,
                 value=f"¥{requester_new - self.amount:,} -> ¥{requester_new:,}",
                 inline=True,
-            )
+            ) 
             embed.timestamp = discord.utils.utcnow()
         else:
             embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 资金申请")
