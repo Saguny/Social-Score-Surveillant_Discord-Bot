@@ -64,15 +64,16 @@ class CreditCommandTree(discord.app_commands.CommandTree):
                 msg = f"Missing permissions: {', '.join(missing)}"
             else:
                 msg = "The bot lacks a required permission for this action."
-            try:
-                if interaction.response.is_done():
-                    await interaction.followup.send(msg, ephemeral=True)
-                else:
-                    await interaction.response.send_message(msg, ephemeral=True)
-            except Exception:
-                pass
         else:
-            raise error
+            print(f"[error] /{getattr(error, 'command', None) and error.command.qualified_name}: {cause!r}")
+            msg = "An internal error occurred. Please try again."
+        try:
+            if interaction.response.is_done():
+                await interaction.followup.send(msg, ephemeral=True)
+            else:
+                await interaction.response.send_message(msg, ephemeral=True)
+        except Exception:
+            pass
 
 load_dotenv()
 

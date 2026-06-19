@@ -224,7 +224,7 @@ def _render_chart(
     return buf.getvalue()
 
 
-def _render_portfolio_chart(timeline: list) -> bytes:
+def _render_portfolio_chart(timeline: list, cost_basis: float = 0.0) -> bytes:
     """Equity curve: [(label_str, total_value), ...] — Trade Republic style."""
     labels = [t[0] for t in timeline]
     values = [float(t[1]) for t in timeline]
@@ -242,21 +242,21 @@ def _render_portfolio_chart(timeline: list) -> bytes:
     ax.margins(x=0.01, y=0.12)
 
     if n > 1:
-        first, last = values[0], values[-1]
-        up    = last >= first
-        color = "#26a69a" if up else "#ef5350"
-        xs    = list(range(n))
+        last      = values[-1]
+        baseline  = cost_basis if cost_basis > 0 else values[0]
+        up        = last >= baseline
+        color     = "#26a69a" if up else "#ef5350"
+        xs        = list(range(n))
         ax.plot(xs, values, color=color, linewidth=2.2, zorder=3)
         ax.fill_between(xs, values, min(values) * 0.998, alpha=0.22, color=color, zorder=2)
 
-        pct  = (last - first) / first * 100 if first > 0 else 0.0
+        pct  = (last - baseline) / baseline * 100 if baseline > 0 else 0.0
         sign = "+" if pct >= 0 else ""
         ax.text(0.98, 0.96, f"¥{int(last):,}  {sign}{pct:.2f}%",
                 transform=ax.transAxes, ha="right", va="top",
                 color=color, fontsize=10, fontweight="bold", zorder=10)
 
-        # start-of-day reference line
-        ax.axhline(y=first, color="white", linewidth=0.8, linestyle="--", alpha=0.25, zorder=1)
+        ax.axhline(y=baseline, color="white", linewidth=0.8, linestyle="--", alpha=0.25, zorder=1)
     else:
         ax.text(0.5, 0.5, "Insufficient history", ha="center", va="center",
                 color="#888888", fontsize=10, transform=ax.transAxes)
@@ -518,17 +518,19 @@ class StocksCog(commands.Cog, name="Stocks"):
         adr_tickers   = [p["ticker"] for p in stock_positions if p["ticker"] in ADR_TICKERS]
         other_tickers = [p["ticker"] for p in stock_positions if p["ticker"] not in ADR_TICKERS]
 
+        async def _empty():
+            return []
+
         # Fetch all price histories in parallel
         adr_dfs, db_rows_list = await asyncio.gather(
             asyncio.gather(*[
                 loop.run_in_executor(None, _yf_history, t, "1d", "5m")
                 for t in adr_tickers
-            ]) if adr_tickers else asyncio.coroutine(lambda: [])(),
+            ]) if adr_tickers else _empty(),
             asyncio.gather(*[
                 self.bot.db.get_price_history(t, since_ts)
                 for t in other_tickers
-            ]) if other_tickers else asyncio.coroutine(lambda: [])(),
-            return_exceptions=False,
+            ]) if other_tickers else _empty(),
         )
 
         # Build per-ticker price series: {ticker: [(unix_ts, price), ...]}
@@ -920,10 +922,17 @@ class StocksCog(commands.Cog, name="Stocks"):
         real_sign  = "+" if realized  >= 0 else ""
         real_color = "🟢" if realized  >= 0 else "🔴"
 
-        # Build equity curve timeline and render (in parallel with embed construction)
+        cost_basis = (
+            sum(float(p["avg_cost"]) * float(p["shares"]) for p in positions) +
+            sum(float(tp["cost"]) for tp in tp_rows)
+        )
+
+        # Build equity curve timeline and render
         timeline = await self._build_portfolio_timeline(positions, tp_rows)
         loop     = asyncio.get_running_loop()
-        port_png = await loop.run_in_executor(None, _render_portfolio_chart, timeline)
+        port_png = await loop.run_in_executor(
+            None, _render_portfolio_chart, timeline, cost_basis
+        )
 
         embed_color = 0x26A69A if unrealized >= 0 else 0xEF5350
         display_name = await self.bot.format_user_full(interaction.user, interaction.guild_id)
@@ -959,47 +968,43 @@ class StocksCog(commands.Cog, name="Stocks"):
                 "No turbos generated yet today. Try again in a moment.", ephemeral=True
             )
 
-        long_rows  = [t for t in rows if t["direction"] == "LONG"]
-        short_rows = [t for t in rows if t["direction"] == "SHORT"]
+        tickers = sorted(set(t["ticker"] for t in rows))
+        prices  = self._prices
 
-        def _fmt_row(t):
-            price   = self._prices.get(t["ticker"], float(t["entry_price"]))
-            factor  = max(0.0, _turbo_value_factor(
-                t["direction"], float(t["entry_price"]), float(t["knockout"]), price
-            ))
-            ko_dist = abs(price - float(t["knockout"])) / price * 100 if price > 0 else 0.0
-            return (
-                f"`#{t['id']}` **{t['ticker']}** {t['leverage']}x\n"
-                f"KO {_fmt_price(float(t['knockout']))} · {ko_dist:.1f}% away · factor {factor:.3f}"
-            )
+        def _build_embed(ticker: str) -> discord.Embed:
+            ticker_rows = [t for t in rows if t["ticker"] == ticker]
+            embed = discord.Embed(title=f"涡轮证书 · {ticker}", color=0xCC0000)
+            for direction in ("LONG", "SHORT"):
+                dir_rows = [t for t in ticker_rows if t["direction"] == direction]
+                if not dir_rows:
+                    continue
+                lines = []
+                for t in dir_rows:
+                    price   = prices.get(ticker, float(t["entry_price"]))
+                    factor  = max(0.0, _turbo_value_factor(direction, float(t["entry_price"]), float(t["knockout"]), price))
+                    ko_dist = abs(price - float(t["knockout"])) / price * 100 if price > 0 else 0.0
+                    lines.append(
+                        f"`#{t['id']}` {t['leverage']}x · KO {_fmt_price(float(t['knockout']))} · {ko_dist:.1f}% away · factor {factor:.3f}"
+                    )
+                embed.add_field(name=direction, value="\n".join(lines), inline=True)
+            embed.set_footer(text=f"Min ¥{TURBO_MIN_COST:,} · /turbos open <id> <yuan> · /turbos chart <id>")
+            return embed
 
-        def _chunked_fields(name: str, turbo_rows: list, embed: discord.Embed):
-            chunk, chunk_len = [], 0
-            part = 1
-            for t in turbo_rows:
-                line = _fmt_row(t)
-                sep = 2 if chunk else 0
-                if chunk and chunk_len + sep + len(line) > 1020:
-                    label = name if part == 1 else f"{name} (cont.)"
-                    embed.add_field(name=label, value="\n\n".join(chunk), inline=False)
-                    chunk, chunk_len, part = [], 0, part + 1
-                chunk.append(line)
-                chunk_len += sep + len(line)
-            if chunk:
-                label = name if part == 1 else f"{name} (cont.)"
-                embed.add_field(name=label, value="\n\n".join(chunk), inline=False)
+        class TickerSelect(discord.ui.View):
+            def __init__(self_v):
+                super().__init__(timeout=180)
+                opts = [discord.SelectOption(label=t, value=t) for t in tickers]
+                sel  = discord.ui.Select(placeholder="Select a stock…", options=opts)
+                sel.callback = self_v._on_select
+                self_v.add_item(sel)
+                self_v._sel = sel
 
-        embed = discord.Embed(title="涡轮证书 · Daily Turbos", color=0xCC0000)
-        if long_rows:
-            _chunked_fields("LONG", long_rows, embed)
-        if short_rows:
-            _chunked_fields("SHORT", short_rows, embed)
-        embed.set_footer(text=f"Min ¥{TURBO_MIN_COST:,} · /turbos open <id> <yuan> · /turbos chart <id>")
+            async def _on_select(self_v, itr: discord.Interaction):
+                ticker = self_v._sel.values[0]
+                await itr.response.edit_message(embed=_build_embed(ticker), view=self_v)
 
-        bse = self._make_bse_file()
-        if bse:
-            embed.set_thumbnail(url="attachment://bse.png")
-        await interaction.followup.send(embed=embed, ephemeral=True, **({"file": bse} if bse else {}))
+        view  = TickerSelect()
+        await interaction.followup.send(embed=_build_embed(tickers[0]), view=view, ephemeral=True)
 
     @turbos.command(name="chart", description="Chart the underlying stock with entry and knockout levels")
     @app_commands.describe(turbo_id="Turbo ID from /turbos list", period="Time period")

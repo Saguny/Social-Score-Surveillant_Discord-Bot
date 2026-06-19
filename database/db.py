@@ -1522,10 +1522,13 @@ class Database:
     async def replace_daily_turbos(self, day: int, turbo_list: list) -> None:
         if not turbo_list:
             return
-        await self._pool.executemany(
-            "INSERT INTO turbos (ticker, direction, leverage, entry_price, knockout, day) VALUES ($1, $2, $3, $4, $5, $6)",
-            [(t["ticker"], t["direction"], t["leverage"], t["entry_price"], t["knockout"], t["day"]) for t in turbo_list],
-        )
+        async with self._pool.acquire() as conn:
+            async with conn.transaction():
+                await conn.execute("DELETE FROM turbos WHERE day = $1 AND id NOT IN (SELECT DISTINCT turbo_id FROM turbo_positions WHERE turbo_id IS NOT NULL)", day)
+                await conn.executemany(
+                    "INSERT INTO turbos (ticker, direction, leverage, entry_price, knockout, day) VALUES ($1, $2, $3, $4, $5, $6)",
+                    [(t["ticker"], t["direction"], t["leverage"], t["entry_price"], t["knockout"], t["day"]) for t in turbo_list],
+                )
 
     async def get_daily_turbos(self, day: int) -> list:
         return await self._pool.fetch(
