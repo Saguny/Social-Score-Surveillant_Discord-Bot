@@ -977,6 +977,10 @@ class StocksCog(commands.Cog, name="Stocks"):
 
         # Build equity curve timeline and render
         timeline = await self._build_portfolio_timeline(interaction.guild_id, interaction.user.id)
+        _et = datetime.timezone(datetime.timedelta(hours=-4))
+        now_label = datetime.datetime.now(_et).strftime("%H:%M")
+        if timeline:
+            timeline.append((now_label, total_value))
         loop     = asyncio.get_running_loop()
         port_png = await loop.run_in_executor(
             None, _render_portfolio_chart, timeline, cost_basis
