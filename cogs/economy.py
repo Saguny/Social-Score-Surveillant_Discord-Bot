@@ -1,6 +1,7 @@
 import random
 import time
 import discord
+import asyncio
 from discord import app_commands
 from discord.ext import commands
 from config.shop import SHOP_ITEMS, BADGE_DISPLAY, COSMETIC_META
