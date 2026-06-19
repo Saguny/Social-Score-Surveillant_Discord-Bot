@@ -199,8 +199,10 @@ def _render_chart(
 
     if timestamps and n > 0:
         num_ticks = min(6, n)
-        step      = max(1, n // num_ticks)
-        positions = list(range(0, n, step))[:num_ticks]
+        step      = max(1, (n - 1) // (num_ticks - 1)) if num_ticks > 1 else 1
+        positions = sorted(set(
+            list(range(0, n, step))[:num_ticks - 1] + [n - 1]
+        ))
         labels    = [timestamps[i] for i in positions]
         ax.set_xticks(positions)
         ax.set_xticklabels(labels, color="#aaaaaa", fontsize=7.5, rotation=0)
@@ -319,6 +321,42 @@ class PortfolioPeriodView(discord.ui.View):
             if self._bse_bytes:
                 new_attachments.append(discord.File(io.BytesIO(self._bse_bytes), filename="bse.png"))
             new_attachments.append(discord.File(io.BytesIO(port_png), filename="portfolio.png"))
+            await itr.edit_original_response(embed=self._embed, attachments=new_attachments, view=self)
+        return callback
+
+
+class StockChartView(discord.ui.View):
+    """Period-switcher buttons for /stocks chart — mirrors PortfolioPeriodView."""
+
+    def __init__(self, cog, ticker: str, chart_type: str, embed: discord.Embed, bse_bytes: bytes | None):
+        super().__init__(timeout=300)
+        self._cog        = cog
+        self._ticker     = ticker
+        self._chart_type = chart_type
+        self._embed      = embed
+        self._bse_bytes  = bse_bytes
+        for label in PERIODS:
+            btn          = discord.ui.Button(label=label, style=discord.ButtonStyle.secondary)
+            btn.callback = self._make_cb(label)
+            self.add_item(btn)
+
+    def _make_cb(self, period: str):
+        async def callback(itr: discord.Interaction):
+            await itr.response.defer()
+            try:
+                buf = await self._cog._build_chart(self._ticker, period, self._chart_type)
+            except Exception as e:
+                await itr.followup.send(f"Chart unavailable: {e}", ephemeral=True)
+                return
+            # Update the Period field in the embed
+            for i, field in enumerate(self._embed.fields):
+                if field.name == "Period":
+                    self._embed.set_field_at(i, name="Period", value=period, inline=True)
+                    break
+            new_attachments = []
+            if self._bse_bytes:
+                new_attachments.append(discord.File(io.BytesIO(self._bse_bytes), filename="bse.png"))
+            new_attachments.append(discord.File(buf, filename="chart.png"))
             await itr.edit_original_response(embed=self._embed, attachments=new_attachments, view=self)
         return callback
 
@@ -620,7 +658,14 @@ class StocksCog(commands.Cog, name="Stocks"):
             lows       = [float(v) for v in df["Low"]]
             closes     = [float(v) for v in df["Close"]]
             try:
-                timestamps = [t.strftime(ts_fmt) for t in df.index]
+                # yfinance returns index in exchange local time (America/New_York).
+                # Convert to UTC so labels match what users expect (UTC clock).
+                _utc = datetime.timezone.utc
+                timestamps = [
+                    (t.astimezone(_utc) if t.tzinfo is not None
+                     else t.replace(tzinfo=_utc)).strftime(ts_fmt)
+                    for t in df.index
+                ]
             except Exception:
                 timestamps = None
         else:
@@ -782,11 +827,22 @@ class StocksCog(commands.Cog, name="Stocks"):
             embed.add_field(name="Status", value="⏳ Temporarily halted", inline=False)
 
         embed.set_image(url="attachment://chart.png")
-        bse = self._make_bse_file()
+        bse_bytes = None
+        try:
+            with open(_BSE_THUMB, "rb") as f:
+                bse_bytes = f.read()
+        except Exception:
+            pass
+        bse = discord.File(io.BytesIO(bse_bytes), filename="bse.png") if bse_bytes else None
         if bse:
             embed.set_thumbnail(url="attachment://bse.png")
         chart_file = discord.File(buf, filename="chart.png")
-        await interaction.followup.send(embed=embed, files=([bse, chart_file] if bse else [chart_file]))
+        view = StockChartView(self, ticker, chart_type, embed, bse_bytes)
+        await interaction.followup.send(
+            embed=embed,
+            files=([bse, chart_file] if bse else [chart_file]),
+            view=view,
+        )
 
     @stocks_chart.autocomplete("ticker")
     async def _chart_ticker_ac(self, interaction: discord.Interaction, current: str):
