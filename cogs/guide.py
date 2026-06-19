@@ -354,14 +354,20 @@ class Guide(commands.Cog):
         e8.set_footer(text="Disclaimer: see /disclaimer · GLORY TO THE CCP!")
         embeds.append(e8)
 
+        batches = [
+            embeds[0:2],   # scoring rules + ranks/execution
+            embeds[2:4],   # stat commands + economy/shop
+            embeds[4:7],   # social rating + fundraisers + mod commands
+            embeds[7:9],   # markets + propaganda events
+        ]
         await interaction.response.defer(ephemeral=True)
         try:
-            await interaction.user.send(embeds=embeds[:4])
-            await interaction.user.send(embeds=embeds[4:])
+            for batch in batches:
+                await interaction.user.send(embeds=batch)
             await interaction.followup.send("The Bureau's orientation package has been dispatched to your private channel.", ephemeral=True)
         except discord.Forbidden:
-            await interaction.followup.send(embeds=embeds[:4], ephemeral=True)
-            await interaction.followup.send(embeds=embeds[4:], ephemeral=True)
+            for batch in batches:
+                await interaction.followup.send(embeds=batch, ephemeral=True)
 
     @app_commands.command(name="ping", description="Check the Bureau's response latency")
     async def ping(self, interaction: discord.Interaction):
