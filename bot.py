@@ -260,6 +260,7 @@ class SocialCreditBot(commands.Bot):
         await self.load_extension("cogs.posters")
         await self.load_extension("cogs.checkin")
         await self.load_extension("cogs.propaganda")
+        await self.load_extension("cogs.stocks")
         from web.server import start_web_server
         asyncio.create_task(start_web_server(self))
         asyncio.create_task(_decay_task(self))

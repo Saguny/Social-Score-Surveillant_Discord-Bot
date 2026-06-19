@@ -155,12 +155,18 @@ async function load() {
   if (net7El) { net7El.textContent = (net7>=0?'+':'')+net7.toFixed(1); net7El.className = 'val '+(net7>0?'trend-up':net7<0?'trend-down':'trend-flat'); }
   setHtml('sparkline-wrap', sparkSvg(build7d(d.daily_7d)));
 
+  set('mk-stocks', fmt(d.yuan_in_stocks || 0));
+  set('mk-turbos', fmt(d.yuan_in_turbos || 0));
+  set('mk-ko',     fmt(d.total_knockouts || 0));
+  set('mk-trades', fmt(d.total_stock_trades || 0));
+
   set('ec-circ',  fmt(d.total_yuan));
   set('ec-earn',  fmt(d.total_earned));
   set('ec-spent', fmt(d.total_spent));
   set('ec-items', fmt(d.total_items));
   set('ec-fx',    fmt(d.active_effects));
   set('ec-fr',    fmt(d.fundraiser_yuan));
+  set('ec-rich',  fmt(d.highest_yuan));
 
   const ltPlayed = d.lottery_played || 0;
   const ltWon    = d.lottery_won    || 0;

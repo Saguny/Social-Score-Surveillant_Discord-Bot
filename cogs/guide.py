@@ -166,7 +166,7 @@ class Guide(commands.Cog):
         e3.add_field(name="/score [citizen]",        value="View your score and current rank.", inline=False)
         e3.add_field(name="/stats [citizen]",        value="Full breakdown across 3 pages: Overview (score, rank, trends, rank streak · total days at rank), Social (endorsements, rebukes, reports), Economy (yuan, items, lottery stats, check-in streak).", inline=False)
         e3.add_field(name="/daily_report [citizen]",  value="Today's score activity for any citizen: positive, negative, net change, and yuan compared to yesterday.", inline=False)
-        e3.add_field(name="/leaderboard",            value="Rankings across 8 categories: score, yuan, activity, endorsements, rebukes, and informants.", inline=False)
+        e3.add_field(name="/leaderboard",            value="Rankings across 5 pages: Score, Economy, Activity, Social, and Markets (portfolio value and realized P&L).", inline=False)
         e3.add_field(name="/state_report",           value="Server-wide report: biggest rise/fall, top informant, yuan in circulation, avg score.", inline=False)
         e3.add_field(name="/graph <score|yuan> [citizen]", value="Generate a 30-day trend graph for score or yuan. Yuan graph populates once per day.", inline=False)
         e3.add_field(name="/checkin",                value="Perform your daily check-in. Earns Yuan and a small score bump. Streak increases daily reward up to ¥750.", inline=False)
@@ -290,6 +290,46 @@ class Guide(commands.Cog):
         )
         e7.set_footer(text="GLORY TO THE CCP!")
         embeds.append(e7)
+
+        e_stocks = discord.Embed(color=0xCC0000, title="北京证券交易所 · MARKETS")
+        e_stocks.add_field(
+            name="STOCKS",
+            value=(
+                "5 China ADRs (BABA, BIDU, NIO, JD, BILI) · real prices via yfinance\n"
+                "1 ETF (CNXF) · tracks the basket average of all 5 ADRs\n"
+                "5 Penny stocks (XMNG, DWJT, HQBC, RMKD, WSJZ) · high-volatility simulation\n"
+                "Penny stocks may trigger a 🔥 PUMP · sudden drift followed by a -20% crash"
+            ),
+            inline=False,
+        )
+        e_stocks.add_field(name="/stocks list",     value="All current prices with daily % change.", inline=False)
+        e_stocks.add_field(
+            name="/stocks chart <ticker> [period] [candlestick|line]",
+            value="Price chart for any stock. Periods: 1D · 5D · 1M · 3M · 6M · 1Y.",
+            inline=False,
+        )
+        e_stocks.add_field(name="/stocks buy <ticker> <shares>",   value="Buy shares. Deducted from your Yuan balance.", inline=False)
+        e_stocks.add_field(name="/stocks sell <ticker> <shares>",  value="Sell shares. Proceeds added to Yuan. P&L tracked.", inline=False)
+        e_stocks.add_field(name="/stocks portfolio",               value="View all open stock positions and turbo certificates with live P&L.", inline=False)
+        e_stocks.add_field(
+            name="TURBO CERTIFICATES",
+            value=(
+                "12 turbos generated daily across all tickers. Each is a leveraged directional instrument.\n"
+                "**LONG** · profits if price rises · **SHORT** · profits if price falls\n"
+                "Leverage: 2x 3x 5x 7x 10x · Knockout: price level that wipes the position\n"
+                "A 10x Long is knocked out at -10% · a 5x Short is knocked out at +20%"
+            ),
+            inline=False,
+        )
+        e_stocks.add_field(name="/turbos list",                    value="View today's 12 turbos with knockout levels and current value factor.", inline=False)
+        e_stocks.add_field(name="/turbos open <id> <yuan>",        value=f"Invest yuan in a turbo. Minimum ¥100. Value updates every 2 minutes.", inline=False)
+        e_stocks.add_field(name="/turbos close <position_id>",     value="Manually close a turbo position and collect proceeds.", inline=False)
+        e_stocks.add_field(
+            name="CIRCUIT BREAKERS",
+            value="7% intraday move halts trading 15 min · 20% daily move locks the stock for the day.",
+            inline=False,
+        )
+        embeds.append(e_stocks)
 
         e8 = discord.Embed(color=0xCC0000, title="PROPAGANDA EVENTS")
         e8.add_field(

@@ -240,6 +240,67 @@ class Database:
                     PRIMARY KEY (guild_id, user_id, rank_name)
                 )
             """)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS stocks (
+                    ticker        TEXT PRIMARY KEY,
+                    price         DOUBLE PRECISION NOT NULL DEFAULT 0,
+                    open_price    DOUBLE PRECISION NOT NULL DEFAULT 0,
+                    updated_at    BIGINT NOT NULL DEFAULT 0,
+                    halted_until  BIGINT NOT NULL DEFAULT 0,
+                    daily_locked  BOOLEAN NOT NULL DEFAULT FALSE
+                )
+            """)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS stock_price_history (
+                    id     SERIAL PRIMARY KEY,
+                    ticker TEXT NOT NULL,
+                    ts     BIGINT NOT NULL,
+                    open   DOUBLE PRECISION NOT NULL,
+                    high   DOUBLE PRECISION NOT NULL,
+                    low    DOUBLE PRECISION NOT NULL,
+                    close  DOUBLE PRECISION NOT NULL
+                )
+            """)
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_stock_price_history ON stock_price_history (ticker, ts)")
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS portfolios (
+                    guild_id  BIGINT NOT NULL,
+                    user_id   BIGINT NOT NULL,
+                    ticker    TEXT NOT NULL,
+                    shares    DOUBLE PRECISION NOT NULL DEFAULT 0,
+                    avg_cost  DOUBLE PRECISION NOT NULL DEFAULT 0,
+                    PRIMARY KEY (guild_id, user_id, ticker)
+                )
+            """)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS turbos (
+                    id          SERIAL PRIMARY KEY,
+                    ticker      TEXT NOT NULL,
+                    direction   TEXT NOT NULL,
+                    leverage    INTEGER NOT NULL,
+                    entry_price DOUBLE PRECISION NOT NULL,
+                    knockout    DOUBLE PRECISION NOT NULL,
+                    day         BIGINT NOT NULL
+                )
+            """)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS turbo_positions (
+                    id         SERIAL PRIMARY KEY,
+                    guild_id   BIGINT NOT NULL,
+                    user_id    BIGINT NOT NULL,
+                    turbo_id   INTEGER NOT NULL,
+                    cost       BIGINT NOT NULL,
+                    opened_at  BIGINT NOT NULL,
+                    closed_at  BIGINT,
+                    pnl        BIGINT,
+                    status     TEXT NOT NULL DEFAULT 'open'
+                )
+            """)
+            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS stock_trades  INTEGER NOT NULL DEFAULT 0")
+            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS stock_profit  BIGINT  NOT NULL DEFAULT 0")
+            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS turbo_opened  INTEGER NOT NULL DEFAULT 0")
+            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS turbo_knocked INTEGER NOT NULL DEFAULT 0")
+            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS turbo_profit  BIGINT  NOT NULL DEFAULT 0")
 
     async def _create_tables(self):
         async with self._pool.acquire() as conn:
@@ -1147,6 +1208,7 @@ class Database:
             daily_7d,
             top_reasons,
             top_guild,
+            markets_row,
         ) = await asyncio.gather(
             self._pool.fetchrow("""
                 SELECT
@@ -1163,6 +1225,7 @@ class Database:
                     COALESCE(AVG(score) FILTER (WHERE has_chatted = 1), 750.0)                     AS avg_score,
                     COALESCE(MAX(highest_score), 750.0)                                            AS highest_score,
                     COALESCE(MIN(lowest_score), 750.0)                                             AS lowest_score,
+                    COALESCE(MAX(yuan), 0)                                                         AS highest_yuan,
                     COALESCE(AVG(message_count) FILTER (WHERE has_chatted = 1), 0)                 AS avg_msgs,
                     COALESCE(SUM(times_endorsed), 0)                                               AS endorsements,
                     COALESCE(SUM(times_rebuked), 0)                                                AS rebukes,
@@ -1229,6 +1292,18 @@ class Database:
                 ORDER BY total DESC
                 LIMIT 1
             """),
+
+            self._pool.fetchrow("""
+                SELECT
+                    COALESCE((
+                        SELECT SUM(p.shares * s.price)
+                        FROM portfolios p
+                        JOIN stocks s ON p.ticker = s.ticker
+                    ), 0) AS yuan_in_stocks,
+                    COALESCE((SELECT SUM(cost) FROM turbo_positions WHERE status = 'open'), 0) AS yuan_in_turbos,
+                    COALESCE((SELECT SUM(turbo_knocked) FROM users WHERE turbo_knocked > 0), 0) AS total_knockouts,
+                    COALESCE((SELECT SUM(stock_trades) FROM users WHERE stock_trades > 0), 0) AS total_stock_trades
+            """),
         )
 
         return {
@@ -1246,6 +1321,7 @@ class Database:
             "avg_score":         round(float(users_row["avg_score"]), 2),
             "highest_score":     round(float(users_row["highest_score"]), 2),
             "lowest_score":      round(float(users_row["lowest_score"]), 2),
+            "highest_yuan":      int(users_row["highest_yuan"]),
             "avg_msgs_per_user": round(float(users_row["avg_msgs"]), 1),
             "endorsements":      int(users_row["endorsements"]),
             "rebukes":           int(users_row["rebukes"]),
@@ -1282,6 +1358,10 @@ class Database:
                 "t5": int(users_row["t5"]), "t6": int(users_row["t6"]),
                 "t7": int(users_row["t7"]), "t8": int(users_row["t8"]),
             },
+            "yuan_in_stocks":    int(markets_row["yuan_in_stocks"])    if markets_row else 0,
+            "yuan_in_turbos":    int(markets_row["yuan_in_turbos"])    if markets_row else 0,
+            "total_knockouts":   int(markets_row["total_knockouts"])   if markets_row else 0,
+            "total_stock_trades": int(markets_row["total_stock_trades"]) if markets_row else 0,
         }
 
     async def get_poster_guilds(self):
@@ -1314,6 +1394,194 @@ class Database:
             "SELECT * FROM poster_messages WHERE guild_id = $1 AND message_id = $2",
             guild_id, message_id,
         )
+
+    async def get_all_stocks(self) -> list:
+        return await self._pool.fetch("SELECT * FROM stocks")
+
+    async def upsert_stock_price(self, ticker: str, price: float, open_price: float):
+        await self._pool.execute(
+            """
+            INSERT INTO stocks (ticker, price, open_price, updated_at)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (ticker) DO UPDATE SET price = $2, open_price = $3, updated_at = $4
+            """,
+            ticker, price, open_price, int(time.time()),
+        )
+
+    async def add_price_bar(self, ticker: str, ts: int, open_: float, high: float, low: float, close: float):
+        await self._pool.execute(
+            "INSERT INTO stock_price_history (ticker, ts, open, high, low, close) VALUES ($1, $2, $3, $4, $5, $6)",
+            ticker, ts, open_, high, low, close,
+        )
+
+    async def get_price_history(self, ticker: str, since: int) -> list:
+        return await self._pool.fetch(
+            "SELECT ts, open, high, low, close FROM stock_price_history WHERE ticker = $1 AND ts > $2 ORDER BY ts",
+            ticker, since,
+        )
+
+    async def get_portfolio(self, guild_id: int, user_id: int) -> list:
+        return await self._pool.fetch(
+            "SELECT ticker, shares, avg_cost FROM portfolios WHERE guild_id = $1 AND user_id = $2",
+            guild_id, user_id,
+        )
+
+    async def buy_stock(self, guild_id: int, user_id: int, ticker: str, shares: float, price: float, total_cost: int) -> bool:
+        async with self._pool.acquire() as conn:
+            async with conn.transaction():
+                user = await conn.fetchrow(
+                    "SELECT yuan FROM users WHERE guild_id = $1 AND user_id = $2",
+                    guild_id, user_id,
+                )
+                if not user or user["yuan"] < total_cost:
+                    return False
+                await conn.execute(
+                    "UPDATE users SET yuan = yuan - $1, total_yuan_spent = total_yuan_spent + $1, stock_trades = stock_trades + 1 WHERE guild_id = $2 AND user_id = $3",
+                    total_cost, guild_id, user_id,
+                )
+                await conn.execute(
+                    """
+                    INSERT INTO portfolios (guild_id, user_id, ticker, shares, avg_cost)
+                    VALUES ($1, $2, $3, $4, $5)
+                    ON CONFLICT (guild_id, user_id, ticker) DO UPDATE SET
+                        avg_cost = (portfolios.shares * portfolios.avg_cost + EXCLUDED.shares * EXCLUDED.avg_cost)
+                                   / (portfolios.shares + EXCLUDED.shares),
+                        shares   = portfolios.shares + EXCLUDED.shares
+                    """,
+                    guild_id, user_id, ticker, shares, price,
+                )
+        return True
+
+    async def sell_stock(self, guild_id: int, user_id: int, ticker: str, shares: float, price: float) -> dict | None:
+        async with self._pool.acquire() as conn:
+            async with conn.transaction():
+                pos = await conn.fetchrow(
+                    "SELECT shares, avg_cost FROM portfolios WHERE guild_id = $1 AND user_id = $2 AND ticker = $3",
+                    guild_id, user_id, ticker,
+                )
+                if not pos or float(pos["shares"]) < shares - 1e-9:
+                    return None
+                proceeds  = int(price * shares)
+                pnl       = int((price - float(pos["avg_cost"])) * shares)
+                remaining = float(pos["shares"]) - shares
+                if remaining < 1e-9:
+                    await conn.execute(
+                        "DELETE FROM portfolios WHERE guild_id = $1 AND user_id = $2 AND ticker = $3",
+                        guild_id, user_id, ticker,
+                    )
+                else:
+                    await conn.execute(
+                        "UPDATE portfolios SET shares = $1 WHERE guild_id = $2 AND user_id = $3 AND ticker = $4",
+                        remaining, guild_id, user_id, ticker,
+                    )
+                await conn.execute(
+                    "UPDATE users SET yuan = yuan + $1, stock_trades = stock_trades + 1, stock_profit = stock_profit + $2 WHERE guild_id = $3 AND user_id = $4",
+                    proceeds, pnl, guild_id, user_id,
+                )
+        return {"proceeds": proceeds, "pnl": pnl}
+
+    async def replace_daily_turbos(self, day: int, turbo_list: list) -> None:
+        if not turbo_list:
+            return
+        await self._pool.executemany(
+            "INSERT INTO turbos (ticker, direction, leverage, entry_price, knockout, day) VALUES ($1, $2, $3, $4, $5, $6)",
+            [(t["ticker"], t["direction"], t["leverage"], t["entry_price"], t["knockout"], t["day"]) for t in turbo_list],
+        )
+
+    async def get_daily_turbos(self, day: int) -> list:
+        return await self._pool.fetch(
+            "SELECT * FROM turbos WHERE day = $1 ORDER BY id", day,
+        )
+
+    async def get_turbo(self, turbo_id: int):
+        return await self._pool.fetchrow("SELECT * FROM turbos WHERE id = $1", turbo_id)
+
+    async def open_turbo_position(self, guild_id: int, user_id: int, turbo_id: int, cost: int) -> bool:
+        now = int(time.time())
+        async with self._pool.acquire() as conn:
+            async with conn.transaction():
+                user = await conn.fetchrow(
+                    "SELECT yuan FROM users WHERE guild_id = $1 AND user_id = $2",
+                    guild_id, user_id,
+                )
+                if not user or user["yuan"] < cost:
+                    return False
+                await conn.execute(
+                    "UPDATE users SET yuan = yuan - $1, total_yuan_spent = total_yuan_spent + $1, turbo_opened = turbo_opened + 1 WHERE guild_id = $2 AND user_id = $3",
+                    cost, guild_id, user_id,
+                )
+                await conn.execute(
+                    "INSERT INTO turbo_positions (guild_id, user_id, turbo_id, cost, opened_at) VALUES ($1, $2, $3, $4, $5)",
+                    guild_id, user_id, turbo_id, cost, now,
+                )
+        return True
+
+    async def get_open_turbo_positions(self, guild_id: int, user_id: int) -> list:
+        return await self._pool.fetch(
+            """
+            SELECT tp.id AS position_id, tp.turbo_id, tp.cost,
+                   t.ticker, t.direction, t.leverage, t.entry_price, t.knockout
+            FROM turbo_positions tp
+            JOIN turbos t ON tp.turbo_id = t.id
+            WHERE tp.guild_id = $1 AND tp.user_id = $2 AND tp.status = 'open'
+            ORDER BY tp.opened_at
+            """,
+            guild_id, user_id,
+        )
+
+    async def get_turbo_position(self, guild_id: int, user_id: int, position_id: int):
+        return await self._pool.fetchrow(
+            "SELECT * FROM turbo_positions WHERE id = $1 AND guild_id = $2 AND user_id = $3",
+            position_id, guild_id, user_id,
+        )
+
+    async def get_all_open_turbo_positions(self) -> list:
+        return await self._pool.fetch(
+            """
+            SELECT tp.id AS position_id, tp.guild_id, tp.user_id, tp.cost,
+                   t.ticker, t.direction, t.entry_price, t.knockout
+            FROM turbo_positions tp
+            JOIN turbos t ON tp.turbo_id = t.id
+            WHERE tp.status = 'open'
+            """
+        )
+
+    async def close_turbo_position(self, position_id: int, pnl: int, status: str) -> None:
+        await self._pool.execute(
+            "UPDATE turbo_positions SET status = $1, pnl = $2, closed_at = $3 WHERE id = $4",
+            status, pnl, int(time.time()), position_id,
+        )
+
+    async def update_turbo_stats(self, guild_id: int, user_id: int, knocked: bool, pnl: int) -> None:
+        await self._pool.execute(
+            "UPDATE users SET turbo_knocked = turbo_knocked + $1, turbo_profit = turbo_profit + $2 WHERE guild_id = $3 AND user_id = $4",
+            int(knocked), pnl, guild_id, user_id,
+        )
+
+    async def get_market_leaderboard(self, guild_id: int) -> dict:
+        top_portfolio = await self._pool.fetch(
+            """
+            SELECT p.user_id, COALESCE(SUM(p.shares * s.price), 0) AS portfolio_value
+            FROM portfolios p
+            JOIN stocks s ON p.ticker = s.ticker
+            WHERE p.guild_id = $1
+            GROUP BY p.user_id
+            ORDER BY portfolio_value DESC
+            LIMIT 3
+            """,
+            guild_id,
+        )
+        top_realized = await self._pool.fetch(
+            """
+            SELECT user_id, (stock_profit + turbo_profit) AS total_pnl
+            FROM users
+            WHERE guild_id = $1 AND has_chatted = 1 AND (stock_profit + turbo_profit) > 0
+            ORDER BY total_pnl DESC
+            LIMIT 3
+            """,
+            guild_id,
+        )
+        return {"top_portfolio": top_portfolio, "top_realized": top_realized}
 
     async def record_poster_reaction(self, message_id: int, user_id: int) -> bool:
         result = await self._pool.execute(

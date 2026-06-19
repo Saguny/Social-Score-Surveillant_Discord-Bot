@@ -1,5 +1,6 @@
 import io
 import os
+import asyncio
 import datetime
 import discord
 import matplotlib
@@ -90,7 +91,10 @@ class Stats(commands.Cog):
     @app_commands.command(name="leaderboard", description="View the social credit rankings")
     async def leaderboard(self, interaction: discord.Interaction):
         await interaction.response.defer()
-        data = await self.db.get_extended_leaderboard(interaction.guild.id)
+        data, market_data = await asyncio.gather(
+            self.db.get_extended_leaderboard(interaction.guild.id),
+            self.db.get_market_leaderboard(interaction.guild.id),
+        )
 
         def name(uid):
             m = interaction.guild.get_member(uid)
@@ -105,11 +109,18 @@ class Stats(commands.Cog):
         def fmt_col(rows, col):
             return "\n".join(f"{i}. {name(r['user_id'])} · {r[col]}" for i, r in enumerate(rows, 1)) or "No data."
 
+        def fmt_portfolio(rows):
+            return "\n".join(f"{i}. {name(r['user_id'])} · ¥{int(r['portfolio_value']):,}" for i, r in enumerate(rows, 1)) or "No data."
+
+        def fmt_pnl(rows):
+            return "\n".join(f"{i}. {name(r['user_id'])} · ¥{int(r['total_pnl']):,}" for i, r in enumerate(rows, 1)) or "No data."
+
         pages = {
             "score":    ("MOST COMPLIANT",  fmt_score(data["top_score"]),                         "GREATEST THREATS", fmt_score(data["bottom_score"])),
             "economy":  ("WEALTHIEST",       fmt_yuan(data["richest"]),                            "POOREST",          fmt_yuan(data["poorest"])),
             "activity": ("MOST ACTIVE",      fmt_col(data["most_messages"], "message_count"),      "MOST ENDORSED",    fmt_col(data["most_endorsed"], "times_endorsed")),
             "social":   ("MOST REBUKED",     fmt_col(data["most_rebuked"], "times_rebuked"),       "TOP INFORMANTS",   fmt_col(data["top_snitches"], "times_filed_reports")),
+            "markets":  ("TOP INVESTORS",    fmt_portfolio(market_data["top_portfolio"]),           "TOP TRADERS",      fmt_pnl(market_data["top_realized"])),
         }
 
         def build_embed(page: str) -> discord.Embed:
@@ -120,7 +131,7 @@ class Stats(commands.Cog):
             embed.timestamp = discord.utils.utcnow()
             return embed
 
-        labels = {"score": "SCORE", "economy": "ECONOMY", "activity": "ACTIVITY", "social": "SOCIAL"}
+        labels = {"score": "SCORE", "economy": "ECONOMY", "activity": "ACTIVITY", "social": "SOCIAL", "markets": "MARKETS"}
 
         class LeaderboardView(discord.ui.View):
             def __init__(self, current: str):
@@ -273,6 +284,21 @@ class Stats(commands.Cog):
                 e.add_field(name="CHECK-IN STREAK",      value=f"{streak} days", inline=True)
             if wins:
                 e.add_field(name="PROPAGANDA VICTORIES", value=str(wins),         inline=True)
+            stock_trades  = user.get("stock_trades",  0) or 0
+            stock_profit  = user.get("stock_profit",  0) or 0
+            turbo_opened  = user.get("turbo_opened",  0) or 0
+            turbo_knocked = user.get("turbo_knocked", 0) or 0
+            turbo_profit  = user.get("turbo_profit",  0) or 0
+            if stock_trades:
+                sp_sign = "+" if stock_profit >= 0 else ""
+                e.add_field(name="STOCK TRADES", value=str(stock_trades),                  inline=True)
+                e.add_field(name="STOCK P&L",    value=f"{sp_sign}¥{stock_profit:,}",      inline=True)
+                e.add_field(name="​",       value="​",                            inline=True)
+            if turbo_opened:
+                tp_sign = "+" if turbo_profit >= 0 else ""
+                e.add_field(name="TURBOS OPENED",  value=str(turbo_opened),                inline=True)
+                e.add_field(name="KNOCKED OUT",    value=str(turbo_knocked),               inline=True)
+                e.add_field(name="TURBO P&L",      value=f"{tp_sign}¥{turbo_profit:,}",   inline=True)
             if thumb_url:
                 e.set_thumbnail(url=thumb_url)
             e.timestamp = discord.utils.utcnow()

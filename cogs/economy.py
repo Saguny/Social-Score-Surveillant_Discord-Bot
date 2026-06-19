@@ -438,7 +438,7 @@ class Economy(commands.Cog):
             embed.set_footer(text=f"Report #{report_num:05d} · GLORY TO THE CCP!")
             embed.timestamp = discord.utils.utcnow()
             await interaction.followup.send(embed=embed)
-            await self._post_score(interaction, target, old, new)
+            self._post_score(interaction, target, old, new)
 
         elif item_id == "denounce":
             is_anon = await self.db.consume_effect(gid, uid, "anon_identity")
@@ -472,7 +472,7 @@ class Economy(commands.Cog):
             embed.timestamp = discord.utils.utcnow()
             await interaction.channel.send(embed=embed)
             await interaction.followup.send("Your denouncement has been filed.", ephemeral=True)
-            await self._post_score(interaction, target, old, new)
+            self._post_score(interaction, target, old, new)
 
         elif item_id == "surveillance":
             expires_at = int(time.time()) + cfg["duration"]
@@ -501,7 +501,7 @@ class Economy(commands.Cog):
                 embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局")
                 embed.add_field(name="REHABILITATION APPROVED", value=f"Score adjusted: {old:.2f} -> {new:.2f}", inline=False)
                 await interaction.followup.send(embed=embed, ephemeral=True)
-            await self._post_score(interaction, recipient, old, new)
+            self._post_score(interaction, recipient, old, new)
 
         elif item_id == "appeal":
             recipient = target if target else interaction.user
@@ -628,7 +628,7 @@ class Economy(commands.Cog):
                 embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局")
                 embed.add_field(name="MODEL CITIZEN AWARD", value=f"The Party commends your loyalty. Score: {old:.2f} -> {new:.2f}", inline=False)
                 await interaction.followup.send(embed=embed, ephemeral=True)
-            await self._post_score(interaction, recipient, old, new)
+            self._post_score(interaction, recipient, old, new)
 
         elif item_id == "dispute":
             buyer_wins = random.random() < 0.5
@@ -646,8 +646,8 @@ class Economy(commands.Cog):
             embed.add_field(name="OUTCOME", value=f"{winner_name} wins +2.00 · {loser_name} loses -2.00", inline=False)
             embed.timestamp = discord.utils.utcnow()
             await interaction.followup.send(embed=embed)
-            await self._post_score(interaction, winner, w_old, w_new)
-            await self._post_score(interaction, loser, l_old, l_new)
+            self._post_score(interaction, winner, w_old, w_new)
+            self._post_score(interaction, loser, l_old, l_new)
 
         elif item_id == "investigation":
             extra_bounty = 0
@@ -724,7 +724,7 @@ class Economy(commands.Cog):
             embed.timestamp = discord.utils.utcnow()
             await interaction.followup.send(embed=embed)
             if victim:
-                await self._post_score(interaction, victim, old, new)
+                self._post_score(interaction, victim, old, new)
 
         elif item_id == "history_review":
             history = await self.db.get_score_history_brief(gid, target.id, limit=20)
@@ -1012,7 +1012,7 @@ class Economy(commands.Cog):
         embed.add_field(name="SCORE ADJUSTMENT", value=f"{old:.2f} -> {new:.2f}", inline=True)
         embed.timestamp = discord.utils.utcnow()
         await interaction.followup.send(embed=embed)
-        await self._post_score(interaction, interaction.user, old, new)
+        self._post_score(interaction, interaction.user, old, new)
 
     @buy.autocomplete("item")
     async def item_autocomplete(
