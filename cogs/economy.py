@@ -55,16 +55,28 @@ def _build_shop_embeds(username: str = "yourname") -> dict[str, discord.Embed]:
             inline=False,
         )
 
-    e_lottery = discord.Embed(color=0xFFD700, title=_CATEGORY_TITLES["lottery"])
+    def _fmt_yuan(n):
+        if n >= 1_000_000: return f"¥{n//1_000_000}M"
+        if n >= 1_000:     return f"¥{n//1_000}K"
+        return f"¥{n}"
+
+    e_lottery = discord.Embed(
+        color=0xFFD700,
+        title=_CATEGORY_TITLES["lottery"],
+        description="70% lose · 20% win · 10% jackpot\nAdd a `target` to gift a ticket.",
+    )
     e_lottery.set_thumbnail(url=_THUMBNAIL)
     for item_id in _LOTTERY_ORDER:
         item = SHOP_ITEMS.get(item_id)
-        if not item:
+        tier = _LOTTERY_TIERS.get(item_id)
+        if not item or not tier:
             continue
+        w0, w1 = tier["win"]
+        j0, j1 = tier["jackpot"]
         e_lottery.add_field(
-            name=f"/buy {item_id}  ·  ¥{item['cost']:,}",
-            value=item["description"],
-            inline=False,
+            name=f"{item['name']}  ·  ¥{item['cost']:,}",
+            value=f"Win {_fmt_yuan(w0)}–{_fmt_yuan(w1)}\nJackpot {_fmt_yuan(j0)}–{_fmt_yuan(j1)}",
+            inline=True,
         )
 
     by_cat: dict[str, list] = {}
