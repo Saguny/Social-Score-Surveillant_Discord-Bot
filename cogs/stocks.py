@@ -28,6 +28,13 @@ from config.stocks import (
 PERIODS         = ["1D", "5D", "1M", "3M", "6M", "1Y"]
 CHART_TYPES     = ["candlestick", "line"]
 _BSE_THUMB      = "images/beijingStockExchange.png"
+_PORTFOLIO_PERIODS = {
+    "1D":  ("1d",  "5m",  86400),
+    "7D":  ("7d",  "1h",  7 * 86400),
+    "1M":  ("1mo", "1d",  30 * 86400),
+    "6M":  ("6mo", "1d",  180 * 86400),
+    "1Y":  ("1y",  "1d",  365 * 86400),
+}
 _ADR_CLOSED_VOL = 0.0006   # per-tick micro-drift for ADRs when market is closed
 _CHART_CACHE_TTL = 45       # seconds before a cached chart is considered stale
 
@@ -282,6 +289,40 @@ def _render_portfolio_chart(timeline: list, cost_basis: float = 0.0) -> bytes:
     return buf.getvalue()
 
 
+class PortfolioPeriodView(discord.ui.View):
+    def __init__(self, cog, positions, tp_rows, cost_basis, embed, bse_bytes):
+        super().__init__(timeout=300)
+        self._cog        = cog
+        self._positions  = positions
+        self._tp_rows    = tp_rows
+        self._cost_basis = cost_basis
+        self._embed      = embed
+        self._bse_bytes  = bse_bytes
+        for label in _PORTFOLIO_PERIODS:
+            btn          = discord.ui.Button(label=label, style=discord.ButtonStyle.secondary)
+            btn.callback = self._make_cb(label)
+            self.add_item(btn)
+
+    def _make_cb(self, period_label: str):
+        async def callback(itr: discord.Interaction):
+            await itr.response.defer()
+            yf_p, yf_i, secs = _PORTFOLIO_PERIODS[period_label]
+            since_ts = int(time.time()) - secs
+            timeline = await self._cog._build_portfolio_timeline(
+                self._positions, self._tp_rows, yf_p, yf_i, since_ts,
+            )
+            loop     = asyncio.get_running_loop()
+            port_png = await loop.run_in_executor(
+                None, _render_portfolio_chart, timeline, self._cost_basis,
+            )
+            files = []
+            if self._bse_bytes:
+                files.append(discord.File(io.BytesIO(self._bse_bytes), filename="bse.png"))
+            files.append(discord.File(io.BytesIO(port_png), filename="portfolio.png"))
+            await itr.edit_original_response(embed=self._embed, attachments=[], files=files, view=self)
+        return callback
+
+
 class StocksCog(commands.Cog, name="Stocks"):
     stocks = app_commands.Group(name="stocks", description="Beijing Stock Exchange · 北京证券交易所")
     turbos = app_commands.Group(name="turbos", description="Turbo certificate positions · 涡轮证书")
@@ -510,15 +551,19 @@ class StocksCog(commands.Cog, name="Stocks"):
     # ── Portfolio timeline builder ────────────────────────────────────────────
 
     async def _build_portfolio_timeline(
-        self, stock_positions: list, turbo_positions: list
+        self, stock_positions: list, turbo_positions: list,
+        yf_period: str = "1d", yf_interval: str = "5m", since_ts: int | None = None,
     ) -> list[tuple[str, float]]:
         loop     = asyncio.get_running_loop()
-        since_ts = int(time.time()) - 86400
+        now      = int(time.time())
+        if since_ts is None:
+            since_ts = now - 86400
 
-        # Earliest position open time — clip history to start from there
-        open_times = [p["opened_at"] for p in stock_positions if p.get("opened_at")]
-        open_times += [p["opened_at"] for p in turbo_positions if p.get("opened_at")]
-        clip_ts = min(open_times) if open_times else None
+        # Collect known entry times from opened_at
+        known_entry_times = [p["opened_at"] for p in stock_positions if p.get("opened_at")]
+        known_entry_times += [p["opened_at"] for p in turbo_positions if p.get("opened_at")]
+
+        label_fmt = "%H:%M" if yf_interval in ("5m", "1h") else "%b %d"
 
         adr_tickers   = [p["ticker"] for p in stock_positions if p["ticker"] in ADR_TICKERS]
         other_tickers = [p["ticker"] for p in stock_positions if p["ticker"] not in ADR_TICKERS]
@@ -529,7 +574,7 @@ class StocksCog(commands.Cog, name="Stocks"):
         # Fetch all price histories in parallel
         adr_dfs, db_rows_list = await asyncio.gather(
             asyncio.gather(*[
-                loop.run_in_executor(None, _yf_history, t, "1d", "5m")
+                loop.run_in_executor(None, _yf_history, t, yf_period, yf_interval)
                 for t in adr_tickers
             ]) if adr_tickers else _empty(),
             asyncio.gather(*[
@@ -559,6 +604,29 @@ class StocksCog(commands.Cog, name="Stocks"):
         if not series:
             return []
 
+        # For positions missing opened_at, estimate entry from price series:
+        # scan backward to find the most recent time price ≈ avg_cost (only when
+        # there's enough P&L movement to make the match meaningful, >2%).
+        all_entry_times = list(known_entry_times)
+        for p in stock_positions:
+            if p.get("opened_at"):
+                continue
+            ticker   = p["ticker"]
+            avg_cost = float(p["avg_cost"])
+            current  = self._prices.get(ticker, avg_cost)
+            if avg_cost <= 0 or abs(current - avg_cost) / avg_cost < 0.02:
+                continue
+            pts = series.get(ticker)
+            if not pts:
+                continue
+            tolerance = avg_cost * 0.015
+            for ts_p, price_p in reversed(pts):
+                if abs(price_p - avg_cost) <= tolerance:
+                    all_entry_times.append(ts_p)
+                    break
+
+        clip_ts = max(min(all_entry_times), since_ts) if all_entry_times else since_ts
+
         # Use timestamps from the longest series as the reference grid
         base_ticker = max(series, key=lambda t: len(series[t]))
         base_pts    = series[base_ticker]
@@ -570,7 +638,7 @@ class StocksCog(commands.Cog, name="Stocks"):
 
         timeline: list[tuple[str, float]] = []
         for ts, _ in base_pts:
-            if clip_ts and ts < clip_ts:
+            if ts < clip_ts:
                 continue
             total = 0.0
             for ticker, shares in shares_map.items():
@@ -585,7 +653,7 @@ class StocksCog(commands.Cog, name="Stocks"):
                     tp["direction"], float(tp["entry_price"]), float(tp["knockout"]), cur_p
                 ))
                 total += int(tp["cost"]) * factor
-            label = datetime.datetime.utcfromtimestamp(ts).strftime("%H:%M")
+            label = datetime.datetime.utcfromtimestamp(ts).strftime(label_fmt)
             timeline.append((label, total))
 
         return timeline
@@ -924,9 +992,9 @@ class StocksCog(commands.Cog, name="Stocks"):
             )
 
         realized   = (user_row.get("stock_profit", 0) or 0) + (user_row.get("turbo_profit", 0) or 0)
-        unr_sign   = "+" if unrealized >= 0 else ""
+        unr_sign   = "+" if unrealized >= 0 else "-"
         unr_color  = "🟢" if unrealized >= 0 else "🔴"
-        real_sign  = "+" if realized  >= 0 else ""
+        real_sign  = "+" if realized  >= 0 else "-"
         real_color = "🟢" if realized  >= 0 else "🔴"
 
         cost_basis = (
@@ -952,16 +1020,23 @@ class StocksCog(commands.Cog, name="Stocks"):
         embed.add_field(name="Unrealized P&L", value=f"{unr_color} {unr_sign}¥{abs(unrealized):,}", inline=True)
         embed.add_field(name="Realized P&L",   value=f"{real_color} {real_sign}¥{abs(realized):,}", inline=True)
 
-        bse = self._make_bse_file()
-        if bse:
+        bse_bytes = None
+        try:
+            with open(_BSE_THUMB, "rb") as f:
+                bse_bytes = f.read()
+        except Exception:
+            pass
+
+        if bse_bytes:
             embed.set_thumbnail(url="attachment://bse.png")
         embed.set_image(url="attachment://portfolio.png")
 
+        view  = PortfolioPeriodView(self, positions, tp_rows, cost_basis, embed, bse_bytes)
         files = []
-        if bse:
-            files.append(bse)
+        if bse_bytes:
+            files.append(discord.File(io.BytesIO(bse_bytes), filename="bse.png"))
         files.append(discord.File(io.BytesIO(port_png), filename="portfolio.png"))
-        await interaction.followup.send(embed=embed, files=files)
+        await interaction.followup.send(embed=embed, files=files, view=view)
 
     # ── /turbos commands ──────────────────────────────────────────────────────
 
