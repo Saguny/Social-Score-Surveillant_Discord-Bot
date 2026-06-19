@@ -222,6 +222,7 @@ class Database:
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_users_has_chatted_guild ON users (has_chatted, guild_id)")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_score_history_user_ts ON score_history (guild_id, user_id, timestamp)")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_turbo_positions_status ON turbo_positions (status) WHERE status = 'open'")
+            await conn.execute("ALTER TABLE portfolios ADD COLUMN IF NOT EXISTS opened_at BIGINT")
             await conn.execute("ALTER TABLE guild_config ADD COLUMN IF NOT EXISTS execution_channel_id BIGINT")
             await conn.execute("ALTER TABLE guild_config ADD COLUMN IF NOT EXISTS assign_rank_roles BOOLEAN NOT NULL DEFAULT TRUE")
             await conn.execute("""
@@ -1006,8 +1007,8 @@ class Database:
                 if row["last_checkin"] >= today_start:
                     return {"already_checked_in": True}
                 new_streak = (row["checkin_streak"] + 1) if row["last_checkin"] >= yesterday_start else 1
-                yuan_reward = min(250 + (new_streak - 1) * 50, 750)
-                score_delta = 0.2
+                yuan_reward = min(250 + (new_streak - 1) * 100, 2000)
+                score_delta = round(min(2.0 + (new_streak - 1) * 0.1, 5.0), 2)
                 old_score = row["score"]
                 new_score = min(1300.0, old_score + score_delta)
                 await conn.execute(
@@ -1461,7 +1462,7 @@ class Database:
 
     async def get_portfolio(self, guild_id: int, user_id: int) -> list:
         return await self._pool.fetch(
-            "SELECT ticker, shares, avg_cost FROM portfolios WHERE guild_id = $1 AND user_id = $2",
+            "SELECT ticker, shares, avg_cost, opened_at FROM portfolios WHERE guild_id = $1 AND user_id = $2",
             guild_id, user_id,
         )
 
@@ -1480,14 +1481,15 @@ class Database:
                 )
                 await conn.execute(
                     """
-                    INSERT INTO portfolios (guild_id, user_id, ticker, shares, avg_cost)
-                    VALUES ($1, $2, $3, $4, $5)
+                    INSERT INTO portfolios (guild_id, user_id, ticker, shares, avg_cost, opened_at)
+                    VALUES ($1, $2, $3, $4, $5, $6)
                     ON CONFLICT (guild_id, user_id, ticker) DO UPDATE SET
-                        avg_cost = (portfolios.shares * portfolios.avg_cost + EXCLUDED.shares * EXCLUDED.avg_cost)
-                                   / (portfolios.shares + EXCLUDED.shares),
-                        shares   = portfolios.shares + EXCLUDED.shares
+                        avg_cost  = (portfolios.shares * portfolios.avg_cost + EXCLUDED.shares * EXCLUDED.avg_cost)
+                                    / (portfolios.shares + EXCLUDED.shares),
+                        shares    = portfolios.shares + EXCLUDED.shares,
+                        opened_at = COALESCE(portfolios.opened_at, EXCLUDED.opened_at)
                     """,
-                    guild_id, user_id, ticker, shares, price,
+                    guild_id, user_id, ticker, shares, price, int(time.time()),
                 )
         return True
 

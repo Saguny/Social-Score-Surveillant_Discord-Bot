@@ -515,6 +515,11 @@ class StocksCog(commands.Cog, name="Stocks"):
         loop     = asyncio.get_running_loop()
         since_ts = int(time.time()) - 86400
 
+        # Earliest position open time — clip history to start from there
+        open_times = [p["opened_at"] for p in stock_positions if p.get("opened_at")]
+        open_times += [p["opened_at"] for p in turbo_positions if p.get("opened_at")]
+        clip_ts = min(open_times) if open_times else None
+
         adr_tickers   = [p["ticker"] for p in stock_positions if p["ticker"] in ADR_TICKERS]
         other_tickers = [p["ticker"] for p in stock_positions if p["ticker"] not in ADR_TICKERS]
 
@@ -565,6 +570,8 @@ class StocksCog(commands.Cog, name="Stocks"):
 
         timeline: list[tuple[str, float]] = []
         for ts, _ in base_pts:
+            if clip_ts and ts < clip_ts:
+                continue
             total = 0.0
             for ticker, shares in shares_map.items():
                 pts   = series.get(ticker)

@@ -30,20 +30,25 @@ class CheckIn(commands.Cog):
             return
 
         streak = result["streak"]
-        yuan = result["yuan_reward"]
-        old = result["old_score"]
-        new = result["new_score"]
+        yuan   = result["yuan_reward"]
+        delta  = result["score_delta"]
+        old    = result["old_score"]
+        new    = result["new_score"]
+
+        next_yuan  = min(250 + streak * 100, 2000)
+        next_score = round(min(2.0 + streak * 0.1, 5.0), 2)
+        at_cap     = yuan >= 2000 and delta >= 5.0
 
         embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局 · 日常汇报")
         embed.add_field(name="CHECK-IN RECORDED", value=f"Day {streak} streak", inline=False)
-        embed.add_field(name="YUAN AWARDED", value=f"¥{yuan}", inline=True)
-        embed.add_field(name="SCORE", value=f"{old:.2f} -> {new:.2f}", inline=True)
+        embed.add_field(name="YUAN AWARDED",      value=f"¥{yuan:,}",           inline=True)
+        embed.add_field(name="SCORE",             value=f"{old:.2f} → {new:.2f} (+{delta})", inline=True)
         if streak > 1:
-            embed.add_field(
-                name="STREAK BONUS",
-                value="Continued loyalty earns increased rewards. Maintain your streak for maximum benefit.",
-                inline=False,
-            )
+            if at_cap:
+                bonus_text = f"Maximum loyalty rewards reached · ¥{yuan:,} · +{delta} score per check-in"
+            else:
+                bonus_text = f"Tomorrow: ¥{next_yuan:,} · +{next_score} score"
+            embed.add_field(name="STREAK BONUS", value=bonus_text, inline=False)
         embed.timestamp = discord.utils.utcnow()
         await interaction.followup.send(embed=embed, ephemeral=True)
 
