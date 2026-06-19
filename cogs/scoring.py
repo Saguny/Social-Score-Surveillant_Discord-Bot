@@ -4,7 +4,7 @@ import os
 import time
 import aiohttp
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from config.ranks import get_rank, get_rank_index, RANKS, EXECUTION_THRESHOLD, RANK_YUAN
 from config.rules import (
@@ -59,14 +59,26 @@ class Scoring(commands.Cog):
             max_workers=min(4, max(2, os.cpu_count() or 2)),
             initializer=_init_worker,
         )
+        self._cache_cleanup.start()
 
     async def cog_unload(self):
+        self._cache_cleanup.cancel()
         if self._session:
             await self._session.close()
             self._session = None
         if self._executor:
             self._executor.shutdown(wait=False)
             self._executor = None
+
+    @tasks.loop(hours=1)
+    async def _cache_cleanup(self):
+        now             = time.time()
+        today_start     = int(now) // 86400 * 86400
+        lang_cutoff     = now - _LANG_CACHE_TTL
+        stale_lang      = [k for k, v in self._lang_cache.items() if v[1] < lang_cutoff]
+        stale_tracking  = [k for k, v in self._daily_tracking.items() if v[0] < today_start]
+        for k in stale_lang:     del self._lang_cache[k]
+        for k in stale_tracking: del self._daily_tracking[k]
 
     async def _translate_to_english(self, text: str) -> str:
         try:

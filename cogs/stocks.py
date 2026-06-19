@@ -3,6 +3,7 @@ import math
 import random
 import time
 import asyncio
+import datetime
 
 import discord
 from discord import app_commands
@@ -24,8 +25,25 @@ from config.stocks import (
     _YF_PERIOD_MAP, _PERIOD_SECONDS,
 )
 
-PERIODS     = ["1D", "5D", "1M", "3M", "6M", "1Y"]
-CHART_TYPES = ["candlestick", "line"]
+PERIODS         = ["1D", "5D", "1M", "3M", "6M", "1Y"]
+CHART_TYPES     = ["candlestick", "line"]
+_BSE_THUMB      = "images/beijingStockExchange.png"
+_ADR_CLOSED_VOL = 0.0006   # per-tick micro-drift for ADRs when market is closed
+_CHART_CACHE_TTL = 45       # seconds before a cached chart is considered stale
+
+
+def _ticker_info_name(ticker: str) -> str:
+    if ticker in ADR_STOCKS:  return ADR_STOCKS[ticker]["name"]
+    if ticker == ETF_TICKER:   return ETF_INFO["name"]
+    return PENNY_STOCKS.get(ticker, {}).get("name", ticker)
+
+
+def _is_market_hours() -> bool:
+    now = datetime.datetime.utcnow()
+    if now.weekday() >= 5:
+        return False
+    mins = now.hour * 60 + now.minute
+    return 14 * 60 + 30 <= mins < 21 * 60
 
 
 def _turbo_value_factor(direction: str, entry: float, knockout: float, current: float) -> float:
@@ -35,10 +53,8 @@ def _turbo_value_factor(direction: str, entry: float, knockout: float, current: 
 
 
 def _fmt_price(p: float) -> str:
-    if p >= 100:
-        return f"${p:.2f}"
-    if p >= 1:
-        return f"${p:.3f}"
+    if p >= 100:  return f"${p:.2f}"
+    if p >= 1:    return f"${p:.3f}"
     return f"${p:.4f}"
 
 
@@ -47,14 +63,21 @@ def _fmt_pct(pct: float) -> str:
     return f"{sign}{pct:.2f}%"
 
 
-def _yf_last_price(ticker: str) -> float | None:
+def _yf_price_info(ticker: str) -> tuple:
+    """Returns (last_price, day_open). Kept at module level for executor pickling."""
     try:
         import yfinance as yf
-        info = yf.Ticker(ticker).fast_info
-        p = info.last_price
-        return float(p) if p else None
+        fi    = yf.Ticker(ticker).fast_info
+        last  = float(fi.last_price) if fi.last_price else None
+        open_ = None
+        for attr in ("open", "day_open", "regular_market_open"):
+            v = getattr(fi, attr, None)
+            if v:
+                open_ = float(v)
+                break
+        return last, open_
     except Exception:
-        return None
+        return None, None
 
 
 def _yf_history(ticker: str, period: str, interval: str):
@@ -62,27 +85,44 @@ def _yf_history(ticker: str, period: str, interval: str):
     return yf.Ticker(ticker).history(period=period, interval=interval)
 
 
-def _render_chart(ticker: str, opens: list, highs: list, lows: list, closes: list, chart_type: str) -> io.BytesIO:
+def _render_chart(
+    ticker: str,
+    opens: list, highs: list, lows: list, closes: list,
+    chart_type: str,
+    entry_price: float | None = None,
+    knockout: float | None = None,
+    direction: str | None = None,
+) -> bytes:
     if ticker in ADR_STOCKS:
         bg_path = ADR_STOCKS[ticker]["bg"]
     elif ticker == ETF_TICKER:
         bg_path = ETF_INFO["bg"]
     else:
-        bg_path = "images/stocks/Pennystocks.png"
+        bg_path = None
 
-    fig = plt.figure(figsize=(8, 4), dpi=100, facecolor="none")
+    fig = plt.figure(figsize=(8, 4), dpi=110, facecolor="none")
 
     ax_bg = fig.add_axes([0, 0, 1, 1], zorder=0)
     ax_bg.set_in_layout(False)
     ax_bg.axis("off")
-    try:
-        img = mpimg.imread(bg_path)
-        ax_bg.imshow(img, aspect="auto", extent=[0, 1, 0, 1], transform=ax_bg.transAxes)
-    except Exception:
-        ax_bg.set_facecolor("#111111")
-    ax_bg.add_patch(Rectangle((0, 0), 1, 1, transform=ax_bg.transAxes, color="black", alpha=0.82, zorder=1))
 
-    ax = fig.add_axes([0.08, 0.12, 0.88, 0.78], zorder=2)
+    bg_loaded = False
+    if bg_path:
+        try:
+            img = mpimg.imread(bg_path)
+            ax_bg.imshow(img, aspect="auto", extent=[0, 1, 0, 1], transform=ax_bg.transAxes)
+            ax_bg.add_patch(Rectangle((0, 0), 1, 1, transform=ax_bg.transAxes,
+                                      color="black", alpha=0.80, zorder=1))
+            bg_loaded = True
+        except Exception:
+            pass
+
+    if not bg_loaded:
+        ax_bg.set_facecolor("#0d0d12")
+        ax_bg.add_patch(Rectangle((0, 0), 1, 1, transform=ax_bg.transAxes,
+                                  color="#8B0000", alpha=0.18, zorder=1))
+
+    ax = fig.add_axes([0.09, 0.10, 0.87, 0.82], zorder=2)
     ax.set_facecolor("none")
     ax.set_zorder(2)
     ax.margins(x=0.01)
@@ -94,35 +134,100 @@ def _render_chart(ticker: str, opens: list, highs: list, lows: list, closes: lis
         for i in range(n):
             o, h, l, c = opens[i], highs[i], lows[i], closes[i]
             clr = "#26a69a" if c >= o else "#ef5350"
-            ax.plot([i, i], [l, h], color=clr, linewidth=0.8, zorder=3)
-            body = abs(c - o) or (h - l) * 0.002
-            ax.bar(i, body, bottom=min(o, c), color=clr, width=0.7, zorder=3)
+            ax.plot([i, i], [l, h], color=clr, linewidth=1.1, zorder=3)
+            body = abs(c - o) or (h - l) * 0.01
+            ax.bar(i, body, bottom=min(o, c), color=clr, width=0.65, zorder=4)
     elif n > 0:
-        ax.plot(xs, closes, color="#26a69a", linewidth=1.5, zorder=3)
-        ax.fill_between(xs, closes, min(closes) * 0.999, alpha=0.15, color="#26a69a", zorder=2)
+        ax.plot(xs, closes, color="#26a69a", linewidth=2.2, zorder=3)
+        ax.fill_between(xs, closes, min(closes) * 0.999,
+                        alpha=0.28, color="#26a69a", zorder=2)
+
+    if entry_price is not None and n > 0:
+        ax.axhline(y=entry_price, color="#ffffff", linewidth=1.2,
+                   linestyle="--", alpha=0.75, zorder=5)
+        ax.text(0.01, entry_price, "Entry", transform=ax.get_yaxis_transform(),
+                color="#ffffff", fontsize=7, va="bottom", alpha=0.85)
+
+    if knockout is not None and n > 0:
+        ax.axhline(y=knockout, color="#ff6b35", linewidth=1.4,
+                   linestyle=":", alpha=0.90, zorder=5)
+        ax.text(0.01, knockout, "KO", transform=ax.get_yaxis_transform(),
+                color="#ff6b35", fontsize=7, va="bottom")
 
     ax.set_xticks([])
-    ax.tick_params(axis="y", colors="white", labelsize=8, length=0)
+    ax.tick_params(axis="y", colors="#dddddd", labelsize=9, length=0, pad=3)
     for spine in ax.spines.values():
         spine.set_visible(False)
-    ax.grid(axis="y", color="white", alpha=0.1, linewidth=0.5)
+    ax.grid(axis="y", color="white", alpha=0.10, linewidth=0.5, linestyle="--")
 
     if closes:
         last  = closes[-1]
         first = closes[0]
         pct   = (last - first) / first * 100 if first > 0 else 0.0
         sign  = "+" if pct >= 0 else ""
+        clr   = "#26a69a" if pct >= 0 else "#ef5350"
         ax.text(
             0.98, 0.96, f"{_fmt_price(last)}  {sign}{pct:.2f}%",
             transform=ax.transAxes, ha="right", va="top",
-            color="white", fontsize=10, fontweight="bold", zorder=10,
+            color=clr, fontsize=10, fontweight="bold", zorder=10,
         )
 
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=100, transparent=True)
+    fig.savefig(buf, format="png", dpi=110, transparent=True)
     plt.close(fig)
-    buf.seek(0)
-    return buf
+    return buf.getvalue()
+
+
+def _render_portfolio_chart(positions_data: list) -> bytes:
+    n   = len(positions_data)
+    fig = plt.figure(figsize=(8, max(2.5, n * 0.6 + 1.0)), dpi=110, facecolor="none")
+
+    ax_bg = fig.add_axes([0, 0, 1, 1], zorder=0)
+    ax_bg.set_in_layout(False)
+    ax_bg.axis("off")
+    ax_bg.set_facecolor("#0d0d12")
+    ax_bg.add_patch(Rectangle((0, 0), 1, 1, transform=ax_bg.transAxes,
+                               color="#8B0000", alpha=0.15, zorder=1))
+
+    ax = fig.add_axes([0.20, 0.08, 0.75, 0.84], zorder=2)
+    ax.set_facecolor("none")
+    ax.set_zorder(2)
+
+    if not positions_data:
+        ax.text(0.5, 0.5, "No positions", ha="center", va="center",
+                color="white", fontsize=11, transform=ax.transAxes)
+    else:
+        labels = [p[0] for p in positions_data]
+        values = [max(float(p[1]), 0.0) for p in positions_data]
+        pnls   = [float(p[2]) for p in positions_data]
+        colors = ["#26a69a" if pnl >= 0 else "#ef5350" for pnl in pnls]
+
+        y = list(range(n))
+        ax.barh(y, values, color=colors, height=0.55, zorder=3, alpha=0.90)
+        ax.set_yticks(y)
+        ax.set_yticklabels(labels, color="#e8e8e8", fontsize=8.5)
+        ax.tick_params(axis="y", length=0)
+
+        max_val = max(values) if any(v > 0 for v in values) else 1.0
+        for i, (v, pnl) in enumerate(zip(values, pnls)):
+            sign    = "+" if pnl >= 0 else "-"
+            pnl_clr = "#26a69a" if pnl >= 0 else "#ef5350"
+            ax.text(v + max_val * 0.015, i,        f"¥{int(v):,}",
+                    va="center", color="#cccccc", fontsize=8)
+            ax.text(v + max_val * 0.015, i - 0.28, f"({sign}¥{abs(int(pnl)):,})",
+                    va="center", color=pnl_clr, fontsize=7)
+
+        ax.set_xlim(0, max_val * 1.55)
+
+    ax.set_xticks([])
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+    ax.grid(axis="x", color="white", alpha=0.07, linewidth=0.5)
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=110, transparent=True, bbox_inches="tight")
+    plt.close(fig)
+    return buf.getvalue()
 
 
 class StocksCog(commands.Cog, name="Stocks"):
@@ -131,16 +236,23 @@ class StocksCog(commands.Cog, name="Stocks"):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self._prices: dict[str, float]    = {}
-        self._day_opens: dict[str, float] = {}
-        self._halted: dict[str, float]    = {}
-        self._daily_locked: set[str]      = set()
-        self._pump_state: dict[str, dict] = {}
-        self._last_turbo_day: int         = 0
+        self._prices: dict[str, float]         = {}
+        self._day_opens: dict[str, float]       = {}
+        self._halted: dict[str, float]          = {}
+        self._daily_locked: set[str]            = set()
+        self._pump_state: dict[str, dict]       = {}
+        self._last_turbo_day: int               = 0
+        self._chart_cache: dict[tuple, tuple]   = {}  # key → (png_bytes, timestamp)
         self._price_task.start()
 
     def cog_unload(self):
         self._price_task.cancel()
+
+    def _make_bse_file(self) -> discord.File | None:
+        try:
+            return discord.File(_BSE_THUMB, filename="bse.png")
+        except Exception:
+            return None
 
     @tasks.loop(seconds=PRICE_UPDATE_INTERVAL)
     async def _price_task(self):
@@ -154,6 +266,8 @@ class StocksCog(commands.Cog, name="Stocks"):
         await self.bot.wait_until_ready()
         await self._initialize_prices()
 
+    # ── Startup ───────────────────────────────────────────────────────────────
+
     async def _initialize_prices(self):
         rows = await self.bot.db.get_all_stocks()
         for row in rows:
@@ -161,16 +275,27 @@ class StocksCog(commands.Cog, name="Stocks"):
             self._day_opens[row["ticker"]] = float(row["open_price"])
 
         loop = asyncio.get_running_loop()
-        for ticker in ADR_TICKERS:
-            try:
-                price = await loop.run_in_executor(None, _yf_last_price, ticker)
-                if price and price > 0:
-                    self._prices[ticker] = price
-                    if self._day_opens.get(ticker, 0) <= 0:
-                        self._day_opens[ticker] = price
-                    await self.bot.db.upsert_stock_price(ticker, price, self._day_opens[ticker])
-            except Exception:
-                pass
+
+        # Fetch all ADR prices in parallel
+        results = await asyncio.gather(
+            *[loop.run_in_executor(None, _yf_price_info, t) for t in ADR_TICKERS],
+            return_exceptions=True,
+        )
+        price_updates = []
+        for ticker, res in zip(ADR_TICKERS, results):
+            if isinstance(res, Exception):
+                continue
+            price, yf_open = res
+            if price and price > 0:
+                self._prices[ticker] = price
+                if yf_open and yf_open > 0:
+                    self._day_opens[ticker] = yf_open
+                elif self._day_opens.get(ticker, 0) <= 0:
+                    self._day_opens[ticker] = price
+                price_updates.append((ticker, price, self._day_opens[ticker]))
+
+        if price_updates:
+            await self.bot.db.batch_upsert_stock_prices(price_updates)
 
         if self._prices.get(ETF_TICKER, 0) <= 0:
             base = ETF_INFO["base_price"]
@@ -182,6 +307,8 @@ class StocksCog(commands.Cog, name="Stocks"):
                 self._prices[t]    = cfg["base_price"]
                 self._day_opens[t] = cfg["base_price"]
 
+    # ── Tick ──────────────────────────────────────────────────────────────────
+
     async def _tick(self):
         now       = int(time.time())
         today_day = now // 86400
@@ -191,41 +318,59 @@ class StocksCog(commands.Cog, name="Stocks"):
             await self._reset_daily(today_day)
             self._last_turbo_day = today_day
 
+        price_updates: list[tuple] = []   # (ticker, price, open_price)
+        price_bars: list[tuple]    = []   # (ticker, ts, open, high, low, close)
+
+        # Fetch all ADR prices in parallel
+        adr_results = await asyncio.gather(
+            *[loop.run_in_executor(None, _yf_price_info, t) for t in ADR_TICKERS],
+            return_exceptions=True,
+        )
+
         adr_pcts: dict[str, float] = {}
-        for ticker in ADR_TICKERS:
+        for ticker, res in zip(ADR_TICKERS, adr_results):
             if ticker in self._daily_locked:
                 continue
             if ticker in self._halted and now < self._halted[ticker]:
                 continue
-            try:
-                price = await loop.run_in_executor(None, _yf_last_price, ticker)
-                if price and price > 0:
-                    old      = self._prices.get(ticker, price)
-                    pct      = (price - old) / old if old > 0 else 0.0
-                    day_open = self._day_opens.get(ticker, price)
-                    day_pct  = (price - day_open) / day_open if day_open > 0 else 0.0
-                    if abs(day_pct) >= CIRCUIT_BREAKER_DAILY_PCT:
-                        self._daily_locked.add(ticker)
-                    elif abs(pct) >= CIRCUIT_BREAKER_HALT_PCT:
-                        self._halted[ticker] = now + CIRCUIT_BREAKER_HALT_SECS
-                    else:
-                        self._prices[ticker] = price
-                        adr_pcts[ticker] = pct
-                        await self.bot.db.upsert_stock_price(ticker, price, day_open)
-            except Exception:
-                pass
 
+            old = self._prices.get(ticker, 0.0)
+            if old <= 0:
+                continue
+
+            yf_price = None
+            if not isinstance(res, Exception):
+                yf_price, _ = res
+
+            new_price = yf_price if (yf_price and yf_price > 0) else old
+            if new_price == old:
+                new_price = max(0.01, old * (1 + random.gauss(0, _ADR_CLOSED_VOL)))
+
+            pct      = (new_price - old) / old
+            day_open = self._day_opens.get(ticker, new_price)
+            day_pct  = (new_price - day_open) / day_open if day_open > 0 else 0.0
+
+            if abs(day_pct) >= CIRCUIT_BREAKER_DAILY_PCT:
+                self._daily_locked.add(ticker)
+            elif abs(pct) >= CIRCUIT_BREAKER_HALT_PCT:
+                self._halted[ticker] = now + CIRCUIT_BREAKER_HALT_SECS
+            else:
+                self._prices[ticker] = new_price
+                adr_pcts[ticker]     = pct
+                price_updates.append((ticker, new_price, day_open))
+
+        # ETF tracks ADR average
         if adr_pcts and ETF_TICKER not in self._daily_locked:
             avg_pct = sum(adr_pcts.values()) / len(adr_pcts)
             old_etf = self._prices.get(ETF_TICKER, ETF_INFO["base_price"])
             new_etf = max(0.01, old_etf * (1 + avg_pct))
             self._prices[ETF_TICKER] = new_etf
             etf_open = self._day_opens.get(ETF_TICKER, new_etf)
-            asyncio.create_task(
-                self.bot.db.add_price_bar(ETF_TICKER, now, old_etf, max(old_etf, new_etf), min(old_etf, new_etf), new_etf)
-            )
-            await self.bot.db.upsert_stock_price(ETF_TICKER, new_etf, etf_open)
+            price_updates.append((ETF_TICKER, new_etf, etf_open))
+            price_bars.append((ETF_TICKER, now, old_etf,
+                               max(old_etf, new_etf), min(old_etf, new_etf), new_etf))
 
+        # Penny stock random walk
         updates_per_day = 86400 / PRICE_UPDATE_INTERVAL
         for ticker, cfg in PENNY_STOCKS.items():
             if ticker in self._daily_locked:
@@ -257,10 +402,15 @@ class StocksCog(commands.Cog, name="Stocks"):
                 self._daily_locked.add(ticker)
             else:
                 self._prices[ticker] = new_price
-                asyncio.create_task(
-                    self.bot.db.add_price_bar(ticker, now, old, max(old, new_price), min(old, new_price), new_price)
-                )
-                await self.bot.db.upsert_stock_price(ticker, new_price, day_open)
+                price_updates.append((ticker, new_price, day_open))
+                price_bars.append((ticker, now, old,
+                                   max(old, new_price), min(old, new_price), new_price))
+
+        # Single-round-trip DB writes for the whole tick
+        await asyncio.gather(
+            self.bot.db.batch_upsert_stock_prices(price_updates),
+            self.bot.db.batch_add_price_bars(price_bars),
+        )
 
         await self._check_knockouts()
 
@@ -269,8 +419,9 @@ class StocksCog(commands.Cog, name="Stocks"):
             self._day_opens[ticker] = self._prices.get(ticker, 0.0)
         self._daily_locked.clear()
         self._halted.clear()
+        self._chart_cache.clear()
 
-        rng = random.Random(today_day)
+        rng        = random.Random(today_day)
         candidates = [
             (t, d, lev)
             for t in ALL_TICKERS
@@ -292,16 +443,81 @@ class StocksCog(commands.Cog, name="Stocks"):
 
     async def _check_knockouts(self):
         positions = await self.bot.db.get_all_open_turbo_positions()
+        knocked   = []
         for pos in positions:
-            ticker  = pos["ticker"]
-            current = self._prices.get(ticker)
+            current = self._prices.get(pos["ticker"])
             if current is None:
                 continue
-            factor = _turbo_value_factor(pos["direction"], float(pos["entry_price"]), float(pos["knockout"]), current)
+            factor = _turbo_value_factor(pos["direction"], float(pos["entry_price"]),
+                                         float(pos["knockout"]), current)
             if factor <= 0:
-                cost = int(pos["cost"])
-                await self.bot.db.close_turbo_position(int(pos["position_id"]), -cost, "knocked")
-                await self.bot.db.update_turbo_stats(int(pos["guild_id"]), int(pos["user_id"]), knocked=True, pnl=-cost)
+                knocked.append(pos)
+        if knocked:
+            await self.bot.db.batch_close_knocked_positions(knocked)
+
+    # ── Chart builder (with byte cache) ──────────────────────────────────────
+
+    async def _build_chart(
+        self, ticker: str, period: str, chart_type: str,
+        entry_price: float | None = None,
+        knockout: float | None = None,
+        direction: str | None = None,
+    ) -> io.BytesIO:
+        cache_key = (ticker, period, chart_type, entry_price, knockout)
+        now       = time.time()
+        cached    = self._chart_cache.get(cache_key)
+        if cached and (now - cached[1]) < _CHART_CACHE_TTL:
+            return io.BytesIO(cached[0])
+        if len(self._chart_cache) > 200:
+            stale = [k for k, v in self._chart_cache.items() if (now - v[1]) >= _CHART_CACHE_TTL]
+            for k in stale:
+                del self._chart_cache[k]
+
+        loop = asyncio.get_running_loop()
+        if ticker in ADR_TICKERS:
+            yf_period, yf_interval = _YF_PERIOD_MAP[period]
+            df = await loop.run_in_executor(None, _yf_history, ticker, yf_period, yf_interval)
+            if df is None or df.empty:
+                raise ValueError("No data from yfinance")
+            opens  = df["Open"].tolist()
+            highs  = df["High"].tolist()
+            lows   = df["Low"].tolist()
+            closes = df["Close"].tolist()
+        else:
+            since = int(time.time()) - _PERIOD_SECONDS[period]
+            rows  = await self.bot.db.get_price_history(ticker, since)
+            if not rows:
+                raise ValueError("No price history yet for this period.")
+            opens  = [float(r["open"])  for r in rows]
+            highs  = [float(r["high"])  for r in rows]
+            lows   = [float(r["low"])   for r in rows]
+            closes = [float(r["close"]) for r in rows]
+
+        png = await loop.run_in_executor(
+            None, _render_chart, ticker, opens, highs, lows, closes,
+            chart_type, entry_price, knockout, direction,
+        )
+        self._chart_cache[cache_key] = (png, now)
+        return io.BytesIO(png)
+
+    # ── Autocomplete ──────────────────────────────────────────────────────────
+
+    async def _ticker_autocomplete(
+        self, interaction: discord.Interaction, current: str
+    ) -> list[app_commands.Choice[str]]:
+        cu      = current.upper()
+        choices = []
+        for ticker in ALL_TICKERS:
+            name = _ticker_info_name(ticker)
+            if cu and cu not in ticker and cu.lower() not in name.lower():
+                continue
+            price    = self._prices.get(ticker, 0.0)
+            day_open = self._day_opens.get(ticker, price)
+            pct      = (price - day_open) / day_open * 100 if day_open > 0 else 0.0
+            sign     = "+" if pct >= 0 else ""
+            label    = f"{ticker} · {name} · {_fmt_price(price)} ({sign}{pct:.1f}%)"
+            choices.append(app_commands.Choice(name=label[:100], value=ticker))
+        return choices[:25]
 
     # ── /stocks commands ──────────────────────────────────────────────────────
 
@@ -345,14 +561,14 @@ class StocksCog(commands.Cog, name="Stocks"):
         )
         embed.add_field(name="Penny Stocks", value="\n".join(penny_lines), inline=False)
         embed.set_footer(text=f"Updates every {PRICE_UPDATE_INTERVAL}s · /stocks chart <ticker> for graphs")
-        await interaction.followup.send(embed=embed)
+
+        bse = self._make_bse_file()
+        if bse:
+            embed.set_thumbnail(url="attachment://bse.png")
+        await interaction.followup.send(embed=embed, **({"file": bse} if bse else {}))
 
     @stocks.command(name="chart", description="View a price chart for any stock")
-    @app_commands.describe(
-        ticker="Ticker symbol (e.g. BABA, XMNG, CNXF)",
-        period="Time period",
-        chart_type="Chart style",
-    )
+    @app_commands.describe(ticker="Ticker symbol", period="Time period", chart_type="Chart style")
     @app_commands.choices(
         period=[app_commands.Choice(name=p, value=p) for p in PERIODS],
         chart_type=[app_commands.Choice(name=c, value=c) for c in CHART_TYPES],
@@ -362,7 +578,7 @@ class StocksCog(commands.Cog, name="Stocks"):
         interaction: discord.Interaction,
         ticker: str,
         period: str = "1D",
-        chart_type: str = "candlestick",
+        chart_type: str = "line",
     ):
         await interaction.response.defer()
         ticker = ticker.upper()
@@ -371,21 +587,18 @@ class StocksCog(commands.Cog, name="Stocks"):
                 f"Unknown ticker. Available: {', '.join(ALL_TICKERS)}", ephemeral=True
             )
 
-        price    = self._prices.get(ticker, 0.0)
-        day_open = self._day_opens.get(ticker, price)
-        pct      = (price - day_open) / day_open * 100 if day_open > 0 else 0.0
-        color    = 0x26A69A if pct >= 0 else 0xEF5350
-
         try:
             buf = await self._build_chart(ticker, period, chart_type)
         except Exception as e:
             return await interaction.followup.send(f"Chart unavailable: {e}", ephemeral=True)
 
-        info = (
-            ADR_STOCKS.get(ticker) or
-            (ETF_INFO if ticker == ETF_TICKER else None) or
-            PENNY_STOCKS.get(ticker) or {}
-        )
+        price    = self._prices.get(ticker, 0.0)
+        day_open = self._day_opens.get(ticker, price)
+        pct      = (price - day_open) / day_open * 100 if day_open > 0 else 0.0
+        color    = 0x26A69A if pct >= 0 else 0xEF5350
+
+        info  = (ADR_STOCKS.get(ticker) or (ETF_INFO if ticker == ETF_TICKER else None)
+                 or PENNY_STOCKS.get(ticker) or {})
         embed = discord.Embed(title=f"{info.get('name_zh', ticker)} · {ticker}", color=color)
         embed.add_field(name="Price",      value=_fmt_price(price), inline=True)
         embed.add_field(name="Day Change", value=_fmt_pct(pct),     inline=True)
@@ -400,8 +613,15 @@ class StocksCog(commands.Cog, name="Stocks"):
             embed.add_field(name="Status", value="⏳ Temporarily halted", inline=False)
 
         embed.set_image(url="attachment://chart.png")
-        file = discord.File(buf, filename="chart.png")
-        await interaction.followup.send(embed=embed, file=file)
+        bse = self._make_bse_file()
+        if bse:
+            embed.set_thumbnail(url="attachment://bse.png")
+        chart_file = discord.File(buf, filename="chart.png")
+        await interaction.followup.send(embed=embed, files=([bse, chart_file] if bse else [chart_file]))
+
+    @stocks_chart.autocomplete("ticker")
+    async def _chart_ticker_ac(self, interaction: discord.Interaction, current: str):
+        return await self._ticker_autocomplete(interaction, current)
 
     @stocks.command(name="buy", description="Buy shares of a stock")
     @app_commands.describe(ticker="Stock ticker", shares="Number of shares (decimals OK)")
@@ -435,7 +655,14 @@ class StocksCog(commands.Cog, name="Stocks"):
         embed.add_field(name="Bought", value=f"{shares:g} × {ticker}", inline=True)
         embed.add_field(name="Price",  value=_fmt_price(price),        inline=True)
         embed.add_field(name="Total",  value=f"¥{total:,}",            inline=True)
-        await interaction.followup.send(embed=embed)
+        bse = self._make_bse_file()
+        if bse:
+            embed.set_thumbnail(url="attachment://bse.png")
+        await interaction.followup.send(embed=embed, **({"file": bse} if bse else {}))
+
+    @stocks_buy.autocomplete("ticker")
+    async def _buy_ticker_ac(self, interaction: discord.Interaction, current: str):
+        return await self._ticker_autocomplete(interaction, current)
 
     @stocks.command(name="sell", description="Sell shares of a stock")
     @app_commands.describe(ticker="Stock ticker", shares="Shares to sell")
@@ -461,15 +688,22 @@ class StocksCog(commands.Cog, name="Stocks"):
         color    = 0x26A69A if pnl >= 0 else 0xEF5350
 
         embed = discord.Embed(title="出售确认 · Sale Confirmed", color=color)
-        embed.add_field(name="Sold",     value=f"{shares:g} × {ticker}",     inline=True)
-        embed.add_field(name="Price",    value=_fmt_price(price),             inline=True)
-        embed.add_field(name="Proceeds", value=f"¥{proceeds:,}",             inline=True)
-        embed.add_field(name="P&L",      value=f"{sign}¥{abs(pnl):,}",      inline=True)
-        await interaction.followup.send(embed=embed)
+        embed.add_field(name="Sold",     value=f"{shares:g} × {ticker}",  inline=True)
+        embed.add_field(name="Price",    value=_fmt_price(price),          inline=True)
+        embed.add_field(name="Proceeds", value=f"¥{proceeds:,}",           inline=True)
+        embed.add_field(name="P&L",      value=f"{sign}¥{abs(pnl):,}",    inline=True)
+        bse = self._make_bse_file()
+        if bse:
+            embed.set_thumbnail(url="attachment://bse.png")
+        await interaction.followup.send(embed=embed, **({"file": bse} if bse else {}))
+
+    @stocks_sell.autocomplete("ticker")
+    async def _sell_ticker_ac(self, interaction: discord.Interaction, current: str):
+        return await self._ticker_autocomplete(interaction, current)
 
     @stocks.command(name="portfolio", description="View your investment portfolio")
     async def stocks_portfolio(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer()
 
         positions = await self.bot.db.get_portfolio(interaction.guild_id, interaction.user.id)
         tp_rows   = await self.bot.db.get_open_turbo_positions(interaction.guild_id, interaction.user.id)
@@ -480,6 +714,8 @@ class StocksCog(commands.Cog, name="Stocks"):
 
         total_value = 0.0
         stock_lines = []
+        chart_data  = []
+
         for pos in positions:
             ticker = pos["ticker"]
             shares = float(pos["shares"])
@@ -491,8 +727,10 @@ class StocksCog(commands.Cog, name="Stocks"):
             pct    = (price - avg) / avg * 100 if avg > 0 else 0.0
             total_value += value
             stock_lines.append(
-                f"`{ticker:<4}` {shares:g} sh · {_fmt_price(price)} · ¥{int(value):,} ({sign}¥{abs(pnl):,} / {_fmt_pct(pct)})"
+                f"`{ticker:<4}` {shares:g} sh · {_fmt_price(price)} · "
+                f"¥{int(value):,} ({sign}¥{abs(pnl):,} / {_fmt_pct(pct)})"
             )
+            chart_data.append((ticker, value, pnl))
 
         turbo_lines = []
         for pos in tp_rows:
@@ -510,48 +748,126 @@ class StocksCog(commands.Cog, name="Stocks"):
             total_value += value
             sym = "🟢" if direction == "LONG" else "🔴"
             turbo_lines.append(
-                f"{sym} **#{pos['position_id']}** {direction} {leverage}x `{t_ticker}` · ¥{value:,} ({sign}¥{abs(pnl):,})"
+                f"{sym} **#{pos['position_id']}** {direction} {leverage}x `{t_ticker}` "
+                f"· ¥{value:,} ({sign}¥{abs(pnl):,})"
             )
+            chart_data.append((f"#{pos['position_id']} {t_ticker}", value, pnl))
 
         realized = (user_row.get("stock_profit", 0) or 0) + (user_row.get("turbo_profit", 0) or 0)
+        chart_data.sort(key=lambda x: x[1], reverse=True)
 
-        embed = discord.Embed(title="投资组合 · Portfolio", color=0xCC0000)
+        display_name = await self.bot.format_user_full(interaction.user, interaction.guild_id)
+        embed = discord.Embed(title=f"{display_name}'s Portfolio", color=0xCC0000)
         if stock_lines:
             embed.add_field(name="Stocks", value="\n".join(stock_lines), inline=False)
         if turbo_lines:
             embed.add_field(name="Turbo Certificates", value="\n".join(turbo_lines), inline=False)
         embed.add_field(name="Total Value",  value=f"¥{int(total_value):,}", inline=True)
         embed.add_field(name="Realized P&L", value=f"¥{realized:,}",         inline=True)
-        await interaction.followup.send(embed=embed)
+
+        loop     = asyncio.get_running_loop()
+        port_png = await loop.run_in_executor(None, _render_portfolio_chart, chart_data)
+
+        bse = self._make_bse_file()
+        if bse:
+            embed.set_thumbnail(url="attachment://bse.png")
+        embed.set_image(url="attachment://portfolio.png")
+
+        files = []
+        if bse:
+            files.append(bse)
+        files.append(discord.File(io.BytesIO(port_png), filename="portfolio.png"))
+        await interaction.followup.send(embed=embed, files=files)
 
     # ── /turbos commands ──────────────────────────────────────────────────────
 
     @turbos.command(name="list", description="View today's available turbo certificates")
     async def turbos_list(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer()
         today = int(time.time()) // 86400
         rows  = await self.bot.db.get_daily_turbos(today)
         if not rows:
-            return await interaction.followup.send("No turbos generated yet today. Try again in a moment.", ephemeral=True)
-
-        lines = []
-        for t in rows:
-            price   = self._prices.get(t["ticker"], float(t["entry_price"]))
-            factor  = max(0.0, _turbo_value_factor(t["direction"], float(t["entry_price"]), float(t["knockout"]), price))
-            sym     = "🟢" if t["direction"] == "LONG" else "🔴"
-            ko_dist = abs(price - float(t["knockout"])) / price * 100 if price > 0 else 0.0
-            lines.append(
-                f"**#{t['id']}** {sym} {t['direction']} {t['leverage']}x `{t['ticker']}` "
-                f"· KO: {_fmt_price(float(t['knockout']))} ({ko_dist:.1f}% away) · factor: {factor:.3f}"
+            return await interaction.followup.send(
+                "No turbos generated yet today. Try again in a moment.", ephemeral=True
             )
 
+        long_rows  = [t for t in rows if t["direction"] == "LONG"]
+        short_rows = [t for t in rows if t["direction"] == "SHORT"]
+
+        def _fmt_row(t):
+            price   = self._prices.get(t["ticker"], float(t["entry_price"]))
+            factor  = max(0.0, _turbo_value_factor(
+                t["direction"], float(t["entry_price"]), float(t["knockout"]), price
+            ))
+            ko_dist = abs(price - float(t["knockout"])) / price * 100 if price > 0 else 0.0
+            name    = _ticker_info_name(t["ticker"])
+            return (
+                f"**#{t['id']}** `{t['ticker']}` {t['leverage']}x · {name}\n"
+                f"  KO: {_fmt_price(float(t['knockout']))} · {ko_dist:.1f}% away · factor {factor:.3f}"
+            )
+
+        embed = discord.Embed(title="涡轮证书 · Daily Turbos", color=0xCC0000)
+        if long_rows:
+            embed.add_field(name="🟢 LONG",  value="\n".join(_fmt_row(t) for t in long_rows),  inline=False)
+        if short_rows:
+            embed.add_field(name="🔴 SHORT", value="\n".join(_fmt_row(t) for t in short_rows), inline=False)
+        embed.set_footer(text=f"Min ¥{TURBO_MIN_COST:,} · /turbos open <id> <yuan> · /turbos chart <id>")
+
+        bse = self._make_bse_file()
+        if bse:
+            embed.set_thumbnail(url="attachment://bse.png")
+        await interaction.followup.send(embed=embed, **({"file": bse} if bse else {}))
+
+    @turbos.command(name="chart", description="Chart the underlying stock with entry and knockout levels")
+    @app_commands.describe(turbo_id="Turbo ID from /turbos list", period="Time period")
+    @app_commands.choices(period=[app_commands.Choice(name=p, value=p) for p in PERIODS])
+    async def turbos_chart(
+        self,
+        interaction: discord.Interaction,
+        turbo_id: int,
+        period: str = "1D",
+    ):
+        await interaction.response.defer()
+        today = int(time.time()) // 86400
+        turbo = await self.bot.db.get_turbo(turbo_id)
+        if not turbo or int(turbo["day"]) != today:
+            return await interaction.followup.send("Turbo not found or expired.", ephemeral=True)
+
+        ticker    = turbo["ticker"]
+        direction = turbo["direction"]
+        entry     = float(turbo["entry_price"])
+        knockout  = float(turbo["knockout"])
+        leverage  = turbo["leverage"]
+        price     = self._prices.get(ticker, entry)
+        factor    = max(0.0, _turbo_value_factor(direction, entry, knockout, price))
+        ko_dist   = abs(price - knockout) / price * 100 if price > 0 else 0.0
+        color     = 0x26A69A if direction == "LONG" else 0xEF5350
+
+        try:
+            buf = await self._build_chart(ticker, period, "line",
+                                          entry_price=entry, knockout=knockout, direction=direction)
+        except Exception as e:
+            return await interaction.followup.send(f"Chart unavailable: {e}", ephemeral=True)
+
+        sym   = "🟢" if direction == "LONG" else "🔴"
         embed = discord.Embed(
-            title="涡轮证书 · Daily Turbos",
-            color=0xCC0000,
-            description="\n".join(lines),
+            title=f"{sym} Turbo #{turbo_id} · {direction} {leverage}x {ticker}",
+            description=_ticker_info_name(ticker),
+            color=color,
         )
-        embed.set_footer(text=f"Use /turbos open <id> <yuan> · Minimum ¥{TURBO_MIN_COST:,}")
-        await interaction.followup.send(embed=embed)
+        embed.add_field(name="Current",     value=_fmt_price(price),    inline=True)
+        embed.add_field(name="Entry",       value=_fmt_price(entry),    inline=True)
+        embed.add_field(name="Knockout",    value=_fmt_price(knockout), inline=True)
+        embed.add_field(name="KO Distance", value=f"{ko_dist:.1f}%",   inline=True)
+        embed.add_field(name="Factor",      value=f"{factor:.4f}",      inline=True)
+        embed.add_field(name="Period",      value=period,               inline=True)
+        embed.set_image(url="attachment://chart.png")
+
+        bse = self._make_bse_file()
+        if bse:
+            embed.set_thumbnail(url="attachment://bse.png")
+        chart_file = discord.File(buf, filename="chart.png")
+        await interaction.followup.send(embed=embed, files=([bse, chart_file] if bse else [chart_file]))
 
     @turbos.command(name="open", description="Open a turbo certificate position")
     @app_commands.describe(turbo_id="Turbo ID from /turbos list", cost="Yuan to invest")
@@ -581,13 +897,16 @@ class StocksCog(commands.Cog, name="Stocks"):
         ko_dist  = abs(price - knockout) / price * 100 if price > 0 else 0.0
 
         embed = discord.Embed(title="持仓开立 · Position Opened", color=color)
-        embed.add_field(name="Certificate", value=f"#{turbo_id} {turbo['direction']} {turbo['leverage']}x {ticker}", inline=False)
-        embed.add_field(name="Entry Price",   value=_fmt_price(entry),             inline=True)
-        embed.add_field(name="Knockout",      value=_fmt_price(knockout),          inline=True)
-        embed.add_field(name="KO Distance",   value=f"{ko_dist:.1f}%",             inline=True)
-        embed.add_field(name="Invested",      value=f"¥{cost:,}",                  inline=True)
-        embed.add_field(name="Current Value", value=f"¥{int(cost * factor):,}",    inline=True)
-        await interaction.followup.send(embed=embed)
+        embed.add_field(name="Certificate",   value=f"#{turbo_id} {turbo['direction']} {turbo['leverage']}x {ticker}", inline=False)
+        embed.add_field(name="Entry Price",   value=_fmt_price(entry),          inline=True)
+        embed.add_field(name="Knockout",      value=_fmt_price(knockout),       inline=True)
+        embed.add_field(name="KO Distance",   value=f"{ko_dist:.1f}%",          inline=True)
+        embed.add_field(name="Invested",      value=f"¥{cost:,}",               inline=True)
+        embed.add_field(name="Current Value", value=f"¥{int(cost * factor):,}", inline=True)
+        bse = self._make_bse_file()
+        if bse:
+            embed.set_thumbnail(url="attachment://bse.png")
+        await interaction.followup.send(embed=embed, **({"file": bse} if bse else {}))
 
     @turbos.command(name="close", description="Close an open turbo position")
     @app_commands.describe(position_id="Position ID from /stocks portfolio")
@@ -616,34 +935,12 @@ class StocksCog(commands.Cog, name="Stocks"):
         sign  = "+" if pnl >= 0 else ""
         color = 0x26A69A if pnl >= 0 else 0xEF5350
         embed = discord.Embed(title="持仓平仓 · Position Closed", color=color)
-        embed.add_field(name="Proceeds", value=f"¥{proceeds:,}",          inline=True)
-        embed.add_field(name="P&L",      value=f"{sign}¥{abs(pnl):,}",   inline=True)
-        await interaction.followup.send(embed=embed)
-
-    # ── Chart builder ──────────────────────────────────────────────────────────
-
-    async def _build_chart(self, ticker: str, period: str, chart_type: str) -> io.BytesIO:
-        loop = asyncio.get_running_loop()
-        if ticker in ADR_TICKERS:
-            yf_period, yf_interval = _YF_PERIOD_MAP[period]
-            df = await loop.run_in_executor(None, _yf_history, ticker, yf_period, yf_interval)
-            if df is None or df.empty:
-                raise ValueError("No data from yfinance")
-            opens  = df["Open"].tolist()
-            highs  = df["High"].tolist()
-            lows   = df["Low"].tolist()
-            closes = df["Close"].tolist()
-        else:
-            since = int(time.time()) - _PERIOD_SECONDS[period]
-            rows  = await self.bot.db.get_price_history(ticker, since)
-            if not rows:
-                raise ValueError("No price history yet for this period.")
-            opens  = [float(r["open"])  for r in rows]
-            highs  = [float(r["high"])  for r in rows]
-            lows   = [float(r["low"])   for r in rows]
-            closes = [float(r["close"]) for r in rows]
-
-        return await loop.run_in_executor(None, _render_chart, ticker, opens, highs, lows, closes, chart_type)
+        embed.add_field(name="Proceeds", value=f"¥{proceeds:,}",        inline=True)
+        embed.add_field(name="P&L",      value=f"{sign}¥{abs(pnl):,}", inline=True)
+        bse = self._make_bse_file()
+        if bse:
+            embed.set_thumbnail(url="attachment://bse.png")
+        await interaction.followup.send(embed=embed, **({"file": bse} if bse else {}))
 
 
 async def setup(bot: commands.Bot):

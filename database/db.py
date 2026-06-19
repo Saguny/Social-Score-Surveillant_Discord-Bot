@@ -220,6 +220,8 @@ class Database:
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_users_last_active ON users (last_active)")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_users_last_checkin ON users (last_checkin)")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_users_has_chatted_guild ON users (has_chatted, guild_id)")
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_score_history_user_ts ON score_history (guild_id, user_id, timestamp)")
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_turbo_positions_status ON turbo_positions (status) WHERE status = 'open'")
             await conn.execute("ALTER TABLE guild_config ADD COLUMN IF NOT EXISTS execution_channel_id BIGINT")
             await conn.execute("ALTER TABLE guild_config ADD COLUMN IF NOT EXISTS assign_rank_roles BOOLEAN NOT NULL DEFAULT TRUE")
             await conn.execute("""
@@ -1413,6 +1415,43 @@ class Database:
             "INSERT INTO stock_price_history (ticker, ts, open, high, low, close) VALUES ($1, $2, $3, $4, $5, $6)",
             ticker, ts, open_, high, low, close,
         )
+
+    async def batch_upsert_stock_prices(self, updates: list) -> None:
+        if not updates:
+            return
+        now = int(time.time())
+        await self._pool.executemany(
+            """INSERT INTO stocks (ticker, price, open_price, updated_at)
+               VALUES ($1, $2, $3, $4)
+               ON CONFLICT (ticker) DO UPDATE SET price = $2, open_price = $3, updated_at = $4""",
+            [(t, p, o, now) for t, p, o in updates],
+        )
+
+    async def batch_add_price_bars(self, bars: list) -> None:
+        if not bars:
+            return
+        await self._pool.executemany(
+            "INSERT INTO stock_price_history (ticker, ts, open, high, low, close) VALUES ($1, $2, $3, $4, $5, $6)",
+            bars,
+        )
+
+    async def batch_close_knocked_positions(self, positions: list) -> None:
+        if not positions:
+            return
+        now = int(time.time())
+        async with self._pool.acquire() as conn:
+            async with conn.transaction():
+                for pos in positions:
+                    cost = int(pos["cost"])
+                    await conn.execute(
+                        "UPDATE turbo_positions SET status = 'knocked', pnl = $1, closed_at = $2 WHERE id = $3",
+                        -cost, now, int(pos["position_id"]),
+                    )
+                    await conn.execute(
+                        "UPDATE users SET turbo_knocked = turbo_knocked + 1, turbo_profit = turbo_profit + $1 "
+                        "WHERE guild_id = $2 AND user_id = $3",
+                        -cost, int(pos["guild_id"]), int(pos["user_id"]),
+                    )
 
     async def get_price_history(self, ticker: str, since: int) -> list:
         return await self._pool.fetch(

@@ -466,21 +466,10 @@ class Guide(commands.Cog):
             ),
         )
 
-        e.add_field(
-            name="CREATOR",
-            value="saguny",
-            inline=True,
-        )
-        e.add_field(
-            name="SERVERS · CITIZENS",
-            value=f"{guild_count} servers · {member_count:,} citizens",
-            inline=True,
-        )
-        e.add_field(
-            name="LATENCY",
-            value=f"{latency_ms} ms",
-            inline=True,
-        )
+        e.add_field(name="VERSION",          value="1.0.3",                                    inline=True)
+        e.add_field(name="CREATOR",          value="saguny",                                  inline=True)
+        e.add_field(name="SERVERS · CITIZENS", value=f"{guild_count} servers · {member_count:,} citizens", inline=True)
+        e.add_field(name="LATENCY",          value=f"{latency_ms} ms",                        inline=True)
         e.add_field(
             name="TECHNOLOGY",
             value=(
