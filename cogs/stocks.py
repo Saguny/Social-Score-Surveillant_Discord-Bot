@@ -789,7 +789,7 @@ class StocksCog(commands.Cog, name="Stocks"):
             )
 
         try:
-            buf = await self._build_chart(ticker, period, chart_type)
+            buf = await self._build_chart(ticker, "1D", chart_type)
         except Exception as e:
             return await interaction.followup.send(f"Chart unavailable: {e}", ephemeral=True)
 
