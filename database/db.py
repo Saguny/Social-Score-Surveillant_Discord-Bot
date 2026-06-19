@@ -211,6 +211,10 @@ class Database:
             await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS propaganda_wins INTEGER DEFAULT 0")
             await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS rank_entered_at BIGINT DEFAULT 0")
             await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS prev_day_yuan BIGINT DEFAULT 0")
+            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS lottery_played INTEGER NOT NULL DEFAULT 0")
+            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS lottery_won    INTEGER NOT NULL DEFAULT 0")
+            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS lottery_lost   INTEGER NOT NULL DEFAULT 0")
+            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS lottery_net    BIGINT  NOT NULL DEFAULT 0")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_score_history_timestamp ON score_history (timestamp)")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_score_history_reason ON score_history (reason)")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_users_last_active ON users (last_active)")
@@ -225,6 +229,15 @@ class Database:
                     day      BIGINT,
                     yuan     BIGINT,
                     PRIMARY KEY (guild_id, user_id, day)
+                )
+            """)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS rank_history (
+                    guild_id   BIGINT,
+                    user_id    BIGINT,
+                    rank_name  TEXT,
+                    total_days BIGINT NOT NULL DEFAULT 0,
+                    PRIMARY KEY (guild_id, user_id, rank_name)
                 )
             """)
 
@@ -372,6 +385,57 @@ class Database:
             "UPDATE users SET rank_entered_at = $1 WHERE guild_id = $2 AND user_id = $3",
             int(time.time()), guild_id, user_id,
         )
+
+    async def update_lottery_stats(self, guild_id: int, user_id: int, won: bool, net: int):
+        await self._pool.execute(
+            """
+            UPDATE users SET
+                lottery_played = lottery_played + 1,
+                lottery_won    = lottery_won    + $1,
+                lottery_lost   = lottery_lost   + $2,
+                lottery_net    = lottery_net    + $3
+            WHERE guild_id = $4 AND user_id = $5
+            """,
+            int(won), int(not won), net, guild_id, user_id,
+        )
+
+    async def log_rank_departure(self, guild_id: int, user_id: int, rank_name: str):
+        now = int(time.time())
+        async with self._pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT rank_entered_at FROM users WHERE guild_id = $1 AND user_id = $2",
+                guild_id, user_id,
+            )
+            if not row or not row["rank_entered_at"]:
+                return
+            days = max(0, (now - row["rank_entered_at"]) // 86400)
+            if days == 0:
+                return
+            await conn.execute(
+                """
+                INSERT INTO rank_history (guild_id, user_id, rank_name, total_days)
+                VALUES ($1, $2, $3, $4)
+                ON CONFLICT (guild_id, user_id, rank_name)
+                DO UPDATE SET total_days = rank_history.total_days + EXCLUDED.total_days
+                """,
+                guild_id, user_id, rank_name, days,
+            )
+
+    async def get_rank_stats(self, guild_id: int, user_id: int, rank_name: str) -> dict:
+        now = int(time.time())
+        async with self._pool.acquire() as conn:
+            user_row = await conn.fetchrow(
+                "SELECT rank_entered_at FROM users WHERE guild_id = $1 AND user_id = $2",
+                guild_id, user_id,
+            )
+            hist_row = await conn.fetchrow(
+                "SELECT total_days FROM rank_history WHERE guild_id = $1 AND user_id = $2 AND rank_name = $3",
+                guild_id, user_id, rank_name,
+            )
+        entered = (user_row["rank_entered_at"] or 0) if user_row else 0
+        current_days = max(0, (now - entered) // 86400) if entered else 0
+        hist_days = int(hist_row["total_days"]) if hist_row else 0
+        return {"current_days": current_days, "total_days": hist_days + current_days}
 
     async def consume_effect(self, guild_id: int, user_id: int, effect_type: str) -> bool:
         row = await self._pool.fetchrow(
@@ -1092,6 +1156,10 @@ class Database:
                     COALESCE(SUM(total_yuan_earned), 0)                                            AS total_earned,
                     COALESCE(SUM(total_yuan_spent), 0)                                             AS total_spent,
                     COALESCE(SUM(items_bought), 0)                                                 AS total_items,
+                    COALESCE(SUM(lottery_played), 0)                                               AS lottery_played,
+                    COALESCE(SUM(lottery_won), 0)                                                  AS lottery_won,
+                    COALESCE(SUM(lottery_lost), 0)                                                 AS lottery_lost,
+                    COALESCE(SUM(lottery_net), 0)                                                  AS lottery_net,
                     COALESCE(AVG(score) FILTER (WHERE has_chatted = 1), 750.0)                     AS avg_score,
                     COALESCE(MAX(highest_score), 750.0)                                            AS highest_score,
                     COALESCE(MIN(lowest_score), 750.0)                                             AS lowest_score,
@@ -1171,6 +1239,10 @@ class Database:
             "total_earned":      int(users_row["total_earned"]),
             "total_spent":       int(users_row["total_spent"]),
             "total_items":       int(users_row["total_items"]),
+            "lottery_played":    int(users_row["lottery_played"]),
+            "lottery_won":       int(users_row["lottery_won"]),
+            "lottery_lost":      int(users_row["lottery_lost"]),
+            "lottery_net":       int(users_row["lottery_net"]),
             "avg_score":         round(float(users_row["avg_score"]), 2),
             "highest_score":     round(float(users_row["highest_score"]), 2),
             "lowest_score":      round(float(users_row["lowest_score"]), 2),

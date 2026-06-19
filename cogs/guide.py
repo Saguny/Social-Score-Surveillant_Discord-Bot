@@ -164,7 +164,7 @@ class Guide(commands.Cog):
 
         e3 = discord.Embed(color=0xCC0000, title="SCORE AND STAT COMMANDS")
         e3.add_field(name="/score [citizen]",        value="View your score and current rank.", inline=False)
-        e3.add_field(name="/stats [citizen]",        value="Full breakdown across 3 pages: Overview (score, rank, trends), Social (endorsements, rebukes, reports), Economy (yuan, items, streak).", inline=False)
+        e3.add_field(name="/stats [citizen]",        value="Full breakdown across 3 pages: Overview (score, rank, trends, rank streak · total days at rank), Social (endorsements, rebukes, reports), Economy (yuan, items, lottery stats, check-in streak).", inline=False)
         e3.add_field(name="/daily_report [citizen]",  value="Today's score activity for any citizen: positive, negative, net change, and yuan compared to yesterday.", inline=False)
         e3.add_field(name="/leaderboard",            value="Rankings across 8 categories: score, yuan, activity, endorsements, rebukes, and informants.", inline=False)
         e3.add_field(name="/state_report",           value="Server-wide report: biggest rise/fall, top informant, yuan in circulation, avg score.", inline=False)
@@ -185,9 +185,9 @@ class Guide(commands.Cog):
         e4.add_field(
             name="/shop",
             value=(
-                "Browse the full catalogue across 4 categories. Run `/shop` first to see what you can afford at your current balance.\n"
-                "Categories: **Core** (reports, defense, rehabilitation) · **Economy** (lottery, bounties, disputes) · "
-                "**Misc** (inspection, legal cover, fabricated evidence) · **Cosmetic** (prestige badges, Winnie the Pooh)"
+                "Browse the full catalogue across 5 categories. Run `/shop` first to see what you can afford at your current balance.\n"
+                "Categories: **Core** (reports, defense, rehabilitation) · **Economy** (bounties, disputes) · "
+                "**Misc** (inspection, legal cover, fabricated evidence) · **Lottery** (5 tiers) · **Cosmetic** (prestige badges, Winnie the Pooh)"
             ),
             inline=False,
         )
@@ -202,7 +202,21 @@ class Guide(commands.Cog):
                 "`appeal` (¥4,000) · Next incoming penalty reduced 50% within 12 hours.\n"
                 "`exception` (¥12,000) · Completely cancels the next negative action against you.\n"
                 "`reeducation` (¥20,000) · Freeze a target's score for 2 hours.\n"
-                "See `/shop` for all 30 items."
+                "**Gifting:** Add a `target` to any self-item (`rehabilitate`, `appeal`, `exception`, `model_citizen`, `legal_rep`, `immunity`, `media_coverage`) "
+                "to gift it to another citizen instead. A public announcement is posted. Add `text` as a gift message.\n"
+                "See `/shop` for all items."
+            ),
+            inline=False,
+        )
+        e4.add_field(
+            name="LOTTERY TIERS",
+            value=(
+                "Five tiers scaling with your wealth. All share the same 70/20/10 odds. Add a `target` to buy a ticket for someone else.\n"
+                "`lottery` ¥500 · win ¥400–700 · jackpot ¥2,000–4,000\n"
+                "`lottery_standard` ¥2,500 · win ¥2,000–4,000 · jackpot ¥10,000–20,000\n"
+                "`lottery_premium` ¥10,000 · win ¥8,000–15,000 · jackpot ¥40,000–80,000\n"
+                "`lottery_elite` ¥50,000 · win ¥40,000–75,000 · jackpot ¥200,000–400,000\n"
+                "`lottery_chairman` ¥250,000 · win ¥200,000–400,000 · jackpot ¥1,000,000–2,000,000"
             ),
             inline=False,
         )

@@ -210,8 +210,9 @@ class Stats(commands.Cog):
         gid = interaction.guild.id
         user = await self.db.get_user(gid, target.id)
         rank = get_rank(user["score"])
-        trend_7d  = await self.db.get_score_trend(gid, target.id, 7)
-        trend_30d = await self.db.get_score_trend(gid, target.id, 30)
+        trend_7d    = await self.db.get_score_trend(gid, target.id, 7)
+        trend_30d   = await self.db.get_score_trend(gid, target.id, 30)
+        rank_stats  = await self.db.get_rank_stats(gid, target.id, rank["name"])
 
         def trend_str(val: float) -> str:
             if val > 0: return f"▲ +{val:.2f}"
@@ -233,6 +234,8 @@ class Stats(commands.Cog):
             e.add_field(name="MESSAGES",   value=str(user["message_count"]),     inline=True)
             e.add_field(name="PEAK",       value=f"{user['highest_score']:.2f}", inline=True)
             e.add_field(name="LOW",        value=f"{user['lowest_score']:.2f}",  inline=True)
+            e.add_field(name="RANK STREAK",     value=f"{rank_stats['current_days']}d", inline=True)
+            e.add_field(name="TOTAL AT RANK",   value=f"{rank_stats['total_days']}d",   inline=True)
             if thumb_url:
                 e.set_thumbnail(url=thumb_url)
             e.timestamp = discord.utils.utcnow()
@@ -258,6 +261,14 @@ class Stats(commands.Cog):
             e.add_field(name="YUAN EARNED",  value=f"¥{user['total_yuan_earned']}", inline=True)
             e.add_field(name="YUAN SPENT",   value=f"¥{user['total_yuan_spent']}",  inline=True)
             e.add_field(name="ITEMS BOUGHT", value=str(user["items_bought"]),        inline=True)
+            lottery_played = user.get("lottery_played", 0)
+            lottery_won    = user.get("lottery_won",    0)
+            lottery_lost   = user.get("lottery_lost",   0)
+            lottery_net    = user.get("lottery_net",    0)
+            e.add_field(name="TICKETS PLAYED", value=str(lottery_played),                                   inline=True)
+            e.add_field(name="WON · LOST",     value=f"{lottery_won} · {lottery_lost}",                    inline=True)
+            net_sign = "+" if lottery_net >= 0 else ""
+            e.add_field(name="LOTTERY NET",    value=f"{net_sign}¥{lottery_net:,}",                        inline=True)
             if streak:
                 e.add_field(name="CHECK-IN STREAK",      value=f"{streak} days", inline=True)
             if wins:
@@ -430,6 +441,7 @@ async def _build_graph(db, guild_id: int, user_id: int, graph_type: str, display
         ax_bg = fig.add_axes([0, 0, 1, 1], zorder=0)
         ax_bg.imshow(flag_img, aspect="auto")
         ax_bg.set_axis_off()
+        ax_bg.set_in_layout(False)
         ax_bg.add_patch(Rectangle((0, 0), 1, 1, transform=ax_bg.transAxes, color="#1a1a2e", alpha=0.75, zorder=1))
         ax.set_facecolor("none")
         ax.set_zorder(2)
@@ -446,6 +458,7 @@ async def _build_graph(db, guild_id: int, user_id: int, graph_type: str, display
             y_hi = max(y_hi, y_val + padding * 0.5)
     ax.set_ylim(y_lo, y_hi)
 
+    ax.margins(x=0.02)
     ax.plot(dates, values, color=line_color, linewidth=2, zorder=3)
     ax.fill_between(dates, values, y_lo, color=fill_color, zorder=2)
 

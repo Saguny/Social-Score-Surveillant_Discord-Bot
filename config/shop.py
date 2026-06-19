@@ -27,7 +27,7 @@ SHOP_ITEMS = {
     },
     "rehabilitate": {
         "name": "Rehabilitation Program",
-        "description": "Restores +3 score. Cost doubles each use.",
+        "description": "Restores +3 score. Cost doubles each use. Add a target to gift it.",
         "cost": 3000,
         "requires_target": False,
         "requires_text": False,
@@ -35,7 +35,7 @@ SHOP_ITEMS = {
     },
     "appeal": {
         "name": "Appeal Process",
-        "description": "Next incoming penalty is halved. Single use, expires 12h.",
+        "description": "Next incoming penalty is halved. Single use, expires 12h. Add a target to gift it.",
         "cost": 4000,
         "requires_target": False,
         "requires_text": False,
@@ -44,7 +44,7 @@ SHOP_ITEMS = {
     },
     "exception": {
         "name": "Administrative Exception",
-        "description": "Fully cancels the next negative action against you. Single use, expires 24h.",
+        "description": "Fully cancels the next negative action against you. Single use, expires 24h. Add a target to gift it.",
         "cost": 12000,
         "requires_target": False,
         "requires_text": False,
@@ -62,12 +62,44 @@ SHOP_ITEMS = {
     },
     # --- Economy / interaction ---
     "lottery": {
-        "name": "State Lottery",
-        "description": "70% lose · 20% win ¥400-700 · 10% jackpot ¥2,000-4,000.",
+        "name": "People's Lottery",
+        "description": "70% lose · 20% win ¥400–700 · 10% jackpot ¥2,000–4,000. Add a target to buy a ticket for them.",
         "cost": 500,
         "requires_target": False,
         "requires_text": False,
-        "category": "economy",
+        "category": "lottery",
+    },
+    "lottery_standard": {
+        "name": "Workers' Lottery",
+        "description": "70% lose · 20% win ¥2,000–4,000 · 10% jackpot ¥10,000–20,000. Add a target to buy a ticket for them.",
+        "cost": 2500,
+        "requires_target": False,
+        "requires_text": False,
+        "category": "lottery",
+    },
+    "lottery_premium": {
+        "name": "Cadre Lottery",
+        "description": "70% lose · 20% win ¥8,000–15,000 · 10% jackpot ¥40,000–80,000. Add a target to buy a ticket for them.",
+        "cost": 10000,
+        "requires_target": False,
+        "requires_text": False,
+        "category": "lottery",
+    },
+    "lottery_elite": {
+        "name": "Politburo Lottery",
+        "description": "70% lose · 20% win ¥40,000–75,000 · 10% jackpot ¥200,000–400,000. Add a target to buy a ticket for them.",
+        "cost": 50000,
+        "requires_target": False,
+        "requires_text": False,
+        "category": "lottery",
+    },
+    "lottery_chairman": {
+        "name": "Chairman's Lottery",
+        "description": "70% lose · 20% win ¥200,000–400,000 · 10% jackpot ¥1,000,000–2,000,000. Add a target to buy a ticket for them.",
+        "cost": 250000,
+        "requires_target": False,
+        "requires_text": False,
+        "category": "lottery",
     },
     "tip": {
         "name": "Anonymous Tip",
@@ -79,7 +111,7 @@ SHOP_ITEMS = {
     },
     "model_citizen": {
         "name": "Model Citizen Award",
-        "description": "Instantly gain +1.00 score.",
+        "description": "Instantly gain +1.00 score. Add a target to nominate them instead.",
         "cost": 1000,
         "requires_target": False,
         "requires_text": False,
@@ -146,7 +178,7 @@ SHOP_ITEMS = {
     },
     "legal_rep": {
         "name": "Legal Representation",
-        "description": "All incoming score penalties halved for 12h.",
+        "description": "All incoming score penalties halved for 12h. Add a target to gift it.",
         "cost": 8000,
         "requires_target": False,
         "requires_text": False,
@@ -164,7 +196,7 @@ SHOP_ITEMS = {
     },
     "immunity": {
         "name": "Citizen Immunity",
-        "description": "50% chance to fully block the next negative action against you.",
+        "description": "50% chance to fully block the next negative action against you. Add a target to gift it.",
         "cost": 7500,
         "requires_target": False,
         "requires_text": False,
@@ -181,7 +213,7 @@ SHOP_ITEMS = {
     },
     "media_coverage": {
         "name": "State Media Coverage",
-        "description": "Next organic score gain doubled and broadcast publicly.",
+        "description": "Next organic score gain doubled and broadcast publicly. Add a target to gift it.",
         "cost": 15000,
         "requires_target": False,
         "requires_text": False,

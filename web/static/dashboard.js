@@ -162,6 +162,26 @@ async function load() {
   set('ec-fx',    fmt(d.active_effects));
   set('ec-fr',    fmt(d.fundraiser_yuan));
 
+  const ltPlayed = d.lottery_played || 0;
+  const ltWon    = d.lottery_won    || 0;
+  const ltLost   = d.lottery_lost   || 0;
+  const ltNet    = d.lottery_net    || 0;
+  set('lt-played', fmt(ltPlayed));
+  set('lt-won',    fmt(ltWon));
+  set('lt-lost',   fmt(ltLost));
+  set('lt-wr',     ltPlayed > 0 ? ((ltWon/ltPlayed)*100).toFixed(1)+'% win rate' : '');
+  const ltNetEl = document.getElementById('lt-net');
+  if (ltNetEl) {
+    ltNetEl.textContent = (ltNet >= 0 ? '+' : '') + '¥' + fmt(Math.abs(ltNet));
+    ltNetEl.className = 'val ' + (ltNet >= 0 ? 'trend-up' : 'trend-down');
+  }
+  const ltEdgeEl = document.getElementById('lt-edge');
+  if (ltEdgeEl) {
+    const edge = ltPlayed > 0 ? ltNet / ltPlayed : 0;
+    ltEdgeEl.textContent = (edge >= 0 ? '+' : '') + '¥' + Math.abs(edge).toFixed(0) + '/ticket';
+    ltEdgeEl.className = 'val ' + (edge >= 0 ? 'trend-up' : 'trend-down');
+  }
+
   renderDist(d.score_dist||{}, d.avg_score);
   set('sc-avg',  d.avg_score.toFixed(2));
   set('sc-high', d.highest_score.toFixed(2));

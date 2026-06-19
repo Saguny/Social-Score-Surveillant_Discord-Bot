@@ -11,19 +11,30 @@ _CATEGORY_TITLES = {
     "core":     "中华人民共和国社会信用局 · 核心项目",
     "economy":  "中华人民共和国社会信用局 · 经济 · 互动",
     "misc":     "中华人民共和国社会信用局 · 杂项",
+    "lottery":  "中华人民共和国社会信用局 · 国家彩票",
     "cosmetic": "中华人民共和国社会信用局 · 装饰品 · 声望",
 }
 
 _CATEGORY_LABELS = {
-    "cosmetic": "Cosmetic",
     "core":     "Core",
     "economy":  "Economy",
     "misc":     "Misc",
+    "lottery":  "Lottery",
+    "cosmetic": "Cosmetic",
 }
 
 _THUMBNAIL = "attachment://market.png"
 
 _COSMETIC_ORDER = ["verified", "figure", "influencer", "associate", "asset", "eternal_chairman"]
+_LOTTERY_ORDER  = ["lottery", "lottery_standard", "lottery_premium", "lottery_elite", "lottery_chairman"]
+
+_LOTTERY_TIERS = {
+    "lottery":          {"win": (400,     700),     "jackpot": (2_000,     4_000)},
+    "lottery_standard": {"win": (2_000,   4_000),   "jackpot": (10_000,   20_000)},
+    "lottery_premium":  {"win": (8_000,  15_000),   "jackpot": (40_000,   80_000)},
+    "lottery_elite":    {"win": (40_000, 75_000),   "jackpot": (200_000, 400_000)},
+    "lottery_chairman": {"win": (200_000, 400_000), "jackpot": (1_000_000, 2_000_000)},
+}
 
 
 def _build_shop_embeds(username: str = "yourname") -> dict[str, discord.Embed]:
@@ -44,13 +55,25 @@ def _build_shop_embeds(username: str = "yourname") -> dict[str, discord.Embed]:
             inline=False,
         )
 
+    e_lottery = discord.Embed(color=0xFFD700, title=_CATEGORY_TITLES["lottery"])
+    e_lottery.set_thumbnail(url=_THUMBNAIL)
+    for item_id in _LOTTERY_ORDER:
+        item = SHOP_ITEMS.get(item_id)
+        if not item:
+            continue
+        e_lottery.add_field(
+            name=f"/buy {item_id}  ·  ¥{item['cost']:,}",
+            value=item["description"],
+            inline=False,
+        )
+
     by_cat: dict[str, list] = {}
     for item_id, item in SHOP_ITEMS.items():
         cat = item.get("category", "core")
-        if cat != "cosmetic":
+        if cat not in ("cosmetic", "lottery"):
             by_cat.setdefault(cat, []).append((item_id, item))
 
-    embeds: dict[str, discord.Embed] = {"cosmetic": e_cosmetic}
+    embeds: dict[str, discord.Embed] = {"cosmetic": e_cosmetic, "lottery": e_lottery}
     for cat in ("core", "economy", "misc"):
         embed = discord.Embed(color=0xCC0000, title=_CATEGORY_TITLES[cat])
         embed.set_thumbnail(url=_THUMBNAIL)
@@ -309,7 +332,7 @@ class Economy(commands.Cog):
             await interaction.response.send_message("Invalid target.", ephemeral=True)
             return
 
-        _public_items = {"lottery", "dispute", "inspection", "criticism", "pact"}
+        _public_items = {"lottery", "lottery_standard", "lottery_premium", "lottery_elite", "lottery_chairman", "dispute", "inspection", "criticism", "pact"}
         await interaction.response.defer(ephemeral=item not in _public_items)
 
         if item == "protection" and target and await self.db.get_effect(interaction.guild.id, target.id, "protection"):
@@ -451,37 +474,58 @@ class Economy(commands.Cog):
             await interaction.followup.send(embed=embed, ephemeral=True)
 
         elif item_id == "rehabilitate":
-            old, new = await self.db.update_score(gid, uid, 3.0, "rehabilitation certificate")
-            embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局")
-            embed.add_field(
-                name="REHABILITATION APPROVED",
-                value=f"Score adjusted: {old:.2f} -> {new:.2f}",
-                inline=False,
-            )
-            await interaction.followup.send(embed=embed, ephemeral=True)
-            await self._post_score(interaction, interaction.user, old, new)
+            recipient = target if target else interaction.user
+            old, new = await self.db.update_score(gid, recipient.id, 3.0, "rehabilitation certificate")
+            if target:
+                embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局")
+                embed.add_field(name="REHABILITATION GIFT", value=f"{interaction.user.mention} gifted a Rehabilitation Program to {target.mention}", inline=False)
+                embed.add_field(name="SCORE", value=f"{old:.2f} -> {new:.2f}", inline=True)
+                if text:
+                    embed.add_field(name="MESSAGE", value=text[:200], inline=False)
+                embed.timestamp = discord.utils.utcnow()
+                await interaction.channel.send(embed=embed)
+                await interaction.followup.send("Your gift has been delivered.", ephemeral=True)
+            else:
+                embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局")
+                embed.add_field(name="REHABILITATION APPROVED", value=f"Score adjusted: {old:.2f} -> {new:.2f}", inline=False)
+                await interaction.followup.send(embed=embed, ephemeral=True)
+            await self._post_score(interaction, recipient, old, new)
 
         elif item_id == "appeal":
+            recipient = target if target else interaction.user
             expires_at = int(time.time()) + cfg["duration"]
-            await self.db.add_effect(gid, uid, "appeal", expires_at)
-            embed = discord.Embed(color=0x1a3a5c, title="中华人民共和国社会信用局")
-            embed.add_field(
-                name="APPEAL FILED",
-                value="The next negative score action against you within 12 hours will be reduced by 50%. Single use.",
-                inline=False,
-            )
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            await self.db.add_effect(gid, recipient.id, "appeal", expires_at)
+            if target:
+                embed = discord.Embed(color=0x1a3a5c, title="中华人民共和国社会信用局")
+                embed.add_field(name="APPEAL GIFT", value=f"{interaction.user.mention} filed an Appeal on behalf of {target.mention}", inline=False)
+                embed.add_field(name="EFFECT", value="Their next incoming penalty within 12 hours will be reduced by 50%. Single use.", inline=False)
+                if text:
+                    embed.add_field(name="MESSAGE", value=text[:200], inline=False)
+                embed.timestamp = discord.utils.utcnow()
+                await interaction.channel.send(embed=embed)
+                await interaction.followup.send("Your gift has been delivered.", ephemeral=True)
+            else:
+                embed = discord.Embed(color=0x1a3a5c, title="中华人民共和国社会信用局")
+                embed.add_field(name="APPEAL FILED", value="The next negative score action against you within 12 hours will be reduced by 50%. Single use.", inline=False)
+                await interaction.followup.send(embed=embed, ephemeral=True)
 
         elif item_id == "exception":
+            recipient = target if target else interaction.user
             expires_at = int(time.time()) + cfg["duration"]
-            await self.db.add_effect(gid, uid, "exception", expires_at)
-            embed = discord.Embed(color=0x2d5a27, title="中华人民共和国社会信用局")
-            embed.add_field(
-                name="EXCEPTION GRANTED",
-                value="The next negative score action against you within 24 hours will be completely nullified.",
-                inline=False,
-            )
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            await self.db.add_effect(gid, recipient.id, "exception", expires_at)
+            if target:
+                embed = discord.Embed(color=0x2d5a27, title="中华人民共和国社会信用局")
+                embed.add_field(name="EXCEPTION GIFT", value=f"{interaction.user.mention} granted an Administrative Exception to {target.mention}", inline=False)
+                embed.add_field(name="EFFECT", value="Their next negative score action within 24 hours will be completely nullified. Single use.", inline=False)
+                if text:
+                    embed.add_field(name="MESSAGE", value=text[:200], inline=False)
+                embed.timestamp = discord.utils.utcnow()
+                await interaction.channel.send(embed=embed)
+                await interaction.followup.send("Your gift has been delivered.", ephemeral=True)
+            else:
+                embed = discord.Embed(color=0x2d5a27, title="中华人民共和国社会信用局")
+                embed.add_field(name="EXCEPTION GRANTED", value="The next negative score action against you within 24 hours will be completely nullified.", inline=False)
+                await interaction.followup.send(embed=embed, ephemeral=True)
 
         elif item_id == "reeducation":
             if await self.db.get_effect(gid, target.id, "freeze"):
@@ -500,28 +544,50 @@ class Economy(commands.Cog):
             )
             await interaction.followup.send(embed=embed)
 
-        elif item_id == "lottery":
+        elif item_id in _LOTTERY_TIERS:
+            tier = _LOTTERY_TIERS[item_id]
+            recipient = target if target else interaction.user
+            gifted = target is not None
+            recipient_name = await self.bot.format_user_full(recipient, gid)
             buyer_name = await self.bot.format_user_full(interaction.user, gid)
             roll = random.random()
             if roll < 0.7:
+                net = 0 if gifted else -cost
                 embed = discord.Embed(color=0x333333, title="中华人民共和国社会信用局 · 国家彩票")
-                embed.add_field(name="CITIZEN", value=buyer_name, inline=False)
+                if gifted:
+                    embed.add_field(name="TICKET PURCHASED BY", value=buyer_name, inline=True)
+                    embed.add_field(name="FOR", value=recipient_name, inline=True)
+                else:
+                    embed.add_field(name="CITIZEN", value=buyer_name, inline=False)
                 embed.add_field(name="RESULT", value="Better luck next time. The Party keeps your entry.", inline=False)
                 embed.add_field(name="YUAN CHANGE", value=f"-¥{cost:,}", inline=False)
+                await self.db.update_lottery_stats(gid, recipient.id, False, net)
             elif roll < 0.9:
-                winnings = random.randint(400, 700)
-                await self.db.adjust_yuan(gid, uid, winnings)
+                winnings = random.randint(*tier["win"])
+                net = winnings if gifted else winnings - cost
+                await self.db.adjust_yuan(gid, recipient.id, winnings)
                 embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局 · 国家彩票")
-                embed.add_field(name="CITIZEN", value=buyer_name, inline=False)
+                if gifted:
+                    embed.add_field(name="TICKET PURCHASED BY", value=buyer_name, inline=True)
+                    embed.add_field(name="FOR", value=recipient_name, inline=True)
+                else:
+                    embed.add_field(name="CITIZEN", value=buyer_name, inline=False)
                 embed.add_field(name="WINNER", value="The Party smiles upon you.", inline=False)
-                embed.add_field(name="YUAN CHANGE", value=f"+¥{winnings:,} · net {winnings - cost:+,}", inline=False)
+                embed.add_field(name="YUAN CHANGE", value=f"+¥{winnings:,} · net {net:+,}", inline=False)
+                await self.db.update_lottery_stats(gid, recipient.id, True, net)
             else:
-                winnings = random.randint(2000, 4000)
-                await self.db.adjust_yuan(gid, uid, winnings)
+                winnings = random.randint(*tier["jackpot"])
+                net = winnings if gifted else winnings - cost
+                await self.db.adjust_yuan(gid, recipient.id, winnings)
                 embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局 · 国家彩票")
-                embed.add_field(name="CITIZEN", value=buyer_name, inline=False)
+                if gifted:
+                    embed.add_field(name="TICKET PURCHASED BY", value=buyer_name, inline=True)
+                    embed.add_field(name="FOR", value=recipient_name, inline=True)
+                else:
+                    embed.add_field(name="CITIZEN", value=buyer_name, inline=False)
                 embed.add_field(name="JACKPOT", value="Extraordinary fortune. The state bestows its blessing.", inline=False)
-                embed.add_field(name="YUAN CHANGE", value=f"+¥{winnings:,} · net {winnings - cost:+,}", inline=False)
+                embed.add_field(name="YUAN CHANGE", value=f"+¥{winnings:,} · net {net:+,}", inline=False)
+                await self.db.update_lottery_stats(gid, recipient.id, True, net)
             embed.timestamp = discord.utils.utcnow()
             await interaction.followup.send(embed=embed)
 
@@ -535,15 +601,22 @@ class Economy(commands.Cog):
             await interaction.followup.send("Your tip has been submitted anonymously.", ephemeral=True)
 
         elif item_id == "model_citizen":
-            old, new = await self.db.update_score(gid, uid, 1.0, "model citizen commendation")
-            embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局")
-            embed.add_field(
-                name="MODEL CITIZEN AWARD",
-                value=f"The Party commends your loyalty. Score: {old:.2f} -> {new:.2f}",
-                inline=False,
-            )
-            await interaction.followup.send(embed=embed, ephemeral=True)
-            await self._post_score(interaction, interaction.user, old, new)
+            recipient = target if target else interaction.user
+            old, new = await self.db.update_score(gid, recipient.id, 1.0, "model citizen commendation")
+            if target:
+                embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局")
+                embed.add_field(name="MODEL CITIZEN COMMENDATION", value=f"{interaction.user.mention} has nominated {target.mention} as a Model Citizen", inline=False)
+                embed.add_field(name="SCORE", value=f"{old:.2f} -> {new:.2f}", inline=True)
+                if text:
+                    embed.add_field(name="MESSAGE", value=text[:200], inline=False)
+                embed.timestamp = discord.utils.utcnow()
+                await interaction.channel.send(embed=embed)
+                await interaction.followup.send("Your commendation has been filed.", ephemeral=True)
+            else:
+                embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局")
+                embed.add_field(name="MODEL CITIZEN AWARD", value=f"The Party commends your loyalty. Score: {old:.2f} -> {new:.2f}", inline=False)
+                await interaction.followup.send(embed=embed, ephemeral=True)
+            await self._post_score(interaction, recipient, old, new)
 
         elif item_id == "dispute":
             buyer_wins = random.random() < 0.5
@@ -659,15 +732,22 @@ class Economy(commands.Cog):
             await interaction.followup.send(embed=embed, ephemeral=True)
 
         elif item_id == "legal_rep":
+            recipient = target if target else interaction.user
             expires_at = int(time.time()) + cfg["duration"]
-            await self.db.add_effect(gid, uid, "legal_rep", expires_at)
-            embed = discord.Embed(color=0x1a3a5c, title="中华人民共和国社会信用局")
-            embed.add_field(
-                name="LEGAL REPRESENTATION ACTIVE",
-                value="All negative score actions against you are reduced by 50% for 12 hours.",
-                inline=False,
-            )
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            await self.db.add_effect(gid, recipient.id, "legal_rep", expires_at)
+            if target:
+                embed = discord.Embed(color=0x1a3a5c, title="中华人民共和国社会信用局")
+                embed.add_field(name="LEGAL REPRESENTATION GIFT", value=f"{interaction.user.mention} retained legal counsel for {target.mention}", inline=False)
+                embed.add_field(name="EFFECT", value="All negative score actions against them are reduced by 50% for 12 hours.", inline=False)
+                if text:
+                    embed.add_field(name="MESSAGE", value=text[:200], inline=False)
+                embed.timestamp = discord.utils.utcnow()
+                await interaction.channel.send(embed=embed)
+                await interaction.followup.send("Your gift has been delivered.", ephemeral=True)
+            else:
+                embed = discord.Embed(color=0x1a3a5c, title="中华人民共和国社会信用局")
+                embed.add_field(name="LEGAL REPRESENTATION ACTIVE", value="All negative score actions against you are reduced by 50% for 12 hours.", inline=False)
+                await interaction.followup.send(embed=embed, ephemeral=True)
 
         elif item_id == "anon_identity":
             expires_at = int(time.time()) + cfg["duration"]
@@ -681,15 +761,22 @@ class Economy(commands.Cog):
             await interaction.followup.send(embed=embed, ephemeral=True)
 
         elif item_id == "immunity":
+            recipient = target if target else interaction.user
             expires_at = int(time.time()) + (86400 * 7)
-            await self.db.add_effect(gid, uid, "immunity", expires_at)
-            embed = discord.Embed(color=0x2d5a27, title="中华人民共和国社会信用局")
-            embed.add_field(
-                name="CITIZEN IMMUNITY ACTIVE",
-                value="50% chance to completely block the next negative action against you. Single use.",
-                inline=False,
-            )
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            await self.db.add_effect(gid, recipient.id, "immunity", expires_at)
+            if target:
+                embed = discord.Embed(color=0x2d5a27, title="中华人民共和国社会信用局")
+                embed.add_field(name="IMMUNITY GIFT", value=f"{interaction.user.mention} secured Citizen Immunity for {target.mention}", inline=False)
+                embed.add_field(name="EFFECT", value="50% chance to completely block the next negative action against them. Single use.", inline=False)
+                if text:
+                    embed.add_field(name="MESSAGE", value=text[:200], inline=False)
+                embed.timestamp = discord.utils.utcnow()
+                await interaction.channel.send(embed=embed)
+                await interaction.followup.send("Your gift has been delivered.", ephemeral=True)
+            else:
+                embed = discord.Embed(color=0x2d5a27, title="中华人民共和国社会信用局")
+                embed.add_field(name="CITIZEN IMMUNITY ACTIVE", value="50% chance to completely block the next negative action against you. Single use.", inline=False)
+                await interaction.followup.send(embed=embed, ephemeral=True)
 
         elif item_id == "pact":
             expires_at = int(time.time()) + cfg["duration"]
@@ -704,15 +791,22 @@ class Economy(commands.Cog):
             await interaction.followup.send(embed=embed)
 
         elif item_id == "media_coverage":
+            recipient = target if target else interaction.user
             expires_at = int(time.time()) + cfg["duration"]
-            await self.db.add_effect(gid, uid, "media_coverage", expires_at)
-            embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局")
-            embed.add_field(
-                name="STATE MEDIA COVERAGE ACTIVE",
-                value="Your next organic positive score gain will be doubled and broadcast publicly.",
-                inline=False,
-            )
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            await self.db.add_effect(gid, recipient.id, "media_coverage", expires_at)
+            if target:
+                embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局")
+                embed.add_field(name="MEDIA COVERAGE GIFT", value=f"{interaction.user.mention} arranged State Media Coverage for {target.mention}", inline=False)
+                embed.add_field(name="EFFECT", value="Their next organic positive score gain will be doubled and broadcast publicly.", inline=False)
+                if text:
+                    embed.add_field(name="MESSAGE", value=text[:200], inline=False)
+                embed.timestamp = discord.utils.utcnow()
+                await interaction.channel.send(embed=embed)
+                await interaction.followup.send("Your gift has been delivered.", ephemeral=True)
+            else:
+                embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局")
+                embed.add_field(name="STATE MEDIA COVERAGE ACTIVE", value="Your next organic positive score gain will be doubled and broadcast publicly.", inline=False)
+                await interaction.followup.send(embed=embed, ephemeral=True)
 
         elif item_id == "fabricated_evidence":
             await self.db.add_fabricated_history(gid, target.id, text)

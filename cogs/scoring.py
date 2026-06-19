@@ -180,6 +180,8 @@ class Scoring(commands.Cog):
         old_idx = get_rank_index(old_rank["name"])
         new_idx = get_rank_index(new_rank["name"])
 
+        await self.db.log_rank_departure(guild.id, member.id, old_rank["name"])
+
         if promoted:
             yuan_earned = await self.db.handle_rank_promotion(
                 guild.id, member.id, new_idx, RANK_YUAN[new_idx]
