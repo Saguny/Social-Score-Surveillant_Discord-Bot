@@ -37,7 +37,6 @@ _PORTFOLIO_PERIODS = {
     "6M":  ("6mo", "1d",  180 * 86400),
     "1Y":  ("1y",  "1d",  365 * 86400),
 }
-_ADR_CLOSED_VOL = 0.0006   # per-tick micro-drift for ADRs when market is closed
 _CHART_CACHE_TTL = 45       # seconds before a cached chart is considered stale
 
 
@@ -68,6 +67,11 @@ def _next_market_event() -> tuple[str, int, int]:
             nts = int(nm.timestamp())
             return "open", nts, open_ts
         days += 1
+
+
+def _market_closed_message() -> str:
+    _, next_open_ts, _ = _next_market_event()
+    return f"Market is closed. Opens <t:{next_open_ts}:R> (<t:{next_open_ts}:f>)."
 
 
 def _last_market_open_ts() -> int:
@@ -464,6 +468,9 @@ class StocksCog(commands.Cog, name="Stocks"):
     # ── Tick ──────────────────────────────────────────────────────────────────
 
     async def _tick(self):
+        if not _is_market_hours():
+            return
+
         now       = int(time.time())
         today_day = now // 86400
         loop      = asyncio.get_running_loop()
@@ -497,8 +504,6 @@ class StocksCog(commands.Cog, name="Stocks"):
                 yf_price, _ = res
 
             new_price = yf_price if (yf_price and yf_price > 0) else old
-            if new_price == old:
-                new_price = max(0.01, old * (1 + random.gauss(0, _ADR_CLOSED_VOL)))
 
             pct      = (new_price - old) / old
             day_open = self._day_opens.get(ticker, new_price)
@@ -876,6 +881,8 @@ class StocksCog(commands.Cog, name="Stocks"):
     @app_commands.describe(ticker="Stock ticker", shares="Number of shares (decimals OK)")
     async def stocks_buy(self, interaction: discord.Interaction, ticker: str, shares: float):
         await interaction.response.defer(ephemeral=True)
+        if not _is_market_hours():
+            return await interaction.followup.send(_market_closed_message(), ephemeral=True)
         ticker = ticker.upper()
         if ticker not in ALL_TICKERS:
             return await interaction.followup.send("Unknown ticker.", ephemeral=True)
@@ -917,6 +924,8 @@ class StocksCog(commands.Cog, name="Stocks"):
     @app_commands.describe(ticker="Stock ticker", shares="Shares to sell")
     async def stocks_sell(self, interaction: discord.Interaction, ticker: str, shares: float):
         await interaction.response.defer(ephemeral=True)
+        if not _is_market_hours():
+            return await interaction.followup.send(_market_closed_message(), ephemeral=True)
         ticker = ticker.upper()
         if ticker not in ALL_TICKERS:
             return await interaction.followup.send("Unknown ticker.", ephemeral=True)
@@ -1157,6 +1166,8 @@ class StocksCog(commands.Cog, name="Stocks"):
     @app_commands.describe(turbo_id="Turbo ID from /turbos list", cost="Yuan to invest")
     async def turbos_open(self, interaction: discord.Interaction, turbo_id: int, cost: int):
         await interaction.response.defer(ephemeral=True)
+        if not _is_market_hours():
+            return await interaction.followup.send(_market_closed_message(), ephemeral=True)
         if cost < TURBO_MIN_COST:
             return await interaction.followup.send(f"Minimum investment: ¥{TURBO_MIN_COST:,}", ephemeral=True)
 
@@ -1196,6 +1207,8 @@ class StocksCog(commands.Cog, name="Stocks"):
     @app_commands.describe(position_id="Position ID from /stocks portfolio")
     async def turbos_close(self, interaction: discord.Interaction, position_id: int):
         await interaction.response.defer(ephemeral=True)
+        if not _is_market_hours():
+            return await interaction.followup.send(_market_closed_message(), ephemeral=True)
 
         row = await self.bot.db.get_turbo_position(interaction.guild_id, interaction.user.id, position_id)
         if not row or row["status"] != "open":
