@@ -168,6 +168,7 @@ class Guide(commands.Cog):
         e3.add_field(name="/daily_report [citizen]",  value="Today's score activity for any citizen: positive, negative, net change, and yuan compared to yesterday.", inline=False)
         e3.add_field(name="/leaderboard",            value="Rankings across 8 categories: score, yuan, activity, endorsements, rebukes, and informants.", inline=False)
         e3.add_field(name="/state_report",           value="Server-wide report: biggest rise/fall, top informant, yuan in circulation, avg score.", inline=False)
+        e3.add_field(name="/graph <score|yuan> [citizen]", value="Generate a 30-day trend graph for score or yuan. Yuan graph populates once per day.", inline=False)
         e3.add_field(name="/checkin",                value="Perform your daily check-in. Earns Yuan and a small score bump. Streak increases daily reward up to ¥750.", inline=False)
         e3.add_field(name="/botinfo",                value="Technical information about the bot: creator, tech stack, server count, repo and invite links.", inline=False)
         e3.add_field(name="/uptime",                 value="How long the Bureau has been active since last restart.", inline=False)

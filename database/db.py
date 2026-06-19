@@ -218,6 +218,15 @@ class Database:
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_users_has_chatted_guild ON users (has_chatted, guild_id)")
             await conn.execute("ALTER TABLE guild_config ADD COLUMN IF NOT EXISTS execution_channel_id BIGINT")
             await conn.execute("ALTER TABLE guild_config ADD COLUMN IF NOT EXISTS assign_rank_roles BOOLEAN NOT NULL DEFAULT TRUE")
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS daily_yuan_snapshots (
+                    guild_id BIGINT,
+                    user_id  BIGINT,
+                    day      BIGINT,
+                    yuan     BIGINT,
+                    PRIMARY KEY (guild_id, user_id, day)
+                )
+            """)
 
     async def _create_tables(self):
         async with self._pool.acquire() as conn:
@@ -912,6 +921,38 @@ class Database:
             cutoff,
         )
         await self._pool.execute("UPDATE users SET prev_day_yuan = yuan")
+        today = int(time.time()) // 86400 * 86400
+        await self._pool.execute(
+            """
+            INSERT INTO daily_yuan_snapshots (guild_id, user_id, day, yuan)
+            SELECT guild_id, user_id, $1, yuan FROM users
+            ON CONFLICT (guild_id, user_id, day) DO UPDATE SET yuan = EXCLUDED.yuan
+            """,
+            today,
+        )
+
+    async def get_score_graph_data(self, guild_id: int, user_id: int, days: int = 30):
+        cutoff = int(time.time()) - (days * 86400)
+        rows = await self._pool.fetch(
+            """
+            SELECT FLOOR(timestamp::float / 86400)::bigint * 86400 AS day, SUM(delta) AS net_delta
+            FROM score_history WHERE guild_id = $1 AND user_id = $2 AND timestamp > $3
+            GROUP BY day ORDER BY day
+            """,
+            guild_id, user_id, cutoff,
+        )
+        user = await self._pool.fetchrow(
+            "SELECT score FROM users WHERE guild_id = $1 AND user_id = $2",
+            guild_id, user_id,
+        )
+        return {"rows": rows, "current_score": float(user["score"]) if user else 750.0}
+
+    async def get_yuan_graph_data(self, guild_id: int, user_id: int, days: int = 30):
+        cutoff = int(time.time()) - (days * 86400)
+        return await self._pool.fetch(
+            "SELECT day, yuan FROM daily_yuan_snapshots WHERE guild_id = $1 AND user_id = $2 AND day > $3 ORDER BY day",
+            guild_id, user_id, cutoff,
+        )
 
     async def get_daily_stats(self, guild_id: int, user_id: int) -> dict:
         now = int(time.time())

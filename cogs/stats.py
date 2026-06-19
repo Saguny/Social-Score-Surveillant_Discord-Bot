@@ -1,7 +1,13 @@
+import io
+import datetime
 import discord
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 from discord import app_commands
 from discord.ext import commands
-from config.ranks import get_rank
+from config.ranks import get_rank, EXECUTION_THRESHOLD
 
 STATS_THUMBNAIL = "attachment://ccpstats.png"
 
@@ -338,6 +344,109 @@ class Stats(commands.Cog):
         embed.timestamp = discord.utils.utcnow()
         file = discord.File("images/ccpstats.png", filename="ccpstats.png")
         await interaction.followup.send(embed=embed, file=file)
+
+
+    @app_commands.command(name="graph", description="View a 30-day trend graph for score or yuan")
+    @app_commands.describe(type="What to graph", citizen="Citizen to look up (defaults to yourself)")
+    @app_commands.choices(type=[
+        app_commands.Choice(name="Score", value="score"),
+        app_commands.Choice(name="Yuan",  value="yuan"),
+    ])
+    async def graph(self, interaction: discord.Interaction, type: app_commands.Choice[str], citizen: discord.Member = None):
+        await interaction.response.defer()
+        target = citizen or interaction.user
+        gid, uid = interaction.guild.id, target.id
+
+        buf = await _build_graph(self.db, gid, uid, type.value, str(target.display_name))
+        if buf is None:
+            await interaction.followup.send("Not enough data yet to build a graph.", ephemeral=True)
+            return
+
+        label = type.name
+        file = discord.File(buf, filename="graph.png")
+        embed = discord.Embed(color=0xCC0000, title=f"中华人民共和国社会信用局 · 30-DAY {label.upper()} TREND")
+        embed.set_author(name=await self.bot.format_user_full(target, gid), icon_url=target.display_avatar.url)
+        embed.set_image(url="attachment://graph.png")
+        embed.timestamp = discord.utils.utcnow()
+        await interaction.followup.send(embed=embed, file=file)
+
+
+async def _build_graph(db, guild_id: int, user_id: int, graph_type: str, display_name: str):
+    now = datetime.datetime.now(datetime.timezone.utc)
+    days_back = 30
+
+    if graph_type == "score":
+        data = await db.get_score_graph_data(guild_id, user_id, days=days_back)
+        rows = data["rows"]
+        current = data["current_score"]
+
+        daily = {r["day"]: float(r["net_delta"]) for r in rows}
+        total_delta = sum(daily.values())
+        base = current - total_delta
+
+        day_seconds = [
+            int((now - datetime.timedelta(days=days_back - i)).replace(hour=0, minute=0, second=0, microsecond=0).timestamp())
+            for i in range(days_back + 1)
+        ]
+        scores = []
+        running = base
+        for ts in day_seconds:
+            running += daily.get(ts, 0.0)
+            scores.append(round(running, 2))
+
+        dates = [datetime.datetime.fromtimestamp(ts, tz=datetime.timezone.utc) for ts in day_seconds]
+        values = scores
+        ylabel = "Score"
+        line_color = "#CC0000"
+        fill_color = "#CC000033"
+        ref_lines = [
+            (750.0,  "#888888", "--", "Neutral (750)"),
+            (EXECUTION_THRESHOLD, "#8B0000", ":", f"Execution ({EXECUTION_THRESHOLD})"),
+        ]
+
+    else:
+        rows = await db.get_yuan_graph_data(guild_id, user_id, days=days_back)
+        if not rows:
+            return None
+        dates  = [datetime.datetime.fromtimestamp(r["day"], tz=datetime.timezone.utc) for r in rows]
+        values = [r["yuan"] for r in rows]
+        ylabel = "Yuan (¥)"
+        line_color = "#FFD700"
+        fill_color = "#FFD70033"
+        ref_lines = []
+
+    if len(dates) < 2:
+        return None
+
+    fig, ax = plt.subplots(figsize=(10, 4))
+    fig.patch.set_facecolor("#1a1a2e")
+    ax.set_facecolor("#1a1a2e")
+
+    ax.plot(dates, values, color=line_color, linewidth=2, zorder=3)
+    ax.fill_between(dates, values, min(values), color=fill_color, zorder=2)
+
+    for y_val, color, style, label in ref_lines:
+        ax.axhline(y=y_val, color=color, linestyle=style, linewidth=1, alpha=0.6, label=label)
+
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %d"))
+    ax.xaxis.set_major_locator(mdates.WeekdayLocator(interval=1))
+    fig.autofmt_xdate()
+
+    ax.set_ylabel(ylabel, color="#aaaaaa", fontsize=9)
+    ax.tick_params(colors="#aaaaaa", labelsize=8)
+    for spine in ax.spines.values():
+        spine.set_edgecolor("#333355")
+    ax.grid(axis="y", color="#333355", linewidth=0.5, zorder=1)
+
+    if ref_lines:
+        legend = ax.legend(fontsize=7, facecolor="#1a1a2e", edgecolor="#333355", labelcolor="#aaaaaa")
+
+    fig.tight_layout()
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=120, facecolor=fig.get_facecolor())
+    plt.close(fig)
+    buf.seek(0)
+    return buf
 
 
 async def setup(bot: commands.Bot):
