@@ -38,6 +38,28 @@ def _ticker_info_name(ticker: str) -> str:
     return PENNY_STOCKS.get(ticker, {}).get("name", ticker)
 
 
+def _next_market_event() -> tuple[str, int, int]:
+    """Returns (event, next_ts, today_open_ts) where event is 'open' or 'close'."""
+    now    = datetime.datetime.now(datetime.timezone.utc)
+    midnight = datetime.datetime(now.year, now.month, now.day, tzinfo=datetime.timezone.utc)
+    open_ts  = int((midnight + datetime.timedelta(hours=14, minutes=30)).timestamp())
+    close_ts = int((midnight + datetime.timedelta(hours=21)).timestamp())
+    now_ts   = int(now.timestamp())
+    if now.weekday() < 5:
+        if now_ts < open_ts:
+            return "open", open_ts, open_ts
+        if now_ts < close_ts:
+            return "close", close_ts, open_ts
+    days = 1
+    while True:
+        nxt = now.date() + datetime.timedelta(days=days)
+        if nxt.weekday() < 5:
+            nm   = datetime.datetime(nxt.year, nxt.month, nxt.day, tzinfo=datetime.timezone.utc)
+            nts  = int((nm + datetime.timedelta(hours=14, minutes=30)).timestamp())
+            return "open", nts, open_ts
+        days += 1
+
+
 def _is_market_hours() -> bool:
     now = datetime.datetime.utcnow()
     if now.weekday() >= 5:
@@ -136,10 +158,10 @@ def _render_chart(
         ax_bg.add_patch(Rectangle((0, 0), 1, 1, transform=ax_bg.transAxes,
                                   color="#8B0000", alpha=0.18, zorder=1))
 
-    ax = fig.add_axes([0.09, 0.14, 0.87, 0.78], zorder=2)
+    ax = fig.add_axes([0.09, 0.17, 0.87, 0.75], zorder=2)
     ax.set_facecolor("none")
     ax.set_zorder(2)
-    ax.margins(x=0.01)
+    ax.margins(x=0.01, y=0.12)
 
     n  = len(closes)
     xs = list(range(n))
@@ -552,11 +574,31 @@ class StocksCog(commands.Cog, name="Stocks"):
 
     # ── /stocks commands ──────────────────────────────────────────────────────
 
-    @stocks.command(name="list", description="View all current stock prices")
-    async def stocks_list(self, interaction: discord.Interaction):
+    @app_commands.command(name="market", description="Live prices, market status and trading hours · 北京证券交易所")
+    async def market_overview(self, interaction: discord.Interaction):
         await interaction.response.defer()
-        now   = int(time.time())
-        embed = discord.Embed(title="北京证券交易所 · Beijing Stock Exchange", color=0xCC0000)
+        now_ts = int(time.time())
+
+        event, next_ts, today_open_ts = _next_market_event()
+        is_open   = _is_market_hours()
+        status    = "🟢 Open" if is_open else "🔴 Closed"
+        event_lbl = "Closes" if event == "close" else "Opens"
+        midnight  = datetime.datetime(
+            datetime.datetime.utcnow().year,
+            datetime.datetime.utcnow().month,
+            datetime.datetime.utcnow().day,
+            tzinfo=datetime.timezone.utc,
+        )
+        close_ts = int((midnight + datetime.timedelta(hours=21)).timestamp())
+
+        embed = discord.Embed(
+            title="北京证券交易所 · Beijing Stock Exchange",
+            description=(
+                f"{status} · {event_lbl} <t:{next_ts}:R>\n"
+                f"Hours: <t:{today_open_ts}:t> – <t:{close_ts}:t> · Mon–Fri · NYSE hours"
+            ),
+            color=0x26A69A if is_open else 0xCC0000,
+        )
 
         adr_lines = []
         for ticker, info in ADR_STOCKS.items():
@@ -564,10 +606,15 @@ class StocksCog(commands.Cog, name="Stocks"):
             day_open = self._day_opens.get(ticker, price)
             pct      = (price - day_open) / day_open * 100 if day_open > 0 else 0.0
             arrow    = "▲" if pct >= 0 else "▼"
-            locked   = " ⏸" if ticker in self._daily_locked else (
-                " ⏳" if (ticker in self._halted and now < self._halted[ticker]) else ""
+            status_tag = ""
+            if ticker in self._daily_locked:
+                status_tag = " ⏸"
+            elif ticker in self._halted and now_ts < self._halted[ticker]:
+                status_tag = " ⏳"
+            adr_lines.append(
+                f"`{ticker}` **{info['name_zh']}**  {_fmt_price(price)}  {arrow} {_fmt_pct(pct)}"
+                f"  · open {_fmt_price(day_open)}{status_tag}"
             )
-            adr_lines.append(f"`{ticker:<4}` {_fmt_price(price)}  {arrow} {_fmt_pct(pct)}{locked}")
 
         etf_price = self._prices.get(ETF_TICKER, ETF_INFO["base_price"])
         etf_open  = self._day_opens.get(ETF_TICKER, etf_price)
@@ -580,18 +627,21 @@ class StocksCog(commands.Cog, name="Stocks"):
             day_open = self._day_opens.get(ticker, price)
             pct      = (price - day_open) / day_open * 100 if day_open > 0 else 0.0
             arrow    = "▲" if pct >= 0 else "▼"
-            pump     = " 🔥 PUMP" if ticker in self._pump_state else ""
-            locked   = " ⏸" if ticker in self._daily_locked else ""
-            penny_lines.append(f"`{ticker:<4}` {_fmt_price(price)}  {arrow} {_fmt_pct(pct)}{pump}{locked}")
+            vol_pct  = int(info["daily_vol"] * 100)
+            tag      = " 🔥 **PUMP**" if ticker in self._pump_state else (
+                       " ⏸" if ticker in self._daily_locked else f"  · vol ~{vol_pct}%/day")
+            penny_lines.append(
+                f"`{ticker}` **{info['name_zh']}**  {_fmt_price(price)}  {arrow} {_fmt_pct(pct)}{tag}"
+            )
 
-        embed.add_field(name="ADR Stocks", value="\n".join(adr_lines), inline=True)
+        embed.add_field(name="China ADRs · Real-time", value="\n".join(adr_lines), inline=False)
         embed.add_field(
-            name=f"ETF · {ETF_TICKER}",
-            value=f"`{ETF_TICKER}` {_fmt_price(etf_price)}  {etf_arrow} {_fmt_pct(etf_pct)}",
-            inline=True,
+            name=f"ETF · {ETF_TICKER} · {ETF_INFO['name_zh']}",
+            value=f"{_fmt_price(etf_price)}  {etf_arrow} {_fmt_pct(etf_pct)}  · open {_fmt_price(etf_open)}  · tracks ADR basket",
+            inline=False,
         )
-        embed.add_field(name="Penny Stocks", value="\n".join(penny_lines), inline=False)
-        embed.set_footer(text=f"Updates every {PRICE_UPDATE_INTERVAL}s · /stocks chart <ticker> for graphs")
+        embed.add_field(name="Penny Stocks · Simulated", value="\n".join(penny_lines), inline=False)
+        embed.set_footer(text=f"Prices update every {PRICE_UPDATE_INTERVAL}s · /stocks chart <ticker> for graphs")
 
         bse = self._make_bse_file()
         if bse:
@@ -839,17 +889,31 @@ class StocksCog(commands.Cog, name="Stocks"):
                 t["direction"], float(t["entry_price"]), float(t["knockout"]), price
             ))
             ko_dist = abs(price - float(t["knockout"])) / price * 100 if price > 0 else 0.0
-            name    = _ticker_info_name(t["ticker"])
             return (
-                f"**#{t['id']}** `{t['ticker']}` {t['leverage']}x · {name}\n"
-                f"  KO: {_fmt_price(float(t['knockout']))} · {ko_dist:.1f}% away · factor {factor:.3f}"
+                f"`#{t['id']}` **{t['ticker']}** {t['leverage']}x · "
+                f"KO {_fmt_price(float(t['knockout']))} · {ko_dist:.1f}% away · factor {factor:.3f}"
             )
+
+        def _chunked_fields(name: str, turbo_rows: list, embed: discord.Embed):
+            chunk, chunk_len = [], 0
+            part = 1
+            for t in turbo_rows:
+                line = _fmt_row(t)
+                if chunk and chunk_len + len(line) + 1 > 1020:
+                    label = name if part == 1 else f"{name} (cont.)"
+                    embed.add_field(name=label, value="\n".join(chunk), inline=False)
+                    chunk, chunk_len, part = [], 0, part + 1
+                chunk.append(line)
+                chunk_len += len(line) + 1
+            if chunk:
+                label = name if part == 1 else f"{name} (cont.)"
+                embed.add_field(name=label, value="\n".join(chunk), inline=False)
 
         embed = discord.Embed(title="涡轮证书 · Daily Turbos", color=0xCC0000)
         if long_rows:
-            embed.add_field(name="🟢 LONG",  value="\n".join(_fmt_row(t) for t in long_rows),  inline=False)
+            _chunked_fields("🟢 LONG", long_rows, embed)
         if short_rows:
-            embed.add_field(name="🔴 SHORT", value="\n".join(_fmt_row(t) for t in short_rows), inline=False)
+            _chunked_fields("🔴 SHORT", short_rows, embed)
         embed.set_footer(text=f"Min ¥{TURBO_MIN_COST:,} · /turbos open <id> <yuan> · /turbos chart <id>")
 
         bse = self._make_bse_file()

@@ -1,6 +1,6 @@
 import re
 import random
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import aiohttp
 import discord
 from discord import app_commands
@@ -291,7 +291,21 @@ class Guide(commands.Cog):
         e7.set_footer(text="GLORY TO THE CCP!")
         embeds.append(e7)
 
+        now_utc         = datetime.now(timezone.utc)
+        today_midnight  = datetime(now_utc.year, now_utc.month, now_utc.day, tzinfo=timezone.utc)
+        market_open_ts  = int((today_midnight + timedelta(hours=14, minutes=30)).timestamp())
+        market_close_ts = int((today_midnight + timedelta(hours=21)).timestamp())
+        weekday         = now_utc.weekday()
+        mins_now        = now_utc.hour * 60 + now_utc.minute
+        market_open_now = weekday < 5 and 14 * 60 + 30 <= mins_now < 21 * 60
+        market_status   = "🟢 Open now" if market_open_now else "🔴 Closed now"
+
         e_stocks = discord.Embed(color=0xCC0000, title="北京证券交易所 · MARKETS")
+        e_stocks.add_field(
+            name="MARKET HOURS",
+            value=f"<t:{market_open_ts}:t> – <t:{market_close_ts}:t> · Mon–Fri · {market_status}",
+            inline=False,
+        )
         e_stocks.add_field(
             name="STOCKS",
             value=(
@@ -302,7 +316,7 @@ class Guide(commands.Cog):
             ),
             inline=False,
         )
-        e_stocks.add_field(name="/stocks list",     value="All current prices with daily % change.", inline=False)
+        e_stocks.add_field(name="/market",           value="Live prices for all stocks with market status, opening hours, and day-open prices.", inline=False)
         e_stocks.add_field(
             name="/stocks chart <ticker> [period] [candlestick|line]",
             value="Price chart for any stock. Periods: 1D · 5D · 1M · 3M · 6M · 1Y.",

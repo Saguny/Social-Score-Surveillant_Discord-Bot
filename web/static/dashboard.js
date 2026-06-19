@@ -183,7 +183,7 @@ async function load() {
   }
   const ltEdgeEl = document.getElementById('lt-edge');
   if (ltEdgeEl) {
-    const edge = ltPlayed > 0 ? ltNet / ltPlayed : 0;
+    const edge = ltPlayed > 0 ? -(ltNet / ltPlayed) : 0;
     ltEdgeEl.textContent = (edge >= 0 ? '+' : '') + '¥' + Math.abs(edge).toFixed(0) + '/ticket';
     ltEdgeEl.className = 'val ' + (edge >= 0 ? 'trend-up' : 'trend-down');
   }
