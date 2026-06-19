@@ -412,7 +412,7 @@ async def _build_graph(db, guild_id: int, user_id: int, graph_type: str, display
         values = scores
         ylabel = "Score"
         line_color = "#CC0000"
-        fill_color = "#CC000066"
+        fill_color = "#CC000022" 
         ref_lines = [
             (750.0,  "#888888", "--", "Neutral (750)"),
             (EXECUTION_THRESHOLD, "#8B0000", ":", f"Execution ({EXECUTION_THRESHOLD})"),
@@ -426,7 +426,7 @@ async def _build_graph(db, guild_id: int, user_id: int, graph_type: str, display
         values = [r["yuan"] for r in rows]
         ylabel = "Yuan (¥)"
         line_color = "#FFD700"
-        fill_color = "#FFD70066"
+        fill_color = "#FFD70022"
         ref_lines = []
 
     if len(dates) < 2:
@@ -442,7 +442,7 @@ async def _build_graph(db, guild_id: int, user_id: int, graph_type: str, display
         ax_bg.imshow(flag_img, aspect="auto")
         ax_bg.set_axis_off()
         ax_bg.set_in_layout(False)
-        ax_bg.add_patch(Rectangle((0, 0), 1, 1, transform=ax_bg.transAxes, color="#1a1a2e", alpha=0.75, zorder=1))
+        ax_bg.add_patch(Rectangle((0, 0), 1, 1, transform=ax_bg.transAxes, color="#1a1a2e", alpha=0.82, zorder=1))
         ax.set_facecolor("none")
         ax.set_zorder(2)
     else:
@@ -456,11 +456,13 @@ async def _build_graph(db, guild_id: int, user_id: int, graph_type: str, display
         if y_lo <= y_val <= y_hi or abs(y_val - data_min) < padding * 2 or abs(y_val - data_max) < padding * 2:
             y_lo = min(y_lo, y_val - padding * 0.5)
             y_hi = max(y_hi, y_val + padding * 0.5)
+    ax.set_xlim(dates[0], dates[-1])
     ax.set_ylim(y_lo, y_hi)
 
-    ax.margins(x=0.02)
+    ax.margins(x=0.01)
     ax.plot(dates, values, color=line_color, linewidth=2, zorder=3)
-    ax.fill_between(dates, values, y_lo, color=fill_color, zorder=2)
+    
+    ax.fill_between(dates, values, y_lo + (padding * 0.1), color=fill_color, zorder=2)
 
     for y_val, color, style, label in ref_lines:
         ax.axhline(y=y_val, color=color, linestyle=style, linewidth=1, alpha=0.6, label=label)
@@ -476,11 +478,10 @@ async def _build_graph(db, guild_id: int, user_id: int, graph_type: str, display
     ax.grid(axis="y", color="#333355", linewidth=0.5, zorder=1)
 
     if ref_lines:
-        legend = ax.legend(fontsize=7, facecolor="#1a1a2e", edgecolor="#333355", labelcolor="#aaaaaa")
+        legend = ax.legend(fontsize=7, facecolor="#1a1a2e", edgecolor="#333355", labelcolor="#aaaaaa", loc="upper right")
 
-    fig.tight_layout()
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=120, facecolor=fig.get_facecolor())
+    fig.savefig(buf, format="png", dpi=120, facecolor=fig.get_facecolor(), bbox_inches="tight")
     plt.close(fig)
     buf.seek(0)
     return buf
