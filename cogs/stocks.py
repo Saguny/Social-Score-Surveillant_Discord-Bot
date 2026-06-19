@@ -199,10 +199,7 @@ def _render_chart(
 
     if timestamps and n > 0:
         num_ticks = min(6, n)
-        step      = max(1, (n - 1) // (num_ticks - 1)) if num_ticks > 1 else 1
-        positions = sorted(set(
-            list(range(0, n, step))[:num_ticks - 1] + [n - 1]
-        ))
+        positions = [round(i * (n - 1) / (num_ticks - 1)) for i in range(num_ticks)] if num_ticks > 1 else [0]
         labels    = [timestamps[i] for i in positions]
         ax.set_xticks(positions)
         ax.set_xticklabels(labels, color="#aaaaaa", fontsize=7.5, rotation=0, ha="center")
@@ -274,8 +271,7 @@ def _render_portfolio_chart(timeline: list, cost_basis: float = 0.0) -> bytes:
     # x-axis time labels — always pin last tick to final data point
     if labels and n > 1:
         num_ticks = min(6, n)
-        step      = max(1, (n - 1) // (num_ticks - 1)) if num_ticks > 1 else 1
-        positions = sorted(set(list(range(0, n, step))[:num_ticks - 1] + [n - 1]))
+        positions = [round(i * (n - 1) / (num_ticks - 1)) for i in range(num_ticks)] if num_ticks > 1 else [0]
         ax.set_xticks(positions)
         ax.set_xticklabels([labels[i] for i in positions], color="#aaaaaa", fontsize=7.5, ha="center")
         ax.get_xticklabels()[-1].set_ha("right")
@@ -656,14 +652,8 @@ class StocksCog(commands.Cog, name="Stocks"):
             lows       = [float(v) for v in df["Low"]]
             closes     = [float(v) for v in df["Close"]]
             try:
-                # yfinance returns index in exchange local time (America/New_York).
-                # Convert to UTC so labels match what users expect (UTC clock).
-                _utc = datetime.timezone.utc
-                timestamps = [
-                    (t.astimezone(_utc) if t.tzinfo is not None
-                     else t.replace(tzinfo=_utc)).strftime(ts_fmt)
-                    for t in df.index
-                ]
+                # yfinance index is already in America/New_York — display as NYSE time
+                timestamps = [t.strftime(ts_fmt) for t in df.index]
             except Exception:
                 timestamps = None
         else:
@@ -675,7 +665,8 @@ class StocksCog(commands.Cog, name="Stocks"):
             highs      = [float(r["high"])  for r in rows]
             lows       = [float(r["low"])   for r in rows]
             closes     = [float(r["close"]) for r in rows]
-            timestamps = [datetime.datetime.utcfromtimestamp(int(r["ts"])).strftime(ts_fmt) for r in rows]
+            _et = datetime.timezone(datetime.timedelta(hours=-4))  # EDT (NYSE summer)
+            timestamps = [datetime.datetime.fromtimestamp(int(r["ts"]), tz=_et).strftime(ts_fmt) for r in rows]
 
         png = await loop.run_in_executor(
             None, _render_chart, ticker, opens, highs, lows, closes,
