@@ -395,7 +395,7 @@ class Guide(commands.Cog):
 
         await interaction.followup.send(embed=e, ephemeral=True)
 
-    @app_commands.command(name="botinfo", description="Information about the Social Credit Bot")
+    @app_commands.command(name="botinfo", description="Information about Social Credit Surveillantr")
     async def botinfo(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
 

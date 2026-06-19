@@ -1,10 +1,13 @@
 import io
+import os
 import datetime
 import discord
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
+import matplotlib.image as mpimg
+from matplotlib.patches import Rectangle
 from discord import app_commands
 from discord.ext import commands
 from config.ranks import get_rank, EXECUTION_THRESHOLD
@@ -398,7 +401,7 @@ async def _build_graph(db, guild_id: int, user_id: int, graph_type: str, display
         values = scores
         ylabel = "Score"
         line_color = "#CC0000"
-        fill_color = "#CC000033"
+        fill_color = "#CC000066"
         ref_lines = [
             (750.0,  "#888888", "--", "Neutral (750)"),
             (EXECUTION_THRESHOLD, "#8B0000", ":", f"Execution ({EXECUTION_THRESHOLD})"),
@@ -412,7 +415,7 @@ async def _build_graph(db, guild_id: int, user_id: int, graph_type: str, display
         values = [r["yuan"] for r in rows]
         ylabel = "Yuan (¥)"
         line_color = "#FFD700"
-        fill_color = "#FFD70033"
+        fill_color = "#FFD70066"
         ref_lines = []
 
     if len(dates) < 2:
@@ -420,10 +423,31 @@ async def _build_graph(db, guild_id: int, user_id: int, graph_type: str, display
 
     fig, ax = plt.subplots(figsize=(10, 4))
     fig.patch.set_facecolor("#1a1a2e")
-    ax.set_facecolor("#1a1a2e")
+
+    _flag_path = "images/chinaFlag.png"
+    if os.path.exists(_flag_path):
+        flag_img = mpimg.imread(_flag_path)
+        ax_bg = fig.add_axes([0, 0, 1, 1], zorder=0)
+        ax_bg.imshow(flag_img, aspect="auto")
+        ax_bg.set_axis_off()
+        ax_bg.add_patch(Rectangle((0, 0), 1, 1, transform=ax_bg.transAxes, color="#1a1a2e", alpha=0.75, zorder=1))
+        ax.set_facecolor("none")
+        ax.set_zorder(2)
+    else:
+        ax.set_facecolor("#1a1a2e")
+
+    data_min, data_max = min(values), max(values)
+    padding = max((data_max - data_min) * 0.25, 5.0)
+    y_lo = data_min - padding
+    y_hi = data_max + padding
+    for y_val, _, _, _ in ref_lines:
+        if y_lo <= y_val <= y_hi or abs(y_val - data_min) < padding * 2 or abs(y_val - data_max) < padding * 2:
+            y_lo = min(y_lo, y_val - padding * 0.5)
+            y_hi = max(y_hi, y_val + padding * 0.5)
+    ax.set_ylim(y_lo, y_hi)
 
     ax.plot(dates, values, color=line_color, linewidth=2, zorder=3)
-    ax.fill_between(dates, values, min(values), color=fill_color, zorder=2)
+    ax.fill_between(dates, values, y_lo, color=fill_color, zorder=2)
 
     for y_val, color, style, label in ref_lines:
         ax.axhline(y=y_val, color=color, linestyle=style, linewidth=1, alpha=0.6, label=label)
