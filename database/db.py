@@ -223,6 +223,16 @@ class Database:
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_score_history_user_ts ON score_history (guild_id, user_id, timestamp)")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_turbo_positions_status ON turbo_positions (status) WHERE status = 'open'")
             await conn.execute("ALTER TABLE portfolios ADD COLUMN IF NOT EXISTS opened_at BIGINT")
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS portfolio_history (
+                    guild_id BIGINT NOT NULL,
+                    user_id  BIGINT NOT NULL,
+                    ts       BIGINT NOT NULL,
+                    value    BIGINT NOT NULL,
+                    PRIMARY KEY (guild_id, user_id, ts)
+                )
+            """)
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_portfolio_history_user_ts ON portfolio_history (guild_id, user_id, ts)")
             await conn.execute("ALTER TABLE guild_config ADD COLUMN IF NOT EXISTS execution_channel_id BIGINT")
             await conn.execute("ALTER TABLE guild_config ADD COLUMN IF NOT EXISTS assign_rank_roles BOOLEAN NOT NULL DEFAULT TRUE")
             await conn.execute("""
@@ -304,6 +314,8 @@ class Database:
             await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS turbo_opened  INTEGER NOT NULL DEFAULT 0")
             await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS turbo_knocked INTEGER NOT NULL DEFAULT 0")
             await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS turbo_profit  BIGINT  NOT NULL DEFAULT 0")
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_transactions_user   ON transactions (guild_id, user_id, item_id)")
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_transactions_target ON transactions (guild_id, target_user_id, item_id, timestamp DESC)")
 
     async def _create_tables(self):
         async with self._pool.acquire() as conn:
@@ -465,37 +477,34 @@ class Database:
 
     async def log_rank_departure(self, guild_id: int, user_id: int, rank_name: str):
         now = int(time.time())
-        async with self._pool.acquire() as conn:
-            row = await conn.fetchrow(
-                "SELECT rank_entered_at FROM users WHERE guild_id = $1 AND user_id = $2",
-                guild_id, user_id,
+        await self._pool.execute(
+            """
+            WITH src AS (
+                SELECT GREATEST(0, ($1 - rank_entered_at) / 86400)::BIGINT AS days
+                FROM users
+                WHERE guild_id = $2 AND user_id = $3
+                  AND rank_entered_at IS NOT NULL AND rank_entered_at > 0
             )
-            if not row or not row["rank_entered_at"]:
-                return
-            days = max(0, (now - row["rank_entered_at"]) // 86400)
-            if days == 0:
-                return
-            await conn.execute(
-                """
-                INSERT INTO rank_history (guild_id, user_id, rank_name, total_days)
-                VALUES ($1, $2, $3, $4)
-                ON CONFLICT (guild_id, user_id, rank_name)
-                DO UPDATE SET total_days = rank_history.total_days + EXCLUDED.total_days
-                """,
-                guild_id, user_id, rank_name, days,
-            )
+            INSERT INTO rank_history (guild_id, user_id, rank_name, total_days)
+            SELECT $2, $3, $4, days FROM src WHERE days > 0
+            ON CONFLICT (guild_id, user_id, rank_name)
+            DO UPDATE SET total_days = rank_history.total_days + EXCLUDED.total_days
+            """,
+            now, guild_id, user_id, rank_name,
+        )
 
     async def get_rank_stats(self, guild_id: int, user_id: int, rank_name: str) -> dict:
         now = int(time.time())
-        async with self._pool.acquire() as conn:
-            user_row = await conn.fetchrow(
+        user_row, hist_row = await asyncio.gather(
+            self._pool.fetchrow(
                 "SELECT rank_entered_at FROM users WHERE guild_id = $1 AND user_id = $2",
                 guild_id, user_id,
-            )
-            hist_row = await conn.fetchrow(
+            ),
+            self._pool.fetchrow(
                 "SELECT total_days FROM rank_history WHERE guild_id = $1 AND user_id = $2 AND rank_name = $3",
                 guild_id, user_id, rank_name,
-            )
+            ),
+        )
         entered = (user_row["rank_entered_at"] or 0) if user_row else 0
         current_days = max(0, (now - entered) // 86400) if entered else 0
         hist_days = int(hist_row["total_days"]) if hist_row else 0
@@ -591,19 +600,11 @@ class Database:
         )
 
     async def spend_yuan(self, guild_id, user_id, amount):
-        async with self._pool.acquire() as conn:
-            async with conn.transaction():
-                row = await conn.fetchrow(
-                    "SELECT yuan FROM users WHERE guild_id = $1 AND user_id = $2",
-                    guild_id, user_id,
-                )
-                if not row or row["yuan"] < amount:
-                    return False
-                await conn.execute(
-                    "UPDATE users SET yuan = yuan - $1, total_yuan_spent = total_yuan_spent + $1 WHERE guild_id = $2 AND user_id = $3",
-                    amount, guild_id, user_id,
-                )
-        return True
+        row = await self._pool.fetchrow(
+            "UPDATE users SET yuan = yuan - $3, total_yuan_spent = total_yuan_spent + $3 WHERE guild_id = $1 AND user_id = $2 AND yuan >= $3 RETURNING yuan",
+            guild_id, user_id, amount,
+        )
+        return row is not None
 
     async def get_score_history(self, guild_id, user_id, limit=5):
         return await self._pool.fetch(
@@ -738,14 +739,11 @@ class Database:
         await self._pool.execute("DELETE FROM active_effects WHERE expires_at <= $1", int(now))
 
     async def increment_report_counter(self, guild_id):
-        await self._pool.execute(
-            "UPDATE guild_config SET report_counter = report_counter + 1 WHERE guild_id = $1",
+        row = await self._pool.fetchrow(
+            "UPDATE guild_config SET report_counter = report_counter + 1 WHERE guild_id = $1 RETURNING report_counter",
             guild_id,
         )
-        row = await self._pool.fetchrow(
-            "SELECT report_counter FROM guild_config WHERE guild_id = $1", guild_id
-        )
-        return row["report_counter"]
+        return row["report_counter"] if row else 0
 
     async def log_transaction(self, guild_id, user_id, item_id, cost, target_user_id=None):
         await self._pool.execute(
@@ -779,13 +777,9 @@ class Database:
         )
 
     async def get_leaderboard(self, guild_id):
-        top = await self._pool.fetch(
-            "SELECT user_id, score FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY score DESC LIMIT 3",
-            guild_id,
-        )
-        bottom = await self._pool.fetch(
-            "SELECT user_id, score FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY score ASC LIMIT 3",
-            guild_id,
+        top, bottom = await asyncio.gather(
+            self._pool.fetch("SELECT user_id, score FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY score DESC LIMIT 3", guild_id),
+            self._pool.fetch("SELECT user_id, score FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY score ASC LIMIT 3", guild_id),
         )
         return {"top": top, "bottom": bottom}
 
@@ -798,41 +792,37 @@ class Database:
         return round(sum(r["delta"] for r in rows), 2)
 
     async def get_guild_stats(self, guild_id):
-        active = await self._pool.fetch(
-            "SELECT * FROM users WHERE guild_id = $1 AND has_chatted = 1", guild_id
-        )
-        if not active:
-            return {}
-        total_yuan   = sum(u["yuan"] for u in active)
-        avg_score    = sum(u["score"] for u in active) / len(active)
-        top_score    = max(active, key=lambda u: u["score"])
-        bottom_score = min(active, key=lambda u: u["score"])
-        top_snitch   = max(active, key=lambda u: u["times_filed_reports"])
-        total_reports = await self._pool.fetchval(
-            "SELECT COUNT(*) FROM transactions WHERE guild_id = $1 AND item_id = 'report'",
-            guild_id,
-        )
         week_ago = int(time.time()) - 604800
-        history = await self._pool.fetch(
-            "SELECT user_id, delta FROM score_history WHERE guild_id = $1 AND timestamp > $2",
-            guild_id, week_ago,
+        agg, top_score, bottom_score, top_snitch, total_reports, rise_row, fall_row = await asyncio.gather(
+            self._pool.fetchrow(
+                "SELECT COUNT(*) AS cnt, COALESCE(SUM(yuan),0) AS total_yuan, COALESCE(AVG(score),750.0) AS avg_score FROM users WHERE guild_id = $1 AND has_chatted = 1",
+                guild_id,
+            ),
+            self._pool.fetchrow("SELECT * FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY score DESC LIMIT 1", guild_id),
+            self._pool.fetchrow("SELECT * FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY score ASC LIMIT 1", guild_id),
+            self._pool.fetchrow("SELECT * FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY times_filed_reports DESC LIMIT 1", guild_id),
+            self._pool.fetchval("SELECT COUNT(*) FROM transactions WHERE guild_id = $1 AND item_id = 'report'", guild_id),
+            self._pool.fetchrow(
+                "SELECT user_id, SUM(delta) AS net FROM score_history WHERE guild_id = $1 AND timestamp > $2 AND delta > 0 GROUP BY user_id ORDER BY net DESC LIMIT 1",
+                guild_id, week_ago,
+            ),
+            self._pool.fetchrow(
+                "SELECT user_id, SUM(delta) AS net FROM score_history WHERE guild_id = $1 AND timestamp > $2 AND delta < 0 GROUP BY user_id ORDER BY net ASC LIMIT 1",
+                guild_id, week_ago,
+            ),
         )
-        rises = {}
-        falls = {}
-        for h in history:
-            uid, d = h["user_id"], h["delta"]
-            if d > 0:
-                rises[uid] = rises.get(uid, 0.0) + d
-            elif d < 0:
-                falls[uid] = falls.get(uid, 0.0) + d
-        biggest_rise = max(rises.items(), key=lambda x: x[1]) if rises else None
-        biggest_fall = min(falls.items(), key=lambda x: x[1]) if falls else None
+        if not agg or agg["cnt"] == 0:
+            return {}
         return {
-            "total_yuan": total_yuan, "avg_score": avg_score,
-            "active_count": len(active), "top_score": top_score,
-            "bottom_score": bottom_score, "top_snitch": top_snitch,
-            "total_reports": total_reports, "biggest_rise": biggest_rise,
-            "biggest_fall": biggest_fall,
+            "total_yuan":   int(agg["total_yuan"]),
+            "avg_score":    float(agg["avg_score"]),
+            "active_count": int(agg["cnt"]),
+            "top_score":    top_score,
+            "bottom_score": bottom_score,
+            "top_snitch":   top_snitch,
+            "total_reports": total_reports or 0,
+            "biggest_rise": (rise_row["user_id"], float(rise_row["net"])) if rise_row else None,
+            "biggest_fall": (fall_row["user_id"], float(fall_row["net"])) if fall_row else None,
         }
 
     async def get_endorsement(self, guild_id, giver_id, target_id):
@@ -850,16 +840,16 @@ class Database:
     async def update_social_counts(self, guild_id, target_id, uid, etype):
         recv_col  = "times_endorsed"     if etype == "endorse" else "times_rebuked"
         given_col = "endorsements_given" if etype == "endorse" else "rebukes_given"
-        async with self._pool.acquire() as conn:
-            async with conn.transaction():
-                await conn.execute(
-                    f"UPDATE users SET {recv_col} = {recv_col} + 1 WHERE guild_id = $1 AND user_id = $2",
-                    guild_id, target_id,
-                )
-                await conn.execute(
-                    f"UPDATE users SET {given_col} = {given_col} + 1 WHERE guild_id = $1 AND user_id = $2",
-                    guild_id, uid,
-                )
+        await asyncio.gather(
+            self._pool.execute(
+                f"UPDATE users SET {recv_col} = {recv_col} + 1 WHERE guild_id = $1 AND user_id = $2",
+                guild_id, target_id,
+            ),
+            self._pool.execute(
+                f"UPDATE users SET {given_col} = {given_col} + 1 WHERE guild_id = $1 AND user_id = $2",
+                guild_id, uid,
+            ),
+        )
 
     async def increment_items_bought(self, guild_id, user_id):
         await self._pool.execute(
@@ -961,29 +951,15 @@ class Database:
         await self.update_fundraiser_status(fundraiser_id, "refunded")
 
     async def get_extended_leaderboard(self, guild_id):
-        top_score = await self._pool.fetch(
-            "SELECT user_id, score FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY score DESC LIMIT 3", guild_id,
-        )
-        bottom_score = await self._pool.fetch(
-            "SELECT user_id, score FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY score ASC LIMIT 3", guild_id,
-        )
-        richest = await self._pool.fetch(
-            "SELECT user_id, yuan FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY yuan DESC LIMIT 3", guild_id,
-        )
-        poorest = await self._pool.fetch(
-            "SELECT user_id, yuan FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY yuan ASC LIMIT 3", guild_id,
-        )
-        most_messages = await self._pool.fetch(
-            "SELECT user_id, message_count FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY message_count DESC LIMIT 3", guild_id,
-        )
-        most_endorsed = await self._pool.fetch(
-            "SELECT user_id, times_endorsed FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY times_endorsed DESC LIMIT 3", guild_id,
-        )
-        most_rebuked = await self._pool.fetch(
-            "SELECT user_id, times_rebuked FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY times_rebuked DESC LIMIT 3", guild_id,
-        )
-        top_snitches = await self._pool.fetch(
-            "SELECT user_id, times_filed_reports FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY times_filed_reports DESC LIMIT 3", guild_id,
+        top_score, bottom_score, richest, poorest, most_messages, most_endorsed, most_rebuked, top_snitches = await asyncio.gather(
+            self._pool.fetch("SELECT user_id, score FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY score DESC LIMIT 3", guild_id),
+            self._pool.fetch("SELECT user_id, score FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY score ASC LIMIT 3", guild_id),
+            self._pool.fetch("SELECT user_id, yuan FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY yuan DESC LIMIT 3", guild_id),
+            self._pool.fetch("SELECT user_id, yuan FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY yuan ASC LIMIT 3", guild_id),
+            self._pool.fetch("SELECT user_id, message_count FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY message_count DESC LIMIT 3", guild_id),
+            self._pool.fetch("SELECT user_id, times_endorsed FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY times_endorsed DESC LIMIT 3", guild_id),
+            self._pool.fetch("SELECT user_id, times_rebuked FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY times_rebuked DESC LIMIT 3", guild_id),
+            self._pool.fetch("SELECT user_id, times_filed_reports FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY times_filed_reports DESC LIMIT 3", guild_id),
         )
         return {
             "top_score": top_score, "bottom_score": bottom_score,
@@ -1049,6 +1025,7 @@ class Database:
             cutoff,
         )
         await self._pool.execute("UPDATE users SET prev_day_yuan = yuan")
+        await self.prune_portfolio_history()
         today = int(time.time()) // 86400 * 86400
         await self._pool.execute(
             """
@@ -1061,17 +1038,16 @@ class Database:
 
     async def get_score_graph_data(self, guild_id: int, user_id: int, days: int = 30):
         cutoff = int(time.time()) - (days * 86400)
-        rows = await self._pool.fetch(
-            """
-            SELECT FLOOR(timestamp::float / 86400)::bigint * 86400 AS day, SUM(delta) AS net_delta
-            FROM score_history WHERE guild_id = $1 AND user_id = $2 AND timestamp > $3
-            GROUP BY day ORDER BY day
-            """,
-            guild_id, user_id, cutoff,
-        )
-        user = await self._pool.fetchrow(
-            "SELECT score FROM users WHERE guild_id = $1 AND user_id = $2",
-            guild_id, user_id,
+        rows, user = await asyncio.gather(
+            self._pool.fetch(
+                """
+                SELECT FLOOR(timestamp::float / 86400)::bigint * 86400 AS day, SUM(delta) AS net_delta
+                FROM score_history WHERE guild_id = $1 AND user_id = $2 AND timestamp > $3
+                GROUP BY day ORDER BY day
+                """,
+                guild_id, user_id, cutoff,
+            ),
+            self._pool.fetchrow("SELECT score FROM users WHERE guild_id = $1 AND user_id = $2", guild_id, user_id),
         )
         return {"rows": rows, "current_score": float(user["score"]) if user else 750.0}
 
@@ -1086,20 +1062,19 @@ class Database:
         now = int(time.time())
         today_start = now - (now % 86400)
         yesterday_start = today_start - 86400
-        row = await self._pool.fetchrow(
-            """
-            SELECT
-                COALESCE(SUM(delta) FILTER (WHERE delta > 0 AND timestamp >= $3), 0)                         AS pos_today,
-                COALESCE(SUM(delta) FILTER (WHERE delta < 0 AND timestamp >= $3), 0)                         AS neg_today,
-                COALESCE(SUM(delta) FILTER (WHERE delta > 0 AND timestamp >= $4 AND timestamp < $3), 0)      AS pos_yesterday,
-                COALESCE(SUM(delta) FILTER (WHERE delta < 0 AND timestamp >= $4 AND timestamp < $3), 0)      AS neg_yesterday
-            FROM score_history WHERE guild_id = $1 AND user_id = $2
-            """,
-            guild_id, user_id, today_start, yesterday_start,
-        )
-        user = await self._pool.fetchrow(
-            "SELECT yuan, prev_day_yuan FROM users WHERE guild_id = $1 AND user_id = $2",
-            guild_id, user_id,
+        row, user = await asyncio.gather(
+            self._pool.fetchrow(
+                """
+                SELECT
+                    COALESCE(SUM(delta) FILTER (WHERE delta > 0 AND timestamp >= $3), 0)                         AS pos_today,
+                    COALESCE(SUM(delta) FILTER (WHERE delta < 0 AND timestamp >= $3), 0)                         AS neg_today,
+                    COALESCE(SUM(delta) FILTER (WHERE delta > 0 AND timestamp >= $4 AND timestamp < $3), 0)      AS pos_yesterday,
+                    COALESCE(SUM(delta) FILTER (WHERE delta < 0 AND timestamp >= $4 AND timestamp < $3), 0)      AS neg_yesterday
+                FROM score_history WHERE guild_id = $1 AND user_id = $2
+                """,
+                guild_id, user_id, today_start, yesterday_start,
+            ),
+            self._pool.fetchrow("SELECT yuan, prev_day_yuan FROM users WHERE guild_id = $1 AND user_id = $2", guild_id, user_id),
         )
         return {
             "pos_today":      round(float(row["pos_today"]), 2),
@@ -1183,13 +1158,15 @@ class Database:
 
     async def add_guild_decree(self, guild_id, user_id, content, vote_count):
         now = int(time.time())
-        await self._pool.execute(
-            "INSERT INTO guild_decrees (guild_id, user_id, content, won_at, vote_count) VALUES ($1, $2, $3, $4, $5)",
-            guild_id, user_id, content, now, vote_count,
-        )
-        await self._pool.execute(
-            "UPDATE users SET propaganda_wins = propaganda_wins + 1 WHERE guild_id = $1 AND user_id = $2",
-            guild_id, user_id,
+        await asyncio.gather(
+            self._pool.execute(
+                "INSERT INTO guild_decrees (guild_id, user_id, content, won_at, vote_count) VALUES ($1, $2, $3, $4, $5)",
+                guild_id, user_id, content, now, vote_count,
+            ),
+            self._pool.execute(
+                "UPDATE users SET propaganda_wins = propaganda_wins + 1 WHERE guild_id = $1 AND user_id = $2",
+                guild_id, user_id,
+            ),
         )
 
     async def get_guild_decrees(self, guild_id, limit=10):
@@ -1440,25 +1417,45 @@ class Database:
         if not positions:
             return
         now = int(time.time())
-        async with self._pool.acquire() as conn:
-            async with conn.transaction():
-                for pos in positions:
-                    cost = int(pos["cost"])
-                    await conn.execute(
-                        "UPDATE turbo_positions SET status = 'knocked', pnl = $1, closed_at = $2 WHERE id = $3",
-                        -cost, now, int(pos["position_id"]),
-                    )
-                    await conn.execute(
-                        "UPDATE users SET turbo_knocked = turbo_knocked + 1, turbo_profit = turbo_profit + $1 "
-                        "WHERE guild_id = $2 AND user_id = $3",
-                        -cost, int(pos["guild_id"]), int(pos["user_id"]),
-                    )
+        pos_updates  = [(-int(p["cost"]), now, int(p["position_id"])) for p in positions]
+        user_updates = [(-int(p["cost"]), int(p["guild_id"]), int(p["user_id"])) for p in positions]
+        await asyncio.gather(
+            self._pool.executemany(
+                "UPDATE turbo_positions SET status = 'knocked', pnl = $1, closed_at = $2 WHERE id = $3",
+                pos_updates,
+            ),
+            self._pool.executemany(
+                "UPDATE users SET turbo_knocked = turbo_knocked + 1, turbo_profit = turbo_profit + $1 WHERE guild_id = $2 AND user_id = $3",
+                user_updates,
+            ),
+        )
 
     async def get_price_history(self, ticker: str, since: int) -> list:
         return await self._pool.fetch(
             "SELECT ts, open, high, low, close FROM stock_price_history WHERE ticker = $1 AND ts > $2 ORDER BY ts",
             ticker, since,
         )
+
+    async def get_all_portfolios(self) -> list:
+        return await self._pool.fetch("SELECT guild_id, user_id, ticker, shares FROM portfolios")
+
+    async def batch_insert_portfolio_history(self, records: list) -> None:
+        if not records:
+            return
+        await self._pool.executemany(
+            "INSERT INTO portfolio_history (guild_id, user_id, ts, value) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING",
+            records,
+        )
+
+    async def get_portfolio_history(self, guild_id: int, user_id: int, since_ts: int) -> list:
+        return await self._pool.fetch(
+            "SELECT ts, value FROM portfolio_history WHERE guild_id = $1 AND user_id = $2 AND ts >= $3 ORDER BY ts",
+            guild_id, user_id, since_ts,
+        )
+
+    async def prune_portfolio_history(self) -> None:
+        cutoff = int(time.time()) - 366 * 86400
+        await self._pool.execute("DELETE FROM portfolio_history WHERE ts < $1", cutoff)
 
     async def get_portfolio(self, guild_id: int, user_id: int) -> list:
         return await self._pool.fetch(

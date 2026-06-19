@@ -88,8 +88,8 @@ def _fmt_price(p: float) -> str:
 
 
 def _fmt_pct(pct: float) -> str:
-    sign = "+" if pct >= 0 else ""
-    return f"{sign}{pct:.2f}%"
+    sign = "+" if pct >= 0 else "-"
+    return f"{sign}{abs(pct):.2f}%"
 
 
 def _yf_price_info(ticker: str) -> tuple:
@@ -290,11 +290,11 @@ def _render_portfolio_chart(timeline: list, cost_basis: float = 0.0) -> bytes:
 
 
 class PortfolioPeriodView(discord.ui.View):
-    def __init__(self, cog, positions, tp_rows, cost_basis, embed, bse_bytes):
+    def __init__(self, cog, guild_id, user_id, cost_basis, embed, bse_bytes):
         super().__init__(timeout=300)
         self._cog        = cog
-        self._positions  = positions
-        self._tp_rows    = tp_rows
+        self._guild_id   = guild_id
+        self._user_id    = user_id
         self._cost_basis = cost_basis
         self._embed      = embed
         self._bse_bytes  = bse_bytes
@@ -306,20 +306,20 @@ class PortfolioPeriodView(discord.ui.View):
     def _make_cb(self, period_label: str):
         async def callback(itr: discord.Interaction):
             await itr.response.defer()
-            yf_p, yf_i, secs = _PORTFOLIO_PERIODS[period_label]
+            _, _, secs = _PORTFOLIO_PERIODS[period_label]
             since_ts = int(time.time()) - secs
             timeline = await self._cog._build_portfolio_timeline(
-                self._positions, self._tp_rows, yf_p, yf_i, since_ts,
+                self._guild_id, self._user_id, since_ts,
             )
             loop     = asyncio.get_running_loop()
             port_png = await loop.run_in_executor(
                 None, _render_portfolio_chart, timeline, self._cost_basis,
             )
-            files = []
+            new_attachments = []
             if self._bse_bytes:
-                files.append(discord.File(io.BytesIO(self._bse_bytes), filename="bse.png"))
-            files.append(discord.File(io.BytesIO(port_png), filename="portfolio.png"))
-            await itr.edit_original_response(embed=self._embed, attachments=[], files=files, view=self)
+                new_attachments.append(discord.File(io.BytesIO(self._bse_bytes), filename="bse.png"))
+            new_attachments.append(discord.File(io.BytesIO(port_png), filename="portfolio.png"))
+            await itr.edit_original_response(embed=self._embed, attachments=new_attachments, view=self)
         return callback
 
 
@@ -499,10 +499,34 @@ class StocksCog(commands.Cog, name="Stocks"):
                 price_bars.append((ticker, now, old,
                                    max(old, new_price), min(old, new_price), new_price))
 
+        # Snapshot portfolio values for all users with open positions
+        all_stock_positions = await self.bot.db.get_all_portfolios()
+        all_turbo_positions = await self.bot.db.get_all_open_turbo_positions()
+
+        user_values: dict[tuple[int, int], float] = {}
+        for p in all_stock_positions:
+            key   = (int(p["guild_id"]), int(p["user_id"]))
+            price = self._prices.get(p["ticker"], 0.0)
+            user_values[key] = user_values.get(key, 0.0) + price * float(p["shares"])
+        for tp in all_turbo_positions:
+            key     = (int(tp["guild_id"]), int(tp["user_id"]))
+            current = self._prices.get(tp["ticker"], float(tp["entry_price"]))
+            factor  = max(0.0, _turbo_value_factor(
+                tp["direction"], float(tp["entry_price"]), float(tp["knockout"]), current
+            ))
+            user_values[key] = user_values.get(key, 0.0) + int(tp["cost"]) * factor
+
+        history_records = [
+            (gid, uid, now, int(val))
+            for (gid, uid), val in user_values.items()
+            if val > 0
+        ]
+
         # Single-round-trip DB writes for the whole tick
         await asyncio.gather(
             self.bot.db.batch_upsert_stock_prices(price_updates),
             self.bot.db.batch_add_price_bars(price_bars),
+            self.bot.db.batch_insert_portfolio_history(history_records),
         )
 
         await self._check_knockouts()
@@ -551,112 +575,19 @@ class StocksCog(commands.Cog, name="Stocks"):
     # ── Portfolio timeline builder ────────────────────────────────────────────
 
     async def _build_portfolio_timeline(
-        self, stock_positions: list, turbo_positions: list,
-        yf_period: str = "1d", yf_interval: str = "5m", since_ts: int | None = None,
+        self, guild_id: int, user_id: int, since_ts: int | None = None,
     ) -> list[tuple[str, float]]:
-        loop     = asyncio.get_running_loop()
-        now      = int(time.time())
+        now = int(time.time())
         if since_ts is None:
             since_ts = now - 86400
-
-        # Collect known entry times from opened_at
-        known_entry_times = [p["opened_at"] for p in stock_positions if p.get("opened_at")]
-        known_entry_times += [p["opened_at"] for p in turbo_positions if p.get("opened_at")]
-
-        label_fmt = "%H:%M" if yf_interval in ("5m", "1h") else "%b %d"
-
-        adr_tickers   = [p["ticker"] for p in stock_positions if p["ticker"] in ADR_TICKERS]
-        other_tickers = [p["ticker"] for p in stock_positions if p["ticker"] not in ADR_TICKERS]
-
-        async def _empty():
+        rows = await self.bot.db.get_portfolio_history(guild_id, user_id, since_ts)
+        if not rows:
             return []
-
-        # Fetch all price histories in parallel
-        adr_dfs, db_rows_list = await asyncio.gather(
-            asyncio.gather(*[
-                loop.run_in_executor(None, _yf_history, t, yf_period, yf_interval)
-                for t in adr_tickers
-            ]) if adr_tickers else _empty(),
-            asyncio.gather(*[
-                self.bot.db.get_price_history(t, since_ts)
-                for t in other_tickers
-            ]) if other_tickers else _empty(),
-        )
-
-        # Build per-ticker price series: {ticker: [(unix_ts, price), ...]}
-        series: dict[str, list[tuple[float, float]]] = {}
-
-        for ticker, df in zip(adr_tickers, adr_dfs or []):
-            if df is None or df.empty:
-                continue
-            pts = [
-                (float(idx.timestamp()), float(c))
-                for idx, c in zip(df.index, df["Close"])
-                if not math.isnan(float(c))
-            ]
-            if pts:
-                series[ticker] = pts
-
-        for ticker, rows in zip(other_tickers, db_rows_list or []):
-            if rows:
-                series[ticker] = [(float(r["ts"]), float(r["close"])) for r in rows]
-
-        if not series:
-            return []
-
-        # For positions missing opened_at, estimate entry from price series:
-        # scan backward to find the most recent time price ≈ avg_cost (only when
-        # there's enough P&L movement to make the match meaningful, >2%).
-        all_entry_times = list(known_entry_times)
-        for p in stock_positions:
-            if p.get("opened_at"):
-                continue
-            ticker   = p["ticker"]
-            avg_cost = float(p["avg_cost"])
-            current  = self._prices.get(ticker, avg_cost)
-            if avg_cost <= 0 or abs(current - avg_cost) / avg_cost < 0.02:
-                continue
-            pts = series.get(ticker)
-            if not pts:
-                continue
-            tolerance = avg_cost * 0.015
-            for ts_p, price_p in reversed(pts):
-                if abs(price_p - avg_cost) <= tolerance:
-                    all_entry_times.append(ts_p)
-                    break
-
-        clip_ts = max(min(all_entry_times), since_ts) if all_entry_times else since_ts
-
-        # Use timestamps from the longest series as the reference grid
-        base_ticker = max(series, key=lambda t: len(series[t]))
-        base_pts    = series[base_ticker]
-
-        def _price_at(pts: list[tuple[float, float]], target: float) -> float:
-            return min(pts, key=lambda x: abs(x[0] - target))[1]
-
-        shares_map = {p["ticker"]: float(p["shares"]) for p in stock_positions}
-
-        timeline: list[tuple[str, float]] = []
-        for ts, _ in base_pts:
-            if ts < clip_ts:
-                continue
-            total = 0.0
-            for ticker, shares in shares_map.items():
-                pts   = series.get(ticker)
-                price = _price_at(pts, ts) if pts else self._prices.get(ticker, 0.0)
-                total += price * shares
-            for tp in turbo_positions:
-                t_ticker = tp["ticker"]
-                pts      = series.get(t_ticker)
-                cur_p    = _price_at(pts, ts) if pts else self._prices.get(t_ticker, float(tp["entry_price"]))
-                factor   = max(0.0, _turbo_value_factor(
-                    tp["direction"], float(tp["entry_price"]), float(tp["knockout"]), cur_p
-                ))
-                total += int(tp["cost"]) * factor
-            label = datetime.datetime.utcfromtimestamp(ts).strftime(label_fmt)
-            timeline.append((label, total))
-
-        return timeline
+        label_fmt = "%H:%M" if since_ts > now - 2 * 86400 else "%b %d"
+        return [
+            (datetime.datetime.utcfromtimestamp(r["ts"]).strftime(label_fmt), float(r["value"]))
+            for r in rows
+        ]
 
     # ── Chart builder (with byte cache) ──────────────────────────────────────
 
@@ -961,7 +892,7 @@ class StocksCog(commands.Cog, name="Stocks"):
             price  = self._prices.get(ticker, 0.0)
             value  = price * shares
             pnl    = int((price - avg) * shares)
-            sign   = "+" if pnl >= 0 else ""
+            sign   = "+" if pnl >= 0 else "-"
             pct    = (price - avg) / avg * 100 if avg > 0 else 0.0
             total_value += value
             unrealized  += pnl
@@ -982,7 +913,7 @@ class StocksCog(commands.Cog, name="Stocks"):
             factor    = _turbo_value_factor(direction, entry, knockout, current)
             value     = max(0, int(cost * factor))
             pnl       = value - cost
-            sign      = "+" if pnl >= 0 else ""
+            sign      = "+" if pnl >= 0 else "-"
             total_value += value
             unrealized  += pnl
             sym = "🟢" if direction == "LONG" else "🔴"
@@ -1003,7 +934,7 @@ class StocksCog(commands.Cog, name="Stocks"):
         )
 
         # Build equity curve timeline and render
-        timeline = await self._build_portfolio_timeline(positions, tp_rows)
+        timeline = await self._build_portfolio_timeline(interaction.guild_id, interaction.user.id)
         loop     = asyncio.get_running_loop()
         port_png = await loop.run_in_executor(
             None, _render_portfolio_chart, timeline, cost_basis
@@ -1031,7 +962,7 @@ class StocksCog(commands.Cog, name="Stocks"):
             embed.set_thumbnail(url="attachment://bse.png")
         embed.set_image(url="attachment://portfolio.png")
 
-        view  = PortfolioPeriodView(self, positions, tp_rows, cost_basis, embed, bse_bytes)
+        view  = PortfolioPeriodView(self, interaction.guild_id, interaction.user.id, cost_basis, embed, bse_bytes)
         files = []
         if bse_bytes:
             files.append(discord.File(io.BytesIO(bse_bytes), filename="bse.png"))
