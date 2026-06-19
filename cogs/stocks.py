@@ -17,7 +17,7 @@ from matplotlib.patches import Rectangle
 
 from config.stocks import (
     ADR_STOCKS, ETF_TICKER, ETF_INFO, PENNY_STOCKS,
-    ADR_TICKERS, PENNY_TICKERS, ALL_TICKERS,
+    ADR_TICKERS, ALL_TICKERS,
     TURBO_LEVERAGES, TURBOS_PER_DAY, TURBO_MIN_COST,
     PRICE_UPDATE_INTERVAL,
     CIRCUIT_BREAKER_HALT_PCT, CIRCUIT_BREAKER_HALT_SECS, CIRCUIT_BREAKER_DAILY_PCT,
@@ -165,10 +165,10 @@ def _render_chart(
         ax_bg.add_patch(Rectangle((0, 0), 1, 1, transform=ax_bg.transAxes,
                                   color="#8B0000", alpha=0.18, zorder=1))
 
-    ax = fig.add_axes([0.09, 0.17, 0.87, 0.75], zorder=2)
+    ax = fig.add_axes([0.07, 0.13, 0.90, 0.82], zorder=2)
     ax.set_facecolor("none")
     ax.set_zorder(2)
-    ax.margins(x=0.01, y=0.12)
+    ax.margins(x=0, y=0.08)
 
     n  = len(closes)
     xs = list(range(n))
@@ -205,7 +205,8 @@ def _render_chart(
         ))
         labels    = [timestamps[i] for i in positions]
         ax.set_xticks(positions)
-        ax.set_xticklabels(labels, color="#aaaaaa", fontsize=7.5, rotation=0)
+        ax.set_xticklabels(labels, color="#aaaaaa", fontsize=7.5, rotation=0, ha="center")
+        ax.get_xticklabels()[-1].set_ha("right")
         ax.tick_params(axis="x", length=0, pad=3)
     else:
         ax.set_xticks([])
@@ -245,10 +246,10 @@ def _render_portfolio_chart(timeline: list, cost_basis: float = 0.0) -> bytes:
     ax_bg.axis("off")
     ax_bg.set_facecolor("#0d0d12")
 
-    ax = fig.add_axes([0.09, 0.17, 0.87, 0.75], zorder=2)
+    ax = fig.add_axes([0.07, 0.13, 0.90, 0.82], zorder=2)
     ax.set_facecolor("none")
     ax.set_zorder(2)
-    ax.margins(x=0.01, y=0.12)
+    ax.margins(x=0, y=0.08)
 
     if n > 1:
         last      = values[-1]
@@ -270,12 +271,14 @@ def _render_portfolio_chart(timeline: list, cost_basis: float = 0.0) -> bytes:
         ax.text(0.5, 0.5, "Insufficient history", ha="center", va="center",
                 color="#888888", fontsize=10, transform=ax.transAxes)
 
-    # x-axis time labels
+    # x-axis time labels — always pin last tick to final data point
     if labels and n > 1:
-        step      = max(1, n // 6)
-        positions = list(range(0, n, step))[:6]
+        num_ticks = min(6, n)
+        step      = max(1, (n - 1) // (num_ticks - 1)) if num_ticks > 1 else 1
+        positions = sorted(set(list(range(0, n, step))[:num_ticks - 1] + [n - 1]))
         ax.set_xticks(positions)
-        ax.set_xticklabels([labels[i] for i in positions], color="#aaaaaa", fontsize=7.5)
+        ax.set_xticklabels([labels[i] for i in positions], color="#aaaaaa", fontsize=7.5, ha="center")
+        ax.get_xticklabels()[-1].set_ha("right")
         ax.tick_params(axis="x", length=0, pad=3)
     else:
         ax.set_xticks([])
@@ -348,11 +351,6 @@ class StockChartView(discord.ui.View):
             except Exception as e:
                 await itr.followup.send(f"Chart unavailable: {e}", ephemeral=True)
                 return
-            # Update the Period field in the embed
-            for i, field in enumerate(self._embed.fields):
-                if field.name == "Period":
-                    self._embed.set_field_at(i, name="Period", value=period, inline=True)
-                    break
             new_attachments = []
             if self._bse_bytes:
                 new_attachments.append(discord.File(io.BytesIO(self._bse_bytes), filename="bse.png"))
@@ -782,16 +780,14 @@ class StocksCog(commands.Cog, name="Stocks"):
         await interaction.followup.send(embed=embed, **({"file": bse} if bse else {}))
 
     @stocks.command(name="chart", description="View a price chart for any stock")
-    @app_commands.describe(ticker="Ticker symbol", period="Time period", chart_type="Chart style")
+    @app_commands.describe(ticker="Ticker symbol", chart_type="Chart style")
     @app_commands.choices(
-        period=[app_commands.Choice(name=p, value=p) for p in PERIODS],
         chart_type=[app_commands.Choice(name=c, value=c) for c in CHART_TYPES],
     )
     async def stocks_chart(
         self,
         interaction: discord.Interaction,
         ticker: str,
-        period: str = "1D",
         chart_type: str = "line",
     ):
         await interaction.response.defer()
@@ -816,7 +812,6 @@ class StocksCog(commands.Cog, name="Stocks"):
         embed = discord.Embed(title=f"{info.get('name_zh', ticker)} · {ticker}", color=color)
         embed.add_field(name="Price",      value=_fmt_price(price), inline=True)
         embed.add_field(name="Day Change", value=_fmt_pct(pct),     inline=True)
-        embed.add_field(name="Period",     value=period,            inline=True)
 
         now = int(time.time())
         if ticker in self._pump_state:
