@@ -4,6 +4,7 @@ import random
 import time
 import asyncio
 import datetime
+from zoneinfo import ZoneInfo
 
 import discord
 from discord import app_commands
@@ -25,6 +26,7 @@ from config.stocks import (
     _YF_PERIOD_MAP, _PERIOD_SECONDS,
 )
 
+_NYSE_TZ        = ZoneInfo("America/New_York")  # DST-aware NYSE local time
 PERIODS         = ["1D", "5D", "1M", "3M", "6M", "1Y"]
 CHART_TYPES     = ["candlestick", "line"]
 _BSE_THUMB      = "images/beijingStockExchange.png"
@@ -47,10 +49,11 @@ def _ticker_info_name(ticker: str) -> str:
 
 def _next_market_event() -> tuple[str, int, int]:
     """Returns (event, next_ts, today_open_ts) where event is 'open' or 'close'."""
-    now    = datetime.datetime.now(datetime.timezone.utc)
-    midnight = datetime.datetime(now.year, now.month, now.day, tzinfo=datetime.timezone.utc)
-    open_ts  = int((midnight + datetime.timedelta(hours=14, minutes=30)).timestamp())
-    close_ts = int((midnight + datetime.timedelta(hours=21)).timestamp())
+    now      = datetime.datetime.now(_NYSE_TZ)
+    open_dt  = now.replace(hour=9, minute=30, second=0, microsecond=0)
+    close_dt = now.replace(hour=16, minute=0, second=0, microsecond=0)
+    open_ts  = int(open_dt.timestamp())
+    close_ts = int(close_dt.timestamp())
     now_ts   = int(now.timestamp())
     if now.weekday() < 5:
         if now_ts < open_ts:
@@ -61,18 +64,36 @@ def _next_market_event() -> tuple[str, int, int]:
     while True:
         nxt = now.date() + datetime.timedelta(days=days)
         if nxt.weekday() < 5:
-            nm   = datetime.datetime(nxt.year, nxt.month, nxt.day, tzinfo=datetime.timezone.utc)
-            nts  = int((nm + datetime.timedelta(hours=14, minutes=30)).timestamp())
+            nm  = datetime.datetime(nxt.year, nxt.month, nxt.day, 9, 30, tzinfo=_NYSE_TZ)
+            nts = int(nm.timestamp())
             return "open", nts, open_ts
         days += 1
 
 
+def _last_market_open_ts() -> int:
+    """Returns the timestamp of the most recently elapsed market open (today's,
+    if it has already happened, otherwise the previous trading day's)."""
+    now     = datetime.datetime.now(_NYSE_TZ)
+    open_dt = now.replace(hour=9, minute=30, second=0, microsecond=0)
+    open_ts = int(open_dt.timestamp())
+    now_ts  = int(now.timestamp())
+    if now.weekday() < 5 and now_ts >= open_ts:
+        return open_ts
+    days = 1
+    while True:
+        prev = now.date() - datetime.timedelta(days=days)
+        if prev.weekday() < 5:
+            pm = datetime.datetime(prev.year, prev.month, prev.day, 9, 30, tzinfo=_NYSE_TZ)
+            return int(pm.timestamp())
+        days += 1
+
+
 def _is_market_hours() -> bool:
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(_NYSE_TZ)
     if now.weekday() >= 5:
         return False
     mins = now.hour * 60 + now.minute
-    return 14 * 60 + 30 <= mins < 21 * 60
+    return 9 * 60 + 30 <= mins < 16 * 60
 
 
 def _turbo_value_factor(direction: str, entry: float, knockout: float, current: float) -> float:
@@ -122,6 +143,7 @@ def _render_chart(
     knockout: float | None = None,
     direction: str | None = None,
     timestamps: list | None = None,
+    baseline: float | None = None,
 ) -> bytes:
     # Drop NaN rows (yfinance sometimes returns them at period boundaries)
     clean = [
@@ -182,7 +204,7 @@ def _render_chart(
             ax.bar(i, body, bottom=min(o, c), color=clr, width=0.65, zorder=4)
     elif n > 0:
         ax.plot(xs, closes, color="#26a69a", linewidth=2.2, zorder=3)
-        ax.fill_between(xs, closes, min(closes) * 0.999,
+        ax.fill_between(xs, closes, min(closes) * 0.998,
                         alpha=0.28, color="#26a69a", zorder=2)
 
     if entry_price is not None and n > 0:
@@ -190,6 +212,13 @@ def _render_chart(
                    linestyle="--", alpha=0.75, zorder=5)
         ax.text(0.01, entry_price, "Entry", transform=ax.get_yaxis_transform(),
                 color="#ffffff", fontsize=7, va="bottom", alpha=0.85)
+    elif baseline is not None and baseline > 0 and n > 0:
+        # Day-open reference line — same treatment as the portfolio chart's
+        # baseline line, only shown when there's no entry/KO line to clash with.
+        ax.axhline(y=baseline, color="#ffffff", linewidth=0.8,
+                   linestyle="--", alpha=0.25, zorder=1)
+        ax.text(0.01, baseline, "Open", transform=ax.get_yaxis_transform(),
+                color="#aaaaaa", fontsize=7, va="bottom", alpha=0.7)
 
     if knockout is not None and n > 0:
         ax.axhline(y=knockout, color="#ff6b35", linewidth=1.4,
@@ -215,7 +244,7 @@ def _render_chart(
 
     if closes:
         last  = closes[-1]
-        first = closes[0]
+        first = baseline if baseline is not None and baseline > 0 else closes[0]
         pct   = (last - first) / first * 100 if first > 0 else 0.0
         sign  = "+" if pct >= 0 else ""
         clr   = "#26a69a" if pct >= 0 else "#ef5350"
@@ -617,7 +646,7 @@ class StocksCog(commands.Cog, name="Stocks"):
             return []
         label_fmt = "%H:%M" if since_ts > now - 2 * 86400 else "%b %d"
         return [
-            (datetime.datetime.utcfromtimestamp(r["ts"]).strftime(label_fmt), float(r["value"]))
+            (datetime.datetime.fromtimestamp(r["ts"], tz=_NYSE_TZ).strftime(label_fmt), float(r["value"]))
             for r in rows
         ]
 
@@ -642,11 +671,18 @@ class StocksCog(commands.Cog, name="Stocks"):
         loop = asyncio.get_running_loop()
         ts_fmt = "%H:%M" if period == "1D" else ("%a %H:%M" if period == "5D" else ("%b %d" if period in ("1M", "3M") else "%b '%y"))
 
+        day_open = self._day_opens.get(ticker)
+
         if ticker in ADR_TICKERS:
             yf_period, yf_interval = _YF_PERIOD_MAP[period]
             df = await loop.run_in_executor(None, _yf_history, ticker, yf_period, yf_interval)
             if df is None or df.empty:
                 raise ValueError("No data from yfinance")
+            if period == "1D":
+                open_ts = _last_market_open_ts()
+                df = df[df.index.astype("int64") // 10**9 >= open_ts]
+                if df.empty:
+                    raise ValueError("No price history yet for this period.")
             opens      = [float(v) for v in df["Open"]]
             highs      = [float(v) for v in df["High"]]
             lows       = [float(v) for v in df["Low"]]
@@ -657,7 +693,7 @@ class StocksCog(commands.Cog, name="Stocks"):
             except Exception:
                 timestamps = None
         else:
-            since = int(time.time()) - _PERIOD_SECONDS[period]
+            since = _last_market_open_ts() if period == "1D" else int(time.time()) - _PERIOD_SECONDS[period]
             rows  = await self.bot.db.get_price_history(ticker, since)
             if not rows:
                 raise ValueError("No price history yet for this period.")
@@ -665,12 +701,16 @@ class StocksCog(commands.Cog, name="Stocks"):
             highs      = [float(r["high"])  for r in rows]
             lows       = [float(r["low"])   for r in rows]
             closes     = [float(r["close"]) for r in rows]
-            _et = datetime.timezone(datetime.timedelta(hours=-4))  # EDT (NYSE summer)
-            timestamps = [datetime.datetime.fromtimestamp(int(r["ts"]), tz=_et).strftime(ts_fmt) for r in rows]
+            timestamps = [datetime.datetime.fromtimestamp(int(r["ts"]), tz=_NYSE_TZ).strftime(ts_fmt) for r in rows]
+
+        # Only use the official day-open as the chart's baseline when the chart
+        # is actually showing the since-open window; longer periods should still
+        # compare against their own first plotted point.
+        baseline = day_open if period == "1D" else None
 
         png = await loop.run_in_executor(
             None, _render_chart, ticker, opens, highs, lows, closes,
-            chart_type, entry_price, knockout, direction, timestamps,
+            chart_type, entry_price, knockout, direction, timestamps, baseline,
         )
         self._chart_cache[cache_key] = (png, now)
         return io.BytesIO(png)
@@ -705,13 +745,11 @@ class StocksCog(commands.Cog, name="Stocks"):
         is_open   = _is_market_hours()
         status    = "🟢 Open" if is_open else "🔴 Closed"
         event_lbl = "Closes" if event == "close" else "Opens"
-        midnight  = datetime.datetime(
-            datetime.datetime.utcnow().year,
-            datetime.datetime.utcnow().month,
-            datetime.datetime.utcnow().day,
-            tzinfo=datetime.timezone.utc,
+        close_ts = int(
+            datetime.datetime.now(_NYSE_TZ)
+            .replace(hour=16, minute=0, second=0, microsecond=0)
+            .timestamp()
         )
-        close_ts = int((midnight + datetime.timedelta(hours=21)).timestamp())
 
         embed = discord.Embed(
             title="北京证券交易所 · Beijing Stock Exchange",
@@ -977,8 +1015,7 @@ class StocksCog(commands.Cog, name="Stocks"):
 
         # Build equity curve timeline and render
         timeline = await self._build_portfolio_timeline(interaction.guild_id, interaction.user.id)
-        _et = datetime.timezone(datetime.timedelta(hours=-4))
-        now_label = datetime.datetime.now(_et).strftime("%H:%M")
+        now_label = datetime.datetime.now(_NYSE_TZ).strftime("%H:%M")
         if timeline:
             timeline.append((now_label, total_value))
         loop     = asyncio.get_running_loop()
