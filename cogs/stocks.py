@@ -224,54 +224,60 @@ def _render_chart(
     return buf.getvalue()
 
 
-def _render_portfolio_chart(positions_data: list) -> bytes:
-    n   = len(positions_data)
-    fig = plt.figure(figsize=(8, max(2.5, n * 0.6 + 1.0)), dpi=110, facecolor="none")
+def _render_portfolio_chart(timeline: list) -> bytes:
+    """Equity curve: [(label_str, total_value), ...] — Trade Republic style."""
+    labels = [t[0] for t in timeline]
+    values = [float(t[1]) for t in timeline]
+    n      = len(values)
 
+    fig   = plt.figure(figsize=(8, 4), dpi=110, facecolor="none")
     ax_bg = fig.add_axes([0, 0, 1, 1], zorder=0)
     ax_bg.set_in_layout(False)
     ax_bg.axis("off")
     ax_bg.set_facecolor("#0d0d12")
-    ax_bg.add_patch(Rectangle((0, 0), 1, 1, transform=ax_bg.transAxes,
-                               color="#8B0000", alpha=0.15, zorder=1))
 
-    ax = fig.add_axes([0.20, 0.08, 0.75, 0.84], zorder=2)
+    ax = fig.add_axes([0.09, 0.17, 0.87, 0.75], zorder=2)
     ax.set_facecolor("none")
     ax.set_zorder(2)
+    ax.margins(x=0.01, y=0.12)
 
-    if not positions_data:
-        ax.text(0.5, 0.5, "No positions", ha="center", va="center",
-                color="white", fontsize=11, transform=ax.transAxes)
+    if n > 1:
+        first, last = values[0], values[-1]
+        up    = last >= first
+        color = "#26a69a" if up else "#ef5350"
+        xs    = list(range(n))
+        ax.plot(xs, values, color=color, linewidth=2.2, zorder=3)
+        ax.fill_between(xs, values, min(values) * 0.998, alpha=0.22, color=color, zorder=2)
+
+        pct  = (last - first) / first * 100 if first > 0 else 0.0
+        sign = "+" if pct >= 0 else ""
+        ax.text(0.98, 0.96, f"¥{int(last):,}  {sign}{pct:.2f}%",
+                transform=ax.transAxes, ha="right", va="top",
+                color=color, fontsize=10, fontweight="bold", zorder=10)
+
+        # start-of-day reference line
+        ax.axhline(y=first, color="white", linewidth=0.8, linestyle="--", alpha=0.25, zorder=1)
     else:
-        labels = [p[0] for p in positions_data]
-        values = [max(float(p[1]), 0.0) for p in positions_data]
-        pnls   = [float(p[2]) for p in positions_data]
-        colors = ["#26a69a" if pnl >= 0 else "#ef5350" for pnl in pnls]
+        ax.text(0.5, 0.5, "Insufficient history", ha="center", va="center",
+                color="#888888", fontsize=10, transform=ax.transAxes)
 
-        y = list(range(n))
-        ax.barh(y, values, color=colors, height=0.55, zorder=3, alpha=0.90)
-        ax.set_yticks(y)
-        ax.set_yticklabels(labels, color="#e8e8e8", fontsize=8.5)
-        ax.tick_params(axis="y", length=0)
+    # x-axis time labels
+    if labels and n > 1:
+        step      = max(1, n // 6)
+        positions = list(range(0, n, step))[:6]
+        ax.set_xticks(positions)
+        ax.set_xticklabels([labels[i] for i in positions], color="#aaaaaa", fontsize=7.5)
+        ax.tick_params(axis="x", length=0, pad=3)
+    else:
+        ax.set_xticks([])
 
-        max_val = max(values) if any(v > 0 for v in values) else 1.0
-        for i, (v, pnl) in enumerate(zip(values, pnls)):
-            sign    = "+" if pnl >= 0 else "-"
-            pnl_clr = "#26a69a" if pnl >= 0 else "#ef5350"
-            ax.text(v + max_val * 0.015, i,        f"¥{int(v):,}",
-                    va="center", color="#cccccc", fontsize=8)
-            ax.text(v + max_val * 0.015, i - 0.28, f"({sign}¥{abs(int(pnl)):,})",
-                    va="center", color=pnl_clr, fontsize=7)
-
-        ax.set_xlim(0, max_val * 1.55)
-
-    ax.set_xticks([])
+    ax.tick_params(axis="y", colors="#dddddd", labelsize=9, length=0, pad=3)
     for spine in ax.spines.values():
         spine.set_visible(False)
-    ax.grid(axis="x", color="white", alpha=0.07, linewidth=0.5)
+    ax.grid(axis="y", color="white", alpha=0.08, linewidth=0.5, linestyle="--")
 
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=110, transparent=True, bbox_inches="tight")
+    fig.savefig(buf, format="png", dpi=110, transparent=True)
     plt.close(fig)
     return buf.getvalue()
 
@@ -500,6 +506,80 @@ class StocksCog(commands.Cog, name="Stocks"):
                 knocked.append(pos)
         if knocked:
             await self.bot.db.batch_close_knocked_positions(knocked)
+
+    # ── Portfolio timeline builder ────────────────────────────────────────────
+
+    async def _build_portfolio_timeline(
+        self, stock_positions: list, turbo_positions: list
+    ) -> list[tuple[str, float]]:
+        loop     = asyncio.get_running_loop()
+        since_ts = int(time.time()) - 86400
+
+        adr_tickers   = [p["ticker"] for p in stock_positions if p["ticker"] in ADR_TICKERS]
+        other_tickers = [p["ticker"] for p in stock_positions if p["ticker"] not in ADR_TICKERS]
+
+        # Fetch all price histories in parallel
+        adr_dfs, db_rows_list = await asyncio.gather(
+            asyncio.gather(*[
+                loop.run_in_executor(None, _yf_history, t, "1d", "5m")
+                for t in adr_tickers
+            ]) if adr_tickers else asyncio.coroutine(lambda: [])(),
+            asyncio.gather(*[
+                self.bot.db.get_price_history(t, since_ts)
+                for t in other_tickers
+            ]) if other_tickers else asyncio.coroutine(lambda: [])(),
+            return_exceptions=False,
+        )
+
+        # Build per-ticker price series: {ticker: [(unix_ts, price), ...]}
+        series: dict[str, list[tuple[float, float]]] = {}
+
+        for ticker, df in zip(adr_tickers, adr_dfs or []):
+            if df is None or df.empty:
+                continue
+            pts = [
+                (float(idx.timestamp()), float(c))
+                for idx, c in zip(df.index, df["Close"])
+                if not math.isnan(float(c))
+            ]
+            if pts:
+                series[ticker] = pts
+
+        for ticker, rows in zip(other_tickers, db_rows_list or []):
+            if rows:
+                series[ticker] = [(float(r["ts"]), float(r["close"])) for r in rows]
+
+        if not series:
+            return []
+
+        # Use timestamps from the longest series as the reference grid
+        base_ticker = max(series, key=lambda t: len(series[t]))
+        base_pts    = series[base_ticker]
+
+        def _price_at(pts: list[tuple[float, float]], target: float) -> float:
+            return min(pts, key=lambda x: abs(x[0] - target))[1]
+
+        shares_map = {p["ticker"]: float(p["shares"]) for p in stock_positions}
+
+        timeline: list[tuple[str, float]] = []
+        for ts, _ in base_pts:
+            total = 0.0
+            for ticker, shares in shares_map.items():
+                pts   = series.get(ticker)
+                price = _price_at(pts, ts) if pts else self._prices.get(ticker, 0.0)
+                total += price * shares
+            for tp in turbo_positions:
+                t_ticker = tp["ticker"]
+                pts      = series.get(t_ticker)
+                cur_p    = _price_at(pts, ts) if pts else self._prices.get(t_ticker, float(tp["entry_price"]))
+                factor   = max(0.0, _turbo_value_factor(
+                    tp["direction"], float(tp["entry_price"]), float(tp["knockout"]), cur_p
+                ))
+                total += int(tp["cost"]) * factor
+            label = datetime.datetime.utcfromtimestamp(ts).strftime("%H:%M")
+            timeline.append((label, total))
+
+        return timeline
 
     # ── Chart builder (with byte cache) ──────────────────────────────────────
 
@@ -793,10 +873,9 @@ class StocksCog(commands.Cog, name="Stocks"):
         if not positions and not tp_rows:
             return await interaction.followup.send("You have no open positions.", ephemeral=True)
 
-        total_value   = 0.0
-        unrealized    = 0
-        stock_lines   = []
-        chart_data    = []
+        total_value = 0.0
+        unrealized  = 0
+        stock_lines = []
 
         for pos in positions:
             ticker = pos["ticker"]
@@ -813,7 +892,6 @@ class StocksCog(commands.Cog, name="Stocks"):
                 f"`{ticker:<4}` {shares:g} sh · {_fmt_price(price)} · "
                 f"¥{int(value):,} ({sign}¥{abs(pnl):,} / {_fmt_pct(pct)})"
             )
-            chart_data.append((ticker, value, pnl))
 
         turbo_lines = []
         for pos in tp_rows:
@@ -835,27 +913,28 @@ class StocksCog(commands.Cog, name="Stocks"):
                 f"{sym} **#{pos['position_id']}** {direction} {leverage}x `{t_ticker}` "
                 f"· ¥{value:,} ({sign}¥{abs(pnl):,})"
             )
-            chart_data.append((f"#{pos['position_id']} {t_ticker}", value, pnl))
 
         realized   = (user_row.get("stock_profit", 0) or 0) + (user_row.get("turbo_profit", 0) or 0)
         unr_sign   = "+" if unrealized >= 0 else ""
         unr_color  = "🟢" if unrealized >= 0 else "🔴"
         real_sign  = "+" if realized  >= 0 else ""
         real_color = "🟢" if realized  >= 0 else "🔴"
-        chart_data.sort(key=lambda x: x[1], reverse=True)
 
+        # Build equity curve timeline and render (in parallel with embed construction)
+        timeline = await self._build_portfolio_timeline(positions, tp_rows)
+        loop     = asyncio.get_running_loop()
+        port_png = await loop.run_in_executor(None, _render_portfolio_chart, timeline)
+
+        embed_color = 0x26A69A if unrealized >= 0 else 0xEF5350
         display_name = await self.bot.format_user_full(interaction.user, interaction.guild_id)
-        embed = discord.Embed(title=f"{display_name}'s Portfolio", color=0xCC0000)
+        embed = discord.Embed(title=f"{display_name}'s Portfolio", color=embed_color)
         if stock_lines:
             embed.add_field(name="Stocks", value="\n".join(stock_lines), inline=False)
         if turbo_lines:
             embed.add_field(name="Turbo Certificates", value="\n".join(turbo_lines), inline=False)
-        embed.add_field(name="Total Value",    value=f"¥{int(total_value):,}",                    inline=True)
-        embed.add_field(name="Unrealized P&L", value=f"{unr_color} {unr_sign}¥{abs(unrealized):,}",  inline=True)
-        embed.add_field(name="Realized P&L",   value=f"{real_color} {real_sign}¥{abs(realized):,}",  inline=True)
-
-        loop     = asyncio.get_running_loop()
-        port_png = await loop.run_in_executor(None, _render_portfolio_chart, chart_data)
+        embed.add_field(name="Total Value",    value=f"¥{int(total_value):,}",                       inline=True)
+        embed.add_field(name="Unrealized P&L", value=f"{unr_color} {unr_sign}¥{abs(unrealized):,}", inline=True)
+        embed.add_field(name="Realized P&L",   value=f"{real_color} {real_sign}¥{abs(realized):,}", inline=True)
 
         bse = self._make_bse_file()
         if bse:
@@ -872,7 +951,7 @@ class StocksCog(commands.Cog, name="Stocks"):
 
     @turbos.command(name="list", description="View today's available turbo certificates")
     async def turbos_list(self, interaction: discord.Interaction):
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
         today = int(time.time()) // 86400
         rows  = await self.bot.db.get_daily_turbos(today)
         if not rows:
@@ -890,7 +969,7 @@ class StocksCog(commands.Cog, name="Stocks"):
             ))
             ko_dist = abs(price - float(t["knockout"])) / price * 100 if price > 0 else 0.0
             return (
-                f"`#{t['id']}` **{t['ticker']}** {t['leverage']}x · "
+                f"`#{t['id']}` **{t['ticker']}** {t['leverage']}x\n"
                 f"KO {_fmt_price(float(t['knockout']))} · {ko_dist:.1f}% away · factor {factor:.3f}"
             )
 
@@ -899,27 +978,28 @@ class StocksCog(commands.Cog, name="Stocks"):
             part = 1
             for t in turbo_rows:
                 line = _fmt_row(t)
-                if chunk and chunk_len + len(line) + 1 > 1020:
+                sep = 2 if chunk else 0
+                if chunk and chunk_len + sep + len(line) > 1020:
                     label = name if part == 1 else f"{name} (cont.)"
-                    embed.add_field(name=label, value="\n".join(chunk), inline=False)
+                    embed.add_field(name=label, value="\n\n".join(chunk), inline=False)
                     chunk, chunk_len, part = [], 0, part + 1
                 chunk.append(line)
-                chunk_len += len(line) + 1
+                chunk_len += sep + len(line)
             if chunk:
                 label = name if part == 1 else f"{name} (cont.)"
-                embed.add_field(name=label, value="\n".join(chunk), inline=False)
+                embed.add_field(name=label, value="\n\n".join(chunk), inline=False)
 
         embed = discord.Embed(title="涡轮证书 · Daily Turbos", color=0xCC0000)
         if long_rows:
-            _chunked_fields("🟢 LONG", long_rows, embed)
+            _chunked_fields("LONG", long_rows, embed)
         if short_rows:
-            _chunked_fields("🔴 SHORT", short_rows, embed)
+            _chunked_fields("SHORT", short_rows, embed)
         embed.set_footer(text=f"Min ¥{TURBO_MIN_COST:,} · /turbos open <id> <yuan> · /turbos chart <id>")
 
         bse = self._make_bse_file()
         if bse:
             embed.set_thumbnail(url="attachment://bse.png")
-        await interaction.followup.send(embed=embed, **({"file": bse} if bse else {}))
+        await interaction.followup.send(embed=embed, ephemeral=True, **({"file": bse} if bse else {}))
 
     @turbos.command(name="chart", description="Chart the underlying stock with entry and knockout levels")
     @app_commands.describe(turbo_id="Turbo ID from /turbos list", period="Time period")

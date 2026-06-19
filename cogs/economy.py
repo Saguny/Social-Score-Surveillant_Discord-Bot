@@ -29,11 +29,11 @@ _COSMETIC_ORDER = ["verified", "figure", "influencer", "associate", "asset", "et
 _LOTTERY_ORDER  = ["lottery", "lottery_standard", "lottery_premium", "lottery_elite", "lottery_chairman"]
 
 _LOTTERY_TIERS = {
-    "lottery":          {"win": (400,     700),     "jackpot": (2_000,     4_000)},
-    "lottery_standard": {"win": (2_000,   4_000),   "jackpot": (10_000,   20_000)},
-    "lottery_premium":  {"win": (8_000,  15_000),   "jackpot": (40_000,   80_000)},
-    "lottery_elite":    {"win": (40_000, 75_000),   "jackpot": (200_000, 400_000)},
-    "lottery_chairman": {"win": (200_000, 400_000), "jackpot": (1_000_000, 2_000_000)},
+    "lottery":          {"win": (600,      1_000),   "jackpot": (2_000,     4_000)},
+    "lottery_standard": {"win": (3_000,    5_000),   "jackpot": (10_000,   20_000)},
+    "lottery_premium":  {"win": (12_000,  18_000),   "jackpot": (40_000,   80_000)},
+    "lottery_elite":    {"win": (60_000,  90_000),   "jackpot": (200_000, 400_000)},
+    "lottery_chairman": {"win": (300_000, 500_000),  "jackpot": (1_000_000, 2_000_000)},
 }
 
 
@@ -76,6 +76,13 @@ def _build_shop_embeds(username: str = "yourname") -> dict[str, discord.Embed]:
         e_lottery.add_field(
             name=f"{item['name']}  ·  ¥{item['cost']:,}",
             value=f"Win {_fmt_yuan(w0)}–{_fmt_yuan(w1)}\nJackpot {_fmt_yuan(j0)}–{_fmt_yuan(j1)}",
+            inline=True,
+        )
+    dono_item = SHOP_ITEMS.get("lottery_dono")
+    if dono_item:
+        e_lottery.add_field(
+            name=f"{dono_item['name']}  ·  Your entire balance",
+            value="50% · Double your balance\n50% · Lose everything",
             inline=True,
         )
 
@@ -344,7 +351,7 @@ class Economy(commands.Cog):
             await interaction.response.send_message("Invalid target.", ephemeral=True)
             return
 
-        _public_items = {"lottery", "lottery_standard", "lottery_premium", "lottery_elite", "lottery_chairman", "dispute", "inspection", "criticism", "pact"}
+        _public_items = {"lottery", "lottery_standard", "lottery_premium", "lottery_elite", "lottery_chairman", "lottery_dono", "dispute", "inspection", "criticism", "pact"}
         await interaction.response.defer(ephemeral=item not in _public_items)
 
         if item == "protection" and target and await self.db.get_effect(interaction.guild.id, target.id, "protection"):
@@ -600,6 +607,33 @@ class Economy(commands.Cog):
                 embed.add_field(name="JACKPOT", value="Extraordinary fortune. The state bestows its blessing.", inline=False)
                 embed.add_field(name="YUAN CHANGE", value=f"+¥{winnings:,} · net {net:+,}", inline=False)
                 await self.db.update_lottery_stats(gid, recipient.id, True, net)
+            embed.timestamp = discord.utils.utcnow()
+            await interaction.followup.send(embed=embed)
+
+        elif item_id == "lottery_dono":
+            user_row = await self.db.get_user(gid, uid)
+            balance  = int(user_row["yuan"]) if user_row else 0
+            name     = await self.bot.format_user_full(interaction.user, gid)
+            if balance <= 0:
+                await interaction.followup.send("You have no yuan to wager.", ephemeral=True)
+                return
+            won = random.random() < 0.5
+            if won:
+                await self.db.adjust_yuan(gid, uid, balance)
+                await self.db.update_lottery_stats(gid, uid, True, balance)
+                embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局 · 双倍或无")
+                embed.add_field(name="CITIZEN", value=name, inline=False)
+                embed.add_field(name="RESULT", value="The Party smiles upon your boldness.", inline=False)
+                embed.add_field(name="WAGERED", value=f"¥{balance:,}", inline=True)
+                embed.add_field(name="NEW BALANCE", value=f"¥{balance * 2:,}", inline=True)
+            else:
+                await self.db.set_yuan(gid, uid, 0)
+                await self.db.update_lottery_stats(gid, uid, False, -balance)
+                embed = discord.Embed(color=0x333333, title="中华人民共和国社会信用局 · 双倍或无")
+                embed.add_field(name="CITIZEN", value=name, inline=False)
+                embed.add_field(name="RESULT", value="The Party has confiscated your assets.", inline=False)
+                embed.add_field(name="LOST", value=f"¥{balance:,}", inline=True)
+                embed.add_field(name="NEW BALANCE", value="¥0", inline=True)
             embed.timestamp = discord.utils.utcnow()
             await interaction.followup.send(embed=embed)
 

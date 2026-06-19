@@ -63,7 +63,7 @@ SHOP_ITEMS = {
     # --- Economy / interaction ---
     "lottery": {
         "name": "People's Lottery",
-        "description": "70% lose · 20% win ¥400–700 · 10% jackpot ¥2,000–4,000. Add a target to buy a ticket for them.",
+        "description": "70% lose · 20% win ¥600–1,000 · 10% jackpot ¥2,000–4,000. Add a target to buy a ticket for them.",
         "cost": 500,
         "requires_target": False,
         "requires_text": False,
@@ -71,7 +71,7 @@ SHOP_ITEMS = {
     },
     "lottery_standard": {
         "name": "Workers' Lottery",
-        "description": "70% lose · 20% win ¥2,000–4,000 · 10% jackpot ¥10,000–20,000. Add a target to buy a ticket for them.",
+        "description": "70% lose · 20% win ¥3,000–5,000 · 10% jackpot ¥10,000–20,000. Add a target to buy a ticket for them.",
         "cost": 2500,
         "requires_target": False,
         "requires_text": False,
@@ -79,7 +79,7 @@ SHOP_ITEMS = {
     },
     "lottery_premium": {
         "name": "Cadre Lottery",
-        "description": "70% lose · 20% win ¥8,000–15,000 · 10% jackpot ¥40,000–80,000. Add a target to buy a ticket for them.",
+        "description": "70% lose · 20% win ¥12,000–18,000 · 10% jackpot ¥40,000–80,000. Add a target to buy a ticket for them.",
         "cost": 10000,
         "requires_target": False,
         "requires_text": False,
@@ -87,7 +87,7 @@ SHOP_ITEMS = {
     },
     "lottery_elite": {
         "name": "Politburo Lottery",
-        "description": "70% lose · 20% win ¥40,000–75,000 · 10% jackpot ¥200,000–400,000. Add a target to buy a ticket for them.",
+        "description": "70% lose · 20% win ¥60,000–90,000 · 10% jackpot ¥200,000–400,000. Add a target to buy a ticket for them.",
         "cost": 50000,
         "requires_target": False,
         "requires_text": False,
@@ -95,8 +95,16 @@ SHOP_ITEMS = {
     },
     "lottery_chairman": {
         "name": "Chairman's Lottery",
-        "description": "70% lose · 20% win ¥200,000–400,000 · 10% jackpot ¥1,000,000–2,000,000. Add a target to buy a ticket for them.",
+        "description": "70% lose · 20% win ¥300,000–500,000 · 10% jackpot ¥1,000,000–2,000,000. Add a target to buy a ticket for them.",
         "cost": 250000,
+        "requires_target": False,
+        "requires_text": False,
+        "category": "lottery",
+    },
+    "lottery_dono": {
+        "name": "Double or Nothing",
+        "description": "Wager your entire yuan balance. 50% chance to double it · 50% chance to lose everything. Cannot be gifted.",
+        "cost": 0,
         "requires_target": False,
         "requires_text": False,
         "category": "lottery",
