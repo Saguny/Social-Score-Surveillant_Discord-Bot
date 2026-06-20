@@ -77,8 +77,10 @@ async def process_vote(bot: commands.Bot, user_id: int):
         *(_reward_guild(db, guild, user_id, expires_at) for guild in bot.guilds)
     )
     rewarded_guilds = [name for name in results if name is not None]
+    print(f"[topgg vote] user {user_id} rewarded in {len(rewarded_guilds)}/{len(bot.guilds)} guilds: {rewarded_guilds}")
 
     if not rewarded_guilds:
+        print(f"[topgg vote] user {user_id} not a cached member of any guild, no DM sent")
         return
 
     embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")

@@ -164,26 +164,45 @@ async def _delayed_shutdown(bot):
 async def _handle_topgg_webhook(request):
     secret = os.getenv("TOPGG_WEBHOOK_SECRET", "")
     auth = request.headers.get("Authorization", "")
-    if not secret or not hmac.compare_digest(auth, secret):
+    if not secret:
+        print("[topgg webhook] rejected: TOPGG_WEBHOOK_SECRET is not set")
+        return web.Response(status=403)
+    if not hmac.compare_digest(auth, secret):
+        print(f"[topgg webhook] rejected: Authorization header did not match secret (got {len(auth)} chars)")
         return web.Response(status=403)
 
     try:
         body = await request.json()
-    except Exception:
+    except Exception as e:
+        print(f"[topgg webhook] rejected: invalid JSON body ({e!r})")
         return web.Response(status=400)
 
-    if body.get("type") != "upvote":
+    vote_type = body.get("type")
+    if vote_type != "upvote":
+        print(f"[topgg webhook] ignored: type={vote_type!r} body={body}")
         return web.Response(status=200)
 
     try:
         user_id = int(body.get("user", 0))
     except (TypeError, ValueError):
+        print(f"[topgg webhook] rejected: bad user field in body={body}")
         return web.Response(status=400)
 
+    print(f"[topgg webhook] upvote received from user {user_id}, dispatching process_vote")
     bot = request.app["bot"]
     from cogs.voting import process_vote
-    asyncio.create_task(process_vote(bot, user_id))
+    asyncio.create_task(_run_process_vote(bot, user_id))
     return web.Response(status=200)
+
+
+async def _run_process_vote(bot, user_id):
+    from cogs.voting import process_vote
+    try:
+        await process_vote(bot, user_id)
+    except Exception as e:
+        import traceback
+        print(f"[topgg webhook] process_vote failed for user {user_id}: {e!r}")
+        traceback.print_exc()
 
 
 async def _handle_stats(request):
