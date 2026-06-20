@@ -228,7 +228,7 @@ class SocialCreditBot(commands.Bot):
             if user.id in self.ec_users:
                 return f"{str(user)} 【{_fullwidth('Winnie the Pooh')}】"
             from config.shop import COSMETIC_META
-            _ORDER = ["verified", "figure", "influencer", "associate", "asset"]
+            _ORDER = ["voter", "verified", "figure", "influencer", "associate", "asset"]
             badges = await self.db.get_cosmetic_badges(guild_id, user.id)
             badge_set = set(badges)
             for badge_id in reversed(_ORDER):
@@ -263,6 +263,7 @@ class SocialCreditBot(commands.Bot):
         await self.load_extension("cogs.checkin")
         await self.load_extension("cogs.propaganda")
         await self.load_extension("cogs.stocks")
+        await self.load_extension("cogs.voting")
         from web.server import start_web_server
         asyncio.create_task(start_web_server(self))
         asyncio.create_task(_decay_task(self))

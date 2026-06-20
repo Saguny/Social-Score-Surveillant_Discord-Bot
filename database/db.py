@@ -322,6 +322,20 @@ class Database:
             await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS turbo_profit  BIGINT  NOT NULL DEFAULT 0")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_transactions_user   ON transactions (guild_id, user_id, item_id)")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_transactions_target ON transactions (guild_id, target_user_id, item_id, timestamp DESC)")
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS vote_reminders (
+                    user_id   BIGINT PRIMARY KEY,
+                    remind_at BIGINT NOT NULL
+                )
+            """)
+            await conn.execute("ALTER TABLE cosmetic_badges ADD COLUMN IF NOT EXISTS expires_at BIGINT")
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS topgg_votes (
+                    user_id  BIGINT NOT NULL,
+                    voted_at BIGINT NOT NULL
+                )
+            """)
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_topgg_votes_voted_at ON topgg_votes (voted_at)")
 
     async def _create_tables(self):
         async with self._pool.acquire() as conn:
@@ -722,10 +736,68 @@ class Database:
 
     async def get_cosmetic_badges(self, guild_id: int, user_id: int) -> list[str]:
         rows = await self._pool.fetch(
-            "SELECT badge FROM cosmetic_badges WHERE guild_id = $1 AND user_id = $2",
-            guild_id, user_id,
+            "SELECT badge FROM cosmetic_badges WHERE guild_id = $1 AND user_id = $2 AND (expires_at IS NULL OR expires_at > $3)",
+            guild_id, user_id, int(time.time()),
         )
         return [row["badge"] for row in rows]
+
+    async def add_temporary_cosmetic_badge(self, guild_id: int, user_id: int, badge: str, expires_at: int):
+        await self._pool.execute(
+            """
+            INSERT INTO cosmetic_badges (guild_id, user_id, badge, purchased_at, expires_at)
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (guild_id, user_id, badge) DO UPDATE SET expires_at = $5
+            """,
+            guild_id, user_id, badge, int(time.time()), expires_at,
+        )
+
+    async def clean_expired_cosmetic_badges(self):
+        await self._pool.execute(
+            "DELETE FROM cosmetic_badges WHERE expires_at IS NOT NULL AND expires_at <= $1",
+            int(time.time()),
+        )
+
+    async def set_vote_reminder(self, user_id: int, remind_at: int):
+        await self._pool.execute(
+            "INSERT INTO vote_reminders (user_id, remind_at) VALUES ($1, $2) ON CONFLICT (user_id) DO UPDATE SET remind_at = $2",
+            user_id, remind_at,
+        )
+
+    async def get_due_vote_reminders(self) -> list[int]:
+        rows = await self._pool.fetch(
+            "DELETE FROM vote_reminders WHERE remind_at <= $1 RETURNING user_id",
+            int(time.time()),
+        )
+        return [row["user_id"] for row in rows]
+
+    async def log_topgg_vote(self, user_id: int):
+        await self._pool.execute(
+            "INSERT INTO topgg_votes (user_id, voted_at) VALUES ($1, $2)",
+            user_id, int(time.time()),
+        )
+
+    async def get_topgg_vote_timeline(self, period: str) -> list[dict]:
+        now = int(time.time())
+        period = period.upper()
+        if period == "1D":
+            since, bucket_secs = now - 86400, 3600
+        elif period == "7D":
+            since, bucket_secs = now - 7 * 86400, 86400
+        elif period == "1M":
+            since, bucket_secs = now - 30 * 86400, 86400
+        else:
+            since, bucket_secs = 0, 86400
+        rows = await self._pool.fetch(
+            """
+            SELECT FLOOR(voted_at::float / $1)::bigint * $1 AS bucket, COUNT(*) AS votes
+            FROM topgg_votes
+            WHERE voted_at >= $2
+            GROUP BY bucket
+            ORDER BY bucket
+            """,
+            bucket_secs, since,
+        )
+        return [{"bucket": row["bucket"], "votes": row["votes"]} for row in rows]
 
     async def add_eternal_chairman(self, user_id: int):
         await self._pool.execute(

@@ -36,6 +36,7 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',sans-seri
 .btn-run:hover { background:var(--accent-hover); color:var(--cream); }
 .btn-run:focus-visible { outline:2px solid var(--light-grey); outline-offset:2px; }
 .btn-run:disabled { opacity:.4; }
+.btn-run.active { background:var(--accent-hover); box-shadow:0 0 0 2px var(--accent-soft); }
 .btn-danger-soft { background:rgba(232,84,84,.12); border:1px solid var(--red); color:var(--red); }
 .btn-danger-soft:hover { background:rgba(232,84,84,.22); color:var(--red); }
 #terminal {

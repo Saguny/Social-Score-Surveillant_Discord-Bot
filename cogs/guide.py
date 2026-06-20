@@ -234,6 +234,14 @@ class Guide(commands.Cog):
             ),
             inline=False,
         )
+        e4.add_field(
+            name="/vote",
+            value=(
+                "Vote for this bot on Top.gg. Earns the Loyal Patriot badge, +3.00 score, and ¥2,500 yuan "
+                "on every server you share with the bureau. Lasts 12 hours · vote again to renew."
+            ),
+            inline=False,
+        )
         embeds.append(e4)
 
         e5 = discord.Embed(color=0xCC0000, title="SOCIAL RATING")

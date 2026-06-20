@@ -309,4 +309,5 @@ COSMETIC_META = {
     "associate":        {"color": 0xCC0000, "label": "SYCOPHANT ELITE",         "suffix": "【 𝘚𝘺𝘤𝘰𝘱𝘩𝘢𝘯𝘵 𝘌𝘭𝘪𝘵𝘦 】",                              "note": "Your loyalty has elevated you above ordinary citizens. Server-wide status."},
     "asset":            {"color": 0xF39C12, "label": "STATE-OWNED",             "suffix": "╠══ 𝙎𝙏𝘼𝙏𝙀-𝙊𝙒𝙉𝙀𝘿 ══╣",                                "note": "You are no longer a person. You are an asset of the People's Republic. Server-wide status."},
     "eternal_chairman": {"color": 0xFFB347, "label": "WINNIE THE POOH",         "suffix": "▓▒░【 𝙒𝙞𝙣𝙣𝙞𝙚 𝙩𝙝𝙚 𝙋𝙤𝙤𝙝 】░▒▓",                        "note": "Forbidden in 1.4 billion territories. Your name now renders in the sacred fullwidth script across every server the bureau inhabits. Global status."},
+    "voter":            {"color": 0xE74C3C, "label": "LOYAL PATRIOT",           "suffix": "⟦ 𝘓𝘰𝘺𝘢𝘭 𝘗𝘢𝘵𝘳𝘪𝘰𝘵 ⟧",                                  "note": "Recognised for casting a ballot on the foreign registry Top.gg. Lasts 12 hours · vote again to renew. Recognised on every server the bureau inhabits."},
 }

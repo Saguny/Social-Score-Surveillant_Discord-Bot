@@ -26,6 +26,20 @@
       <div id="terminal"><span class="t-prompt">Ready.</span></div>
     </div>
 
+    <div class="card-panel p-4 mb-3">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <div style="color:var(--text-muted);font-size:.75rem;text-transform:uppercase;letter-spacing:1px">Top.gg Votes</div>
+        <div class="btn-group" role="group" id="vote-period-group">
+          <button class="btn btn-run btn-sm px-3" data-period="1D" onclick="loadVoteChart('1D')">1D</button>
+          <button class="btn btn-run btn-sm px-3" data-period="7D" onclick="loadVoteChart('7D')">7D</button>
+          <button class="btn btn-run btn-sm px-3" data-period="1M" onclick="loadVoteChart('1M')">1M</button>
+          <button class="btn btn-run btn-sm px-3" data-period="TOTAL" onclick="loadVoteChart('TOTAL')">TOTAL</button>
+        </div>
+      </div>
+      <div id="vote-total" style="color:var(--text-muted);font-size:.8rem;margin-bottom:8px"></div>
+      <canvas id="vote-chart" height="90"></canvas>
+    </div>
+
     <div class="card-panel p-4">
 
       <div class="cmd-section">
@@ -115,6 +129,8 @@
 
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
 <script src="/static/admin.js"></script>
+<script>loadVoteChart('7D');</script>
 </body>
 </html>

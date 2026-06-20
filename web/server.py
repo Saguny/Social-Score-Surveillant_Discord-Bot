@@ -161,6 +161,31 @@ async def _delayed_shutdown(bot):
     await bot.close()
 
 
+async def _handle_topgg_webhook(request):
+    secret = os.getenv("TOPGG_WEBHOOK_SECRET", "")
+    auth = request.headers.get("Authorization", "")
+    if not secret or not hmac.compare_digest(auth, secret):
+        return web.Response(status=403)
+
+    try:
+        body = await request.json()
+    except Exception:
+        return web.Response(status=400)
+
+    if body.get("type") != "upvote":
+        return web.Response(status=200)
+
+    try:
+        user_id = int(body.get("user", 0))
+    except (TypeError, ValueError):
+        return web.Response(status=400)
+
+    bot = request.app["bot"]
+    from cogs.voting import process_vote
+    asyncio.create_task(process_vote(bot, user_id))
+    return web.Response(status=200)
+
+
 async def _handle_stats(request):
     bot = request.app["bot"]
     t0 = time.time()
@@ -169,6 +194,16 @@ async def _handle_stats(request):
     stats["uptime_seconds"]  = int(time.time() - bot.start_time.timestamp()) if getattr(bot, "start_time", None) else 0
     stats["discord_ping_ms"] = round(bot.latency * 1000, 1) if bot.latency else None
     return web.json_response(stats)
+
+
+async def _handle_topgg_votes(request):
+    bot = request.app["bot"]
+    period = request.query.get("period", "7D").upper()
+    if period not in ("1D", "7D", "1M", "TOTAL"):
+        period = "7D"
+    buckets = await bot.db.get_topgg_vote_timeline(period)
+    total = sum(row["votes"] for row in buckets)
+    return web.json_response({"period": period, "buckets": buckets, "total": total})
 
 
 async def start_web_server(bot):
@@ -186,6 +221,8 @@ async def start_web_server(bot):
     app.router.add_get("/admin", _require_auth(_handle_admin))
     app.router.add_post("/api/admin/command", _require_auth(_handle_admin_command))
     app.router.add_get("/api/stats", _require_auth(_handle_stats))
+    app.router.add_get("/api/admin/topgg-votes", _require_auth(_handle_topgg_votes))
+    app.router.add_post("/webhooks/topgg", _handle_topgg_webhook)
     app.router.add_static('/static', Path(__file__).parent / 'static', name='static')
 
     _runner = web.AppRunner(app)
