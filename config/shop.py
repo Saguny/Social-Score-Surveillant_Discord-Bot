@@ -303,11 +303,11 @@ BADGE_DISPLAY = {
 }
 
 COSMETIC_META = {
-    "verified":         {"color": 0x5DADE2, "label": "CERTIFIED NORMAL",       "suffix": "【 𝖢𝖾𝗋𝗍𝗂𝖿𝗂𝖾𝖽 𝖭𝗈𝗋𝗆𝖺𝗅 】",                          "note": "You have been certified normal by the bureau. Server-wide status."},
-    "figure":           {"color": 0x27AE60, "label": "NEIGHBOURHOOD SNITCH",   "suffix": "〖 𝘕𝘦𝘪𝘨𝘩𝘣𝘰𝘶𝘳𝘩𝘰𝘰𝘥 𝘚𝘯𝘪𝘵𝘤𝘩 〗",                      "note": "Your dedication to reporting neighbours has been recognised. Server-wide status."},
-    "influencer":       {"color": 0x8E44AD, "label": "PROPAGANDA MOUTHPIECE",  "suffix": "〔  ▰▰  𝙋𝙍𝙊𝙋𝘼𝙂𝘼𝙉𝘿𝘼 𝙈𝙊𝙐𝙏𝙃𝙋𝙄𝙀𝘾𝙀  ▰▰  〕",         "note": "The bureau has selected you as an official voice of the Party. Server-wide status."},
-    "associate":        {"color": 0xCC0000, "label": "SYCOPHANT ELITE",         "suffix": "【 𝘚𝘺𝘤𝘰𝘱𝘩𝘢𝘯𝘵 𝘌𝘭𝘪𝘵𝘦 】",                              "note": "Your loyalty has elevated you above ordinary citizens. Server-wide status."},
-    "asset":            {"color": 0xF39C12, "label": "STATE-OWNED",             "suffix": "╠══ 𝙎𝙏𝘼𝙏𝙀-𝙊𝙒𝙉𝙀𝘿 ══╣",                                "note": "You are no longer a person. You are an asset of the People's Republic. Server-wide status."},
-    "eternal_chairman": {"color": 0xFFB347, "label": "WINNIE THE POOH",         "suffix": "▓▒░【 𝙒𝙞𝙣𝙣𝙞𝙚 𝙩𝙝𝙚 𝙋𝙤𝙤𝙝 】░▒▓",                        "note": "Forbidden in 1.4 billion territories. Your name now renders in the sacred fullwidth script across every server the bureau inhabits. Global status."},
-    "voter":            {"color": 0xE74C3C, "label": "LOYAL PATRIOT",           "suffix": "⟦ 𝘓𝘰𝘺𝘢𝘭 𝘗𝘢𝘵𝘳𝘪𝘰𝘵 ⟧",                                  "note": "Recognised for casting a ballot on the foreign registry Top.gg. Lasts 12 hours · vote again to renew. Recognised on every server the bureau inhabits."},
+    "verified":         {"color": 0x5DADE2, "label": "CERTIFIED NORMAL",       "suffix": " |【 𝖢𝖾𝗋𝗍𝗂𝖿𝗂𝖾𝖽 𝖭𝗈𝗋𝗆𝖺𝗅 】",                          "note": "You have been certified normal by the bureau. Server-wide status."},
+    "figure":           {"color": 0x27AE60, "label": "NEIGHBOURHOOD SNITCH",   "suffix": " |〖 𝘕𝘦𝘪𝘨𝘩𝘣𝘰𝘶𝘳𝘩𝘰𝘰𝘥 𝘚𝘯𝘪𝘵𝘤𝘩 〗",                      "note": "Your dedication to reporting neighbours has been recognised. Server-wide status."},
+    "influencer":       {"color": 0x8E44AD, "label": "PROPAGANDA MOUTHPIECE",  "suffix": " | 〔  ▰▰  𝙋𝙍𝙊𝙋𝘼𝙂𝘼𝙉𝘿𝘼 𝙈𝙊𝙐𝙏𝙃𝙋𝙄𝙀𝘾𝙀  ▰▰  〕",         "note": "The bureau has selected you as an official voice of the Party. Server-wide status."},
+    "associate":        {"color": 0xCC0000, "label": "SYCOPHANT ELITE",         "suffix": " |【 𝘚𝘺𝘤𝘰𝘱𝘩𝘢𝘯𝘵 𝘌𝘭𝘪𝘵𝘦 】",                              "note": "Your loyalty has elevated you above ordinary citizens. Server-wide status."},
+    "asset":            {"color": 0xF39C12, "label": "STATE-OWNED",             "suffix": " | ╠══ 𝙎𝙏𝘼𝙏𝙀-𝙊𝙒𝙉𝙀𝘿 ══╣",                                "note": "You are no longer a person. You are an asset of the People's Republic. Server-wide status."},
+    "eternal_chairman": {"color": 0xFFB347, "label": "WINNIE THE POOH",         "suffix": " | ▓▒░【 𝙒𝙞𝙣𝙣𝙞𝙚 𝙩𝙝𝙚 𝙋𝙤𝙤𝙝 】░▒▓",                        "note": "Forbidden in 1.4 billion territories. Your name now renders in the sacred fullwidth script across every server the bureau inhabits. Global status."},
+    "voter":            {"color": 0xE74C3C, "label": "LOYAL PATRIOT",           "suffix": " | ⟦ 𝘓𝘰𝘺𝘢𝘭 𝘗𝘢𝘵𝘳𝘪𝘰𝘵 ⟧",                                  "note": "Recognised for casting a ballot on the foreign registry Top.gg. Lasts 12 hours · vote again to renew. Recognised on every server the bureau inhabits."},
 }

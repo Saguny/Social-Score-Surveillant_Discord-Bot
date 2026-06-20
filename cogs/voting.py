@@ -9,8 +9,8 @@ from discord.ext import commands, tasks
 VOTE_URL = "https://top.gg/bot/856163780265902151/vote"
 TOPGG_BOT_ID = "856163780265902151"
 TOPGG_STATS_URL = f"https://top.gg/api/bots/{TOPGG_BOT_ID}/stats"
-VOTE_SCORE_DELTA = 3.0
-VOTE_YUAN_REWARD = 2500
+VOTE_SCORE_DELTA = 2.0
+VOTE_YUAN_REWARD = 1500
 VOTE_BADGE = "voter"
 VOTE_COOLDOWN = 12 * 60 * 60
 
@@ -127,7 +127,7 @@ class Voting(commands.Cog):
             name="VOTE FOR THE BUREAU",
             value=(
                 "Cast your ballot for this bot on Top.gg to receive a badge, "
-                "+3.00 score, and ¥2,500 yuan on every server you share with the bureau. "
+                "+2.00 score, and ¥1,500 yuan on every server you share with the bureau. "
                 "You can vote again every 12 hours."
             ),
             inline=False,
