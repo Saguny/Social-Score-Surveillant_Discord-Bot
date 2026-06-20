@@ -1,6 +1,8 @@
 import os
 import hmac
 import time
+import json
+import hashlib
 import secrets
 import asyncio
 import webbrowser
@@ -163,34 +165,50 @@ async def _delayed_shutdown(bot):
 
 async def _handle_topgg_webhook(request):
     secret = os.getenv("TOPGG_WEBHOOK_SECRET", "")
-    auth = request.headers.get("Authorization", "")
     if not secret:
         print("[topgg webhook] rejected: TOPGG_WEBHOOK_SECRET is not set")
         return web.Response(status=403)
-    if not hmac.compare_digest(auth, secret):
-        print(f"[topgg webhook] rejected: Authorization header did not match secret (got {len(auth)} chars)")
+
+    raw_body = await request.text()
+    signature = request.headers.get("x-topgg-signature", "")
+    if not signature:
+        print(f"[topgg webhook] rejected: missing x-topgg-signature header (headers={list(request.headers.keys())})")
         return web.Response(status=403)
 
     try:
-        body = await request.json()
+        parts = dict(p.split("=", 1) for p in signature.split(","))
+        timestamp, received_sig = parts["t"], parts["v1"]
+    except (KeyError, ValueError):
+        print(f"[topgg webhook] rejected: malformed x-topgg-signature header {signature!r}")
+        return web.Response(status=400)
+
+    expected_sig = hmac.new(secret.encode(), f"{timestamp}.{raw_body}".encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(received_sig, expected_sig):
+        print("[topgg webhook] rejected: signature mismatch")
+        return web.Response(status=403)
+
+    try:
+        body = json.loads(raw_body)
     except Exception as e:
         print(f"[topgg webhook] rejected: invalid JSON body ({e!r})")
         return web.Response(status=400)
 
-    vote_type = body.get("type")
-    if vote_type != "upvote":
-        print(f"[topgg webhook] ignored: type={vote_type!r} body={body}")
+    event_type = body.get("type")
+    if event_type == "webhook.test":
+        print(f"[topgg webhook] test received and verified, body={body}")
+        return web.Response(status=200)
+    if event_type != "vote.create":
+        print(f"[topgg webhook] ignored: unrecognized event type={event_type!r} body={body}")
         return web.Response(status=200)
 
     try:
-        user_id = int(body.get("user", 0))
-    except (TypeError, ValueError):
-        print(f"[topgg webhook] rejected: bad user field in body={body}")
+        user_id = int(body["data"]["user"]["platform_id"])
+    except (KeyError, TypeError, ValueError):
+        print(f"[topgg webhook] rejected: could not extract user platform_id from body={body}")
         return web.Response(status=400)
 
-    print(f"[topgg webhook] upvote received from user {user_id}, dispatching process_vote")
+    print(f"[topgg webhook] vote.create received from user {user_id}, dispatching process_vote")
     bot = request.app["bot"]
-    from cogs.voting import process_vote
     asyncio.create_task(_run_process_vote(bot, user_id))
     return web.Response(status=200)
 
