@@ -6,6 +6,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 from config.ranks import RANKS
+from cogs.stocks import _is_market_hours, _next_market_event
 
 REPO_URL      = "https://github.com/Saguny/Social-Score-Surveillant_Discord-Bot"
 INVITE_URL    = "https://discord.com/oauth2/authorize?client_id=856163780265902151&permissions=2416438352&integration_type=0&scope=bot"
@@ -291,19 +292,19 @@ class Guide(commands.Cog):
         e7.set_footer(text="GLORY TO THE CCP!")
         embeds.append(e7)
 
-        now_utc         = datetime.now(timezone.utc)
-        today_midnight  = datetime(now_utc.year, now_utc.month, now_utc.day, tzinfo=timezone.utc)
-        market_open_ts  = int((today_midnight + timedelta(hours=14, minutes=30)).timestamp())
-        market_close_ts = int((today_midnight + timedelta(hours=21)).timestamp())
-        weekday         = now_utc.weekday()
-        mins_now        = now_utc.hour * 60 + now_utc.minute
-        market_open_now = weekday < 5 and 14 * 60 + 30 <= mins_now < 21 * 60
+        market_open_now = _is_market_hours()
         market_status   = "🟢 Open now" if market_open_now else "🔴 Closed now"
+        _, next_event_ts, today_open_ts = _next_market_event()
 
         e_stocks = discord.Embed(color=0xCC0000, title="北京证券交易所 · MARKETS")
         e_stocks.add_field(
             name="MARKET HOURS",
-            value=f"<t:{market_open_ts}:t> – <t:{market_close_ts}:t> · Mon–Fri · {market_status}",
+            value=(
+                f"<t:{today_open_ts}:t> – <t:{today_open_ts + 23400}:t> ET · Mon–Fri · {market_status}\n"
+                f"Next change: <t:{next_event_ts}:R>\n"
+                "All trading, price ticking, and portfolio chart updates pause outside these hours, "
+                "exactly like a real broker."
+            ),
             inline=False,
         )
         e_stocks.add_field(
@@ -313,6 +314,15 @@ class Guide(commands.Cog):
                 "1 ETF (CNXF) · tracks the basket average of all 5 ADRs\n"
                 "5 Penny stocks (XMNG, DWJT, HQBC, RMKD, WSJZ) · high-volatility simulation\n"
                 "Penny stocks may trigger a 🔥 PUMP · sudden drift followed by a -20% crash"
+            ),
+            inline=False,
+        )
+        e_stocks.add_field(
+            name="SOCIAL CREDIT BONUS",
+            value=(
+                "Holding stocks at a 2%+ unrealized gain slowly raises your score. "
+                "Checked once every 24 hours alongside score decay. "
+                "Reward scales with your gain percentage, capped at +0.30 per day. Losses never penalize score."
             ),
             inline=False,
         )
@@ -500,7 +510,7 @@ class Guide(commands.Cog):
         )
         e.add_field(
             name="LINKS",
-            value=f"[Source Code]({REPO_URL}) · [Invite to Server]({INVITE_URL})",
+              value=f"[Source Code]({REPO_URL}) · [Invite to Server]({INVITE_URL})",
             inline=False,
         )
 

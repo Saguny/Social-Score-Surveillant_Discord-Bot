@@ -4,6 +4,12 @@ import json
 import asyncio
 import asyncpg
 
+from config.rules import (
+    PORTFOLIO_SCORE_MIN_GAIN_PCT,
+    PORTFOLIO_SCORE_SCALE,
+    PORTFOLIO_SCORE_DAILY_CAP,
+)
+
 
 TABLES = [
     """
@@ -1456,6 +1462,52 @@ class Database:
     async def prune_portfolio_history(self) -> None:
         cutoff = int(time.time()) - 366 * 86400
         await self._pool.execute("DELETE FROM portfolio_history WHERE ts < $1", cutoff)
+
+    async def apply_portfolio_score_bonus(self) -> None:
+        rows = await self._pool.fetch(
+            """
+            SELECT p.guild_id, p.user_id,
+                   SUM(p.shares * p.avg_cost) AS cost_basis,
+                   SUM(p.shares * s.price)    AS current_value
+            FROM portfolios p
+            JOIN stocks s ON s.ticker = p.ticker
+            GROUP BY p.guild_id, p.user_id
+            """
+        )
+        now     = int(time.time())
+        updates = []
+        history = []
+        for row in rows:
+            cost_basis = float(row["cost_basis"])
+            if cost_basis <= 0:
+                continue
+            gain_pct = (float(row["current_value"]) - cost_basis) / cost_basis
+            if gain_pct < PORTFOLIO_SCORE_MIN_GAIN_PCT:
+                continue
+            delta     = min(gain_pct * PORTFOLIO_SCORE_SCALE, PORTFOLIO_SCORE_DAILY_CAP)
+            guild_id  = int(row["guild_id"])
+            user_id   = int(row["user_id"])
+            updates.append((delta, guild_id, user_id))
+            history.append((guild_id, user_id, delta, "portfolio gains", now))
+
+        if not updates:
+            return
+
+        await asyncio.gather(
+            self._pool.executemany(
+                """
+                UPDATE users SET
+                    score         = GREATEST(600.0, LEAST(1300.0, score + $1)),
+                    highest_score = GREATEST(highest_score, GREATEST(600.0, LEAST(1300.0, score + $1)))
+                WHERE guild_id = $2 AND user_id = $3
+                """,
+                updates,
+            ),
+            self._pool.executemany(
+                "INSERT INTO score_history (guild_id, user_id, delta, reason, timestamp) VALUES ($1, $2, $3, $4, $5)",
+                history,
+            ),
+        )
 
     async def get_portfolio(self, guild_id: int, user_id: int) -> list:
         return await self._pool.fetch(

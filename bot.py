@@ -113,6 +113,7 @@ async def _decay_task(bot: commands.Bot):
     while True:
         await asyncio.sleep(86400)
         await bot.db.apply_score_decay()
+        await bot.db.apply_portfolio_score_bonus()
 
 
 async def console_loop(bot: commands.Bot):
