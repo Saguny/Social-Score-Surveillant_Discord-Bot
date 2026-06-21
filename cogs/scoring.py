@@ -269,8 +269,8 @@ class Scoring(commands.Cog):
                 
                 status_text = (
                     " **CRITICAL INFRACTION DETECTED**\n"
-                    "Your score has breached the survival threshold. You have been placed on the **Execution List**.\n"
-                    f"**Role Assigned:** `{exec_role_name}`"
+                    "Your social credit score has gone below 610-. You have been placed on the **Execution List** by the Bureau.\n"
+                    f"Your Role has been assigned."
                 )
                 embed.add_field(name="SURVEILLANCE STATUS", value=status_text, inline=False)
                 
@@ -287,7 +287,7 @@ class Scoring(commands.Cog):
                 else:
                     embed.set_footer(text="中华人民共和国社会信用局 · ALL ACTIONS RECORDED")
                 
-                await target.send(content=f"{member.mention} **REPORT FOR DE-REGISTRATION.**", embed=embed)
+                await target.send(content=f"{member.mention} **The Eternal Chairman awaits your Execution with Joy.**", embed=embed)
 
             else:
                 exec_role = discord.utils.get(guild.roles, name=exec_role_name)
