@@ -498,7 +498,7 @@ class Guide(commands.Cog):
 
     @app_commands.command(name="botinfo", description="Information about Social Credit Surveillantr")
     async def botinfo(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer()
 
         guild_count  = len(self.bot.guilds)
         member_count = sum(g.member_count or 0 for g in self.bot.guilds)
@@ -532,7 +532,7 @@ class Guide(commands.Cog):
         )
 
         e.set_footer(text="Disclaimer: see /disclaimer")
-        await interaction.followup.send(embed=e, ephemeral=True)
+        await interaction.followup.send(embed=e)
 
 
 async def setup(bot: commands.Bot):
