@@ -91,10 +91,13 @@ class StatCache:
         stats["db_query_ms"] = latency.get("db_query_ms")
         stats["discord_ping_ms"] = latency.get("discord_ping_ms")
         stats["uptime_seconds"] = int(time.time() - self.bot.start_time.timestamp()) if getattr(self.bot, "start_time", None) else 0
+        stats["total_guilds"] = len(self.bot.guilds)
         scoring_cog = self.bot.get_cog("Scoring")
         executor = getattr(scoring_cog, "_executor", None)
-        workers = getattr(executor, "_max_workers", None) if executor else None
-        stats["sentiment_workers"] = workers if isinstance(workers, int) else None
+        max_workers = getattr(executor, "_max_workers", None) if executor else None
+        active_workers = len(getattr(executor, "_processes", None) or {}) if executor else None
+        stats["sentiment_workers_max"] = max_workers if isinstance(max_workers, int) else None
+        stats["sentiment_workers_active"] = active_workers if isinstance(active_workers, int) else None
 
     async def _refresh_timeline(self):
         for rng in self.TIMELINE_RANGES:

@@ -287,7 +287,7 @@ function pingClass(ms) {
 
 function _setStatusClass(id, cls) {
   const e = document.getElementById(id);
-  if (e) e.className = cls;
+  if (e) e.className = cls ? 'val ' + cls : 'val val-white';
 }
 
 function _feedRow(ev) {
@@ -368,7 +368,7 @@ function renderStats(d) {
   set('mc-db', typeof d.db_query_ms === 'number' ? d.db_query_ms+'ms' : '—');
   _setStatusClass('mc-db', typeof d.db_query_ms === 'number' ? dbCls : '');
 
-  set('mc-workers', d.sentiment_workers != null ? d.sentiment_workers+'/'+d.sentiment_workers : '—');
+  set('mc-workers', d.sentiment_workers_max != null ? (d.sentiment_workers_active ?? 0)+'/'+d.sentiment_workers_max : '—');
 
   _pushLatencySample(d.db_query_ms, d.discord_ping_ms);
 

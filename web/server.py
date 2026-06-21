@@ -251,10 +251,13 @@ async def _handle_stats(request):
         stats["db_query_ms"] = round((time.time() - t0) * 1000, 1)
         stats["uptime_seconds"] = int(time.time() - bot.start_time.timestamp()) if getattr(bot, "start_time", None) else 0
         stats["discord_ping_ms"] = round(bot.latency * 1000, 1) if bot.latency else None
+        stats["total_guilds"] = len(bot.guilds)
         scoring_cog = bot.get_cog("Scoring")
         executor = getattr(scoring_cog, "_executor", None)
-        workers = getattr(executor, "_max_workers", None) if executor else None
-        stats["sentiment_workers"] = workers if isinstance(workers, int) else None
+        max_workers = getattr(executor, "_max_workers", None) if executor else None
+        active_workers = len(getattr(executor, "_processes", None) or {}) if executor else None
+        stats["sentiment_workers_max"] = max_workers if isinstance(max_workers, int) else None
+        stats["sentiment_workers_active"] = active_workers if isinstance(active_workers, int) else None
 
     return web.json_response(stats)
 

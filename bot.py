@@ -213,6 +213,7 @@ class SocialCreditBot(commands.Bot):
         self.db = Database()
         self.ec_users: set[int] = set()
         self._cmd_cooldowns: dict[int, float] = {}
+        self.start_time = None
 
     def format_user(self, user) -> str:
         name = str(user)
@@ -272,7 +273,8 @@ class SocialCreditBot(commands.Bot):
         self.loop.create_task(console_loop(self))
 
     async def on_ready(self):
-        self.start_time = datetime.now(timezone.utc)
+        if self.start_time is None:
+            self.start_time = datetime.now(timezone.utc)
         rank_names = {r["name"] for r in RANKS}
         exec_role_name = "Execution Date: Tomorrow"
         for guild in self.guilds:
