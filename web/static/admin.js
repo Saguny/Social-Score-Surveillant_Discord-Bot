@@ -32,6 +32,134 @@ function confirmRun(command, args, msg) {
   if (confirm(msg)) run(command, args);
 }
 
+let ebFields = [];
+
+function _esc(s) {
+  return (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function addEmbedField() {
+  if (ebFields.length >= 25) return;
+  ebFields.push({ name: '', value: '', inline: false });
+  renderEmbedFields();
+  renderEmbedPreview();
+}
+
+function removeEmbedField(i) {
+  ebFields.splice(i, 1);
+  renderEmbedFields();
+  renderEmbedPreview();
+}
+
+function updateEmbedField(i, key, val) {
+  ebFields[i][key] = val;
+  renderEmbedPreview();
+}
+
+function renderEmbedFields() {
+  const container = document.getElementById('eb-fields');
+  container.innerHTML = '';
+  ebFields.forEach((f, i) => {
+    const row = document.createElement('div');
+    row.className = 'row g-2 align-items-center mb-2';
+    row.innerHTML = `
+      <div class="col-4"><input type="text" class="form-control form-control-sm" placeholder="Field name" value="${_esc(f.name)}" oninput="updateEmbedField(${i},'name',this.value)"></div>
+      <div class="col-5"><input type="text" class="form-control form-control-sm" placeholder="Field value" value="${_esc(f.value)}" oninput="updateEmbedField(${i},'value',this.value)"></div>
+      <div class="col-auto form-check">
+        <input class="form-check-input" type="checkbox" id="eb-inline-${i}" ${f.inline ? 'checked' : ''} onchange="updateEmbedField(${i},'inline',this.checked)">
+        <label class="form-check-label" for="eb-inline-${i}" style="font-size:.7rem;color:var(--text-muted)">inline</label>
+      </div>
+      <div class="col-auto"><button class="btn btn-danger-soft btn-sm" onclick="removeEmbedField(${i})">&times;</button></div>
+    `;
+    container.appendChild(row);
+  });
+}
+
+function renderEmbedPreview() {
+  const title = v('eb-title');
+  const desc = v('eb-desc');
+  const color = document.getElementById('eb-color').value;
+  const image = v('eb-image');
+  const thumb = v('eb-thumb');
+
+  const fieldsHtml = ebFields.filter(f => f.name && f.value).map(f =>
+    `<div style="flex:${f.inline ? '0 0 auto;min-width:120px' : '1 0 100%'};margin-top:8px">
+       <div style="font-weight:600;font-size:.8rem">${_esc(f.name)}</div>
+       <div style="font-size:.8rem;color:var(--text-muted);white-space:pre-wrap">${_esc(f.value)}</div>
+     </div>`
+  ).join('');
+
+  document.getElementById('eb-preview').innerHTML = `
+    <div style="border-left:4px solid ${color};background:var(--bg-recessed);border-radius:4px;padding:12px 14px;display:flex;gap:12px">
+      <div style="flex:1;min-width:0">
+        ${title ? `<div style="font-weight:700;margin-bottom:4px">${_esc(title)}</div>` : ''}
+        ${desc ? `<div style="font-size:.85rem;color:var(--text-muted);white-space:pre-wrap">${_esc(desc)}</div>` : ''}
+        <div style="display:flex;flex-wrap:wrap;gap:8px">${fieldsHtml}</div>
+        ${image ? `<img src="${image}" style="max-width:100%;border-radius:4px;margin-top:10px" onerror="this.style.display='none'">` : ''}
+        <div style="font-size:.7rem;color:var(--text-faint);margin-top:10px">GLORY TO THE CCP! (footer added automatically)</div>
+      </div>
+      ${thumb ? `<img src="${thumb}" style="width:64px;height:64px;border-radius:4px;object-fit:cover" onerror="this.style.display='none'">` : ''}
+    </div>
+  `;
+}
+
+async function loadGuildListForBroadcast() {
+  const res = await fetch('/api/admin/guild-list');
+  if (res.status === 401 || res.status === 403) { location.href = '/login?next=/admin'; return; }
+  const data = await res.json();
+  const sel = document.getElementById('eb-target');
+  sel.innerHTML = '<option value="all">All servers</option>';
+  (data.guilds || []).forEach(g => {
+    const opt = document.createElement('option');
+    opt.value = g.id;
+    opt.textContent = `${g.name} (${g.member_count} members)`;
+    sel.appendChild(opt);
+  });
+}
+
+async function sendBroadcastEmbed() {
+  const title = v('eb-title');
+  const desc = v('eb-desc');
+  if (!title && !desc) { alert('Add a title or description first.'); return; }
+
+  const sel = document.getElementById('eb-target');
+  const target = sel.value;
+  const targetLabel = sel.selectedOptions[0].textContent;
+  if (!confirm(`Send this embed to ${targetLabel}? This sends once, immediately, and cannot be undone.`)) return;
+
+  const payload = {
+    target,
+    title,
+    description: desc,
+    color: document.getElementById('eb-color').value.replace('#', ''),
+    image_url: v('eb-image'),
+    thumbnail_url: v('eb-thumb'),
+    fields: ebFields.filter(f => f.name && f.value),
+  };
+
+  const out = document.getElementById('eb-result');
+  out.style.color = 'var(--text-muted)';
+  out.textContent = 'Sending...';
+
+  const res = await fetch('/api/admin/broadcast-embed', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (res.status === 401 || res.status === 403) { location.href = '/login?next=/admin'; return; }
+  const data = await res.json();
+
+  if (data.error) {
+    out.style.color = 'var(--red)';
+    out.textContent = 'Error: ' + data.error;
+    return;
+  }
+
+  out.style.color = 'var(--text)';
+  out.textContent = `Sent to ${data.sent}/${data.total} guild(s):\n` +
+    data.results.map(r => `${r.guild_name} (${r.guild_id}) -- ${r.status}${r.detail ? ': ' + r.detail : ''}`).join('\n');
+}
+
 let _voteChart = null;
 
 function _formatBucket(ts, period) {

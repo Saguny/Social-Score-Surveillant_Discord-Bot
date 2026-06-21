@@ -8,6 +8,7 @@ import asyncio
 import webbrowser
 from pathlib import Path
 from aiohttp import web
+import discord
 
 PORT = int(os.getenv("PORT", 8080))
 _runner = None
@@ -243,6 +244,109 @@ async def _handle_topgg_votes(request):
     return web.json_response({"period": period, "buckets": buckets, "total": total})
 
 
+def _find_writable_channel(guild: discord.Guild) -> discord.TextChannel | None:
+    candidates = []
+    if guild.system_channel:
+        candidates.append(guild.system_channel)
+    candidates.extend(c for c in guild.text_channels if c != guild.system_channel)
+
+    for channel in candidates:
+        everyone_perms = channel.permissions_for(guild.default_role)
+        bot_perms = channel.permissions_for(guild.me)
+        if (
+            everyone_perms.view_channel and everyone_perms.send_messages
+            and bot_perms.view_channel and bot_perms.send_messages and bot_perms.embed_links
+        ):
+            return channel
+    return None
+
+
+async def _handle_guild_list(request):
+    bot = request.app["bot"]
+    guilds = sorted(bot.guilds, key=lambda g: g.name.lower())
+    return web.json_response({
+        "guilds": [
+            {"id": str(g.id), "name": g.name, "member_count": g.member_count or 0}
+            for g in guilds
+        ]
+    })
+
+
+async def _handle_broadcast_embed(request):
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "Invalid JSON"}, status=400)
+
+    bot = request.app["bot"]
+    target = str(body.get("target", "all")).strip()
+    title = (body.get("title") or "").strip()
+    description = (body.get("description") or "").strip()
+    color_raw = (body.get("color") or "").strip().lstrip("#")
+    image_url = (body.get("image_url") or "").strip()
+    thumbnail_url = (body.get("thumbnail_url") or "").strip()
+    fields = body.get("fields") or []
+
+    if not title and not description:
+        return web.json_response({"error": "Embed needs a title or description."}, status=400)
+
+    try:
+        color = int(color_raw, 16) if color_raw else 0xCC0000
+    except ValueError:
+        return web.json_response({"error": "Invalid color hex."}, status=400)
+
+    if target == "all":
+        guilds = list(bot.guilds)
+    else:
+        try:
+            gid = int(target)
+        except ValueError:
+            return web.json_response({"error": "Invalid guild id."}, status=400)
+        guild = bot.get_guild(gid)
+        if not guild:
+            return web.json_response({"error": f"Bot is not in guild {gid}."}, status=404)
+        guilds = [guild]
+
+    if not guilds:
+        return web.json_response({"error": "No target guilds."}, status=400)
+
+    results = []
+    for guild in guilds:
+        embed = discord.Embed(title=title or None, description=description or None, color=color)
+        if image_url:
+            embed.set_image(url=image_url)
+        if thumbnail_url:
+            embed.set_thumbnail(url=thumbnail_url)
+        for f in fields[:25]:
+            name = (f.get("name") or "").strip()
+            value = (f.get("value") or "").strip()
+            if not name or not value:
+                continue
+            embed.add_field(name=name, value=value, inline=bool(f.get("inline")))
+
+        channel = _find_writable_channel(guild)
+        if not channel:
+            results.append({
+                "guild_id": str(guild.id), "guild_name": guild.name,
+                "status": "skipped", "detail": "No channel writable by @everyone found.",
+            })
+            continue
+        try:
+            await channel.send(embed=embed)
+            results.append({
+                "guild_id": str(guild.id), "guild_name": guild.name,
+                "status": "sent", "detail": f"#{channel.name}",
+            })
+        except Exception as e:
+            results.append({
+                "guild_id": str(guild.id), "guild_name": guild.name,
+                "status": "error", "detail": str(e),
+            })
+
+    sent = sum(1 for r in results if r["status"] == "sent")
+    return web.json_response({"results": results, "sent": sent, "total": len(results)})
+
+
 async def start_web_server(bot):
     global _runner
     if _runner:
@@ -259,6 +363,8 @@ async def start_web_server(bot):
     app.router.add_post("/api/admin/command", _require_auth(_handle_admin_command))
     app.router.add_get("/api/stats", _require_auth(_handle_stats))
     app.router.add_get("/api/admin/topgg-votes", _require_auth(_handle_topgg_votes))
+    app.router.add_get("/api/admin/guild-list", _require_auth(_handle_guild_list))
+    app.router.add_post("/api/admin/broadcast-embed", _require_auth(_handle_broadcast_embed))
     app.router.add_post("/webhooks/topgg", _handle_topgg_webhook)
     app.router.add_static('/static', Path(__file__).parent / 'static', name='static')
 

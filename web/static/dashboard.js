@@ -202,7 +202,9 @@ async function load() {
 
   set('ci-today',  fmt(d.checkins_today));
   setHtml('ci-t',  trendHtml(d.checkins_today, d.checkins_yday));
+  set('ci-rate',   d.dau > 0 ? Math.round(d.checkins_today / d.dau * 100) + '%' : '—');
   set('ci-streak', fmt(d.highest_streak));
+  set('ci-votes',  fmt(d.total_votes || 0));
   set('pr-ev',     fmt(d.prop_events));
   set('pr-subs',   fmt(d.prop_subs));
   set('pr-avg',    d.prop_events > 0 ? 'avg '+(d.prop_subs/d.prop_events).toFixed(1)+'/event' : '');

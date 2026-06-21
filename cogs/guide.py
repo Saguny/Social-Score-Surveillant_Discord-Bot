@@ -6,10 +6,11 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 from config.ranks import RANKS
-from cogs.stocks import _is_market_hours, _next_market_event
+from config.market_hours import is_market_hours as _is_market_hours, next_market_event as _next_market_event
 
 REPO_URL      = "https://github.com/Saguny/Social-Score-Surveillant_Discord-Bot"
 INVITE_URL    = "https://discord.com/oauth2/authorize?client_id=856163780265902151&permissions=2416438352&integration_type=0&scope=bot"
+SUPPORT_URL   = "https://discord.gg/FTgM4y3Bkb"
 WIKIQUOTE_API = "https://en.wikiquote.org/w/api.php"
 
 FALLBACK_DECREES = [
@@ -99,8 +100,9 @@ class Guide(commands.Cog):
             value=(
                 "Score gains from messages are capped at **+8.00 net per day**. "
                 "Once reached, further positive messages yield nothing until penalties bring you below the cap.\n"
-                "After your first 25 positive messages in a day, each additional positive message contributes at 25% effectiveness. "
-                "Negative penalties are always full strength regardless of message count."
+                "Once your net score gained today reaches **+6.00**, further positive messages contribute at 25% effectiveness. "
+                "This reverses automatically if penalties bring your net back below +6.00 — it is not a one-way switch.\n"
+                "Negative penalties are always full strength regardless of net score today."
             ),
             inline=False,
         )
@@ -170,7 +172,7 @@ class Guide(commands.Cog):
         e3.add_field(name="/leaderboard",            value="Rankings across 5 pages: Score, Economy, Activity, Social, and Markets (portfolio value and realized P&L).", inline=False)
         e3.add_field(name="/state_report",           value="Server-wide report: biggest rise/fall, top informant, yuan in circulation, avg score.", inline=False)
         e3.add_field(name="/graph <score|yuan> [citizen]", value="Generate a 30-day trend graph for score or yuan. Yuan graph populates once per day.", inline=False)
-        e3.add_field(name="/checkin",                value="Perform your daily check-in. Earns Yuan and a small score bump. Streak increases daily reward up to ¥750.", inline=False)
+        e3.add_field(name="/checkin",                value="Perform your daily check-in. Earns Yuan and a small score bump. Streak increases daily reward up to ¥2,000.", inline=False)
         e3.add_field(name="/botinfo",                value="Technical information about the bot: creator, tech stack, server count, repo and invite links.", inline=False)
         e3.add_field(name="/uptime",                 value="How long the Bureau has been active since last restart.", inline=False)
         e3.add_field(name="/ping",                   value="Check the Bureau's response latency.", inline=False)
@@ -179,7 +181,14 @@ class Guide(commands.Cog):
         embeds.append(e3)
 
         e4 = discord.Embed(color=0xCC0000, title="YUAN AND ECONOMY")
-        e4.add_field(name="Earning Yuan",  value="You earn ¥10 per message automatically. Check-ins and propaganda victories are additional sources.", inline=False)
+        e4.add_field(
+            name="Earning Yuan",
+            value=(
+                "You earn ¥10 per message automatically. Check-ins and propaganda victories are additional sources.\n"
+                f"Members of the [support server]({SUPPORT_URL}) earn +15% Yuan per message, checked live, leave and it switches off."
+            ),
+            inline=False,
+        )
         e4.add_field(name="/yuan",         value="Check your Yuan balance and lifetime earned/spent.", inline=False)
         e4.add_field(name="/transfer <citizen> <amount>", value="Send Yuan directly to another citizen. A confirmation prompt shows the amount and your balance after transfer before executing.", inline=False)
         e4.add_field(name="/requestyuan <citizen> <amount>", value="Request Yuan from another citizen. Posts a public embed they can Accept or Decline. Expires after 5 minutes.", inline=False)
@@ -213,11 +222,11 @@ class Guide(commands.Cog):
             name="LOTTERY TIERS",
             value=(
                 "Five tiers scaling with your wealth. All share the same 70/20/10 odds. Add a `target` to buy a ticket for someone else.\n"
-                "`lottery` ¥500 · win ¥400–700 · jackpot ¥2,000–4,000\n"
-                "`lottery_standard` ¥2,500 · win ¥2,000–4,000 · jackpot ¥10,000–20,000\n"
-                "`lottery_premium` ¥10,000 · win ¥8,000–15,000 · jackpot ¥40,000–80,000\n"
-                "`lottery_elite` ¥50,000 · win ¥40,000–75,000 · jackpot ¥200,000–400,000\n"
-                "`lottery_chairman` ¥250,000 · win ¥200,000–400,000 · jackpot ¥1,000,000–2,000,000"
+                "`lottery` ¥500 · win ¥600–1,000 · jackpot ¥2,000–4,000\n"
+                "`lottery_standard` ¥2,500 · win ¥3,000–5,000 · jackpot ¥10,000–20,000\n"
+                "`lottery_premium` ¥10,000 · win ¥12,000–18,000 · jackpot ¥40,000–80,000\n"
+                "`lottery_elite` ¥50,000 · win ¥60,000–90,000 · jackpot ¥200,000–400,000\n"
+                "`lottery_chairman` ¥250,000 · win ¥300,000–500,000 · jackpot ¥1,000,000–2,000,000"
             ),
             inline=False,
         )
@@ -230,14 +239,14 @@ class Guide(commands.Cog):
             name="/confess <text>",
             value=(
                 "Publicly confess your crimes to the Bureau. Costs Yuan scaled to how far your score has fallen "
-                "(¥200 minimum · up to ¥750 at the floor). Grants +0.5 score on acceptance."
+                "(¥200 minimum · up to ¥750 at the floor). Grants +0.5 score on acceptance. 1 hour cooldown."
             ),
             inline=False,
         )
         e4.add_field(
             name="/vote",
             value=(
-                "Vote for this bot on Top.gg. Earns the Loyal Patriot badge, +3.00 score, and ¥2,500 yuan "
+                "Vote for this bot on Top.gg. Earns the Loyal Patriot badge, +2.00 score, and ¥1,500 yuan "
                 "on every server you share with the bureau. Lasts 12 hours · vote again to renew."
             ),
             inline=False,
@@ -518,7 +527,7 @@ class Guide(commands.Cog):
         )
         e.add_field(
             name="LINKS",
-              value=f"[Source Code]({REPO_URL}) · [Invite to Server]({INVITE_URL})",
+              value=f"[Source Code]({REPO_URL}) · [Invite to Server]({INVITE_URL}) · [Support Server]({SUPPORT_URL})",
             inline=False,
         )
 

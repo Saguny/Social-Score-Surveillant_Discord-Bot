@@ -25,6 +25,12 @@ from config.stocks import (
     PUMP_TRIGGER_PROB, PUMP_DURATION_SECS, PUMP_DRIFT_PER_TICK, PUMP_CRASH_PCT,
     _YF_PERIOD_MAP, _PERIOD_SECONDS,
 )
+from config.market_hours import (
+    is_market_hours as _is_market_hours,
+    next_market_event as _next_market_event,
+    market_closed_message as _market_closed_message,
+    last_market_open_ts as _last_market_open_ts,
+)
 
 _NYSE_TZ        = ZoneInfo("America/New_York")  # DST-aware NYSE local time
 PERIODS         = ["1D", "5D", "1M", "3M", "6M", "1Y"]
@@ -44,60 +50,6 @@ def _ticker_info_name(ticker: str) -> str:
     if ticker in ADR_STOCKS:  return ADR_STOCKS[ticker]["name"]
     if ticker == ETF_TICKER:   return ETF_INFO["name"]
     return PENNY_STOCKS.get(ticker, {}).get("name", ticker)
-
-
-def _next_market_event() -> tuple[str, int, int]:
-    """Returns (event, next_ts, today_open_ts) where event is 'open' or 'close'."""
-    now      = datetime.datetime.now(_NYSE_TZ)
-    open_dt  = now.replace(hour=9, minute=30, second=0, microsecond=0)
-    close_dt = now.replace(hour=16, minute=0, second=0, microsecond=0)
-    open_ts  = int(open_dt.timestamp())
-    close_ts = int(close_dt.timestamp())
-    now_ts   = int(now.timestamp())
-    if now.weekday() < 5:
-        if now_ts < open_ts:
-            return "open", open_ts, open_ts
-        if now_ts < close_ts:
-            return "close", close_ts, open_ts
-    days = 1
-    while True:
-        nxt = now.date() + datetime.timedelta(days=days)
-        if nxt.weekday() < 5:
-            nm  = datetime.datetime(nxt.year, nxt.month, nxt.day, 9, 30, tzinfo=_NYSE_TZ)
-            nts = int(nm.timestamp())
-            return "open", nts, open_ts
-        days += 1
-
-
-def _market_closed_message() -> str:
-    _, next_open_ts, _ = _next_market_event()
-    return f"Market is closed. Opens <t:{next_open_ts}:R> (<t:{next_open_ts}:f>)."
-
-
-def _last_market_open_ts() -> int:
-    """Returns the timestamp of the most recently elapsed market open (today's,
-    if it has already happened, otherwise the previous trading day's)."""
-    now     = datetime.datetime.now(_NYSE_TZ)
-    open_dt = now.replace(hour=9, minute=30, second=0, microsecond=0)
-    open_ts = int(open_dt.timestamp())
-    now_ts  = int(now.timestamp())
-    if now.weekday() < 5 and now_ts >= open_ts:
-        return open_ts
-    days = 1
-    while True:
-        prev = now.date() - datetime.timedelta(days=days)
-        if prev.weekday() < 5:
-            pm = datetime.datetime(prev.year, prev.month, prev.day, 9, 30, tzinfo=_NYSE_TZ)
-            return int(pm.timestamp())
-        days += 1
-
-
-def _is_market_hours() -> bool:
-    now = datetime.datetime.now(_NYSE_TZ)
-    if now.weekday() >= 5:
-        return False
-    mins = now.hour * 60 + now.minute
-    return 9 * 60 + 30 <= mins < 16 * 60
 
 
 def _turbo_value_factor(direction: str, entry: float, knockout: float, current: float) -> float:
@@ -400,7 +352,7 @@ class StocksCog(commands.Cog, name="Stocks"):
         self._daily_locked: set[str]            = set()
         self._pump_state: dict[str, dict]       = {}
         self._last_turbo_day: int               = 0
-        self._chart_cache: dict[tuple, tuple]   = {}  # key → (png_bytes, timestamp)
+        self._chart_cache: dict[tuple, tuple]   = {}  # key -> (png_bytes, timestamp)
         self._price_task.start()
 
     def cog_unload(self):

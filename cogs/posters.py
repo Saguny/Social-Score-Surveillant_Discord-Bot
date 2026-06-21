@@ -110,7 +110,8 @@ class Posters(commands.Cog):
             await self.db.tick_user(gid, uid, HEART_YUAN)
             old, new = await self.db.update_score(gid, uid, HEART_SCORE, "propaganda poster: supported")
         else:
-            old, new = await self.db.update_score(gid, uid, RAGE_SCORE, "propaganda poster: resisted")
+            rage_delta, _ = await self.db.apply_defense_chain(gid, uid, RAGE_SCORE)
+            old, new = await self.db.update_score(gid, uid, rage_delta, "propaganda poster: resisted")
         if member and channel:
             self.bot.dispatch("score_change", guild, member, channel, old, new)
 

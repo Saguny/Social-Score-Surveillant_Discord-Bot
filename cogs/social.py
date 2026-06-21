@@ -41,6 +41,7 @@ class Social(commands.Cog):
 
         await self.db.set_endorsement(gid, uid, target.id, etype)
         delta = ENDORSE_DELTA if etype == "endorse" else REBUKE_DELTA
+        delta, _ = await self.db.apply_defense_chain(gid, target.id, delta)
         score_reason = f"citizen {etype}ment" + (f": {reason}" if reason else "")
         old_score, new_score = await self.db.update_score(gid, target.id, delta, score_reason)
         await self.db.update_social_counts(gid, target.id, uid, etype)

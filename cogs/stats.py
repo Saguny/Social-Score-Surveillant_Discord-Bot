@@ -230,8 +230,8 @@ class Stats(commands.Cog):
             if val < 0: return f"▼ {val:.2f}"
             return "= 0.00"
 
-        streak = user.get("checkin_streak", 0)
-        wins   = user.get("propaganda_wins", 0)
+        wins        = user.get("propaganda_wins", 0)
+        has_markets = bool((user.get("stock_trades") or 0) or (user.get("turbo_opened") or 0))
         author_name = await self.bot.format_user_full(target, gid)
 
         def build_overview(thumb_url: str | None) -> discord.Embed:
@@ -276,29 +276,41 @@ class Stats(commands.Cog):
             lottery_won    = user.get("lottery_won",    0)
             lottery_lost   = user.get("lottery_lost",   0)
             lottery_net    = user.get("lottery_net",    0)
-            e.add_field(name="TICKETS PLAYED", value=str(lottery_played),                                   inline=True)
-            e.add_field(name="WON · LOST",     value=f"{lottery_won} · {lottery_lost}",                    inline=True)
-            net_sign = "+" if lottery_net >= 0 else ""
-            e.add_field(name="LOTTERY NET",    value=f"{net_sign}¥{lottery_net:,}",                        inline=True)
-            if streak:
-                e.add_field(name="CHECK-IN STREAK",      value=f"{streak} days", inline=True)
+            e.add_field(name="TICKETS PLAYED", value=str(lottery_played),                                inline=True)
+            e.add_field(name="WON · LOST",     value=f"{lottery_won} · {lottery_lost}",                 inline=True)
+            lt_sign = "+" if lottery_net >= 0 else "-"
+            e.add_field(name="LOTTERY NET",    value=f"{lt_sign}¥{abs(lottery_net):,}",                 inline=True)
+            streak  = user.get("checkin_streak",         0) or 0
+            longest = user.get("longest_checkin_streak", 0) or 0
+            if streak or longest:
+                e.add_field(name="CHECK-IN STREAK", value=f"{streak} days", inline=True)
+                if longest > streak:
+                    e.add_field(name="BEST STREAK", value=f"{longest} days", inline=True)
             if wins:
-                e.add_field(name="PROPAGANDA VICTORIES", value=str(wins),         inline=True)
+                e.add_field(name="PROPAGANDA VICTORIES", value=str(wins), inline=True)
+            if thumb_url:
+                e.set_thumbnail(url=thumb_url)
+            e.timestamp = discord.utils.utcnow()
+            return e
+
+        def build_markets(thumb_url: str | None) -> discord.Embed:
+            e = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 公民档案")
+            e.set_author(name=author_name, icon_url=target.display_avatar.url)
             stock_trades  = user.get("stock_trades",  0) or 0
             stock_profit  = user.get("stock_profit",  0) or 0
             turbo_opened  = user.get("turbo_opened",  0) or 0
             turbo_knocked = user.get("turbo_knocked", 0) or 0
             turbo_profit  = user.get("turbo_profit",  0) or 0
             if stock_trades:
-                sp_sign = "+" if stock_profit >= 0 else ""
-                e.add_field(name="STOCK TRADES", value=str(stock_trades),                  inline=True)
-                e.add_field(name="STOCK P&L",    value=f"{sp_sign}¥{stock_profit:,}",      inline=True)
-                e.add_field(name="​",       value="​",                            inline=True)
+                sp_sign = "+" if stock_profit >= 0 else "-"
+                e.add_field(name="STOCK TRADES", value=str(stock_trades),                    inline=True)
+                e.add_field(name="STOCK P&L",    value=f"{sp_sign}¥{abs(stock_profit):,}",  inline=True)
+                e.add_field(name="​",        value="​",                             inline=True)
             if turbo_opened:
-                tp_sign = "+" if turbo_profit >= 0 else ""
-                e.add_field(name="TURBOS OPENED",  value=str(turbo_opened),                inline=True)
-                e.add_field(name="KNOCKED OUT",    value=str(turbo_knocked),               inline=True)
-                e.add_field(name="TURBO P&L",      value=f"{tp_sign}¥{turbo_profit:,}",   inline=True)
+                tp_sign = "+" if turbo_profit >= 0 else "-"
+                e.add_field(name="TURBOS OPENED", value=str(turbo_opened),                   inline=True)
+                e.add_field(name="KNOCKED OUT",   value=str(turbo_knocked),                  inline=True)
+                e.add_field(name="TURBO P&L",     value=f"{tp_sign}¥{abs(turbo_profit):,}", inline=True)
             if thumb_url:
                 e.set_thumbnail(url=thumb_url)
             e.timestamp = discord.utils.utcnow()
@@ -306,6 +318,9 @@ class Stats(commands.Cog):
 
         builders = {"overview": build_overview, "social": build_social, "economy": build_economy}
         labels   = {"overview": "OVERVIEW", "social": "SOCIAL", "economy": "ECONOMY"}
+        if has_markets:
+            builders["markets"] = build_markets
+            labels["markets"]   = "MARKETS"
 
         class StatsView(discord.ui.View):
             def __init__(self, current: str, thumb_url: str | None):

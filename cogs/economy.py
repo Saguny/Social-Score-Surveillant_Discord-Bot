@@ -309,6 +309,31 @@ class Economy(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.db = bot.db
+        self._buy_handlers = {
+            "report":              self._buy_report,
+            "denounce":            self._buy_denounce,
+            "surveillance":        self._buy_surveillance,
+            "rehabilitate":        self._buy_rehabilitate,
+            "appeal":              self._buy_appeal,
+            "exception":           self._buy_exception,
+            "reeducation":         self._buy_reeducation,
+            "lottery_dono":        self._buy_lottery_dono,
+            "tip":                 self._buy_tip,
+            "model_citizen":       self._buy_model_citizen,
+            "dispute":             self._buy_dispute,
+            "investigation":       self._buy_investigation,
+            "protection":          self._buy_protection,
+            "inquiry":             self._buy_inquiry,
+            "criticism":           self._buy_criticism,
+            "inspection":          self._buy_inspection,
+            "history_review":      self._buy_history_review,
+            "legal_rep":           self._buy_legal_rep,
+            "anon_identity":       self._buy_anon_identity,
+            "immunity":            self._buy_immunity,
+            "pact":                self._buy_pact,
+            "media_coverage":      self._buy_media_coverage,
+            "fabricated_evidence": self._buy_fabricated_evidence,
+        }
 
     def _post_score(self, interaction: discord.Interaction, member: discord.Member, old: float, new: float):
         self.bot.dispatch("score_change", interaction.guild, member, interaction.channel, old, new)
@@ -324,16 +349,18 @@ class Economy(commands.Cog):
             file=discord.File("images/market.png", filename="market.png"),
         )
 
-    @app_commands.command(name="yuan", description="Check your Yuan balance")
-    async def yuan(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
-        user = await self.db.get_user(interaction.guild.id, interaction.user.id)
+    @app_commands.command(name="yuan", description="View a citizen's Yuan balance")
+    @app_commands.describe(citizen="Citizen to look up (defaults to yourself)")
+    async def yuan(self, interaction: discord.Interaction, citizen: discord.Member = None):
+        await interaction.response.defer()
+        target = citizen or interaction.user
+        user = await self.db.get_user(interaction.guild.id, target.id)
         embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")
-        embed.add_field(name="CITIZEN", value=await self.bot.format_user_full(interaction.user, interaction.guild.id), inline=False)
-        embed.add_field(name="BALANCE", value=f"¥{user['yuan']:,}", inline=True)
+        embed.set_author(name=await self.bot.format_user_full(target, interaction.guild.id), icon_url=target.display_avatar.url)
+        embed.add_field(name="BALANCE",      value=f"¥{user['yuan']:,}",              inline=True)
         embed.add_field(name="TOTAL EARNED", value=f"¥{user['total_yuan_earned']:,}", inline=True)
-        embed.add_field(name="TOTAL SPENT", value=f"¥{user['total_yuan_spent']:,}", inline=True)
-        await interaction.followup.send(embed=embed, ephemeral=True)
+        embed.add_field(name="TOTAL SPENT",  value=f"¥{user['total_yuan_spent']:,}",  inline=True)
+        await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="buy", description="Purchase an item from the shop")
     @app_commands.describe(
@@ -415,485 +442,474 @@ class Economy(commands.Cog):
         await self.db.increment_items_bought(gid, uid)
         await self._dispatch(interaction, item, cfg, target, text, cost)
 
-    async def _apply_defense_chain(self, gid: int, target_id: int, base_delta: float) -> tuple[float, str | None]:
-        if await self.db.get_effect(gid, target_id, "criticism"):
-            base_delta *= 2
-        if await self.db.consume_effect(gid, target_id, "exception"):
-            return 0.0, "exception"
-        if await self.db.consume_effect(gid, target_id, "immunity"):
-            if random.random() < 0.5:
-                return 0.0, "immunity"
-        reduction = 1.0
-        if await self.db.consume_effect(gid, target_id, "appeal"):
-            reduction *= 0.5
-        if await self.db.consume_effect(gid, target_id, "protection"):
-            reduction *= 0.5
-        if await self.db.get_effect(gid, target_id, "legal_rep"):
-            reduction *= 0.5
-        return round(base_delta * reduction, 2), None
-
     async def _dispatch(self, interaction, item_id, cfg, target, text, cost):
         gid = interaction.guild.id
         uid = interaction.user.id
-
-        if item_id == "report":
-            is_anon = await self.db.consume_effect(gid, uid, "anon_identity")
-            delta, block = await self._apply_defense_chain(gid, target.id, -2.0)
-            if block:
-                embed = discord.Embed(color=0x333333, title="中华人民共和国社会信用局")
-                msg = (
-                    f"{target.mention} had an Administrative Exception on file. Report nullified."
-                    if block == "exception" else
-                    f"{target.mention}'s Citizen Immunity deflected the report."
-                )
-                embed.add_field(name="REPORT NULLIFIED", value=msg, inline=False)
-                await interaction.followup.send(embed=embed, ephemeral=True)
-                return
-
-            old, new = await self.db.update_score(gid, target.id, delta, "citizen report")
-            await self.db.increment_reported(gid, target.id)
-            await self.db.increment_filed_reports(gid, uid)
-            report_num = await self.db.increment_report_counter(gid)
-            reporter_name = "Unknown Citizen" if is_anon else await self.bot.format_user_full(interaction.user, gid)
-            embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")
-            embed.add_field(name="OFFICIAL REPORT FILED", value=target.mention, inline=False)
-            embed.add_field(name="FILED BY", value=reporter_name, inline=True)
-            embed.add_field(name="SCORE IMPACT", value=f"{delta:.2f}", inline=True)
-            embed.set_footer(text=f"Report #{report_num:05d} · GLORY TO THE CCP!")
-            embed.timestamp = discord.utils.utcnow()
-            await interaction.followup.send(embed=embed)
-            self._post_score(interaction, target, old, new)
-
-        elif item_id == "denounce":
-            is_anon = await self.db.consume_effect(gid, uid, "anon_identity")
-            delta, block = await self._apply_defense_chain(gid, target.id, -20.0)
-            if block:
-                embed = discord.Embed(color=0x333333, title="中华人民共和国社会信用局")
-                msg = (
-                    f"{target.mention} had an Administrative Exception on file. Denouncement nullified."
-                    if block == "exception" else
-                    f"{target.mention}'s Citizen Immunity deflected the denouncement."
-                )
-                embed.add_field(name="DENOUNCEMENT NULLIFIED", value=msg, inline=False)
-                await interaction.followup.send(embed=embed, ephemeral=True)
-                return
-
-            old, new = await self.db.update_score(gid, target.id, delta, "public denouncement")
-            await self.db.increment_reported(gid, target.id)
-            report_num = await self.db.increment_report_counter(gid)
-            bounty = await self.db.consume_investigation_bounty(gid, target.id)
-            if bounty:
-                await self.db.adjust_yuan(gid, uid, bounty.get("reward", _INVESTIGATION_BOUNTY_REWARD))
-            denouncer_name = "Unknown Citizen" if is_anon else await self.bot.format_user_full(interaction.user, gid)
-            embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 公开谴责")
-            embed.add_field(name="SUBJECT", value=target.mention, inline=False)
-            embed.add_field(name="DENOUNCED BY", value=denouncer_name, inline=True)
-            embed.add_field(name="STATED CRIME", value=text[:100], inline=False)
-            embed.add_field(name="SCORE IMPACT", value=f"{delta:.2f}", inline=True)
-            if bounty:
-                embed.add_field(name="INVESTIGATION BOUNTY CLAIMED", value=f"+¥{bounty.get('reward', _INVESTIGATION_BOUNTY_REWARD):,}", inline=False)
-            embed.set_footer(text=f"Report #{report_num:05d} · GLORY TO THE CCP!")
-            embed.timestamp = discord.utils.utcnow()
-            await interaction.channel.send(embed=embed)
-            await interaction.followup.send("Your denouncement has been filed.", ephemeral=True)
-            self._post_score(interaction, target, old, new)
-
-        elif item_id == "surveillance":
-            expires_at = int(time.time()) + cfg["duration"]
-            await self.db.add_effect(gid, uid, "surveillance", expires_at, {"target_id": target.id})
-            embed = discord.Embed(color=0x333333, title="中华人民共和国社会信用局")
-            embed.add_field(
-                name="INTELLIGENCE PACKAGE ACQUIRED",
-                value=f"Dossier on {target.mention} is ready.\nUse `/surveillance_report` within 30 days to redeem.",
-                inline=False,
-            )
-            await interaction.followup.send(embed=embed, ephemeral=True)
-
-        elif item_id == "rehabilitate":
-            recipient = target if target else interaction.user
-            old, new = await self.db.update_score(gid, recipient.id, 3.0, "rehabilitation certificate")
-            if target:
-                embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局")
-                embed.add_field(name="REHABILITATION GIFT", value=f"{interaction.user.mention} gifted a Rehabilitation Program to {target.mention}", inline=False)
-                embed.add_field(name="SCORE", value=f"{old:.2f} -> {new:.2f}", inline=True)
-                if text:
-                    embed.add_field(name="MESSAGE", value=text[:200], inline=False)
-                embed.timestamp = discord.utils.utcnow()
-                await interaction.channel.send(embed=embed)
-                await interaction.followup.send("Your gift has been delivered.", ephemeral=True)
-            else:
-                embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局")
-                embed.add_field(name="REHABILITATION APPROVED", value=f"Score adjusted: {old:.2f} -> {new:.2f}", inline=False)
-                await interaction.followup.send(embed=embed, ephemeral=True)
-            self._post_score(interaction, recipient, old, new)
-
-        elif item_id == "appeal":
-            recipient = target if target else interaction.user
-            expires_at = int(time.time()) + cfg["duration"]
-            await self.db.add_effect(gid, recipient.id, "appeal", expires_at)
-            if target:
-                embed = discord.Embed(color=0x1a3a5c, title="中华人民共和国社会信用局")
-                embed.add_field(name="APPEAL GIFT", value=f"{interaction.user.mention} filed an Appeal on behalf of {target.mention}", inline=False)
-                embed.add_field(name="EFFECT", value="Their next incoming penalty within 12 hours will be reduced by 50%. Single use.", inline=False)
-                if text:
-                    embed.add_field(name="MESSAGE", value=text[:200], inline=False)
-                embed.timestamp = discord.utils.utcnow()
-                await interaction.channel.send(embed=embed)
-                await interaction.followup.send("Your gift has been delivered.", ephemeral=True)
-            else:
-                embed = discord.Embed(color=0x1a3a5c, title="中华人民共和国社会信用局")
-                embed.add_field(name="APPEAL FILED", value="The next negative score action against you within 12 hours will be reduced by 50%. Single use.", inline=False)
-                await interaction.followup.send(embed=embed, ephemeral=True)
-
-        elif item_id == "exception":
-            recipient = target if target else interaction.user
-            expires_at = int(time.time()) + cfg["duration"]
-            await self.db.add_effect(gid, recipient.id, "exception", expires_at)
-            if target:
-                embed = discord.Embed(color=0x2d5a27, title="中华人民共和国社会信用局")
-                embed.add_field(name="EXCEPTION GIFT", value=f"{interaction.user.mention} granted an Administrative Exception to {target.mention}", inline=False)
-                embed.add_field(name="EFFECT", value="Their next negative score action within 24 hours will be completely nullified. Single use.", inline=False)
-                if text:
-                    embed.add_field(name="MESSAGE", value=text[:200], inline=False)
-                embed.timestamp = discord.utils.utcnow()
-                await interaction.channel.send(embed=embed)
-                await interaction.followup.send("Your gift has been delivered.", ephemeral=True)
-            else:
-                embed = discord.Embed(color=0x2d5a27, title="中华人民共和国社会信用局")
-                embed.add_field(name="EXCEPTION GRANTED", value="The next negative score action against you within 24 hours will be completely nullified.", inline=False)
-                await interaction.followup.send(embed=embed, ephemeral=True)
-
-        elif item_id == "reeducation":
-            if await self.db.get_effect(gid, target.id, "freeze"):
-                await interaction.followup.send(
-                    f"{target.mention} is already score-frozen.", ephemeral=True
-                )
-                return
-            expires_at = int(time.time()) + cfg["duration"]
-            await self.db.add_effect(gid, target.id, "freeze", expires_at)
-            self.db.invalidate_effect_cache(gid, target.id, "freeze")
-            embed = discord.Embed(color=0x8B0000, title="中华人民共和国社会信用局 · 再教育营")
-            embed.add_field(
-                name="RE-EDUCATION SENTENCE ISSUED",
-                value=f"{target.mention}'s social credit score is frozen for 2 hours by order of the bureau.",
-                inline=False,
-            )
-            await interaction.followup.send(embed=embed)
-
-        elif item_id in _LOTTERY_TIERS:
-            tier = _LOTTERY_TIERS[item_id]
-            recipient = target if target else interaction.user
-            gifted = target is not None
-            recipient_name = await self.bot.format_user_full(recipient, gid)
-            buyer_name = await self.bot.format_user_full(interaction.user, gid)
-            roll = random.random()
-            if roll < 0.7:
-                net = 0 if gifted else -cost
-                embed = discord.Embed(color=0x333333, title="中华人民共和国社会信用局 · 国家彩票")
-                if gifted:
-                    embed.add_field(name="TICKET PURCHASED BY", value=buyer_name, inline=True)
-                    embed.add_field(name="FOR", value=recipient_name, inline=True)
-                else:
-                    embed.add_field(name="CITIZEN", value=buyer_name, inline=False)
-                embed.add_field(name="RESULT", value="Better luck next time. The Party keeps your entry.", inline=False)
-                embed.add_field(name="YUAN CHANGE", value=f"-¥{cost:,}", inline=False)
-                await self.db.update_lottery_stats(gid, recipient.id, False, net)
-            elif roll < 0.9:
-                winnings = random.randint(*tier["win"])
-                net = winnings if gifted else winnings - cost
-                await self.db.adjust_yuan(gid, recipient.id, winnings)
-                embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局 · 国家彩票")
-                if gifted:
-                    embed.add_field(name="TICKET PURCHASED BY", value=buyer_name, inline=True)
-                    embed.add_field(name="FOR", value=recipient_name, inline=True)
-                else:
-                    embed.add_field(name="CITIZEN", value=buyer_name, inline=False)
-                embed.add_field(name="WINNER", value="The Party smiles upon you.", inline=False)
-                embed.add_field(name="YUAN CHANGE", value=f"+¥{winnings:,} · net {net:+,}", inline=False)
-                await self.db.update_lottery_stats(gid, recipient.id, True, net)
-            else:
-                winnings = random.randint(*tier["jackpot"])
-                net = winnings if gifted else winnings - cost
-                await self.db.adjust_yuan(gid, recipient.id, winnings)
-                embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局 · 国家彩票")
-                if gifted:
-                    embed.add_field(name="TICKET PURCHASED BY", value=buyer_name, inline=True)
-                    embed.add_field(name="FOR", value=recipient_name, inline=True)
-                else:
-                    embed.add_field(name="CITIZEN", value=buyer_name, inline=False)
-                embed.add_field(name="JACKPOT", value="Extraordinary fortune. The state bestows its blessing.", inline=False)
-                embed.add_field(name="YUAN CHANGE", value=f"+¥{winnings:,} · net {net:+,}", inline=False)
-                await self.db.update_lottery_stats(gid, recipient.id, True, net)
-            embed.timestamp = discord.utils.utcnow()
-            await interaction.followup.send(embed=embed)
-
-        elif item_id == "lottery_dono":
-            user_row = await self.db.get_user(gid, uid)
-            balance  = int(user_row["yuan"]) if user_row else 0
-            name     = await self.bot.format_user_full(interaction.user, gid)
-            if balance <= 0:
-                await interaction.followup.send("You have no yuan to wager.", ephemeral=True)
-                return
-            won = random.random() < 0.5
-            if won:
-                await self.db.adjust_yuan(gid, uid, balance)
-                await self.db.update_lottery_stats(gid, uid, True, balance)
-                embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局 · 双倍或无")
-                embed.add_field(name="CITIZEN", value=name, inline=False)
-                embed.add_field(name="RESULT", value="The Party smiles upon your boldness.", inline=False)
-                embed.add_field(name="WAGERED", value=f"¥{balance:,}", inline=True)
-                embed.add_field(name="NEW BALANCE", value=f"¥{balance * 2:,}", inline=True)
-            else:
-                await self.db.set_yuan(gid, uid, 0)
-                await self.db.update_lottery_stats(gid, uid, False, -balance)
-                embed = discord.Embed(color=0x333333, title="中华人民共和国社会信用局 · 双倍或无")
-                embed.add_field(name="CITIZEN", value=name, inline=False)
-                embed.add_field(name="RESULT", value="The Party has confiscated your assets.", inline=False)
-                embed.add_field(name="LOST", value=f"¥{balance:,}", inline=True)
-                embed.add_field(name="NEW BALANCE", value="¥0", inline=True)
-            embed.timestamp = discord.utils.utcnow()
-            await interaction.followup.send(embed=embed)
-
-        elif item_id == "tip":
-            embed = discord.Embed(color=0x555555, title="中华人民共和国社会信用局 · 匿名举报")
-            embed.add_field(name="SUBJECT", value=target.mention, inline=False)
-            embed.add_field(name="SUBMITTED BY", value="Unknown Citizen", inline=True)
-            embed.add_field(name="TIP", value=text[:200], inline=False)
-            embed.timestamp = discord.utils.utcnow()
-            await interaction.channel.send(embed=embed)
-            await interaction.followup.send("Your tip has been submitted anonymously.", ephemeral=True)
-
-        elif item_id == "model_citizen":
-            recipient = target if target else interaction.user
-            old, new = await self.db.update_score(gid, recipient.id, 1.0, "model citizen commendation")
-            if target:
-                embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局")
-                embed.add_field(name="MODEL CITIZEN COMMENDATION", value=f"{interaction.user.mention} has nominated {target.mention} as a Model Citizen", inline=False)
-                embed.add_field(name="SCORE", value=f"{old:.2f} -> {new:.2f}", inline=True)
-                if text:
-                    embed.add_field(name="MESSAGE", value=text[:200], inline=False)
-                embed.timestamp = discord.utils.utcnow()
-                await interaction.channel.send(embed=embed)
-                await interaction.followup.send("Your commendation has been filed.", ephemeral=True)
-            else:
-                embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局")
-                embed.add_field(name="MODEL CITIZEN AWARD", value=f"The Party commends your loyalty. Score: {old:.2f} -> {new:.2f}", inline=False)
-                await interaction.followup.send(embed=embed, ephemeral=True)
-            self._post_score(interaction, recipient, old, new)
-
-        elif item_id == "dispute":
-            buyer_wins = random.random() < 0.5
-            winner = interaction.user if buyer_wins else target
-            loser = target if buyer_wins else interaction.user
-            w_old, w_new = await self.db.update_score(gid, winner.id, 2.0, "dispute resolution victory")
-            l_old, l_new = await self.db.update_score(gid, loser.id, -2.0, "dispute resolution loss")
-            embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 争议裁决")
-            challenger_name = await self.bot.format_user_full(interaction.user, gid)
-            defendant_name = await self.bot.format_user_full(target, gid)
-            winner_name = await self.bot.format_user_full(winner, gid)
-            loser_name = await self.bot.format_user_full(loser, gid)
-            embed.add_field(name="CHALLENGER", value=challenger_name, inline=True)
-            embed.add_field(name="DEFENDANT", value=defendant_name, inline=True)
-            embed.add_field(name="OUTCOME", value=f"{winner_name} wins +2.00 · {loser_name} loses -2.00", inline=False)
-            embed.timestamp = discord.utils.utcnow()
-            await interaction.followup.send(embed=embed)
-            self._post_score(interaction, winner, w_old, w_new)
-            self._post_score(interaction, loser, l_old, l_new)
-
-        elif item_id == "investigation":
-            extra_bounty = 0
-            if text:
-                try:
-                    extra_bounty = max(0, int(text.replace(",", "").strip()))
-                except ValueError:
-                    pass
-            if extra_bounty > 0 and not await self.db.spend_yuan(gid, uid, extra_bounty):
-                balance = (await self.db.get_user(gid, uid))["yuan"]
-                await interaction.followup.send(
-                    f"Insufficient funds for ¥{extra_bounty:,} extra bounty (balance: ¥{balance:,}). Base bounty applied.",
-                    ephemeral=True,
-                )
-                extra_bounty = 0
-            total_bounty = _INVESTIGATION_BOUNTY_REWARD + extra_bounty
-            expires_at = int(time.time()) + cfg["duration"]
-            await self.db.add_effect(gid, target.id, "investigation", expires_at, {"buyer_id": uid, "reward": total_bounty})
-            embed = discord.Embed(color=0x8B0000, title="中华人民共和国社会信用局")
-            bounty_line = f"¥{total_bounty:,} bounty" + (f" (¥{_INVESTIGATION_BOUNTY_REWARD:,} base + ¥{extra_bounty:,} added)" if extra_bounty else "")
-            embed.add_field(
-                name="SPECIAL INVESTIGATION OPENED",
-                value=f"{bounty_line} placed on {target.mention}.\nThe next citizen to file a report on them will receive the reward.",
-                inline=False,
-            )
-            await interaction.followup.send(embed=embed, ephemeral=True)
-
-        elif item_id == "protection":
-            expires_at = int(time.time()) + 315360000
-            await self.db.add_effect(gid, target.id, "protection", expires_at)
-            embed = discord.Embed(color=0x2d5a27, title="中华人民共和国社会信用局")
-            embed.add_field(
-                name="POLITICAL PROTECTION GRANTED",
-                value=f"{target.mention} is under political protection.\nThe first negative action against them will be reduced by 50%. Lasts until triggered.",
-                inline=False,
-            )
-            await interaction.followup.send(embed=embed, ephemeral=True)
-
-        elif item_id == "inquiry":
-            attacker_id = await self.db.get_last_attacker(gid, uid)
-            embed = discord.Embed(color=0x1a1a2e, title="中华人民共和国社会信用局 · 内部调查")
-            if attacker_id:
-                attacker = interaction.guild.get_member(attacker_id)
-                attacker_name = await self.bot.format_user_full(attacker, gid) if attacker else f"User {attacker_id}"
-                embed.add_field(name="LAST KNOWN AGGRESSOR", value=attacker_name, inline=False)
-            else:
-                embed.add_field(name="RESULT", value="No reports or denouncements on file against you.", inline=False)
-            embed.timestamp = discord.utils.utcnow()
-            await interaction.followup.send(embed=embed, ephemeral=True)
-
-        elif item_id == "criticism":
-            expires_at = int(time.time()) + cfg["duration"]
-            await self.db.add_effect(gid, target.id, "criticism", expires_at)
-            embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")
-            embed.add_field(
-                name="COORDINATED CRITICISM ACTIVE",
-                value=f"All negative score actions against {target.mention} deal double score loss for 24 hours.",
-                inline=False,
-            )
-            embed.timestamp = discord.utils.utcnow()
-            await interaction.followup.send(embed=embed)
-
-        elif item_id == "inspection":
-            victim_id = await self.db.get_random_active_user(gid, uid)
-            if not victim_id:
-                await interaction.followup.send("No eligible citizens found in this server.", ephemeral=True)
-                return
-            old, new = await self.db.update_score(gid, victim_id, -1.0, "compliance inspection")
-            victim = interaction.guild.get_member(victim_id)
-            victim_name = await self.bot.format_user_full(victim, gid) if victim else f"Citizen {victim_id}"
-            embed = discord.Embed(color=0x8B0000, title="中华人民共和国社会信用局 · 合规检查")
-            embed.add_field(name="SELECTED CITIZEN", value=victim_name, inline=False)
-            embed.add_field(name="RESULT", value=f"Score: {old:.2f} -> {new:.2f}", inline=True)
-            embed.timestamp = discord.utils.utcnow()
-            await interaction.followup.send(embed=embed)
-            if victim:
-                self._post_score(interaction, victim, old, new)
-
-        elif item_id == "history_review":
-            history = await self.db.get_score_history_brief(gid, target.id, limit=20)
-            embed = discord.Embed(color=0x1a1a2e, title="中华人民共和国社会信用局 · 历史审查")
-            embed.add_field(name="SUBJECT", value=await self.bot.format_user_full(target, gid), inline=False)
-            if history:
-                lines = []
-                for h in history:
-                    sign = "+" if h["delta"] >= 0 else ""
-                    from datetime import datetime, timezone
-                    ts = datetime.fromtimestamp(h["timestamp"], tz=timezone.utc).strftime("%m/%d %H:%M")
-                    lines.append(f"`{ts}` {sign}{h['delta']:.2f} · {h['reason'] or 'unknown'}")
-                embed.add_field(name="LAST 20 EVENTS", value="\n".join(lines[:20])[:1024], inline=False)
-            else:
-                embed.add_field(name="RESULT", value="No score history on file.", inline=False)
-            embed.timestamp = discord.utils.utcnow()
-            await interaction.followup.send(embed=embed, ephemeral=True)
-
-        elif item_id == "legal_rep":
-            recipient = target if target else interaction.user
-            expires_at = int(time.time()) + cfg["duration"]
-            await self.db.add_effect(gid, recipient.id, "legal_rep", expires_at)
-            if target:
-                embed = discord.Embed(color=0x1a3a5c, title="中华人民共和国社会信用局")
-                embed.add_field(name="LEGAL REPRESENTATION GIFT", value=f"{interaction.user.mention} retained legal counsel for {target.mention}", inline=False)
-                embed.add_field(name="EFFECT", value="All negative score actions against them are reduced by 50% for 12 hours.", inline=False)
-                if text:
-                    embed.add_field(name="MESSAGE", value=text[:200], inline=False)
-                embed.timestamp = discord.utils.utcnow()
-                await interaction.channel.send(embed=embed)
-                await interaction.followup.send("Your gift has been delivered.", ephemeral=True)
-            else:
-                embed = discord.Embed(color=0x1a3a5c, title="中华人民共和国社会信用局")
-                embed.add_field(name="LEGAL REPRESENTATION ACTIVE", value="All negative score actions against you are reduced by 50% for 12 hours.", inline=False)
-                await interaction.followup.send(embed=embed, ephemeral=True)
-
-        elif item_id == "anon_identity":
-            expires_at = int(time.time()) + cfg["duration"]
-            await self.db.add_effect(gid, uid, "anon_identity", expires_at)
-            embed = discord.Embed(color=0x333333, title="中华人民共和国社会信用局")
-            embed.add_field(
-                name="ALTERNATE IDENTITY ACTIVE",
-                value="Your next report or denouncement will appear as Unknown Citizen. Single use.",
-                inline=False,
-            )
-            await interaction.followup.send(embed=embed, ephemeral=True)
-
-        elif item_id == "immunity":
-            recipient = target if target else interaction.user
-            expires_at = int(time.time()) + (86400 * 7)
-            await self.db.add_effect(gid, recipient.id, "immunity", expires_at)
-            if target:
-                embed = discord.Embed(color=0x2d5a27, title="中华人民共和国社会信用局")
-                embed.add_field(name="IMMUNITY GIFT", value=f"{interaction.user.mention} secured Citizen Immunity for {target.mention}", inline=False)
-                embed.add_field(name="EFFECT", value="50% chance to completely block the next negative action against them. Single use.", inline=False)
-                if text:
-                    embed.add_field(name="MESSAGE", value=text[:200], inline=False)
-                embed.timestamp = discord.utils.utcnow()
-                await interaction.channel.send(embed=embed)
-                await interaction.followup.send("Your gift has been delivered.", ephemeral=True)
-            else:
-                embed = discord.Embed(color=0x2d5a27, title="中华人民共和国社会信用局")
-                embed.add_field(name="CITIZEN IMMUNITY ACTIVE", value="50% chance to completely block the next negative action against you. Single use.", inline=False)
-                await interaction.followup.send(embed=embed, ephemeral=True)
-
-        elif item_id == "pact":
-            expires_at = int(time.time()) + cfg["duration"]
-            await self.db.add_effect(gid, uid, "appeal", expires_at)
-            await self.db.add_effect(gid, target.id, "appeal", expires_at)
-            embed = discord.Embed(color=0x2d5a27, title="中华人民共和国社会信用局")
-            embed.add_field(
-                name="MUTUAL ASSISTANCE PACT SEALED",
-                value=f"You and {target.mention} both now carry a 50% reduction shield on your next incoming penalty.",
-                inline=False,
-            )
-            await interaction.followup.send(embed=embed)
-
-        elif item_id == "media_coverage":
-            recipient = target if target else interaction.user
-            expires_at = int(time.time()) + cfg["duration"]
-            await self.db.add_effect(gid, recipient.id, "media_coverage", expires_at)
-            if target:
-                embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局")
-                embed.add_field(name="MEDIA COVERAGE GIFT", value=f"{interaction.user.mention} arranged State Media Coverage for {target.mention}", inline=False)
-                embed.add_field(name="EFFECT", value="Their next organic positive score gain will be doubled and broadcast publicly.", inline=False)
-                if text:
-                    embed.add_field(name="MESSAGE", value=text[:200], inline=False)
-                embed.timestamp = discord.utils.utcnow()
-                await interaction.channel.send(embed=embed)
-                await interaction.followup.send("Your gift has been delivered.", ephemeral=True)
-            else:
-                embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局")
-                embed.add_field(name="STATE MEDIA COVERAGE ACTIVE", value="Your next organic positive score gain will be doubled and broadcast publicly.", inline=False)
-                await interaction.followup.send(embed=embed, ephemeral=True)
-
-        elif item_id == "fabricated_evidence":
-            await self.db.add_fabricated_history(gid, target.id, text)
-            embed = discord.Embed(color=0x333333, title="中华人民共和国社会信用局")
-            embed.add_field(
-                name="EVIDENCE PLANTED",
-                value=f"An unverified entry has been inserted into {target.mention}'s score history.",
-                inline=False,
-            )
-            await interaction.followup.send(embed=embed, ephemeral=True)
-
+        if item_id in _LOTTERY_TIERS:
+            await self._buy_lottery(interaction, gid, uid, cfg, target, text, cost, item_id)
+            return
+        handler = self._buy_handlers.get(item_id)
+        if handler:
+            await handler(interaction, gid, uid, cfg, target, text, cost)
         elif cfg.get("cosmetic"):
-            meta = COSMETIC_META.get(item_id, {})
-            color = meta.get("color", 0xFFD700)
-            label = meta.get("label", item_id.upper())
-            note = meta.get("note", "Your cosmetic status has been recorded in the bureau's registry.")
-            if item_id == "eternal_chairman":
-                await self.db.add_eternal_chairman(uid)
-                self.bot.ec_users.add(uid)
-            else:
-                await self.db.add_cosmetic_badge(gid, uid, item_id)
-            embed = discord.Embed(color=color, title="中华人民共和国社会信用局")
-            embed.add_field(name=f"STATUS GRANTED: {label}", value=note, inline=False)
+            await self._buy_cosmetic(interaction, gid, uid, item_id, cfg, target, text, cost)
+
+    async def _buy_report(self, interaction, gid, uid, cfg, target, text, cost):
+        is_anon = await self.db.consume_effect(gid, uid, "anon_identity")
+        delta, block = await self.db.apply_defense_chain(gid, target.id, -2.0)
+        if block:
+            embed = discord.Embed(color=0x333333, title="中华人民共和国社会信用局")
+            msg = (
+                f"{target.mention} had an Administrative Exception on file. Report nullified."
+                if block == "exception" else
+                f"{target.mention}'s Citizen Immunity deflected the report."
+            )
+            embed.add_field(name="REPORT NULLIFIED", value=msg, inline=False)
             await interaction.followup.send(embed=embed, ephemeral=True)
+            return
+        old, new = await self.db.update_score(gid, target.id, delta, "citizen report")
+        await self.db.increment_reported(gid, target.id)
+        await self.db.increment_filed_reports(gid, uid)
+        report_num = await self.db.increment_report_counter(gid)
+        reporter_name = "Unknown Citizen" if is_anon else await self.bot.format_user_full(interaction.user, gid)
+        embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")
+        embed.add_field(name="OFFICIAL REPORT FILED", value=target.mention, inline=False)
+        embed.add_field(name="FILED BY", value=reporter_name, inline=True)
+        embed.add_field(name="SCORE IMPACT", value=f"{delta:.2f}", inline=True)
+        embed.set_footer(text=f"Report #{report_num:05d} · GLORY TO THE CCP!")
+        embed.timestamp = discord.utils.utcnow()
+        await interaction.followup.send(embed=embed)
+        self._post_score(interaction, target, old, new)
+
+    async def _buy_denounce(self, interaction, gid, uid, cfg, target, text, cost):
+        is_anon = await self.db.consume_effect(gid, uid, "anon_identity")
+        delta, block = await self.db.apply_defense_chain(gid, target.id, -20.0)
+        if block:
+            embed = discord.Embed(color=0x333333, title="中华人民共和国社会信用局")
+            msg = (
+                f"{target.mention} had an Administrative Exception on file. Denouncement nullified."
+                if block == "exception" else
+                f"{target.mention}'s Citizen Immunity deflected the denouncement."
+            )
+            embed.add_field(name="DENOUNCEMENT NULLIFIED", value=msg, inline=False)
+            await interaction.followup.send(embed=embed, ephemeral=True)
+            return
+        old, new = await self.db.update_score(gid, target.id, delta, "public denouncement")
+        await self.db.increment_reported(gid, target.id)
+        report_num = await self.db.increment_report_counter(gid)
+        bounty = await self.db.consume_investigation_bounty(gid, target.id)
+        if bounty:
+            await self.db.adjust_yuan(gid, uid, bounty.get("reward", _INVESTIGATION_BOUNTY_REWARD))
+        denouncer_name = "Unknown Citizen" if is_anon else await self.bot.format_user_full(interaction.user, gid)
+        embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 公开谴责")
+        embed.add_field(name="SUBJECT", value=target.mention, inline=False)
+        embed.add_field(name="DENOUNCED BY", value=denouncer_name, inline=True)
+        embed.add_field(name="STATED CRIME", value=text[:100], inline=False)
+        embed.add_field(name="SCORE IMPACT", value=f"{delta:.2f}", inline=True)
+        if bounty:
+            embed.add_field(name="INVESTIGATION BOUNTY CLAIMED", value=f"+¥{bounty.get('reward', _INVESTIGATION_BOUNTY_REWARD):,}", inline=False)
+        embed.set_footer(text=f"Report #{report_num:05d} · GLORY TO THE CCP!")
+        embed.timestamp = discord.utils.utcnow()
+        await interaction.channel.send(embed=embed)
+        await interaction.followup.send("Your denouncement has been filed.", ephemeral=True)
+        self._post_score(interaction, target, old, new)
+
+    async def _buy_surveillance(self, interaction, gid, uid, cfg, target, text, cost):
+        expires_at = int(time.time()) + cfg["duration"]
+        await self.db.add_effect(gid, uid, "surveillance", expires_at, {"target_id": target.id})
+        embed = discord.Embed(color=0x333333, title="中华人民共和国社会信用局")
+        embed.add_field(
+            name="INTELLIGENCE PACKAGE ACQUIRED",
+            value=f"Dossier on {target.mention} is ready.\nUse `/surveillance_report` within 30 days to redeem.",
+            inline=False,
+        )
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
+    async def _buy_rehabilitate(self, interaction, gid, uid, cfg, target, text, cost):
+        recipient = target if target else interaction.user
+        old, new = await self.db.update_score(gid, recipient.id, 3.0, "rehabilitation certificate")
+        if target:
+            embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局")
+            embed.add_field(name="REHABILITATION GIFT", value=f"{interaction.user.mention} gifted a Rehabilitation Program to {target.mention}", inline=False)
+            embed.add_field(name="SCORE", value=f"{old:.2f} -> {new:.2f}", inline=True)
+            if text:
+                embed.add_field(name="MESSAGE", value=text[:200], inline=False)
+            embed.timestamp = discord.utils.utcnow()
+            await interaction.channel.send(embed=embed)
+            await interaction.followup.send("Your gift has been delivered.", ephemeral=True)
+        else:
+            embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局")
+            embed.add_field(name="REHABILITATION APPROVED", value=f"Score adjusted: {old:.2f} -> {new:.2f}", inline=False)
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        self._post_score(interaction, recipient, old, new)
+
+    async def _buy_appeal(self, interaction, gid, uid, cfg, target, text, cost):
+        recipient = target if target else interaction.user
+        expires_at = int(time.time()) + cfg["duration"]
+        await self.db.add_effect(gid, recipient.id, "appeal", expires_at)
+        if target:
+            embed = discord.Embed(color=0x1a3a5c, title="中华人民共和国社会信用局")
+            embed.add_field(name="APPEAL GIFT", value=f"{interaction.user.mention} filed an Appeal on behalf of {target.mention}", inline=False)
+            embed.add_field(name="EFFECT", value="Their next incoming penalty within 12 hours will be reduced by 50%. Single use.", inline=False)
+            if text:
+                embed.add_field(name="MESSAGE", value=text[:200], inline=False)
+            embed.timestamp = discord.utils.utcnow()
+            await interaction.channel.send(embed=embed)
+            await interaction.followup.send("Your gift has been delivered.", ephemeral=True)
+        else:
+            embed = discord.Embed(color=0x1a3a5c, title="中华人民共和国社会信用局")
+            embed.add_field(name="APPEAL FILED", value="The next negative score action against you within 12 hours will be reduced by 50%. Single use.", inline=False)
+            await interaction.followup.send(embed=embed, ephemeral=True)
+
+    async def _buy_exception(self, interaction, gid, uid, cfg, target, text, cost):
+        recipient = target if target else interaction.user
+        expires_at = int(time.time()) + cfg["duration"]
+        await self.db.add_effect(gid, recipient.id, "exception", expires_at)
+        if target:
+            embed = discord.Embed(color=0x2d5a27, title="中华人民共和国社会信用局")
+            embed.add_field(name="EXCEPTION GIFT", value=f"{interaction.user.mention} granted an Administrative Exception to {target.mention}", inline=False)
+            embed.add_field(name="EFFECT", value="Their next negative score action within 24 hours will be completely nullified. Single use.", inline=False)
+            if text:
+                embed.add_field(name="MESSAGE", value=text[:200], inline=False)
+            embed.timestamp = discord.utils.utcnow()
+            await interaction.channel.send(embed=embed)
+            await interaction.followup.send("Your gift has been delivered.", ephemeral=True)
+        else:
+            embed = discord.Embed(color=0x2d5a27, title="中华人民共和国社会信用局")
+            embed.add_field(name="EXCEPTION GRANTED", value="The next negative score action against you within 24 hours will be completely nullified.", inline=False)
+            await interaction.followup.send(embed=embed, ephemeral=True)
+
+    async def _buy_reeducation(self, interaction, gid, uid, cfg, target, text, cost):
+        if await self.db.get_effect(gid, target.id, "freeze"):
+            await interaction.followup.send(f"{target.mention} is already score-frozen.", ephemeral=True)
+            return
+        expires_at = int(time.time()) + cfg["duration"]
+        await self.db.add_effect(gid, target.id, "freeze", expires_at)
+        self.db.invalidate_effect_cache(gid, target.id, "freeze")
+        embed = discord.Embed(color=0x8B0000, title="中华人民共和国社会信用局 · 再教育营")
+        embed.add_field(
+            name="RE-EDUCATION SENTENCE ISSUED",
+            value=f"{target.mention}'s social credit score is frozen for 2 hours by order of the bureau.",
+            inline=False,
+        )
+        await interaction.followup.send(embed=embed)
+
+    async def _buy_lottery(self, interaction, gid, uid, cfg, target, text, cost, item_id):
+        tier = _LOTTERY_TIERS[item_id]
+        recipient = target if target else interaction.user
+        gifted = target is not None
+        recipient_name = await self.bot.format_user_full(recipient, gid)
+        buyer_name = await self.bot.format_user_full(interaction.user, gid)
+        roll = random.random()
+        if roll < 0.7:
+            net = 0 if gifted else -cost
+            embed = discord.Embed(color=0x333333, title="中华人民共和国社会信用局 · 国家彩票")
+            if gifted:
+                embed.add_field(name="TICKET PURCHASED BY", value=buyer_name, inline=True)
+                embed.add_field(name="FOR", value=recipient_name, inline=True)
+            else:
+                embed.add_field(name="CITIZEN", value=buyer_name, inline=False)
+            embed.add_field(name="RESULT", value="Better luck next time. The Party keeps your entry.", inline=False)
+            embed.add_field(name="YUAN CHANGE", value=f"-¥{cost:,}", inline=False)
+            await self.db.update_lottery_stats(gid, recipient.id, False, net)
+        elif roll < 0.9:
+            winnings = random.randint(*tier["win"])
+            net = winnings if gifted else winnings - cost
+            await self.db.adjust_yuan(gid, recipient.id, winnings)
+            embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局 · 国家彩票")
+            if gifted:
+                embed.add_field(name="TICKET PURCHASED BY", value=buyer_name, inline=True)
+                embed.add_field(name="FOR", value=recipient_name, inline=True)
+            else:
+                embed.add_field(name="CITIZEN", value=buyer_name, inline=False)
+            embed.add_field(name="WINNER", value="The Party smiles upon you.", inline=False)
+            embed.add_field(name="YUAN CHANGE", value=f"+¥{winnings:,} · net {net:+,}", inline=False)
+            await self.db.update_lottery_stats(gid, recipient.id, True, net)
+        else:
+            winnings = random.randint(*tier["jackpot"])
+            net = winnings if gifted else winnings - cost
+            await self.db.adjust_yuan(gid, recipient.id, winnings)
+            embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局 · 国家彩票")
+            if gifted:
+                embed.add_field(name="TICKET PURCHASED BY", value=buyer_name, inline=True)
+                embed.add_field(name="FOR", value=recipient_name, inline=True)
+            else:
+                embed.add_field(name="CITIZEN", value=buyer_name, inline=False)
+            embed.add_field(name="JACKPOT", value="Extraordinary fortune. The state bestows its blessing.", inline=False)
+            embed.add_field(name="YUAN CHANGE", value=f"+¥{winnings:,} · net {net:+,}", inline=False)
+            await self.db.update_lottery_stats(gid, recipient.id, True, net)
+        embed.timestamp = discord.utils.utcnow()
+        await interaction.followup.send(embed=embed)
+
+    async def _buy_lottery_dono(self, interaction, gid, uid, cfg, target, text, cost):
+        user_row = await self.db.get_user(gid, uid)
+        balance  = int(user_row["yuan"]) if user_row else 0
+        name     = await self.bot.format_user_full(interaction.user, gid)
+        if balance <= 0:
+            await interaction.followup.send("You have no yuan to wager.", ephemeral=True)
+            return
+        won = random.random() < 0.5
+        if won:
+            await self.db.adjust_yuan(gid, uid, balance)
+            await self.db.update_lottery_stats(gid, uid, True, balance)
+            embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局 · 双倍或无")
+            embed.add_field(name="CITIZEN", value=name, inline=False)
+            embed.add_field(name="RESULT", value="The Party smiles upon your boldness.", inline=False)
+            embed.add_field(name="WAGERED", value=f"¥{balance:,}", inline=True)
+            embed.add_field(name="NEW BALANCE", value=f"¥{balance * 2:,}", inline=True)
+        else:
+            await self.db.set_yuan(gid, uid, 0)
+            await self.db.update_lottery_stats(gid, uid, False, -balance)
+            embed = discord.Embed(color=0x333333, title="中华人民共和国社会信用局 · 双倍或无")
+            embed.add_field(name="CITIZEN", value=name, inline=False)
+            embed.add_field(name="RESULT", value="The Party has confiscated your assets.", inline=False)
+            embed.add_field(name="LOST", value=f"¥{balance:,}", inline=True)
+            embed.add_field(name="NEW BALANCE", value="¥0", inline=True)
+        embed.timestamp = discord.utils.utcnow()
+        await interaction.followup.send(embed=embed)
+
+    async def _buy_tip(self, interaction, gid, uid, cfg, target, text, cost):
+        embed = discord.Embed(color=0x555555, title="中华人民共和国社会信用局 · 匿名举报")
+        embed.add_field(name="SUBJECT", value=target.mention, inline=False)
+        embed.add_field(name="SUBMITTED BY", value="Unknown Citizen", inline=True)
+        embed.add_field(name="TIP", value=text[:200], inline=False)
+        embed.timestamp = discord.utils.utcnow()
+        await interaction.channel.send(embed=embed)
+        await interaction.followup.send("Your tip has been submitted anonymously.", ephemeral=True)
+
+    async def _buy_model_citizen(self, interaction, gid, uid, cfg, target, text, cost):
+        recipient = target if target else interaction.user
+        old, new = await self.db.update_score(gid, recipient.id, 1.0, "model citizen commendation")
+        if target:
+            embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局")
+            embed.add_field(name="MODEL CITIZEN COMMENDATION", value=f"{interaction.user.mention} has nominated {target.mention} as a Model Citizen", inline=False)
+            embed.add_field(name="SCORE", value=f"{old:.2f} -> {new:.2f}", inline=True)
+            if text:
+                embed.add_field(name="MESSAGE", value=text[:200], inline=False)
+            embed.timestamp = discord.utils.utcnow()
+            await interaction.channel.send(embed=embed)
+            await interaction.followup.send("Your commendation has been filed.", ephemeral=True)
+        else:
+            embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局")
+            embed.add_field(name="MODEL CITIZEN AWARD", value=f"The Party commends your loyalty. Score: {old:.2f} -> {new:.2f}", inline=False)
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        self._post_score(interaction, recipient, old, new)
+
+    async def _buy_dispute(self, interaction, gid, uid, cfg, target, text, cost):
+        buyer_wins = random.random() < 0.5
+        winner = interaction.user if buyer_wins else target
+        loser  = target if buyer_wins else interaction.user
+        w_old, w_new = await self.db.update_score(gid, winner.id,  2.0, "dispute resolution victory")
+        loser_delta, _ = await self.db.apply_defense_chain(gid, loser.id, -2.0)
+        l_old, l_new = await self.db.update_score(gid, loser.id,  loser_delta, "dispute resolution loss")
+        challenger_name = await self.bot.format_user_full(interaction.user, gid)
+        defendant_name  = await self.bot.format_user_full(target, gid)
+        winner_name     = await self.bot.format_user_full(winner, gid)
+        loser_name      = await self.bot.format_user_full(loser,  gid)
+        embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 争议裁决")
+        embed.add_field(name="CHALLENGER", value=challenger_name, inline=True)
+        embed.add_field(name="DEFENDANT",  value=defendant_name,  inline=True)
+        embed.add_field(name="OUTCOME", value=f"{winner_name} wins +2.00 · {loser_name} loses {loser_delta:.2f}", inline=False)
+        embed.timestamp = discord.utils.utcnow()
+        await interaction.followup.send(embed=embed)
+        self._post_score(interaction, winner, w_old, w_new)
+        self._post_score(interaction, loser,  l_old, l_new)
+
+    async def _buy_investigation(self, interaction, gid, uid, cfg, target, text, cost):
+        extra_bounty = 0
+        if text:
+            try:
+                extra_bounty = max(0, int(text.replace(",", "").strip()))
+            except ValueError:
+                pass
+        if extra_bounty > 0 and not await self.db.spend_yuan(gid, uid, extra_bounty):
+            balance = (await self.db.get_user(gid, uid))["yuan"]
+            await interaction.followup.send(
+                f"Insufficient funds for ¥{extra_bounty:,} extra bounty (balance: ¥{balance:,}). Base bounty applied.",
+                ephemeral=True,
+            )
+            extra_bounty = 0
+        total_bounty = _INVESTIGATION_BOUNTY_REWARD + extra_bounty
+        expires_at = int(time.time()) + cfg["duration"]
+        await self.db.add_effect(gid, target.id, "investigation", expires_at, {"buyer_id": uid, "reward": total_bounty})
+        bounty_line = f"¥{total_bounty:,} bounty" + (f" (¥{_INVESTIGATION_BOUNTY_REWARD:,} base + ¥{extra_bounty:,} added)" if extra_bounty else "")
+        embed = discord.Embed(color=0x8B0000, title="中华人民共和国社会信用局")
+        embed.add_field(
+            name="SPECIAL INVESTIGATION OPENED",
+            value=f"{bounty_line} placed on {target.mention}.\nThe next citizen to file a report on them will receive the reward.",
+            inline=False,
+        )
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
+    async def _buy_protection(self, interaction, gid, uid, cfg, target, text, cost):
+        expires_at = int(time.time()) + 315360000
+        await self.db.add_effect(gid, target.id, "protection", expires_at)
+        embed = discord.Embed(color=0x2d5a27, title="中华人民共和国社会信用局")
+        embed.add_field(
+            name="POLITICAL PROTECTION GRANTED",
+            value=f"{target.mention} is under political protection.\nThe first negative action against them will be reduced by 50%. Lasts until triggered.",
+            inline=False,
+        )
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
+    async def _buy_inquiry(self, interaction, gid, uid, cfg, target, text, cost):
+        attacker_id = await self.db.get_last_attacker(gid, uid)
+        embed = discord.Embed(color=0x1a1a2e, title="中华人民共和国社会信用局 · 内部调查")
+        if attacker_id:
+            attacker = interaction.guild.get_member(attacker_id)
+            attacker_name = await self.bot.format_user_full(attacker, gid) if attacker else f"User {attacker_id}"
+            embed.add_field(name="LAST KNOWN AGGRESSOR", value=attacker_name, inline=False)
+        else:
+            embed.add_field(name="RESULT", value="No reports or denouncements on file against you.", inline=False)
+        embed.timestamp = discord.utils.utcnow()
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
+    async def _buy_criticism(self, interaction, gid, uid, cfg, target, text, cost):
+        expires_at = int(time.time()) + cfg["duration"]
+        await self.db.add_effect(gid, target.id, "criticism", expires_at)
+        embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")
+        embed.add_field(
+            name="COORDINATED CRITICISM ACTIVE",
+            value=f"All negative score actions against {target.mention} deal double score loss for 24 hours.",
+            inline=False,
+        )
+        embed.timestamp = discord.utils.utcnow()
+        await interaction.followup.send(embed=embed)
+
+    async def _buy_inspection(self, interaction, gid, uid, cfg, target, text, cost):
+        victim_id = await self.db.get_random_active_user(gid, uid)
+        if not victim_id:
+            await interaction.followup.send("No eligible citizens found in this server.", ephemeral=True)
+            return
+        victim_delta, _ = await self.db.apply_defense_chain(gid, victim_id, -1.0)
+        old, new = await self.db.update_score(gid, victim_id, victim_delta, "compliance inspection")
+        victim = interaction.guild.get_member(victim_id)
+        victim_name = await self.bot.format_user_full(victim, gid) if victim else f"Citizen {victim_id}"
+        embed = discord.Embed(color=0x8B0000, title="中华人民共和国社会信用局 · 合规检查")
+        embed.add_field(name="SELECTED CITIZEN", value=victim_name, inline=False)
+        embed.add_field(name="RESULT", value=f"Score: {old:.2f} -> {new:.2f}", inline=True)
+        embed.timestamp = discord.utils.utcnow()
+        await interaction.followup.send(embed=embed)
+        if victim:
+            self._post_score(interaction, victim, old, new)
+
+    async def _buy_history_review(self, interaction, gid, uid, cfg, target, text, cost):
+        from datetime import datetime, timezone
+        history = await self.db.get_score_history_brief(gid, target.id, limit=20)
+        embed = discord.Embed(color=0x1a1a2e, title="中华人民共和国社会信用局 · 历史审查")
+        embed.add_field(name="SUBJECT", value=await self.bot.format_user_full(target, gid), inline=False)
+        if history:
+            lines = []
+            for h in history:
+                sign = "+" if h["delta"] >= 0 else ""
+                ts = datetime.fromtimestamp(h["timestamp"], tz=timezone.utc).strftime("%m/%d %H:%M")
+                lines.append(f"`{ts}` {sign}{h['delta']:.2f} · {h['reason'] or 'unknown'}")
+            embed.add_field(name="LAST 20 EVENTS", value="\n".join(lines[:20])[:1024], inline=False)
+        else:
+            embed.add_field(name="RESULT", value="No score history on file.", inline=False)
+        embed.timestamp = discord.utils.utcnow()
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
+    async def _buy_legal_rep(self, interaction, gid, uid, cfg, target, text, cost):
+        recipient = target if target else interaction.user
+        expires_at = int(time.time()) + cfg["duration"]
+        await self.db.add_effect(gid, recipient.id, "legal_rep", expires_at)
+        if target:
+            embed = discord.Embed(color=0x1a3a5c, title="中华人民共和国社会信用局")
+            embed.add_field(name="LEGAL REPRESENTATION GIFT", value=f"{interaction.user.mention} retained legal counsel for {target.mention}", inline=False)
+            embed.add_field(name="EFFECT", value="All negative score actions against them are reduced by 50% for 12 hours.", inline=False)
+            if text:
+                embed.add_field(name="MESSAGE", value=text[:200], inline=False)
+            embed.timestamp = discord.utils.utcnow()
+            await interaction.channel.send(embed=embed)
+            await interaction.followup.send("Your gift has been delivered.", ephemeral=True)
+        else:
+            embed = discord.Embed(color=0x1a3a5c, title="中华人民共和国社会信用局")
+            embed.add_field(name="LEGAL REPRESENTATION ACTIVE", value="All negative score actions against you are reduced by 50% for 12 hours.", inline=False)
+            await interaction.followup.send(embed=embed, ephemeral=True)
+
+    async def _buy_anon_identity(self, interaction, gid, uid, cfg, target, text, cost):
+        expires_at = int(time.time()) + cfg["duration"]
+        await self.db.add_effect(gid, uid, "anon_identity", expires_at)
+        embed = discord.Embed(color=0x333333, title="中华人民共和国社会信用局")
+        embed.add_field(
+            name="ALTERNATE IDENTITY ACTIVE",
+            value="Your next report or denouncement will appear as Unknown Citizen. Single use.",
+            inline=False,
+        )
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
+    async def _buy_immunity(self, interaction, gid, uid, cfg, target, text, cost):
+        recipient = target if target else interaction.user
+        expires_at = int(time.time()) + (86400 * 7)
+        await self.db.add_effect(gid, recipient.id, "immunity", expires_at)
+        if target:
+            embed = discord.Embed(color=0x2d5a27, title="中华人民共和国社会信用局")
+            embed.add_field(name="IMMUNITY GIFT", value=f"{interaction.user.mention} secured Citizen Immunity for {target.mention}", inline=False)
+            embed.add_field(name="EFFECT", value="50% chance to completely block the next negative action against them. Single use.", inline=False)
+            if text:
+                embed.add_field(name="MESSAGE", value=text[:200], inline=False)
+            embed.timestamp = discord.utils.utcnow()
+            await interaction.channel.send(embed=embed)
+            await interaction.followup.send("Your gift has been delivered.", ephemeral=True)
+        else:
+            embed = discord.Embed(color=0x2d5a27, title="中华人民共和国社会信用局")
+            embed.add_field(name="CITIZEN IMMUNITY ACTIVE", value="50% chance to completely block the next negative action against you. Single use.", inline=False)
+            await interaction.followup.send(embed=embed, ephemeral=True)
+
+    async def _buy_pact(self, interaction, gid, uid, cfg, target, text, cost):
+        expires_at = int(time.time()) + cfg["duration"]
+        await self.db.add_effect(gid, uid, "appeal", expires_at)
+        await self.db.add_effect(gid, target.id, "appeal", expires_at)
+        embed = discord.Embed(color=0x2d5a27, title="中华人民共和国社会信用局")
+        embed.add_field(
+            name="MUTUAL ASSISTANCE PACT SEALED",
+            value=f"You and {target.mention} both now carry a 50% reduction shield on your next incoming penalty.",
+            inline=False,
+        )
+        await interaction.followup.send(embed=embed)
+
+    async def _buy_media_coverage(self, interaction, gid, uid, cfg, target, text, cost):
+        recipient = target if target else interaction.user
+        expires_at = int(time.time()) + cfg["duration"]
+        await self.db.add_effect(gid, recipient.id, "media_coverage", expires_at)
+        if target:
+            embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局")
+            embed.add_field(name="MEDIA COVERAGE GIFT", value=f"{interaction.user.mention} arranged State Media Coverage for {target.mention}", inline=False)
+            embed.add_field(name="EFFECT", value="Their next organic positive score gain will be doubled and broadcast publicly.", inline=False)
+            if text:
+                embed.add_field(name="MESSAGE", value=text[:200], inline=False)
+            embed.timestamp = discord.utils.utcnow()
+            await interaction.channel.send(embed=embed)
+            await interaction.followup.send("Your gift has been delivered.", ephemeral=True)
+        else:
+            embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局")
+            embed.add_field(name="STATE MEDIA COVERAGE ACTIVE", value="Your next organic positive score gain will be doubled and broadcast publicly.", inline=False)
+            await interaction.followup.send(embed=embed, ephemeral=True)
+
+    async def _buy_fabricated_evidence(self, interaction, gid, uid, cfg, target, text, cost):
+        await self.db.add_fabricated_history(gid, target.id, text)
+        embed = discord.Embed(color=0x333333, title="中华人民共和国社会信用局")
+        embed.add_field(
+            name="EVIDENCE PLANTED",
+            value=f"An unverified entry has been inserted into {target.mention}'s score history.",
+            inline=False,
+        )
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
+    async def _buy_cosmetic(self, interaction, gid, uid, item_id, cfg, target, text, cost):
+        meta  = COSMETIC_META.get(item_id, {})
+        color = meta.get("color", 0xFFD700)
+        label = meta.get("label", item_id.upper())
+        note  = meta.get("note", "Your cosmetic status has been recorded in the bureau's registry.")
+        if item_id == "eternal_chairman":
+            await self.db.add_eternal_chairman(uid)
+            self.bot.ec_users.add(uid)
+        else:
+            await self.db.add_cosmetic_badge(gid, uid, item_id)
+        embed = discord.Embed(color=color, title="中华人民共和国社会信用局")
+        embed.add_field(name=f"STATUS GRANTED: {label}", value=note, inline=False)
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
     @app_commands.command(name="transfer", description="Transfer Yuan to another citizen")
     @app_commands.describe(recipient="The citizen to send Yuan to", amount="Amount of Yuan to transfer")
@@ -1041,6 +1057,16 @@ class Economy(commands.Cog):
 
         if len(text) > 200:
             await interaction.followup.send("Confession exceeds 200 characters.", ephemeral=True)
+            return
+
+        last_confess = await self.db.get_last_self_action_time(gid, uid, "confess")
+        if last_confess and int(time.time()) - last_confess < 3600:
+            remaining = 3600 - (int(time.time()) - last_confess)
+            minutes = remaining // 60
+            await interaction.followup.send(
+                f"Confession cooldown active. You may confess again in {minutes}m.",
+                ephemeral=True,
+            )
             return
 
         user = await self.db.get_user(gid, uid)

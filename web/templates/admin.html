@@ -40,6 +40,62 @@
       <canvas id="vote-chart" height="90"></canvas>
     </div>
 
+    <div class="card-panel p-4 mb-3">
+      <div class="mb-3" style="color:var(--text-muted);font-size:.75rem;text-transform:uppercase;letter-spacing:1px">Embed Broadcaster</div>
+
+      <div class="row g-3">
+        <div class="col-md-7">
+          <div class="mb-2">
+            <label class="form-label">Title</label>
+            <input type="text" id="eb-title" class="form-control" placeholder="Official Decree" maxlength="256" oninput="renderEmbedPreview()">
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Description</label>
+            <textarea id="eb-desc" class="form-control" rows="4" maxlength="4096" placeholder="Embed body text" oninput="renderEmbedPreview()"></textarea>
+          </div>
+          <div class="row g-2 mb-2">
+            <div class="col-4">
+              <label class="form-label">Color</label>
+              <input type="color" id="eb-color" class="form-control" value="#cc0000" oninput="renderEmbedPreview()" style="height:38px">
+            </div>
+            <div class="col-4">
+              <label class="form-label">Image URL</label>
+              <input type="text" id="eb-image" class="form-control" placeholder="https://..." oninput="renderEmbedPreview()">
+            </div>
+            <div class="col-4">
+              <label class="form-label">Thumbnail URL</label>
+              <input type="text" id="eb-thumb" class="form-control" placeholder="https://..." oninput="renderEmbedPreview()">
+            </div>
+          </div>
+
+          <div class="mb-2">
+            <label class="form-label">Fields</label>
+            <div id="eb-fields"></div>
+            <button class="btn btn-run btn-sm px-3 mt-1" onclick="addEmbedField()">+ ADD FIELD</button>
+          </div>
+
+          <div class="row g-2 align-items-end mt-3">
+            <div class="col-7">
+              <label class="form-label">Send to</label>
+              <select id="eb-target" class="form-select"><option value="all">All servers</option></select>
+            </div>
+            <div class="col-auto">
+              <button class="btn btn-danger-soft px-4" onclick="sendBroadcastEmbed()">SEND EMBED</button>
+            </div>
+          </div>
+          <div id="eb-result" class="mt-2" style="font-size:.8rem;white-space:pre-wrap"></div>
+        </div>
+
+        <div class="col-md-5">
+          <label class="form-label">Preview</label>
+          <div id="eb-preview" class="embed-preview"></div>
+          <div style="color:var(--text-faint);font-size:.7rem;margin-top:8px">
+            Sends once, only to a channel @everyone can already write in. The bot's standard footer is appended automatically.
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="card-panel p-4">
 
       <div class="cmd-section">
@@ -131,6 +187,11 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
 <script src="/static/admin.js"></script>
-<script>loadVoteChart('7D');</script>
+<script>
+  loadVoteChart('7D');
+  loadGuildListForBroadcast();
+  renderEmbedFields();
+  renderEmbedPreview();
+</script>
 </body>
 </html>

@@ -49,6 +49,7 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',sans-seri
 .t-out { color:var(--text); white-space:pre-wrap; }
 .t-ok  { color:var(--green); }
 .t-err { color:var(--red); }
+.embed-preview { min-height:80px; }
 .cmd-section { border-bottom:1px solid var(--border); padding-bottom:16px; margin-bottom:16px; }
 .cmd-section:last-child { border-bottom:none; margin-bottom:0; padding-bottom:0; }
 ::-webkit-scrollbar{width:6px} ::-webkit-scrollbar-track{background:var(--bg)} ::-webkit-scrollbar-thumb{background:var(--accent);border-radius:3px}

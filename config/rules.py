@@ -1,18 +1,8 @@
-STRUCTURAL_RULES = [
-    {
-        "type": "spam",
-        "min_length": 10,
-        "delta": -0.7,
-        "reason": "repeated transmission",
-    },
-    {
-        "type": "caps",
-        "threshold": 0.8,
-        "min_length": 16,
-        "delta": -0.4,
-        "reason": "disruptive formatting",
-    },
-]
+SPAM_MIN_LENGTH = 10
+SPAM_DELTA      = -0.7
+CAPS_MIN_LENGTH = 16
+CAPS_THRESHOLD  = 0.8
+CAPS_DELTA      = -0.4
 
 SENTIMENT_SCALE = 0.30
 SENTIMENT_NEUTRAL_THRESHOLD = 0.05
@@ -21,9 +11,12 @@ NEUTRAL_BONUS = 0.03
 YUAN_PER_MESSAGE = 10
 
 DAILY_MSG_SCORE_CAP = 8.0
-DAILY_MSG_DIMINISHING_THRESHOLD = 25
+DAILY_NET_DIMINISHING_THRESHOLD = 6.0
 DAILY_MSG_DIMINISHING_FACTOR = 0.25
 
 PORTFOLIO_SCORE_MIN_GAIN_PCT = 0.02
 PORTFOLIO_SCORE_SCALE = 2.0
 PORTFOLIO_SCORE_DAILY_CAP = 0.3
+
+SUPPORT_GUILD_ID = 1518272254671196400
+SUPPORT_YUAN_MULTIPLIER = 1.15

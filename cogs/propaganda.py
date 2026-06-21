@@ -194,11 +194,12 @@ class Propaganda(commands.Cog):
         match = get_banned_match(text)
         if match:
             await self.db.ban_from_propaganda_event(event["id"], gid, uid, match)
-            old, new = await self.db.update_score(gid, uid, -5.0, "counter-revolutionary propaganda submission")
+            penalty, _ = await self.db.apply_defense_chain(gid, uid, -5.0)
+            old, new = await self.db.update_score(gid, uid, penalty, "counter-revolutionary propaganda submission")
             await interaction.followup.send(
                 f"Your submission contains banned content: `{match}`\n\n"
                 f"You have been banned from this event but may participate in future events.\n"
-                f"**−5.00** social credit has been deducted.",
+                f"**{penalty:.2f}** social credit has been deducted.",
                 ephemeral=True,
             )
             self.bot.dispatch("score_change", interaction.guild, interaction.user, interaction.channel, old, new)

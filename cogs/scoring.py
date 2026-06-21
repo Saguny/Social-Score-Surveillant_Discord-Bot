@@ -1,6 +1,7 @@
 import asyncio
 import concurrent.futures
 import os
+import random
 import time
 import aiohttp
 import discord
@@ -8,8 +9,10 @@ from discord.ext import commands, tasks
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from config.ranks import get_rank, get_rank_index, RANKS, EXECUTION_THRESHOLD, RANK_YUAN
 from config.rules import (
-    STRUCTURAL_RULES, SENTIMENT_SCALE, SENTIMENT_NEUTRAL_THRESHOLD, NEUTRAL_BONUS, YUAN_PER_MESSAGE,
-    DAILY_MSG_SCORE_CAP, DAILY_MSG_DIMINISHING_THRESHOLD, DAILY_MSG_DIMINISHING_FACTOR,
+    SPAM_MIN_LENGTH, SPAM_DELTA, CAPS_MIN_LENGTH, CAPS_THRESHOLD, CAPS_DELTA,
+    SENTIMENT_SCALE, SENTIMENT_NEUTRAL_THRESHOLD, NEUTRAL_BONUS, YUAN_PER_MESSAGE,
+    DAILY_MSG_SCORE_CAP, DAILY_NET_DIMINISHING_THRESHOLD, DAILY_MSG_DIMINISHING_FACTOR,
+    SUPPORT_GUILD_ID, SUPPORT_YUAN_MULTIPLIER,
 )
 from config.banned_topics import contains_banned_topic
 
@@ -97,22 +100,16 @@ class Scoring(commands.Cog):
         reasons = []
         key = (message.guild.id, message.author.id)
 
-        for rule in STRUCTURAL_RULES:
-            t = rule["type"]
+        if len(content) >= SPAM_MIN_LENGTH and self._last_messages.get(key) == content:
+            total += SPAM_DELTA
+            reasons.append("repeated transmission")
 
-            if t == "spam":
-                min_len = rule.get("min_length", 0)
-                if len(content) >= min_len and self._last_messages.get(key) == content:
-                    total += rule["delta"]
-                    reasons.append(rule["reason"])
-
-            elif t == "caps":
-                raw = message.content
-                if len(raw) >= rule["min_length"]:
-                    letters = [c for c in raw if c.isalpha()]
-                    if letters and sum(1 for c in letters if c.isupper()) / len(letters) >= rule["threshold"]:
-                        total += rule["delta"]
-                        reasons.append(rule["reason"])
+        raw = message.content
+        if len(raw) >= CAPS_MIN_LENGTH:
+            letters = [c for c in raw if c.isalpha()]
+            if letters and sum(1 for c in letters if c.isupper()) / len(letters) >= CAPS_THRESHOLD:
+                total += CAPS_DELTA
+                reasons.append("disruptive formatting")
 
         self._last_messages[key] = content
         return total, reasons
@@ -176,6 +173,10 @@ class Scoring(commands.Cog):
         total = round(struct_delta + sent_delta, 2)
         return total, ", ".join(reasons) if reasons else "routine activity"
 
+    def _is_support_member(self, user_id: int) -> bool:
+        support_guild = self.bot.get_guild(SUPPORT_GUILD_ID)
+        return support_guild is not None and support_guild.get_member(user_id) is not None
+
     async def _get_or_create_role(self, guild: discord.Guild, name: str) -> discord.Role:
         role = discord.utils.get(guild.roles, name=name)
         if not role:
@@ -184,7 +185,12 @@ class Scoring(commands.Cog):
 
     async def _handle_rank_change(self, guild: discord.Guild, member: discord.Member, channel: discord.TextChannel, old: float, new: float):
         old_rank = get_rank(old)
-        new_rank = get_rank(new) if new >= old else get_rank(new + 1.0)
+        if new >= old:
+            new_rank = get_rank(new)
+        elif new <= old_rank["min"] - 1.0:
+            new_rank = get_rank(new)
+        else:
+            new_rank = old_rank
         if old_rank["name"] == new_rank["name"]:
             return
 
@@ -220,7 +226,7 @@ class Scoring(commands.Cog):
         status = "PROMOTED" if promoted else "DEMOTED"
 
         embed = discord.Embed(color=color, title="中华人民共和国社会信用局")
-        embed.add_field(name="CITIZEN", value=str(member), inline=False)
+        embed.add_field(name="CITIZEN", value=await self.bot.format_user_full(member, guild.id), inline=False)
         embed.add_field(
             name=f"STATUS CHANGE: {status}",
             value=f"{old_rank['name']} -> {new_rank['name']}\nScore: {new:.2f} · {yuan_label}",
@@ -255,7 +261,7 @@ class Scoring(commands.Cog):
                 target = exec_channel or channel
 
                 embed = discord.Embed(color=0x8B0000, title="中华人民共和国社会信用局 · 处决名单")
-                embed.add_field(name="CITIZEN", value=str(member), inline=False)
+                embed.add_field(name="CITIZEN", value=await self.bot.format_user_full(member, guild.id), inline=False)
                 embed.add_field(
                     name="STATUS",
                     value="Placed on the Execution List\nExecution Date: Tomorrow",
@@ -292,7 +298,10 @@ class Scoring(commands.Cog):
 
         gid, uid = message.guild.id, message.author.id
 
-        await self.db.tick_user(gid, uid, YUAN_PER_MESSAGE)
+        yuan_gain = YUAN_PER_MESSAGE
+        if self._is_support_member(uid):
+            yuan_gain = round(yuan_gain * SUPPORT_YUAN_MULTIPLIER)
+        await self.db.tick_user(gid, uid, yuan_gain)
 
         if await self.db.get_effect(gid, uid, "freeze"):
             return
@@ -317,7 +326,7 @@ class Scoring(commands.Cog):
             _, daily_net, msg_count = tracking
 
         if delta > 0:
-            if msg_count >= DAILY_MSG_DIMINISHING_THRESHOLD:
+            if daily_net >= DAILY_NET_DIMINISHING_THRESHOLD:
                 delta = round(delta * DAILY_MSG_DIMINISHING_FACTOR, 2)
             headroom = DAILY_MSG_SCORE_CAP - daily_net
             if headroom <= 0.0:
@@ -326,6 +335,7 @@ class Scoring(commands.Cog):
             delta = round(min(delta, headroom), 2)
             self._daily_tracking[key] = (today_start, daily_net + delta, msg_count + 1)
         else:
+            delta, _ = await self.db.apply_defense_chain(gid, uid, delta)
             self._daily_tracking[key] = (today_start, daily_net + delta, msg_count)
 
         if delta == 0:

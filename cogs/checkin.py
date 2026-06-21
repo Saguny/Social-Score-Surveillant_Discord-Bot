@@ -42,7 +42,7 @@ class CheckIn(commands.Cog):
         embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局 · 日常汇报")
         embed.add_field(name="CHECK-IN RECORDED", value=f"Day {streak} streak", inline=False)
         embed.add_field(name="YUAN AWARDED",      value=f"¥{yuan:,}",           inline=True)
-        embed.add_field(name="SCORE",             value=f"{old:.2f} → {new:.2f} (+{delta})", inline=True)
+        embed.add_field(name="SCORE",             value=f"{old:.2f} -> {new:.2f} (+{delta})", inline=True)
         if streak > 1:
             if at_cap:
                 bonus_text = f"Maximum loyalty rewards reached · ¥{yuan:,} · +{delta} score per check-in"
