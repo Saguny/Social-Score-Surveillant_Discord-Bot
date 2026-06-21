@@ -246,6 +246,10 @@ class Scoring(commands.Cog):
 
         exec_role_name = "Execution Date: Tomorrow"
         try:
+            exec_channel_id = await self.db.get_execution_channel(guild.id)
+            exec_channel = guild.get_channel(exec_channel_id) if exec_channel_id else None
+            target = exec_channel or channel
+
             if entered:
                 exec_role = await self._get_or_create_role(guild, exec_role_name)
                 for rank in RANKS:
@@ -255,38 +259,62 @@ class Scoring(commands.Cog):
                 await member.add_roles(exec_role)
 
                 confiscated = await self.db.confiscate_yuan(guild.id, member.id)
+                citizen_str = await self.bot.format_user_full(member, guild.id)
 
-                exec_channel_id = await self.db.get_execution_channel(guild.id)
-                exec_channel = guild.get_channel(exec_channel_id) if exec_channel_id else None
-                target = exec_channel or channel
-
-                embed = discord.Embed(color=0x8B0000, title="中华人民共和国社会信用局 · 处决名单")
-                embed.add_field(name="CITIZEN", value=await self.bot.format_user_full(member, guild.id), inline=False)
-                embed.add_field(
-                    name="STATUS",
-                    value="Placed on the Execution List\nExecution Date: Tomorrow",
-                    inline=False,
+                embed = discord.Embed(
+                    color=0x8B0000, 
+                    title="🚨 中华人民共和国社会信用局 · NOTICE OF TERMINATION",
+                    description=f"**Citizen:** {citizen_str}\n**Current Score:** `{new:.2f}`"
                 )
-                embed.add_field(name="SCORE", value=f"{new:.2f}", inline=False)
+                
+                status_text = (
+                    " **CRITICAL INFRACTION DETECTED**\n"
+                    "Your score has breached the survival threshold. You have been placed on the **Execution List**.\n"
+                    f"**Role Assigned:** `{exec_role_name}`"
+                )
+                embed.add_field(name="SURVEILLANCE STATUS", value=status_text, inline=False)
+                
                 if confiscated > 0:
                     embed.add_field(
-                        name="ASSETS CONFISCATED",
-                        value=f"¥{confiscated:,} seized and redistributed to the people.",
-                        inline=False,
+                        name="STATE CONFISCATION", 
+                        value=f"All assets totaling **¥{confiscated:,}** have been seized and redistributed evenly to compliant citizens.", 
+                        inline=False
                     )
+                
                 embed.timestamp = discord.utils.utcnow()
                 if not exec_channel_id:
-                    embed.set_footer(text="Use `ccp executions #channel` to configure a dedicated channel.")
-                await target.send(embed=embed)
+                    embed.set_footer(text="System Notice: Use 'ccp executions #channel' to assign a dedicated firing squad channel.")
+                else:
+                    embed.set_footer(text="中华人民共和国社会信用局 · ALL ACTIONS RECORDED")
+                
+                await target.send(content=f"{member.mention} **REPORT FOR DE-REGISTRATION.**", embed=embed)
 
             else:
                 exec_role = discord.utils.get(guild.roles, name=exec_role_name)
                 if exec_role and exec_role in member.roles:
                     await member.remove_roles(exec_role)
+                
+                correct_rank = get_rank(new)
                 if await self.db.get_assign_rank_roles(guild.id):
-                    correct_rank = get_rank(new)
                     correct_role = await self._get_or_create_role(guild, correct_rank["name"])
                     await member.add_roles(correct_role)
+                
+                citizen_str = await self.bot.format_user_full(member, guild.id)
+                
+                embed = discord.Embed(
+                    color=0x008000,
+                    title="🇨🇳 中华人民共和国社会信用局 · PROBATION UPDATE",
+                    description=f"**Citizen:** {citizen_str}\n**Current Score:** `{new:.2f}` (`{correct_rank['name']}`)"
+                )
+                embed.add_field(
+                    name="REHABILITATION SUCCESSFUL",
+                    value=f"Citizen has successfully recovered above the threshold. The execution order has been rescinded and the `{exec_role_name}` role removed.",
+                    inline=False
+                )
+                embed.timestamp = discord.utils.utcnow()
+                embed.set_footer(text="GLORY TO THE CCP!")
+                
+                await target.send(embed=embed)
 
         except discord.Forbidden:
             pass
