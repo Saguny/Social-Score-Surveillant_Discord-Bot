@@ -1,4 +1,5 @@
 # Social Score Surveillant - A Discord Bot
+# Outdated Read me , will update soon
 
 ## DISCLAIMER
 
