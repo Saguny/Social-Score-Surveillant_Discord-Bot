@@ -286,6 +286,8 @@ async def _handle_broadcast_embed(request):
     image_url = (body.get("image_url") or "").strip()
     thumbnail_url = (body.get("thumbnail_url") or "").strip()
     fields = body.get("fields") or []
+    button_label = (body.get("button_label") or "").strip()
+    button_url = (body.get("button_url") or "").strip()
 
     if not title and not description:
         return web.json_response({"error": "Embed needs a title or description."}, status=400)
@@ -294,6 +296,13 @@ async def _handle_broadcast_embed(request):
         color = int(color_raw, 16) if color_raw else 0xCC0000
     except ValueError:
         return web.json_response({"error": "Invalid color hex."}, status=400)
+
+    view = None
+    if button_label and button_url:
+        if not (button_url.startswith("http://") or button_url.startswith("https://")):
+            return web.json_response({"error": "Button URL must start with http:// or https://"}, status=400)
+        view = discord.ui.View()
+        view.add_item(discord.ui.Button(label=button_label[:80], url=button_url, style=discord.ButtonStyle.link))
 
     if target == "all":
         guilds = list(bot.guilds)
@@ -332,7 +341,10 @@ async def _handle_broadcast_embed(request):
             })
             continue
         try:
-            await channel.send(embed=embed)
+            if view is not None:
+                await channel.send(embed=embed, view=view)
+            else:
+                await channel.send(embed=embed)
             results.append({
                 "guild_id": str(guild.id), "guild_name": guild.name,
                 "status": "sent", "detail": f"#{channel.name}",

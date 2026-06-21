@@ -81,6 +81,8 @@ function renderEmbedPreview() {
   const color = document.getElementById('eb-color').value;
   const image = v('eb-image');
   const thumb = v('eb-thumb');
+  const btnLabel = v('eb-btn-label');
+  const btnUrl = v('eb-btn-url');
 
   const fieldsHtml = ebFields.filter(f => f.name && f.value).map(f =>
     `<div style="flex:${f.inline ? '0 0 auto;min-width:120px' : '1 0 100%'};margin-top:8px">
@@ -96,6 +98,7 @@ function renderEmbedPreview() {
         ${desc ? `<div style="font-size:.85rem;color:var(--text-muted);white-space:pre-wrap">${_esc(desc)}</div>` : ''}
         <div style="display:flex;flex-wrap:wrap;gap:8px">${fieldsHtml}</div>
         ${image ? `<img src="${image}" style="max-width:100%;border-radius:4px;margin-top:10px" onerror="this.style.display='none'">` : ''}
+        ${btnLabel && btnUrl ? `<div style="margin-top:10px"><span style="display:inline-block;padding:6px 14px;border:1px solid var(--text-muted);border-radius:4px;font-size:.8rem;color:var(--text)">&#128279; ${_esc(btnLabel)}</span></div>` : ''}
         <div style="font-size:.7rem;color:var(--text-faint);margin-top:10px">GLORY TO THE CCP! (footer added automatically)</div>
       </div>
       ${thumb ? `<img src="${thumb}" style="width:64px;height:64px;border-radius:4px;object-fit:cover" onerror="this.style.display='none'">` : ''}
@@ -135,6 +138,8 @@ async function sendBroadcastEmbed() {
     image_url: v('eb-image'),
     thumbnail_url: v('eb-thumb'),
     fields: ebFields.filter(f => f.name && f.value),
+    button_label: v('eb-btn-label'),
+    button_url: v('eb-btn-url'),
   };
 
   const out = document.getElementById('eb-result');

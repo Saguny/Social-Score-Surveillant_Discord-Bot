@@ -74,6 +74,17 @@
             <button class="btn btn-run btn-sm px-3 mt-1" onclick="addEmbedField()">+ ADD FIELD</button>
           </div>
 
+          <div class="row g-2 mb-2">
+            <div class="col-5">
+              <label class="form-label">Button Label</label>
+              <input type="text" id="eb-btn-label" class="form-control" placeholder="Join Server" maxlength="80" oninput="renderEmbedPreview()">
+            </div>
+            <div class="col-7">
+              <label class="form-label">Button URL</label>
+              <input type="text" id="eb-btn-url" class="form-control" placeholder="https://discord.gg/..." oninput="renderEmbedPreview()">
+            </div>
+          </div>
+
           <div class="row g-2 align-items-end mt-3">
             <div class="col-7">
               <label class="form-label">Send to</label>
