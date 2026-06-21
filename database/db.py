@@ -358,3 +358,10 @@ class Database(
                 )
             """)
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_topgg_votes_voted_at ON topgg_votes (voted_at)")
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS guild_joins (
+                    guild_id  BIGINT NOT NULL,
+                    joined_at BIGINT NOT NULL
+                )
+            """)
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_guild_joins_joined_at ON guild_joins (joined_at)")

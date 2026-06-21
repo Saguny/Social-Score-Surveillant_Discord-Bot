@@ -52,4 +52,7 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',sans-seri
 .embed-preview { min-height:80px; }
 .cmd-section { border-bottom:1px solid var(--border); padding-bottom:16px; margin-bottom:16px; }
 .cmd-section:last-child { border-bottom:none; margin-bottom:0; padding-bottom:0; }
+.lbl { color:var(--text-muted); font-size:.75rem; text-transform:uppercase; letter-spacing:1px; }
+.shdr { color:var(--text-muted); font-size:.65rem; text-transform:uppercase; letter-spacing:2px;
+        margin:1.8rem 0 .7rem; padding-bottom:.4rem; border-bottom:1px solid var(--border); }
 ::-webkit-scrollbar{width:6px} ::-webkit-scrollbar-track{background:var(--bg)} ::-webkit-scrollbar-thumb{background:var(--accent);border-radius:3px}

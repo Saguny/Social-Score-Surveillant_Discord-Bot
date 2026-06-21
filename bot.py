@@ -111,7 +111,9 @@ Console commands:
 
 async def _decay_task(bot: commands.Bot):
     while True:
-        await asyncio.sleep(86400)
+        now = time.time()
+        next_run = (int(now) // 86400 + 1) * 86400
+        await asyncio.sleep(next_run - now)
         await bot.db.apply_score_decay()
         await bot.db.apply_portfolio_score_bonus()
 
@@ -330,6 +332,7 @@ class SocialCreditBot(commands.Bot):
     async def on_guild_join(self, guild: discord.Guild):
         member_ids = [m.id for m in guild.members if not m.bot]
         await self.db.register_guild_members(guild.id, member_ids)
+        await self.db.log_guild_join(guild.id)
         self.tree.copy_global_to(guild=guild)
         await self.tree.sync(guild=guild)
         print(f"Joined {guild.name} · registered {len(member_ids)} members · slash commands synced.")

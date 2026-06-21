@@ -22,206 +22,256 @@
 
   <div id="anomaly-wrap"></div>
 
-  <div class="shdr">Mission Control</div>
   <div class="row g-3 mb-2">
-    <div class="col-md-4">
-      <div class="sc hero">
-        <div class="lbl">Servers</div>
-        <div class="val xl" id="mc-guilds">—</div>
-        <div class="sub" id="mc-guilds-sub"></div>
-      </div>
-    </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
       <div class="sc hero">
         <div class="lbl">Citizens</div>
-        <div class="val xl" id="mc-users">—</div>
+        <div class="val val-white" id="mc-users">—</div>
         <div class="sub" id="mc-users-sub"></div>
       </div>
     </div>
-    <div class="col-md-4">
-      <div class="sc hero">
-        <div class="lbl">Most Active Guild</div>
-        <div class="val" style="font-size:1.3rem;word-break:break-word" id="mc-mag">—</div>
-        <div class="sub" id="mc-mag-sub"></div>
-      </div>
-    </div>
-  </div>
-  <div class="row g-3 mb-1">
-    <div class="col-6 col-sm-4 col-lg-2"><div class="sc">
-      <div class="lbl">Uptime</div><div class="val" id="mc-uptime">—</div>
-    </div></div>
-    <div class="col-6 col-sm-4 col-lg-2"><div class="sc">
-      <div class="lbl">Msgs / sec</div><div class="val" id="mc-mps">—</div><div class="sub">lifetime avg</div>
-    </div></div>
-    <div class="col-6 col-sm-4 col-lg-2"><div class="sc">
-      <div class="lbl">Discord Ping</div><div class="val" id="mc-ping">—</div>
-    </div></div>
-    <div class="col-6 col-sm-4 col-lg-2"><div class="sc">
-      <div class="lbl">DB Query</div><div class="val" id="mc-db">—</div>
-    </div></div>
-    <div class="col-6 col-sm-4 col-lg-2"><div class="sc">
-      <div class="lbl">DAU</div><div class="val" id="mc-dau">—</div>
-    </div></div>
-    <div class="col-6 col-sm-4 col-lg-2"><div class="sc">
-      <div class="lbl">WAU</div><div class="val" id="mc-wau">—</div>
-    </div></div>
-  </div>
-
-  <div class="shdr">Activity · Last 24h vs Prior 24h</div>
-  <div class="row g-3 mb-1">
-    <div class="col-6 col-md-3"><div class="sc">
-      <div class="lbl">Score Events</div><div class="val" id="act-ev">—</div><div class="sub" id="act-ev-t"></div>
-    </div></div>
-    <div class="col-6 col-md-3"><div class="sc">
-      <div class="lbl">Positive</div><div class="val trend-up" id="act-pos">—</div><div class="sub" id="act-pos-t"></div>
-    </div></div>
-    <div class="col-6 col-md-3"><div class="sc">
-      <div class="lbl">Negative</div><div class="val trend-down" id="act-neg">—</div><div class="sub" id="act-neg-t"></div>
-    </div></div>
-    <div class="col-6 col-md-3"><div class="sc">
-      <div class="lbl">Net Delta · 7 Days</div>
-      <div class="val" id="act-net7">—</div>
-      <div id="sparkline-wrap" class="mt-2"></div>
-    </div></div>
-  </div>
-
-  <div class="shdr">Economy</div>
-  <div class="row g-3 mb-1">
-    <div class="col-6 col-sm-4 col-md-2"><div class="sc">
-      <div class="lbl">In Circulation</div><div class="val" id="ec-circ">—</div>
-    </div></div>
-    <div class="col-6 col-sm-4 col-md-2"><div class="sc">
-      <div class="lbl">Total Earned</div><div class="val" id="ec-earn">—</div>
-    </div></div>
-    <div class="col-6 col-sm-4 col-md-2"><div class="sc">
-      <div class="lbl">Total Spent</div><div class="val" id="ec-spent">—</div>
-    </div></div>
-    <div class="col-6 col-sm-4 col-md-2"><div class="sc">
-      <div class="lbl">Items Purchased</div><div class="val" id="ec-items">—</div>
-    </div></div>
-    <div class="col-6 col-sm-4 col-md-2"><div class="sc">
-      <div class="lbl">Active Effects</div><div class="val" id="ec-fx">—</div>
-    </div></div>
-    <div class="col-6 col-sm-4 col-md-2"><div class="sc">
-      <div class="lbl">Fundraiser Yuan</div><div class="val" id="ec-fr">—</div><div class="sub">total raised</div>
-    </div></div>
-    <div class="col-6 col-sm-4 col-md-2"><div class="sc">
-      <div class="lbl">Richest Citizen</div><div class="val" id="ec-rich">—</div><div class="sub">current balance</div>
-    </div></div>
-  </div>
-
-  <div class="shdr">Markets</div>
-  <div class="row g-3 mb-1">
-    <div class="col-6 col-sm-3"><div class="sc">
-      <div class="lbl">Yuan in Stocks</div><div class="val" id="mk-stocks">—</div><div class="sub">portfolio value</div>
-    </div></div>
-    <div class="col-6 col-sm-3"><div class="sc">
-      <div class="lbl">Yuan in Turbos</div><div class="val" id="mk-turbos">—</div><div class="sub">open positions</div>
-    </div></div>
-    <div class="col-6 col-sm-3"><div class="sc">
-      <div class="lbl">Knockouts</div><div class="val trend-down" id="mk-ko">—</div><div class="sub">all-time</div>
-    </div></div>
-    <div class="col-6 col-sm-3"><div class="sc">
-      <div class="lbl">Stock Trades</div><div class="val" id="mk-trades">—</div><div class="sub">all-time</div>
-    </div></div>
-  </div>
-
-  <div class="shdr">Lottery</div>
-  <div class="row g-3 mb-1">
-    <div class="col-6 col-sm-3"><div class="sc">
-      <div class="lbl">Tickets Played</div><div class="val" id="lt-played">—</div>
-    </div></div>
-    <div class="col-6 col-sm-3"><div class="sc">
-      <div class="lbl">Won · Lost</div>
-      <div class="val"><span class="trend-up" id="lt-won">—</span> · <span class="trend-down" id="lt-lost">—</span></div>
-      <div class="sub" id="lt-wr"></div>
-    </div></div>
-    <div class="col-6 col-sm-3"><div class="sc">
-      <div class="lbl">Net Earnings</div><div class="val" id="lt-net">—</div><div class="sub">all citizens combined</div>
-    </div></div>
-    <div class="col-6 col-sm-3"><div class="sc">
-      <div class="lbl">House Edge</div><div class="val" id="lt-edge">—</div><div class="sub">net / tickets</div>
-    </div></div>
-  </div>
-
-  <div class="shdr">Scores</div>
-  <div class="row g-3 mb-1">
-    <div class="col-md-5"><div class="sc h-100">
-      <div class="lbl" style="margin-bottom:.7rem">Distribution</div>
-      <div id="dist-chart"></div>
-    </div></div>
     <div class="col-md-3">
-      <div class="row g-3">
-        <div class="col-12"><div class="sc">
-          <div class="lbl">Avg Score</div><div class="val" id="sc-avg">—</div>
+      <div class="sc hero">
+        <div class="lbl">Servers</div>
+        <div class="val val-orange" id="mc-guilds">—</div>
+        <div class="sub">connected</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="sc hero">
+        <div class="lbl">Daily Active Users</div>
+        <div class="val val-blue" id="mc-dau">—</div>
+        <div class="sub" id="mc-dau-sub"></div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="sc hero">
+        <div class="lbl">Messages / sec</div>
+        <div class="val val-green" id="mc-mps">—</div>
+        <div class="sub">lifetime avg</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pill-row">
+    <div class="pill">Discord <b id="mc-ping">—</b></div>
+    <div class="pill">Database <b id="mc-db">—</b></div>
+    <div class="pill">Uptime <b id="mc-uptime">—</b></div>
+    <div class="pill">Sentiment Workers <b id="mc-workers">—</b></div>
+  </div>
+
+  <div class="shdr d-flex justify-content-between align-items-center">
+    <span>Activity</span>
+    <div class="btn-group" role="group" id="activity-range-group">
+      <button class="btn btn-run btn-sm px-3" data-range="24h" onclick="loadActivity('24h')">24H</button>
+      <button class="btn btn-run btn-sm px-3 active" data-range="7d" onclick="loadActivity('7d')">7D</button>
+      <button class="btn btn-run btn-sm px-3" data-range="30d" onclick="loadActivity('30d')">30D</button>
+    </div>
+  </div>
+  <div class="row g-3 mb-1">
+    <div class="col-lg-8">
+      <div class="sc sc-auto">
+        <div class="lbl" style="margin-bottom:.4rem">Messages</div>
+        <div class="activity-chart-wrap activity-chart-wrap-msgs"><canvas id="chart-activity-msgs"></canvas></div>
+      </div>
+      <div class="sc sc-auto mt-3">
+        <div class="lbl" style="margin-bottom:.4rem">Score Delta · DAU · Check-ins</div>
+        <div class="activity-chart-wrap activity-chart-wrap-eng"><canvas id="chart-activity-eng"></canvas></div>
+      </div>
+    </div>
+    <div class="col-lg-4 d-flex flex-column gap-3">
+      <div class="sc flex-grow-1">
+        <div class="lbl" style="margin-bottom:.6rem">Live Feed</div>
+        <div class="feed-wrap" id="live-feed"><div class="sub">No data yet</div></div>
+      </div>
+      <div class="sc spark-tile">
+        <div class="lbl">DB Latency (live)</div>
+        <div class="val" id="tl-dblatency-val">—</div>
+        <div class="spark-canvas-wrap" id="chart-dblatency-wrap"><canvas id="chart-dblatency"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <ul class="nav nav-tabs" id="dash-tabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-overview" type="button">Overview</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-economy" type="button">Economy</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-scores" type="button">Scores</button>
+    </li>
+  </ul>
+
+  <div class="tab-content">
+
+    <div class="tab-pane fade show active" id="tab-overview" role="tabpanel">
+      <div class="shdr">Engagement</div>
+      <div class="row g-3 mb-1">
+        <div class="col-md-4">
+          <div class="sc">
+            <div class="lbl">Most Active Guild</div>
+            <div class="val" style="font-size:1.3rem;word-break:break-word" id="mc-mag">—</div>
+            <div class="sub" id="mc-mag-sub"></div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="sc">
+            <div class="lbl">Weekly Active Users</div>
+            <div class="val" id="mc-wau">—</div>
+          </div>
+        </div>
+        <div class="col-md-4 spark-tile-col"><div class="sc spark-tile">
+          <div class="lbl">Server Joins / Day</div>
+          <div class="val" id="tl-joins-val">—</div>
+          <div class="spark-canvas-wrap" id="chart-joins-wrap"><canvas id="chart-joins"></canvas></div>
         </div></div>
-        <div class="col-12"><div class="sc">
-          <div class="lbl">All-time High</div><div class="val trend-up" id="sc-high">—</div>
+      </div>
+
+      <div class="shdr">Score Activity · 24h</div>
+      <div class="row g-3 mb-1">
+        <div class="col-6 col-md-3"><div class="sc">
+          <div class="lbl">Score Events</div><div class="val" id="act-ev">—</div><div class="sub" id="act-ev-t"></div>
         </div></div>
-        <div class="col-12"><div class="sc">
-          <div class="lbl">All-time Low</div><div class="val trend-down" id="sc-low">—</div>
+        <div class="col-6 col-md-3"><div class="sc">
+          <div class="lbl">Positive</div><div class="val trend-up" id="act-pos">—</div><div class="sub" id="act-pos-t"></div>
+        </div></div>
+        <div class="col-6 col-md-3"><div class="sc">
+          <div class="lbl">Negative</div><div class="val trend-down" id="act-neg">—</div><div class="sub" id="act-neg-t"></div>
+        </div></div>
+        <div class="col-6 col-md-3"><div class="sc">
+          <div class="lbl">Net Score Delta · 7 Days</div>
+          <div class="val" id="act-net7">—</div>
+          <div id="sparkline-wrap" class="mt-2"></div>
+        </div></div>
+      </div>
+
+      <div class="shdr">Check-ins &amp; Propaganda</div>
+      <div class="row g-3 mb-1">
+        <div class="col-6 col-sm-3"><div class="sc">
+          <div class="lbl">Check-ins Today</div><div class="val" id="ci-today">—</div><div class="sub" id="ci-t"></div>
+        </div></div>
+        <div class="col-6 col-sm-3"><div class="sc">
+          <div class="lbl">Check-in Rate</div><div class="val" id="ci-rate">—</div><div class="sub">of DAU</div>
+        </div></div>
+        <div class="col-6 col-sm-3"><div class="sc">
+          <div class="lbl">All-time Best Streak</div><div class="val" id="ci-streak">—</div><div class="sub">days</div>
+        </div></div>
+        <div class="col-6 col-sm-3"><div class="sc">
+          <div class="lbl">Top.gg Votes</div><div class="val" id="ci-votes">—</div><div class="sub">all-time</div>
+        </div></div>
+        <div class="col-6 col-sm-3"><div class="sc">
+          <div class="lbl">Propaganda Events Run</div><div class="val" id="pr-ev">—</div>
+        </div></div>
+        <div class="col-6 col-sm-3"><div class="sc">
+          <div class="lbl">Propaganda Submissions</div><div class="val" id="pr-subs">—</div><div class="sub" id="pr-avg"></div>
         </div></div>
       </div>
     </div>
-    <div class="col-md-4"><div class="sc h-100">
-      <div class="lbl">Messages Rated</div>
-      <div class="val" id="sc-msgs">—</div>
-      <div class="sub" style="margin-bottom:.7rem">all-time</div>
-      <div class="lbl">Avg Msgs / User</div>
-      <div class="val" style="font-size:1.2rem" id="sc-ampu">—</div>
-      <hr style="border-color:var(--border);margin:.8rem 0">
-      <div class="row g-2">
-        <div class="col-6">
+
+    <div class="tab-pane fade" id="tab-economy" role="tabpanel">
+      <div class="row g-3 mb-1">
+        <div class="col-6 col-sm-4 col-md-2"><div class="sc">
+          <div class="lbl">In Circulation</div><div class="val" id="ec-circ">—</div>
+        </div></div>
+        <div class="col-6 col-sm-4 col-md-2"><div class="sc">
+          <div class="lbl">Total Earned</div><div class="val" id="ec-earn">—</div>
+        </div></div>
+        <div class="col-6 col-sm-4 col-md-2"><div class="sc">
+          <div class="lbl">Total Spent</div><div class="val" id="ec-spent">—</div>
+        </div></div>
+        <div class="col-6 col-sm-4 col-md-2"><div class="sc">
+          <div class="lbl">Items Purchased</div><div class="val" id="ec-items">—</div>
+        </div></div>
+        <div class="col-6 col-sm-4 col-md-2"><div class="sc">
+          <div class="lbl">Active Effects</div><div class="val" id="ec-fx">—</div>
+        </div></div>
+        <div class="col-6 col-sm-4 col-md-2"><div class="sc">
+          <div class="lbl">Fundraiser Yuan</div><div class="val" id="ec-fr">—</div><div class="sub">total raised</div>
+        </div></div>
+      </div>
+      <div class="row g-3 mb-1">
+        <div class="col-6 col-sm-4 col-md-2 spark-tile-col"><div class="sc spark-tile">
+          <div class="lbl">Yuan In Circulation</div>
+          <div class="val" id="tl-yuan-val">—</div>
+          <div class="spark-canvas-wrap" id="chart-yuan-wrap"><canvas id="chart-yuan"></canvas></div>
+        </div></div>
+        <div class="col-6 col-sm-4 col-md-2 spark-tile-col"><div class="sc spark-tile">
+          <div class="lbl">Portfolio Value</div>
+          <div class="val" id="tl-portfolio-val">—</div>
+          <div class="spark-canvas-wrap" id="chart-portfolio-wrap"><canvas id="chart-portfolio"></canvas></div>
+        </div></div>
+        <div class="col-6 col-sm-4 col-md-2"><div class="sc">
+          <div class="lbl">Richest Citizen</div><div class="val" id="ec-rich">—</div><div class="sub">current balance</div>
+        </div></div>
+        <div class="col-6 col-sm-4 col-md-2"><div class="sc">
+          <div class="lbl">Yuan in Stocks</div><div class="val" id="mk-stocks">—</div><div class="sub">portfolio value</div>
+        </div></div>
+        <div class="col-6 col-sm-4 col-md-2"><div class="sc">
+          <div class="lbl">Yuan in Turbos</div><div class="val" id="mk-turbos">—</div><div class="sub">open positions</div>
+        </div></div>
+        <div class="col-6 col-sm-4 col-md-2"><div class="sc">
+          <div class="lbl">Stock Trades</div><div class="val" id="mk-trades">—</div><div class="sub">all-time</div>
+        </div></div>
+      </div>
+
+      <div class="shdr">Lottery</div>
+      <div class="row g-3 mb-1">
+        <div class="col-6 col-sm-3"><div class="sc">
+          <div class="lbl">Tickets Played</div><div class="val" id="lt-played">—</div>
+        </div></div>
+        <div class="col-6 col-sm-3"><div class="sc">
+          <div class="lbl">Won · Lost</div>
+          <div class="val"><span class="trend-up" id="lt-won">—</span> · <span class="trend-down" id="lt-lost">—</span></div>
+          <div class="sub" id="lt-wr"></div>
+        </div></div>
+        <div class="col-6 col-sm-3"><div class="sc">
+          <div class="lbl">Net Earnings</div><div class="val" id="lt-net">—</div><div class="sub">all citizens combined</div>
+        </div></div>
+        <div class="col-6 col-sm-3"><div class="sc">
+          <div class="lbl">House Edge</div><div class="val" id="lt-edge">—</div><div class="sub">net / tickets</div>
+        </div></div>
+        <div class="col-6 col-sm-3"><div class="sc">
+          <div class="lbl">Knockouts</div><div class="val trend-down" id="mk-ko">—</div><div class="sub">all-time</div>
+        </div></div>
+      </div>
+    </div>
+
+    <div class="tab-pane fade" id="tab-scores" role="tabpanel">
+      <div class="row g-3 mb-1">
+        <div class="col-md-5"><div class="sc h-100">
+          <div class="lbl" style="margin-bottom:.7rem">Distribution</div>
+          <div id="dist-chart"></div>
+        </div></div>
+        <div class="col-md-3">
+          <div class="row g-3">
+            <div class="col-12"><div class="sc">
+              <div class="lbl">Avg Score</div><div class="val" id="sc-avg">—</div>
+            </div></div>
+            <div class="col-12"><div class="sc">
+              <div class="lbl">All-time High</div><div class="val trend-up" id="sc-high">—</div>
+            </div></div>
+            <div class="col-12"><div class="sc">
+              <div class="lbl">All-time Low</div><div class="val trend-down" id="sc-low">—</div>
+            </div></div>
+          </div>
+        </div>
+        <div class="col-md-4"><div class="sc h-100">
+          <div class="lbl">Messages Rated</div>
+          <div class="val" id="sc-msgs">—</div>
+          <div class="sub" style="margin-bottom:.7rem">all-time</div>
+          <div class="lbl">Avg Msgs / User</div>
+          <div class="val" style="font-size:1.2rem" id="sc-ampu">—</div>
+          <hr style="border-color:var(--border);margin:.8rem 0">
           <div class="lbl">Endorsements</div>
           <div class="val trend-up" style="font-size:1.2rem" id="sc-end">—</div>
-        </div>
-        <div class="col-6">
-          <div class="lbl">Rebukes</div>
-          <div class="val trend-down" style="font-size:1.2rem" id="sc-reb">—</div>
-        </div>
+          <div class="sub" id="sc-er"></div>
+        </div></div>
       </div>
-      <div class="sub mt-1" id="sc-er"></div>
-    </div></div>
-  </div>
 
-  <div class="shdr">Top Scoring Reasons</div>
-  <div class="row g-3 mb-1">
-    <div class="col-md-6"><div class="sc h-100">
-      <div class="lbl" style="margin-bottom:.6rem;color:var(--green)">▲ Positive</div>
-      <div id="reasons-pos"></div>
-    </div></div>
-    <div class="col-md-6"><div class="sc h-100">
-      <div class="lbl" style="margin-bottom:.6rem;color:var(--red)">▼ Negative</div>
-      <div id="reasons-neg"></div>
-    </div></div>
-  </div>
-
-  <div class="shdr">Check-ins &amp; Propaganda</div>
-  <div class="row g-3 mb-1">
-    <div class="col-6 col-sm-3"><div class="sc">
-      <div class="lbl">Check-ins Today</div><div class="val" id="ci-today">—</div><div class="sub" id="ci-t"></div>
-    </div></div>
-    <div class="col-6 col-sm-3"><div class="sc">
-      <div class="lbl">Check-in Rate</div><div class="val" id="ci-rate">—</div><div class="sub">of DAU</div>
-    </div></div>
-    <div class="col-6 col-sm-3"><div class="sc">
-      <div class="lbl">All-time Best Streak</div><div class="val" id="ci-streak">—</div><div class="sub">days</div>
-    </div></div>
-    <div class="col-6 col-sm-3"><div class="sc">
-      <div class="lbl">Top.gg Votes</div><div class="val" id="ci-votes">—</div><div class="sub">all-time</div>
-    </div></div>
-    <div class="col-6 col-sm-3"><div class="sc">
-      <div class="lbl">Events Run</div><div class="val" id="pr-ev">—</div>
-    </div></div>
-    <div class="col-6 col-sm-3"><div class="sc">
-      <div class="lbl">Submissions</div><div class="val" id="pr-subs">—</div><div class="sub" id="pr-avg"></div>
-    </div></div>
-  </div>
-
-  <div class="shdr">
-    <details>
-      <summary>Advanced Metrics</summary>
-      <div class="row g-3 mt-2">
+      <div class="shdr">Advanced Metrics</div>
+      <div class="row g-3 mb-1">
         <div class="col-6 col-sm-4 col-md-2"><div class="sc">
           <div class="lbl">+Events All-time</div><div class="val" style="font-size:1.2rem" id="adv-pos">—</div>
         </div></div>
@@ -242,7 +292,30 @@
           <div class="sub">% endorsements</div>
         </div></div>
       </div>
-    </details>
+
+      <div class="shdr">Endorsements &amp; Rebukes</div>
+      <div class="row g-3 mb-1">
+        <div class="col-6 col-sm-4 spark-tile-col"><div class="sc spark-tile">
+          <div class="lbl">Endorse / Rebuke</div>
+          <div class="val" id="tl-social-val">—</div>
+          <div class="spark-canvas-wrap" id="chart-social-wrap"><canvas id="chart-social"></canvas></div>
+        </div></div>
+        <div class="col-6 col-sm-4"><div class="sc">
+          <div class="lbl">Rebukes</div><div class="val trend-down" id="sc-reb">—</div><div class="sub">all-time</div>
+        </div></div>
+      </div>
+      <div class="row g-3 mb-1">
+        <div class="col-md-6"><div class="sc h-100">
+          <div class="lbl" style="margin-bottom:.6rem;color:var(--green)">▲ Positive Reasons</div>
+          <div id="reasons-pos"></div>
+        </div></div>
+        <div class="col-md-6"><div class="sc h-100">
+          <div class="lbl" style="margin-bottom:.6rem;color:var(--red)">▼ Negative Reasons</div>
+          <div id="reasons-neg"></div>
+        </div></div>
+      </div>
+    </div>
+
   </div>
 
   <div style="height:2rem"></div>
@@ -252,6 +325,8 @@
   <div class="spinner-border" style="color:var(--text-muted)" role="status"></div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="/static/dashboard.js"></script>
 </body>
 </html>

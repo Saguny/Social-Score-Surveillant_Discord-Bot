@@ -1,3 +1,173 @@
+if (window.Chart) {
+  Chart.defaults.color = '#D8D9DA';
+  Chart.defaults.borderColor = 'rgba(97,103,122,.25)';
+  Chart.defaults.font.family = "'Segoe UI',sans-serif";
+}
+
+const _charts = {};
+let _activityRange = '7d';
+
+function _dayLabel(ts) {
+  return new Date(ts * 1000).toLocaleDateString([], {month: 'short', day: 'numeric'});
+}
+function _hourLabel(ts) {
+  return new Date(ts * 1000).toLocaleTimeString([], {hour: 'numeric'});
+}
+
+function _sparkChart(canvasId, labels, data, color, minPoints = 3) {
+  const el = document.getElementById(canvasId);
+  if (!el) return;
+  const wrap = el.parentElement;
+  if (_charts[canvasId]) { _charts[canvasId].destroy(); delete _charts[canvasId]; }
+  wrap.querySelectorAll('.spark-empty').forEach(e => e.remove());
+  if (labels.length < minPoints) {
+    el.style.display = 'none';
+    const msg = document.createElement('div');
+    msg.className = 'spark-empty';
+    msg.textContent = labels.length ? 'Collecting data…' : 'No data yet';
+    wrap.appendChild(msg);
+    return;
+  }
+  el.style.display = 'block';
+  _charts[canvasId] = new Chart(el.getContext('2d'), {
+    type: 'line',
+    data: { labels, datasets: [{ data, borderColor: color, backgroundColor: color + '22', fill: true, tension: .3 }] },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { displayColors: false, callbacks: { title: items => items[0].label } },
+      },
+      scales: { x: { display: false }, y: { display: false } },
+      elements: { point: { radius: 0, hoverRadius: 3 }, line: { borderWidth: 2 } },
+      interaction: { intersect: false, mode: 'index' },
+    },
+  });
+}
+
+function _hideIfEmpty(canvasId, points) {
+  const el = document.getElementById(canvasId);
+  if (!el) return;
+  const col = el.closest('.spark-tile-col');
+  if (col) col.classList.toggle('d-none', points === 0);
+}
+
+function _trendValClass(n) {
+  return n > 0 ? 'trend-up' : n < 0 ? 'trend-down' : '';
+}
+
+function _multiLineChart(canvasId, labels, datasets, dualAxis = false) {
+  const el = document.getElementById(canvasId);
+  if (!el) return;
+  if (_charts[canvasId]) { _charts[canvasId].destroy(); delete _charts[canvasId]; }
+  const wrap = el.parentElement;
+  wrap.querySelectorAll('.chart-empty').forEach(e => e.remove());
+  if (labels.length < 2) {
+    el.style.display = 'none';
+    const msg = document.createElement('div');
+    msg.className = 'chart-empty';
+    msg.textContent = 'Collecting data…';
+    wrap.appendChild(msg);
+    return;
+  }
+  el.style.display = 'block';
+  const scales = {
+    x: { grid: { color: 'rgba(97,103,122,.15)' } },
+    y: { grid: { color: 'rgba(97,103,122,.15)' } },
+  };
+  if (dualAxis) {
+    scales.y1 = { position: 'right', grid: { display: false } };
+  }
+  _charts[canvasId] = new Chart(el.getContext('2d'), {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 10, font: { size: 11 } } },
+        tooltip: { mode: 'index', intersect: false },
+      },
+      scales,
+      elements: { point: { radius: 0, hoverRadius: 3 }, line: { borderWidth: 2 } },
+      interaction: { intersect: false, mode: 'index' },
+    },
+  });
+}
+
+async function loadActivity(range) {
+  _activityRange = range;
+  document.querySelectorAll('#activity-range-group button').forEach(b => {
+    b.classList.toggle('active', b.dataset.range === range);
+  });
+
+  const res = await fetch('/api/stats/timeline?range=' + range);
+  if (res.status === 401 || res.status === 403) { location.href = '/login?next=/'; return; }
+  const d = await res.json();
+  const labelFn = range === '24h' ? _hourLabel : _dayLabel;
+
+  const eng = d.engagement || [];
+  const labels = eng.map(r => labelFn(r.bucket));
+  const msgVals = eng.map(r => Math.max(0, r.events - r.checkins - r.endorsements - r.rebukes));
+  const scoreMap = {};
+  (d.score || []).forEach(r => scoreMap[r[0]] = r[1]);
+  const scoreVals = eng.map(r => scoreMap[r.bucket] ?? 0);
+  const dauVals = eng.map(r => r.active_users);
+  const ciVals = eng.map(r => r.checkins);
+
+  _multiLineChart('chart-activity-msgs', labels, [
+    { label: 'Messages',    data: msgVals,   borderColor: '#4B8EAF', backgroundColor: '#4B8EAF22', fill: false, tension: .3 },
+  ]);
+
+  _multiLineChart('chart-activity-eng', labels, [
+    { label: 'Score Delta', data: scoreVals, borderColor: '#3DAA6E', backgroundColor: '#3DAA6E22', fill: false, tension: .3, yAxisID: 'y' },
+    { label: 'DAU',         data: dauVals,   borderColor: '#F5A855', backgroundColor: '#F5A85522', fill: false, tension: .3, yAxisID: 'y1' },
+    { label: 'Check-ins',   data: ciVals,    borderColor: '#F4E557', backgroundColor: '#F4E55722', fill: false, tension: .3, yAxisID: 'y1' },
+  ], true);
+
+  const socVals = eng.map(r => r.endorsements + r.rebukes);
+  set('tl-social-val', socVals.length ? fmt(socVals[socVals.length - 1]) : '—');
+  _sparkChart('chart-social', labels, socVals, '#E85454');
+  _hideIfEmpty('chart-social', socVals.length);
+
+  const yuan = d.yuan || [];
+  const yuanLabels = yuan.map(r => labelFn(r[0]));
+  const yuanVals = yuan.map(r => r[1]);
+  set('tl-yuan-val', yuanVals.length ? '¥' + fmt(yuanVals[yuanVals.length - 1]) : '—');
+  _sparkChart('chart-yuan', yuanLabels, yuanVals, '#F4E557');
+  _hideIfEmpty('chart-yuan', yuanVals.length);
+
+  const port = d.portfolio || [];
+  const portLabels = port.map(r => labelFn(r[0]));
+  const portVals = port.map(r => r[1]);
+  set('tl-portfolio-val', portVals.length ? '¥' + fmt(portVals[portVals.length - 1]) : '—');
+  _sparkChart('chart-portfolio', portLabels, portVals, '#F5A855');
+  _hideIfEmpty('chart-portfolio', portVals.length);
+
+  const joins = d.joins || [];
+  const joinLabels = joins.map(r => labelFn(r[0]));
+  const joinVals = joins.map(r => r[1]);
+  set('tl-joins-val', joinVals.length ? fmt(joinVals[joinVals.length - 1]) : '—');
+  _sparkChart('chart-joins', joinLabels, joinVals, '#F4E557');
+  _hideIfEmpty('chart-joins', joinVals.length);
+}
+
+const _dbLatencyBuf = [];
+const _pingBuf = [];
+const _LATENCY_BUF_MAX = 60;
+
+function _pushLatencySample(dbMs, pingMs) {
+  if (typeof dbMs !== 'number' || !isFinite(dbMs)) return;
+  const t = new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+  _dbLatencyBuf.push([t, dbMs]);
+  _pingBuf.push([t, pingMs || 0]);
+  if (_dbLatencyBuf.length > _LATENCY_BUF_MAX) _dbLatencyBuf.shift();
+  if (_pingBuf.length > _LATENCY_BUF_MAX) _pingBuf.shift();
+  set('tl-dblatency-val', dbMs + 'ms');
+  _sparkChart('chart-dblatency', _dbLatencyBuf.map(r => r[0]), _dbLatencyBuf.map(r => r[1]), '#E85454', 2);
+}
+
 const TIERS = [
   {label:'600–649', key:'t1', min:600,  max:650,  color:'#E85454'},
   {label:'650–699', key:'t2', min:650,  max:700,  color:'#D47030'},
@@ -115,33 +285,92 @@ function pingClass(ms) {
   return ms < 100 ? 'ping-good' : ms < 200 ? 'ping-warn' : 'ping-bad';
 }
 
-async function load() {
-  const res = await fetch('/api/stats');
-  if (res.status===401||res.status===403){location.href='/login?next=/';return;}
-  const d = await res.json();
+function _setStatusClass(id, cls) {
+  const e = document.getElementById(id);
+  if (e) e.className = cls;
+}
 
+function _feedRow(ev) {
+  const sign = ev.delta > 0 ? 'trend-up' : ev.delta < 0 ? 'trend-down' : 'trend-flat';
+  const deltaStr = (ev.delta > 0 ? '+' : '') + ev.delta.toFixed(2);
+  const t = new Date(ev.timestamp * 1000).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+  const countStr = ev._count > 1 ? ` <span class="feed-time">×${ev._count}</span>` : '';
+  return `<div class="feed-row" data-user="${ev.user}" data-reason="${ev.reason || ''}" data-count="${ev._count || 1}">
+    <span class="feed-time">${t}</span>
+    <span class="feed-delta ${sign}">${deltaStr}</span>
+    <span class="feed-user">${ev.user}</span>
+    <span class="feed-reason">${ev.reason || ''}</span>${countStr}
+  </div>`;
+}
+
+const _FEED_MAX = 20;
+
+function _feedPrepend(ev) {
+  const el = document.getElementById('live-feed');
+  if (!el) return;
+  if (el.querySelector('.sub')) el.innerHTML = '';
+  const top = el.firstElementChild;
+  if (top && top.dataset.user === String(ev.user) && top.dataset.reason === (ev.reason || '')) {
+    const count = (parseInt(top.dataset.count || '1', 10)) + 1;
+    top.dataset.count = String(count);
+    top.outerHTML = _feedRow({ ...ev, _count: count });
+    return;
+  }
+  el.insertAdjacentHTML('afterbegin', _feedRow(ev));
+  while (el.children.length > _FEED_MAX) el.removeChild(el.lastChild);
+}
+
+function _collapseRepeats(events) {
+  const out = [];
+  for (const ev of events) {
+    const prev = out[out.length - 1];
+    if (prev && prev.user === ev.user && prev.reason === ev.reason) {
+      prev._count = (prev._count || 1) + 1;
+    } else {
+      out.push({ ...ev });
+    }
+  }
+  return out;
+}
+
+async function loadFeed() {
+  const res = await fetch('/api/stats/recent-events');
+  if (res.status === 401 || res.status === 403) { location.href = '/login?next=/'; return; }
+  const d = await res.json();
+  const events = _collapseRepeats(d.events || []);
+  setHtml('live-feed', events.length ? events.map(_feedRow).join('') : '<div class="sub">No data yet</div>');
+}
+
+function renderStats(d) {
   const uptime  = d.uptime_seconds || 0;
-  const mps     = uptime > 0 ? (d.total_messages/uptime).toFixed(4) : '—';
+  const mps     = uptime > 0 ? (d.total_messages/uptime).toFixed(2) : '—';
   const tot_soc = (d.endorsements||0)+(d.rebukes||0);
 
   renderAnomalies(d);
 
-  set('mc-guilds',  fmt(d.total_guilds));
-  set('mc-users',   fmt(d.total_users));
-  set('mc-uptime',  fmtUptime(uptime));
-  set('mc-mps',     mps);
-  set('mc-dau',     fmt(d.dau));
-  set('mc-wau',     fmt(d.wau));
-  setHtml('mc-users-sub', `DAU <b>${fmt(d.dau)}</b> &middot; WAU <b>${fmt(d.wau)}</b>`);
+  set('mc-users',  fmt(d.total_users));
+  set('mc-users-sub', '');
+  set('mc-guilds', fmt(d.total_guilds));
+  set('mc-uptime', fmtUptime(uptime));
+  set('mc-mps',    mps);
+  set('mc-dau',    fmt(d.dau));
+  set('mc-dau-sub', d.wau ? 'WAU '+fmt(d.wau) : '');
+  set('mc-wau',    fmt(d.wau));
 
   const mag = d.most_active_guild || {};
   set('mc-mag',     mag.guild_name || mag.guild_id || '—');
   set('mc-mag-sub', mag.total ? fmt(mag.total)+' msgs rated' : '');
 
-  const pingEl = document.getElementById('mc-ping');
-  if (pingEl) { pingEl.textContent = d.discord_ping_ms ? d.discord_ping_ms+'ms' : '—'; pingEl.className = 'val '+pingClass(d.discord_ping_ms); }
-  const dbEl = document.getElementById('mc-db');
-  if (dbEl)   { dbEl.textContent = d.db_query_ms+'ms'; dbEl.className = 'val '+(d.db_query_ms>500?'ping-bad':d.db_query_ms>200?'ping-warn':'ping-good'); }
+  set('mc-ping', d.discord_ping_ms ? d.discord_ping_ms+'ms' : '—');
+  _setStatusClass('mc-ping', pingClass(d.discord_ping_ms));
+
+  const dbCls = d.db_query_ms>500?'ping-bad':d.db_query_ms>200?'ping-warn':'ping-good';
+  set('mc-db', typeof d.db_query_ms === 'number' ? d.db_query_ms+'ms' : '—');
+  _setStatusClass('mc-db', typeof d.db_query_ms === 'number' ? dbCls : '');
+
+  set('mc-workers', d.sentiment_workers != null ? d.sentiment_workers+'/'+d.sentiment_workers : '—');
+
+  _pushLatencySample(d.db_query_ms, d.discord_ping_ms);
 
   setHtml('act-ev',    fmt(d.events_24h));
   setHtml('act-ev-t',  trendHtml(d.events_24h, d.events_prev_24h));
@@ -221,5 +450,34 @@ async function load() {
   set('last-updated', 'Updated '+new Date().toLocaleTimeString());
 }
 
+async function load() {
+  const res = await fetch('/api/stats');
+  if (res.status === 401 || res.status === 403) { location.href = '/login?next=/'; return; }
+  renderStats(await res.json());
+}
+
+let _streamConnected = false;
+let _pollFallback = null;
+
+function _startPollFallback() {
+  if (_pollFallback) return;
+  _pollFallback = setInterval(() => { if (!_streamConnected) { load(); loadFeed(); } }, 30000);
+}
+
+function _connectStream() {
+  const stream = new EventSource('/api/stream');
+  stream.addEventListener('stats', e => renderStats(JSON.parse(e.data)));
+  stream.addEventListener('latency', e => {
+    const d = JSON.parse(e.data);
+    _pushLatencySample(d.db_query_ms, d.discord_ping_ms);
+  });
+  stream.addEventListener('feed', e => _feedPrepend(JSON.parse(e.data)));
+  stream.onopen  = () => { _streamConnected = true; };
+  stream.onerror = () => { _streamConnected = false; _startPollFallback(); };
+}
+
 load();
-setInterval(load, 30000);
+loadActivity('7d');
+loadFeed();
+_connectStream();
+setInterval(() => loadActivity(_activityRange), 300000);

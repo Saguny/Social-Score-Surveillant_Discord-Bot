@@ -27,6 +27,12 @@ class CoreMixin:
                     [(guild_id, uid) for uid in user_ids],
                 )
 
+    async def log_guild_join(self, guild_id):
+        await self._pool.execute(
+            "INSERT INTO guild_joins (guild_id, joined_at) VALUES ($1, $2)",
+            guild_id, int(time.time()),
+        )
+
     async def tick_user(self, guild_id, user_id, yuan):
         now = int(time.time())
         async with self._pool.acquire() as conn:

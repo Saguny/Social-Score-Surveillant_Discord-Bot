@@ -3,6 +3,9 @@ import asyncio
 
 
 class StatsMixin:
+    async def ping(self):
+        return await self._pool.fetchval("SELECT 1")
+
     async def get_score_history(self, guild_id, user_id, limit=5):
         return await self._pool.fetch(
             "SELECT * FROM score_history WHERE guild_id = $1 AND user_id = $2 ORDER BY timestamp DESC LIMIT $3",
@@ -152,6 +155,90 @@ class StatsMixin:
             "most_messages": most_messages, "most_endorsed": most_endorsed,
             "most_rebuked": most_rebuked, "top_snitches": top_snitches,
         }
+
+    _TIMELINE_RANGES = {
+        "24h": (86400, 3600),
+        "7d":  (7 * 86400, 86400),
+        "30d": (30 * 86400, 86400),
+        "90d": (90 * 86400, 86400),
+    }
+
+    async def get_global_timeline(self, range: str = "30d") -> dict:
+        cutoff_secs, bucket_secs = self._TIMELINE_RANGES.get(range, self._TIMELINE_RANGES["30d"])
+        cutoff = int(time.time()) - cutoff_secs
+
+        score_rows, yuan_rows, portfolio_rows, join_rows = await asyncio.gather(
+            self._pool.fetch(
+                """
+                SELECT
+                    FLOOR(timestamp::float / $2)::bigint * $2 AS bucket,
+                    SUM(delta) AS net_delta,
+                    COUNT(*) FILTER (WHERE reason LIKE 'daily check-in%') AS checkins,
+                    COUNT(*) FILTER (WHERE reason LIKE 'citizen endorse%') AS endorsements,
+                    COUNT(*) FILTER (WHERE reason LIKE 'citizen rebuke%') AS rebukes,
+                    COUNT(*) AS events,
+                    COUNT(DISTINCT user_id) AS active_users
+                FROM score_history
+                WHERE timestamp > $1
+                GROUP BY bucket ORDER BY bucket
+                """,
+                cutoff, bucket_secs,
+            ),
+            self._pool.fetch(
+                """
+                SELECT day AS bucket, SUM(yuan) AS total_yuan
+                FROM daily_yuan_snapshots
+                WHERE day > $1
+                GROUP BY day ORDER BY day
+                """,
+                cutoff,
+            ),
+            self._pool.fetch(
+                """
+                WITH bucketed AS (
+                    SELECT guild_id, user_id, value,
+                           FLOOR(ts::float / $2)::bigint * $2 AS bucket,
+                           ROW_NUMBER() OVER (PARTITION BY guild_id, user_id, FLOOR(ts::float / $2)::bigint ORDER BY ts DESC) AS rn
+                    FROM portfolio_history
+                    WHERE ts > $1
+                )
+                SELECT bucket, SUM(value) AS total_value
+                FROM bucketed WHERE rn = 1
+                GROUP BY bucket ORDER BY bucket
+                """,
+                cutoff, bucket_secs,
+            ),
+            self._pool.fetch(
+                """
+                SELECT
+                    FLOOR(joined_at::float / $2)::bigint * $2 AS bucket,
+                    COUNT(*) AS joins
+                FROM guild_joins
+                WHERE joined_at > $1
+                GROUP BY bucket ORDER BY bucket
+                """,
+                cutoff, bucket_secs,
+            ),
+        )
+
+        return {
+            "score":     [[int(r["bucket"]), round(float(r["net_delta"]), 2)] for r in score_rows],
+            "engagement": [
+                {"bucket": int(r["bucket"]), "events": int(r["events"]), "checkins": int(r["checkins"]),
+                 "endorsements": int(r["endorsements"]), "rebukes": int(r["rebukes"]),
+                 "active_users": int(r["active_users"])}
+                for r in score_rows
+            ],
+            "yuan":      [[int(r["bucket"]), int(r["total_yuan"])] for r in yuan_rows],
+            "portfolio": [[int(r["bucket"]), int(r["total_value"])] for r in portfolio_rows],
+            "joins":     [[int(r["bucket"]), int(r["joins"])] for r in join_rows],
+        }
+
+    async def get_recent_events(self, limit: int = 20):
+        return await self._pool.fetch(
+            "SELECT guild_id, user_id, delta, reason, timestamp FROM score_history ORDER BY timestamp DESC LIMIT $1",
+            limit,
+        )
 
     async def get_global_stats(self):
         now      = int(time.time())

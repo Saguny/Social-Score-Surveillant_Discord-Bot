@@ -10,8 +10,12 @@ from pathlib import Path
 from aiohttp import web
 import discord
 
+from web.cache import StatCache, format_event
+from web.sse import SSEHub
+
 PORT = int(os.getenv("PORT", 8080))
 _runner = None
+_cache: StatCache | None = None
 
 _RATE_WINDOW  = 60 * 5
 _RATE_LIMIT   = 5
@@ -154,6 +158,8 @@ async def _handle_admin_command(request):
 
 async def _delayed_restart(bot):
     await asyncio.sleep(0.5)
+    if _cache:
+        await _cache.stop()
     await bot.close()
     import os as _os
     _os._exit(42)
@@ -161,6 +167,8 @@ async def _delayed_restart(bot):
 
 async def _delayed_shutdown(bot):
     await asyncio.sleep(0.5)
+    if _cache:
+        await _cache.stop()
     await bot.close()
 
 
@@ -226,12 +234,58 @@ async def _run_process_vote(bot, user_id):
 
 async def _handle_stats(request):
     bot = request.app["bot"]
-    t0 = time.time()
-    stats = await bot.db.get_global_stats()
-    stats["db_query_ms"]     = round((time.time() - t0) * 1000, 1)
-    stats["uptime_seconds"]  = int(time.time() - bot.start_time.timestamp()) if getattr(bot, "start_time", None) else 0
-    stats["discord_ping_ms"] = round(bot.latency * 1000, 1) if bot.latency else None
+    cache = request.app.get("cache")
+
+    if cache:
+        stats = dict(cache.get("stats") or {})
+        if not stats:
+            stats = await bot.db.get_global_stats()
+        cache.augment_live_fields(stats)
+        if stats.get("db_query_ms") is None:
+            t0 = time.time()
+            await bot.db.ping()
+            stats["db_query_ms"] = round((time.time() - t0) * 1000, 1)
+    else:
+        t0 = time.time()
+        stats = await bot.db.get_global_stats()
+        stats["db_query_ms"] = round((time.time() - t0) * 1000, 1)
+        stats["uptime_seconds"] = int(time.time() - bot.start_time.timestamp()) if getattr(bot, "start_time", None) else 0
+        stats["discord_ping_ms"] = round(bot.latency * 1000, 1) if bot.latency else None
+        scoring_cog = bot.get_cog("Scoring")
+        executor = getattr(scoring_cog, "_executor", None)
+        workers = getattr(executor, "_max_workers", None) if executor else None
+        stats["sentiment_workers"] = workers if isinstance(workers, int) else None
+
     return web.json_response(stats)
+
+
+async def _handle_stats_timeline(request):
+    bot = request.app["bot"]
+    range_ = request.query.get("range", "30d")
+    if range_ not in ("24h", "7d", "30d", "90d"):
+        range_ = "30d"
+
+    cache = request.app.get("cache")
+    if cache:
+        cached = cache.get(f"timeline:{range_}")
+        if cached:
+            return web.json_response(cached)
+
+    timeline = await bot.db.get_global_timeline(range_)
+    return web.json_response(timeline)
+
+
+async def _handle_recent_events(request):
+    bot = request.app["bot"]
+    cache = request.app.get("cache")
+    if cache:
+        cached = cache.get("feed")
+        if cached:
+            return web.json_response(cached)
+
+    rows = await bot.db.get_recent_events(20)
+    events = [format_event(bot, r) for r in rows]
+    return web.json_response({"events": events})
 
 
 async def _handle_topgg_votes(request):
@@ -239,9 +293,21 @@ async def _handle_topgg_votes(request):
     period = request.query.get("period", "7D").upper()
     if period not in ("1D", "7D", "1M", "TOTAL"):
         period = "7D"
+
+    cache = request.app.get("cache")
+    if cache:
+        cached = cache.get(f"votes:{period}")
+        if cached:
+            return web.json_response(cached)
+
     buckets = await bot.db.get_topgg_vote_timeline(period)
     total = sum(row["votes"] for row in buckets)
     return web.json_response({"period": period, "buckets": buckets, "total": total})
+
+
+async def _handle_sse(request):
+    hub = request.app["sse_hub"]
+    return await hub.stream(request)
 
 
 def _find_writable_channel(guild: discord.Guild) -> discord.TextChannel | None:
@@ -263,6 +329,12 @@ def _find_writable_channel(guild: discord.Guild) -> discord.TextChannel | None:
 
 async def _handle_guild_list(request):
     bot = request.app["bot"]
+    cache = request.app.get("cache")
+    if cache:
+        cached = cache.get("guilds")
+        if cached:
+            return web.json_response(cached)
+
     guilds = sorted(bot.guilds, key=lambda g: g.name.lower())
     return web.json_response({
         "guilds": [
@@ -360,20 +432,30 @@ async def _handle_broadcast_embed(request):
 
 
 async def start_web_server(bot):
-    global _runner
+    global _runner, _cache
     if _runner:
         print(f"Web dashboard already running at http://localhost:{PORT}")
         return
 
+    hub = SSEHub()
+    cache = StatCache(bot, hub)
+    await cache.start()
+    _cache = cache
+
     app = web.Application()
     app["bot"] = bot
     app["session_id"] = secrets.token_hex(32)
+    app["cache"] = cache
+    app["sse_hub"] = hub
     app.router.add_get("/login", _handle_login)
     app.router.add_post("/api/auth", _handle_auth)
     app.router.add_get("/", _require_auth(_handle_index))
     app.router.add_get("/admin", _require_auth(_handle_admin))
     app.router.add_post("/api/admin/command", _require_auth(_handle_admin_command))
     app.router.add_get("/api/stats", _require_auth(_handle_stats))
+    app.router.add_get("/api/stats/timeline", _require_auth(_handle_stats_timeline))
+    app.router.add_get("/api/stats/recent-events", _require_auth(_handle_recent_events))
+    app.router.add_get("/api/stream", _require_auth(_handle_sse))
     app.router.add_get("/api/admin/topgg-votes", _require_auth(_handle_topgg_votes))
     app.router.add_get("/api/admin/guild-list", _require_auth(_handle_guild_list))
     app.router.add_post("/api/admin/broadcast-embed", _require_auth(_handle_broadcast_embed))
