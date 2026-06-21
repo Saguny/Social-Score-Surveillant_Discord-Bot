@@ -10,7 +10,7 @@ from config.market_hours import is_market_hours as _is_market_hours, next_market
 
 REPO_URL      = "https://github.com/Saguny/Social-Score-Surveillant_Discord-Bot"
 INVITE_URL    = "https://discord.com/oauth2/authorize?client_id=856163780265902151&permissions=2416438352&integration_type=0&scope=bot"
-SUPPORT_URL   = "https://discord.gg/FTgM4y3Bkb"
+SUPPORT_URL   = "https://discord.gg/invite/k4W6YAPYhC"
 WIKIQUOTE_API = "https://en.wikiquote.org/w/api.php"
 
 FALLBACK_DECREES = [
