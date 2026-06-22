@@ -190,6 +190,16 @@ async def _handle_admin_command(request):
         except Exception as e:
             return web.json_response({"error": str(e)})
 
+    elif command == "force_score":
+        if len(args) < 3:
+            return web.json_response({"error": "Usage: force_score <guild_id> <user_id> <score>"})
+        try:
+            gid, uid, score = int(args[0]), int(args[1]), float(args[2])
+            await bot.db.set_score(gid, uid, score)
+            return web.json_response({"output": f"User {uid} in guild {gid} score set to {score}."})
+        except Exception as e:
+            return web.json_response({"error": str(e)})
+
     elif command == "db_reset":
         if not args:
             return web.json_response({"error": "Usage: db_reset <guild_id>"})

@@ -112,6 +112,18 @@ class CoreMixin:
             guild_id, user_id, amount,
         )
 
+    async def set_score(self, guild_id: int, user_id: int, score: float):
+        await self._pool.execute(
+            """
+            UPDATE users SET
+                score         = GREATEST(600.0, LEAST(1300.0, $3)),
+                highest_score = GREATEST(highest_score, GREATEST(600.0, LEAST(1300.0, $3))),
+                lowest_score  = LEAST(lowest_score,     GREATEST(600.0, LEAST(1300.0, $3)))
+            WHERE guild_id = $1 AND user_id = $2
+            """,
+            guild_id, user_id, score,
+        )
+
     async def add_yuan(self, guild_id, user_id, amount):
         await self._pool.execute(
             "UPDATE users SET yuan = yuan + $1, total_yuan_earned = total_yuan_earned + $1 WHERE guild_id = $2 AND user_id = $3",

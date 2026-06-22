@@ -145,7 +145,7 @@ class StatsMixin:
                 guild_id, today_start, yesterday_start,
             ),
             self._pool.fetchrow(
-                "SELECT COALESCE(SUM(yuan),0) AS yuan, COALESCE(SUM(prev_day_yuan),0) AS prev_day_yuan, COUNT(*) AS citizens FROM users WHERE guild_id = $1 AND has_chatted = 1",
+                "SELECT COALESCE(SUM(yuan),0) AS yuan, COALESCE(SUM(prev_day_yuan),0) AS prev_day_yuan, COUNT(*) AS citizens FROM users WHERE guild_id = $1",
                 guild_id,
             ),
         )
