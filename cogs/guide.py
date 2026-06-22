@@ -13,6 +13,7 @@ REPO_URL      = "https://github.com/Saguny/Social-Score-Surveillant_Discord-Bot"
 INVITE_URL    = "https://discord.com/oauth2/authorize?client_id=856163780265902151&permissions=2416438352&integration_type=0&scope=bot"
 TOPGG_URL     = "https://top.gg/bot/856163780265902151/invite"
 SUPPORT_URL   = "https://discord.gg/invite/k4W6YAPYhC"
+DASHBOARD_URL = "https://worker-production-f501.up.railway.app/"
 WIKIQUOTE_API = "https://en.wikiquote.org/w/api.php"
 
 FALLBACK_DECREES = [
@@ -603,7 +604,7 @@ class Guide(commands.Cog):
         )
         e.add_field(
             name="LINKS",
-              value=f"[Source Code]({REPO_URL}) · [Invite to Server]({INVITE_URL}) · [Support Server]({SUPPORT_URL})",
+              value=f"[Source Code]({REPO_URL}) · [Invite to Server]({INVITE_URL}) · [Support Server]({SUPPORT_URL}) · [Public Dashboard]({DASHBOARD_URL})",
             inline=False,
         )
 

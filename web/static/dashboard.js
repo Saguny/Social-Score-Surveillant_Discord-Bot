@@ -61,7 +61,7 @@ function _trendValClass(n) {
   return n > 0 ? 'trend-up' : n < 0 ? 'trend-down' : '';
 }
 
-function _multiLineChart(canvasId, labels, datasets, dualAxis = false) {
+function _multiLineChart(canvasId, labels, datasets) {
   const el = document.getElementById(canvasId);
   if (!el) return;
   if (_charts[canvasId]) { _charts[canvasId].destroy(); delete _charts[canvasId]; }
@@ -80,9 +80,6 @@ function _multiLineChart(canvasId, labels, datasets, dualAxis = false) {
     x: { grid: { color: 'rgba(97,103,122,.15)' } },
     y: { grid: { color: 'rgba(97,103,122,.15)' } },
   };
-  if (dualAxis) {
-    scales.y1 = { position: 'right', grid: { display: false } };
-  }
   _charts[canvasId] = new Chart(el.getContext('2d'), {
     type: 'line',
     data: { labels, datasets },
@@ -121,14 +118,17 @@ async function loadActivity(range) {
   const ciVals = eng.map(r => r.checkins);
 
   _multiLineChart('chart-activity-msgs', labels, [
-    { label: 'Messages',    data: msgVals,   borderColor: '#7D9D9C', backgroundColor: '#4B8EAF22', fill: false, tension: .3 },
+    { label: 'Messages',    data: msgVals,   borderColor: '#7D9D9C', backgroundColor: '#7D9D9C22', fill: false, tension: .3 },
   ]);
 
-  _multiLineChart('chart-activity-eng', labels, [
-    { label: 'Score Delta', data: scoreVals, borderColor: '#3DAA6E', backgroundColor: '#3DAA6E22', fill: false, tension: .3, yAxisID: 'y' },
-    { label: 'DAU',         data: dauVals,   borderColor: '#F5A855', backgroundColor: '#F5A85522', fill: false, tension: .3, yAxisID: 'y1' },
-    { label: 'Check-ins',   data: ciVals,    borderColor: '#F4E557', backgroundColor: '#F4E55722', fill: false, tension: .3, yAxisID: 'y1' },
-  ], true);
+  _multiLineChart('chart-activity-score', labels, [
+    { label: 'Score Delta', data: scoreVals, borderColor: '#3DAA6E', backgroundColor: '#3DAA6E22', fill: false, tension: .3 },
+  ]);
+
+  _multiLineChart('chart-activity-dau', labels, [
+    { label: 'DAU',         data: dauVals,   borderColor: '#F5A855', backgroundColor: '#F5A85522', fill: false, tension: .3 },
+    { label: 'Check-ins',   data: ciVals,    borderColor: '#F4E557', backgroundColor: '#F4E55722', fill: false, tension: .3 },
+  ]);
 
   const socVals = eng.map(r => r.endorsements + r.rebukes);
   set('tl-social-val', socVals.length ? fmt(socVals.reduce((a, b) => a + b, 0)) : '—');
@@ -204,28 +204,6 @@ function trendHtml(now, prev) {
   const arrow = pct > 0 ? '↑' : '↓';
   const cls   = pct > 0 ? 'trend-up' : 'trend-down';
   return `<span class="${cls}">${arrow} ${Math.abs(pct).toFixed(0)}% vs prev 24h</span>`;
-}
-
-function sparkSvg(vals, w=90, h=26) {
-  if (!vals || vals.length < 2) return '';
-  const max  = Math.max(...vals, 1);
-  const step = w / (vals.length - 1);
-  const pts  = vals.map((v,i) => `${(i*step).toFixed(1)},${(h - v/max*(h-2)).toFixed(1)}`).join(' ');
-  const lx   = ((vals.length-1)*step).toFixed(1);
-  const ly   = (h - vals[vals.length-1]/max*(h-2)).toFixed(1);
-  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="display:block;overflow:visible">
-    <polyline points="${pts}" fill="none" stroke="var(--mid)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
-    <circle cx="${lx}" cy="${ly}" r="2.5" fill="var(--mid)"/>
-  </svg>`;
-}
-
-function build7d(daily7d) {
-  const today = Math.floor(Date.now() / 86400000);
-  const map = {};
-  (daily7d||[]).forEach(r => map[r[0]] = r[1]);
-  const vals = [];
-  for (let i = 6; i >= 0; i--) vals.push(map[today - i] || 0);
-  return vals;
 }
 
 function renderDist(dist, avg) {
@@ -386,7 +364,6 @@ function renderStats(d) {
   const net7   = d.net_delta_7d;
   const net7El = document.getElementById('act-net7');
   if (net7El) { net7El.textContent = (net7>=0?'+':'')+net7.toFixed(1); net7El.className = 'val '+(net7>0?'trend-up':net7<0?'trend-down':'trend-flat'); }
-  setHtml('sparkline-wrap', sparkSvg(build7d(d.daily_7d)));
 
   set('mk-stocks', fmt(d.yuan_in_stocks || 0));
   set('mk-turbos', fmt(d.yuan_in_turbos || 0));

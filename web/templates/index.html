@@ -11,7 +11,7 @@
 <body>
 
 <nav class="navbar px-4 py-3 mb-3">
-  <span class="navbar-brand">中华人民共和国 &nbsp;&middot;&nbsp; SOCIAL CREDIT DASHBOARD</span>
+  <span class="navbar-brand">中华人民共和国 &nbsp;&middot;&nbsp; SOCIAL CREDIT SURVEILLANT ANALYTICAL DASHBOARD</span>
   <div class="d-flex gap-3 align-items-center">
     <a class="nav-link active" href="/">STATS</a>
     <span class="refresh-meta" id="last-updated"></span>
@@ -86,8 +86,12 @@
         <div class="activity-chart-wrap activity-chart-wrap-msgs"><canvas id="chart-activity-msgs"></canvas></div>
       </div>
       <div class="sc sc-auto mt-3">
-        <div class="lbl" style="margin-bottom:.4rem">Score Delta · DAU · Check-ins</div>
-        <div class="activity-chart-wrap activity-chart-wrap-eng"><canvas id="chart-activity-eng"></canvas></div>
+        <div class="lbl" style="margin-bottom:.4rem">Score Delta</div>
+        <div class="activity-chart-wrap activity-chart-wrap-eng"><canvas id="chart-activity-score"></canvas></div>
+      </div>
+      <div class="sc sc-auto mt-3">
+        <div class="lbl" style="margin-bottom:.4rem">DAU · Check-ins</div>
+        <div class="activity-chart-wrap activity-chart-wrap-eng"><canvas id="chart-activity-dau"></canvas></div>
       </div>
     </div>
     <div class="col-lg-4 d-flex flex-column gap-3">
@@ -154,7 +158,6 @@
         <div class="col-6 col-md-3"><div class="sc">
           <div class="lbl">Net Score Delta · 7 Days</div>
           <div class="val" id="act-net7">—</div>
-          <div id="sparkline-wrap" class="mt-2"></div>
         </div></div>
       </div>
 
@@ -332,6 +335,12 @@
 
   <div style="height:2rem"></div>
 </div>
+
+<footer class="site-footer">
+  Made with <span class="footer-heart">&hearts;</span> by saguny &nbsp;&middot;&nbsp;
+  <a href="https://discord.gg/invite/k4W6YAPYhC" target="_blank" rel="noopener">Support Server</a> &nbsp;&middot;&nbsp;
+  <a href="https://discord.com/oauth2/authorize?client_id=856163780265902151&permissions=2416438352&integration_type=0&scope=bot" target="_blank" rel="noopener">Invite Bot</a>
+</footer>
 
 <div class="spinner-wrapper" id="spinner">
   <div class="spinner-border" style="color:var(--text-muted)" role="status"></div>

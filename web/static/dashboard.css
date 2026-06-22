@@ -125,3 +125,8 @@ details[open] summary::before { content:'▼  '; }
 .feed-delta { flex-shrink:0; font-weight:700; width:46px; }
 .feed-user { color:var(--text-muted); flex-shrink:0; }
 .feed-reason { color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+.site-footer { text-align:center; color:var(--text-faint); font-size:.78rem; padding:1.5rem 0 2.5rem; }
+.site-footer a { color:var(--text-muted); text-decoration:none; }
+.site-footer a:hover { color:var(--accent-hover); text-decoration:underline; }
+.footer-heart { color:var(--red); }
