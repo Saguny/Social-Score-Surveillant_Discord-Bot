@@ -2,6 +2,7 @@ import time
 import discord
 from discord import app_commands
 from discord.ext import commands
+from cogs.achievements import unlock as unlock_achievement
 
 COOLDOWN_SECONDS = 86400
 ENDORSE_DELTA = 1.5
@@ -45,6 +46,12 @@ class Social(commands.Cog):
         score_reason = f"citizen {etype}ment" + (f": {reason}" if reason else "")
         old_score, new_score = await self.db.update_score(gid, target.id, delta, score_reason)
         await self.db.update_social_counts(gid, target.id, uid, etype)
+
+        giver = await self.db.get_user(gid, uid)
+        if etype == "endorse" and giver.get("endorsements_given", 0) == 1:
+            await unlock_achievement(self.bot, interaction.guild, interaction.user, "first_endorsement", channel=interaction.channel)
+        elif etype == "rebuke" and giver.get("rebukes_given", 0) == 1:
+            await unlock_achievement(self.bot, interaction.guild, interaction.user, "first_rebuke", channel=interaction.channel)
 
         self.bot.dispatch("score_change", interaction.guild, target, interaction.channel, old_score, new_score)
 

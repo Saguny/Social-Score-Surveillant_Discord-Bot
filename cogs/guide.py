@@ -6,7 +6,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 from config.ranks import RANKS
-from config.market_hours import is_market_hours as _is_market_hours, next_market_event as _next_market_event
+from config.market_hours import all_exchange_status as _all_exchange_status, EXCHANGE_NAMES as _EXCHANGE_NAMES
 
 REPO_URL      = "https://github.com/Saguny/Social-Score-Surveillant_Discord-Bot"
 INVITE_URL    = "https://discord.com/oauth2/authorize?client_id=856163780265902151&permissions=2416438352&integration_type=0&scope=bot"
@@ -168,7 +168,7 @@ class Guide(commands.Cog):
         e3 = discord.Embed(color=0xCC0000, title="SCORE AND STAT COMMANDS")
         e3.add_field(name="/score [citizen]",        value="View your score and current rank.", inline=False)
         e3.add_field(name="/stats [citizen]",        value="Full breakdown across 3 pages: Overview (score, rank, trends, rank streak · total days at rank), Social (endorsements, rebukes, reports), Economy (yuan, items, lottery stats, check-in streak).", inline=False)
-        e3.add_field(name="/daily_report [citizen]",  value="Today's score activity for any citizen: positive, negative, net change, and yuan compared to yesterday.", inline=False)
+        e3.add_field(name="/daily_report [citizen]",  value="Today's score activity for any citizen: positive, negative, net change, message counts (positive/negative/neutral), and yuan compared to yesterday.", inline=False)
         e3.add_field(name="/leaderboard",            value="Rankings across 5 pages: Score, Economy, Activity, Social, and Markets (portfolio value and realized P&L).", inline=False)
         e3.add_field(name="/state_report",           value="Server-wide report: biggest rise/fall, top informant, yuan in circulation, avg score.", inline=False)
         e3.add_field(name="/graph <score|yuan> [citizen]", value="Generate a 30-day trend graph for score or yuan. Yuan graph populates once per day.", inline=False)
@@ -192,6 +192,7 @@ class Guide(commands.Cog):
         e4.add_field(name="/yuan",         value="Check your Yuan balance and lifetime earned/spent.", inline=False)
         e4.add_field(name="/transfer <citizen> <amount>", value="Send Yuan directly to another citizen. A confirmation prompt shows the amount and your balance after transfer before executing.", inline=False)
         e4.add_field(name="/requestyuan <citizen> <amount>", value="Request Yuan from another citizen. Posts a public embed they can Accept or Decline. Expires after 5 minutes.", inline=False)
+        e4.add_field(name="/battle <opponent> <amount>", value="Challenge a citizen to a 50/50 Yuan duel. Minimum ¥1,000 stake. Both sides risk the same amount, the opponent must Accept or Decline within 5 minutes, and the winner takes both stakes. Declining or letting it expire refunds the challenger in full.", inline=False)
         e4.add_field(
             name="/shop",
             value=(
@@ -309,28 +310,35 @@ class Guide(commands.Cog):
         e7.set_footer(text="GLORY TO THE CCP!")
         embeds.append(e7)
 
-        market_open_now = _is_market_hours()
-        market_status   = "🟢 Open now" if market_open_now else "🔴 Closed now"
-        _, next_event_ts, today_open_ts = _next_market_event()
+        exchange_status = _all_exchange_status()
+        hours_lines = []
+        for exchange, st in exchange_status.items():
+            tag = "🟢 Open now" if st["open"] else "🔴 Closed now"
+            event_lbl = "Closes" if st["next_event"] == "close" else "Opens"
+            hours_lines.append(f"**{_EXCHANGE_NAMES[exchange]}** ({exchange})  {tag} · {event_lbl} <t:{st['next_ts']}:R>")
 
         e_stocks = discord.Embed(color=0xCC0000, title="北京证券交易所 · MARKETS")
         e_stocks.add_field(
             name="MARKET HOURS",
             value=(
-                f"<t:{today_open_ts}:t> – <t:{today_open_ts + 23400}:t> ET · Mon–Fri · {market_status}\n"
-                f"Next change: <t:{next_event_ts}:R>\n"
-                "All trading, price ticking, and portfolio chart updates pause outside these hours, "
+                "\n".join(hours_lines) + "\n"
+                "TSE observes a midday lunch recess (11:30–12:30 JST) where trading pauses.\n"
+                "When an exchange is closed, its tickers freeze at the last traded price — "
+                "charts and portfolio history hold a flat line until that exchange reopens, "
                 "exactly like a real broker."
             ),
             inline=False,
         )
         e_stocks.add_field(
-            name="STOCKS",
+            name="STOCKS · PRICES SHOWN IN YUAN",
             value=(
-                "5 China ADRs (BABA, BIDU, NIO, JD, BILI) · real prices via yfinance\n"
-                "1 ETF (CNXF) · tracks the basket average of all 5 ADRs\n"
-                "5 Penny stocks (XMNG, DWJT, HQBC, RMKD, WSJZ) · high-volatility simulation\n"
-                "Penny stocks may trigger a 🔥 PUMP · sudden drift followed by a -20% crash"
+                "New York · 5 China ADRs (BABA, BIDU, NIO, JD, BILI) · real prices via yfinance\n"
+                "London · 3 LSE blue chips (HSBA.L, BP.L, ULVR.L) · GBX converted to GBP then Yuan\n"
+                "Tokyo · 3 TSE blue chips (7203.T Toyota, 6758.T Sony, 9984.T SoftBank) · JPY to Yuan\n"
+                "1 ETF (CNXF) · tracks the basket average of all 11 real tickers across all 3 exchanges\n"
+                "5 Penny stocks (XMNG, DWJT, HQBC, RMKD, WSJZ) · high-volatility simulation, NYSE hours\n"
+                "Penny stocks may trigger a 🔥 PUMP · sudden drift followed by a -20% crash\n"
+                "All non-Yuan prices are converted live using USD/GBP/JPY to Yuan exchange rates."
             ),
             inline=False,
         )
@@ -395,11 +403,40 @@ class Guide(commands.Cog):
         e8.set_footer(text="Disclaimer: see /disclaimer · GLORY TO THE CCP!")
         embeds.append(e8)
 
+        e9 = discord.Embed(color=0xCC0000, title="成就 · ACHIEVEMENTS")
+        e9.add_field(
+            name="/achievements [citizen]",
+            value="View your unlocked and locked achievements. Locked secret achievements show only a hint until earned.",
+            inline=False,
+        )
+        e9.add_field(
+            name="CATEGORIES",
+            value="Score · Economy · Social · Markets · Propaganda · Joke",
+            inline=False,
+        )
+        e9.add_field(
+            name="NOTIFICATION TIERS",
+            value=(
+                "Silent · recorded with no announcement\n"
+                "Reaction · a quiet reaction on the triggering message\n"
+                "Announce · posted to the achievements channel, batched with other unlocks"
+            ),
+            inline=False,
+        )
+        e9.add_field(
+            name="REWARDS",
+            value="Most achievements grant Yuan, score, or a cosmetic badge shown in your profile header.",
+            inline=False,
+        )
+        e9.set_footer(text="GLORY TO THE CCP!")
+        embeds.append(e9)
+
         batches = [
             embeds[0:2],   # scoring rules + ranks/execution
             embeds[2:4],   # stat commands + economy/shop
             embeds[4:7],   # social rating + fundraisers + mod commands
             embeds[7:9],   # markets + propaganda events
+            embeds[9:10],  # achievements
         ]
         await interaction.response.defer(ephemeral=True)
         try:

@@ -1,6 +1,7 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
+from cogs.achievements import unlock as unlock_achievement
 
 
 def progress_bar(raised: int, goal: int) -> str:
@@ -231,6 +232,8 @@ class Fundraiser(commands.Cog):
                 f"{creator.mention if creator else 'Organizer'} has been awarded ¥{fr['goal']}.\n"
                 f"The bureau thanks all citizens for their participation."
             )
+            if creator:
+                await unlock_achievement(self.bot, interaction.guild, creator, "fundraiser_success", channel=interaction.channel)
         else:
             await self.db.refund_fundraiser(fundraiser_id)
             color = 0x555555

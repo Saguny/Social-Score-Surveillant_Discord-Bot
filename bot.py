@@ -231,13 +231,30 @@ class SocialCreditBot(commands.Bot):
             if user.id in self.ec_users:
                 return f"{str(user)} 【{_fullwidth('Winnie the Pooh')}】"
             from config.shop import COSMETIC_META
+            from config.achievements import ACHIEVEMENTS
+
+            def _suffix_for(badge_id: str) -> str:
+                if badge_id in COSMETIC_META:
+                    return COSMETIC_META[badge_id]["suffix"]
+                return badge_id
+
+            badge_set = set(await self.db.get_cosmetic_badges(user.id))
+            if not badge_set:
+                return str(user)
+
+            preferred = await self.db.get_badge_preference(user.id)
+            if preferred and preferred in badge_set:
+                return f"{str(user)} {_suffix_for(preferred)}"
+
             _ORDER = ["voter", "verified", "figure", "influencer", "associate", "asset"]
-            badges = await self.db.get_cosmetic_badges(guild_id, user.id)
-            badge_set = set(badges)
             for badge_id in reversed(_ORDER):
                 if badge_id in badge_set:
-                    suffix = COSMETIC_META[badge_id]["suffix"]
-                    return f"{str(user)} {suffix}"
+                    return f"{str(user)} {_suffix_for(badge_id)}"
+
+            for data in ACHIEVEMENTS.values():
+                badge_id = data.get("badge")
+                if badge_id and badge_id in badge_set:
+                    return f"{str(user)} {_suffix_for(badge_id)}"
         return str(user)
 
     async def process_commands(self, message: discord.Message) -> None:
@@ -267,6 +284,8 @@ class SocialCreditBot(commands.Bot):
         await self.load_extension("cogs.propaganda")
         await self.load_extension("cogs.stocks")
         await self.load_extension("cogs.voting")
+        await self.load_extension("cogs.achievements")
+        await self.load_extension("cogs.badges")
         from web.server import start_web_server
         asyncio.create_task(start_web_server(self))
         asyncio.create_task(_decay_task(self))

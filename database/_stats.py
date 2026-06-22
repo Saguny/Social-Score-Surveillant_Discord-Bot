@@ -81,7 +81,17 @@ class StatsMixin:
                     COALESCE(SUM(delta) FILTER (WHERE delta > 0 AND timestamp >= $3), 0)                         AS pos_today,
                     COALESCE(SUM(delta) FILTER (WHERE delta < 0 AND timestamp >= $3), 0)                         AS neg_today,
                     COALESCE(SUM(delta) FILTER (WHERE delta > 0 AND timestamp >= $4 AND timestamp < $3), 0)      AS pos_yesterday,
-                    COALESCE(SUM(delta) FILTER (WHERE delta < 0 AND timestamp >= $4 AND timestamp < $3), 0)      AS neg_yesterday
+                    COALESCE(SUM(delta) FILTER (WHERE delta < 0 AND timestamp >= $4 AND timestamp < $3), 0)      AS neg_yesterday,
+                    COUNT(*) FILTER (WHERE timestamp >= $3 AND reason ILIKE '%positive sentiment%')              AS pos_msgs_today,
+                    COUNT(*) FILTER (WHERE timestamp >= $3 AND reason ILIKE '%civic participation%')             AS neutral_msgs_today,
+                    COUNT(*) FILTER (
+                        WHERE timestamp >= $3 AND (
+                            reason ILIKE '%negative sentiment%'
+                            OR reason ILIKE '%counter-revolutionary speech%'
+                            OR reason ILIKE '%repeated transmission%'
+                            OR reason ILIKE '%disruptive formatting%'
+                        )
+                    )                                                                                            AS neg_msgs_today
                 FROM score_history WHERE guild_id = $1 AND user_id = $2
                 """,
                 guild_id, user_id, today_start, yesterday_start,
@@ -89,12 +99,15 @@ class StatsMixin:
             self._pool.fetchrow("SELECT yuan, prev_day_yuan FROM users WHERE guild_id = $1 AND user_id = $2", guild_id, user_id),
         )
         return {
-            "pos_today":      round(float(row["pos_today"]), 2),
-            "neg_today":      round(float(row["neg_today"]), 2),
-            "pos_yesterday":  round(float(row["pos_yesterday"]), 2),
-            "neg_yesterday":  round(float(row["neg_yesterday"]), 2),
-            "yuan":           user["yuan"] if user else 0,
-            "prev_day_yuan":  user["prev_day_yuan"] if user else 0,
+            "pos_today":         round(float(row["pos_today"]), 2),
+            "neg_today":         round(float(row["neg_today"]), 2),
+            "pos_yesterday":     round(float(row["pos_yesterday"]), 2),
+            "neg_yesterday":     round(float(row["neg_yesterday"]), 2),
+            "pos_msgs_today":    row["pos_msgs_today"],
+            "neg_msgs_today":    row["neg_msgs_today"],
+            "neutral_msgs_today": row["neutral_msgs_today"],
+            "yuan":              user["yuan"] if user else 0,
+            "prev_day_yuan":     user["prev_day_yuan"] if user else 0,
         }
 
     async def get_leaderboard(self, guild_id):

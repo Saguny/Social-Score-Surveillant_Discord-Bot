@@ -12,6 +12,7 @@ from matplotlib.patches import Rectangle
 from discord import app_commands
 from discord.ext import commands
 from config.ranks import get_rank, EXECUTION_THRESHOLD
+from cogs.achievements import unlock as unlock_achievement
 
 STATS_THUMBNAIL = "attachment://ccpstats.png"
 
@@ -20,6 +21,12 @@ class Stats(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.db = bot.db
+
+    async def _check_yuan_milestones(self, guild, user, channel, total_earned: int):
+        if total_earned >= 10_000:
+            await unlock_achievement(self.bot, guild, user, "first_10k_yuan", channel=channel)
+        if total_earned >= 1_000_000:
+            await unlock_achievement(self.bot, guild, user, "millionaire", channel=channel)
 
     @app_commands.command(name="score", description="View a citizen's social credit score")
     @app_commands.describe(citizen="Citizen to look up (defaults to yourself)")
@@ -199,10 +206,17 @@ class Stats(commands.Cog):
         neg  = f"{data['neg_today']:.2f}"
         net  = f"{net_today:+.2f}"
         yuan = f"¥{data['yuan']:,}"
+        pos_msgs     = f"{data['pos_msgs_today']}x"
+        neg_msgs     = f"{data['neg_msgs_today']}x"
+        neutral_msgs = f"{data['neutral_msgs_today']}x"
         table = (
             f"{GREEN}SCORE GAINED  {pos:>8}{RESET}\n"
             f"{RED}SCORE LOST    {neg:>8}{RESET}\n"
             f"{net_color}NET TODAY     {net:>8}{RESET}  {GRAY}{net_vs}{RESET}\n"
+            f"\n"
+            f"{GREEN}POSITIVE MSGS {pos_msgs:>8}{RESET}\n"
+            f"{RED}NEGATIVE MSGS {neg_msgs:>8}{RESET}\n"
+            f"{GRAY}NEUTRAL MSGS  {neutral_msgs:>8}{RESET}\n"
             f"\n"
             f"{yuan_color}YUAN          {yuan:>8}{RESET}{GRAY}{yuan_vs}{RESET}"
         )
@@ -224,6 +238,7 @@ class Stats(commands.Cog):
         trend_7d    = await self.db.get_score_trend(gid, target.id, 7)
         trend_30d   = await self.db.get_score_trend(gid, target.id, 30)
         rank_stats  = await self.db.get_rank_stats(gid, target.id, rank["name"])
+        await self._check_yuan_milestones(interaction.guild, target, interaction.channel, user["total_yuan_earned"])
 
         def trend_str(val: float) -> str:
             if val > 0: return f"▲ +{val:.2f}"

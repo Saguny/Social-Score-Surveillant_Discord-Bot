@@ -1,6 +1,7 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
+from cogs.achievements import unlock as unlock_achievement
 
 
 class CheckIn(commands.Cog):
@@ -53,6 +54,13 @@ class CheckIn(commands.Cog):
         await interaction.followup.send(embed=embed, ephemeral=True)
 
         self.bot.dispatch("score_change", interaction.guild, interaction.user, interaction.channel, old, new)
+
+        if streak >= 100:
+            await unlock_achievement(self.bot, interaction.guild, interaction.user, "checkin_streak_100", channel=interaction.channel)
+        elif streak >= 30:
+            await unlock_achievement(self.bot, interaction.guild, interaction.user, "checkin_streak_30", channel=interaction.channel)
+        elif streak >= 7:
+            await unlock_achievement(self.bot, interaction.guild, interaction.user, "checkin_streak_7", channel=interaction.channel)
 
 
 async def setup(bot: commands.Bot):

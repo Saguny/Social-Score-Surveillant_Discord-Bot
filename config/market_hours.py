@@ -1,55 +1,97 @@
 import datetime
 from zoneinfo import ZoneInfo
 
-NYSE_TZ = ZoneInfo("America/New_York")
+EXCHANGE_TZ = {
+    "NYSE": ZoneInfo("America/New_York"),
+    "LSE":  ZoneInfo("Europe/London"),
+    "TSE":  ZoneInfo("Asia/Tokyo"),
+}
+
+EXCHANGE_SESSIONS = {
+    "NYSE": [((9, 30), (16, 0))],
+    "LSE":  [((8, 0), (16, 30))],
+    "TSE":  [((9, 0), (11, 30)), ((12, 30), (15, 0))],
+}
+
+EXCHANGE_NAMES = {
+    "NYSE": "New York Stock Exchange",
+    "LSE":  "London Stock Exchange",
+    "TSE":  "Tokyo Stock Exchange",
+}
+
+NYSE_TZ = EXCHANGE_TZ["NYSE"]
 
 
-def next_market_event() -> tuple[str, int, int]:
-    now      = datetime.datetime.now(NYSE_TZ)
-    open_dt  = now.replace(hour=9, minute=30, second=0, microsecond=0)
-    close_dt = now.replace(hour=16, minute=0, second=0, microsecond=0)
-    open_ts  = int(open_dt.timestamp())
-    close_ts = int(close_dt.timestamp())
-    now_ts   = int(now.timestamp())
+def _session_bounds(now: datetime.datetime, session: tuple) -> tuple[datetime.datetime, datetime.datetime]:
+    (oh, om), (ch, cm) = session
+    open_dt  = now.replace(hour=oh, minute=om, second=0, microsecond=0)
+    close_dt = now.replace(hour=ch, minute=cm, second=0, microsecond=0)
+    return open_dt, close_dt
+
+
+def is_market_hours(exchange: str = "NYSE") -> bool:
+    tz  = EXCHANGE_TZ[exchange]
+    now = datetime.datetime.now(tz)
+    if now.weekday() >= 5:
+        return False
+    for session in EXCHANGE_SESSIONS[exchange]:
+        open_dt, close_dt = _session_bounds(now, session)
+        if open_dt <= now < close_dt:
+            return True
+    return False
+
+
+def next_market_event(exchange: str = "NYSE") -> tuple[str, int, int]:
+    tz       = EXCHANGE_TZ[exchange]
+    now      = datetime.datetime.now(tz)
+    sessions = EXCHANGE_SESSIONS[exchange]
+    today_first_open, _ = _session_bounds(now, sessions[0])
+
     if now.weekday() < 5:
-        if now_ts < open_ts:
-            return "open", open_ts, open_ts
-        if now_ts < close_ts:
-            return "close", close_ts, open_ts
+        for session in sessions:
+            open_dt, close_dt = _session_bounds(now, session)
+            if now < open_dt:
+                return "open", int(open_dt.timestamp()), int(today_first_open.timestamp())
+            if now < close_dt:
+                return "close", int(close_dt.timestamp()), int(today_first_open.timestamp())
+
     days = 1
     while True:
         nxt = now.date() + datetime.timedelta(days=days)
         if nxt.weekday() < 5:
-            nm  = datetime.datetime(nxt.year, nxt.month, nxt.day, 9, 30, tzinfo=NYSE_TZ)
-            nts = int(nm.timestamp())
-            return "open", nts, open_ts
+            (oh, om), _ = sessions[0]
+            nm = datetime.datetime(nxt.year, nxt.month, nxt.day, oh, om, tzinfo=tz)
+            return "open", int(nm.timestamp()), int(today_first_open.timestamp())
         days += 1
 
 
-def market_closed_message() -> str:
-    _, next_open_ts, _ = next_market_event()
-    return f"Market is closed. Opens <t:{next_open_ts}:R> (<t:{next_open_ts}:f>)."
+def market_closed_message(exchange: str = "NYSE") -> str:
+    _, next_open_ts, _ = next_market_event(exchange)
+    name = EXCHANGE_NAMES.get(exchange, exchange)
+    return f"{name} is closed. Opens <t:{next_open_ts}:R> (<t:{next_open_ts}:f>)."
 
 
-def last_market_open_ts() -> int:
-    now     = datetime.datetime.now(NYSE_TZ)
-    open_dt = now.replace(hour=9, minute=30, second=0, microsecond=0)
-    open_ts = int(open_dt.timestamp())
-    now_ts  = int(now.timestamp())
-    if now.weekday() < 5 and now_ts >= open_ts:
-        return open_ts
+def last_market_open_ts(exchange: str = "NYSE") -> int:
+    tz       = EXCHANGE_TZ[exchange]
+    now      = datetime.datetime.now(tz)
+    sessions = EXCHANGE_SESSIONS[exchange]
+    first_open, _ = _session_bounds(now, sessions[0])
+    if now.weekday() < 5 and now >= first_open:
+        return int(first_open.timestamp())
     days = 1
     while True:
         prev = now.date() - datetime.timedelta(days=days)
         if prev.weekday() < 5:
-            pm = datetime.datetime(prev.year, prev.month, prev.day, 9, 30, tzinfo=NYSE_TZ)
+            (oh, om), _ = sessions[0]
+            pm = datetime.datetime(prev.year, prev.month, prev.day, oh, om, tzinfo=tz)
             return int(pm.timestamp())
         days += 1
 
 
-def is_market_hours() -> bool:
-    now = datetime.datetime.now(NYSE_TZ)
-    if now.weekday() >= 5:
-        return False
-    mins = now.hour * 60 + now.minute
-    return 9 * 60 + 30 <= mins < 16 * 60
+def all_exchange_status() -> dict[str, dict]:
+    status = {}
+    for exchange in EXCHANGE_TZ:
+        open_now = is_market_hours(exchange)
+        event, ts, _ = next_market_event(exchange)
+        status[exchange] = {"open": open_now, "next_event": event, "next_ts": ts}
+    return status

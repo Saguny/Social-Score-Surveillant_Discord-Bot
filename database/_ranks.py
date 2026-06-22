@@ -87,6 +87,13 @@ class RanksMixin:
         hist_days = int(hist_row["total_days"]) if hist_row else 0
         return {"current_days": current_days, "total_days": hist_days + current_days}
 
+    async def increment_execution_count(self, guild_id: int, user_id: int) -> int:
+        row = await self._pool.fetchrow(
+            "UPDATE users SET execution_count = execution_count + 1 WHERE guild_id = $1 AND user_id = $2 RETURNING execution_count",
+            guild_id, user_id,
+        )
+        return row["execution_count"] if row else 1
+
     async def get_execution_channel(self, guild_id):
         row = await self._pool.fetchrow(
             "SELECT execution_channel_id FROM guild_config WHERE guild_id = $1",

@@ -5,6 +5,7 @@ import aiohttp
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
+from cogs.achievements import unlock as unlock_achievement
 
 VOTE_URL = "https://top.gg/bot/856163780265902151/vote"
 TOPGG_BOT_ID = "856163780265902151"
@@ -15,8 +16,9 @@ VOTE_BADGE = "voter"
 VOTE_COOLDOWN = 12 * 60 * 60
 
 _PRESENCE_CYCLE = [
-    discord.Activity(type=discord.ActivityType.watching, name="/guide"),
-    discord.Activity(type=discord.ActivityType.watching, name="/vote for rewards"),
+    discord.Activity(type=discord.ActivityType.watching, name="/guide | /shop"),
+    discord.Activity(type=discord.ActivityType.watching, name="/vote | /checkin"),
+    discord.Activity(type=discord.ActivityType.watching, name="/botinfo"),
 ]
 
 
@@ -57,15 +59,15 @@ class VoteReminderView(discord.ui.View):
             pass
 
 
-async def _reward_guild(db, guild, user_id: int, expires_at: int) -> str | None:
+async def _reward_guild(bot, db, guild, user_id: int, expires_at: int) -> str | None:
     member = guild.get_member(user_id)
     if not member:
         return None
     await asyncio.gather(
         db.update_score(guild.id, user_id, VOTE_SCORE_DELTA, "topgg vote"),
         db.adjust_yuan(guild.id, user_id, VOTE_YUAN_REWARD),
-        db.add_temporary_cosmetic_badge(guild.id, user_id, VOTE_BADGE, expires_at),
     )
+    await unlock_achievement(bot, guild, member, "first_vote")
     return guild.name
 
 
@@ -74,7 +76,7 @@ async def process_vote(bot: commands.Bot, user_id: int):
     await db.log_topgg_vote(user_id)
     expires_at = int(time.time()) + VOTE_COOLDOWN
     results = await asyncio.gather(
-        *(_reward_guild(db, guild, user_id, expires_at) for guild in bot.guilds)
+        *(_reward_guild(bot, db, guild, user_id, expires_at) for guild in bot.guilds)
     )
     rewarded_guilds = [name for name in results if name is not None]
     print(f"[topgg vote] user {user_id} rewarded in {len(rewarded_guilds)}/{len(bot.guilds)} guilds: {rewarded_guilds}")
@@ -82,6 +84,8 @@ async def process_vote(bot: commands.Bot, user_id: int):
     if not rewarded_guilds:
         print(f"[topgg vote] user {user_id} not a cached member of any guild, no DM sent")
         return
+
+    await db.add_temporary_cosmetic_badge(user_id, VOTE_BADGE, expires_at)
 
     embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")
     embed.add_field(

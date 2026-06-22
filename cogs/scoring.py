@@ -10,11 +10,12 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from config.ranks import get_rank, get_rank_index, RANKS, EXECUTION_THRESHOLD, RANK_YUAN
 from config.rules import (
     SPAM_MIN_LENGTH, SPAM_DELTA, CAPS_MIN_LENGTH, CAPS_THRESHOLD, CAPS_DELTA,
-    SENTIMENT_SCALE, SENTIMENT_NEUTRAL_THRESHOLD, NEUTRAL_BONUS, YUAN_PER_MESSAGE,
+    SENTIMENT_SCALE, SENTIMENT_NEUTRAL_THRESHOLD, NEUTRAL_BONUS, BANNED_TOPIC_PENALTY, YUAN_PER_MESSAGE,
     DAILY_MSG_SCORE_CAP, DAILY_NET_DIMINISHING_THRESHOLD, DAILY_MSG_DIMINISHING_FACTOR,
     SUPPORT_GUILD_ID, SUPPORT_YUAN_MULTIPLIER,
 )
 from config.banned_topics import contains_banned_topic
+from cogs.achievements import unlock as unlock_achievement
 
 TRANSLATE_URL = "https://translate.googleapis.com/translate_a/single"
 _LANG_CACHE_TTL = 3600
@@ -127,14 +128,14 @@ class Scoring(commands.Cog):
             lang = cached[0]
             english = text if lang == "en" else await self._translate_to_english(text)
             if contains_banned_topic(english):
-                return -SENTIMENT_SCALE, "counter-revolutionary speech"
+                return BANNED_TOPIC_PENALTY, "counter-revolutionary speech"
             compound = await loop.run_in_executor(self._executor, _vader_only, english)
         else:
             lang, compound = await loop.run_in_executor(self._executor, _run_in_worker, text)
             self._lang_cache[cache_key] = (lang, now)
             english = text if lang == "en" else await self._translate_to_english(text)
             if contains_banned_topic(english):
-                return -SENTIMENT_SCALE, "counter-revolutionary speech"
+                return BANNED_TOPIC_PENALTY, "counter-revolutionary speech"
             if lang != "en":
                 compound = await loop.run_in_executor(self._executor, _vader_only, english)
 
@@ -222,6 +223,13 @@ class Scoring(commands.Cog):
             except discord.Forbidden:
                 pass
 
+        if promoted:
+            await unlock_achievement(self.bot, guild, member, "first_promotion", channel=channel)
+            if new_rank["name"] == RANKS[-1]["name"]:
+                await unlock_achievement(self.bot, guild, member, "top_rank", channel=channel)
+                if old_rank["name"] == RANKS[0]["name"]:
+                    await unlock_achievement(self.bot, guild, member, "fastest_climb", channel=channel)
+
         color = 0xFFD700 if promoted else 0xCC0000
         status = "PROMOTED" if promoted else "DEMOTED"
 
@@ -289,6 +297,10 @@ class Scoring(commands.Cog):
                 
                 await target.send(content=f"{member.mention} **The Eternal Chairman awaits your Execution with Joy.**", embed=embed)
 
+                exec_count = await self.db.increment_execution_count(guild.id, member.id)
+                if exec_count >= 3:
+                    await unlock_achievement(self.bot, guild, member, "execution_regular", channel=target)
+
             else:
                 exec_role = discord.utils.get(guild.roles, name=exec_role_name)
                 if exec_role and exec_role in member.roles:
@@ -315,6 +327,7 @@ class Scoring(commands.Cog):
                 embed.set_footer(text="GLORY TO THE CCP!")
                 
                 await target.send(embed=embed)
+                await unlock_achievement(self.bot, guild, member, "survived_execution", channel=target)
 
         except discord.Forbidden:
             pass

@@ -1,12 +1,39 @@
 import math
 
 ADR_STOCKS = {
-    "BABA": {"name": "Alibaba Group",  "name_zh": "阿里巴巴", "bg": "images/stocks/BABA.png"},
-    "BIDU": {"name": "Baidu Inc.",     "name_zh": "百度",     "bg": "images/stocks/BIDU.png"},
-    "NIO":  {"name": "NIO Inc.",       "name_zh": "蔚来",     "bg": "images/stocks/NIO.png"},
-    "JD":   {"name": "JD.com",         "name_zh": "京东",     "bg": "images/stocks/JD.png"},
-    "BILI": {"name": "Bilibili Inc.",  "name_zh": "哔哩哔哩", "bg": "images/stocks/BILI.png"},
+    "BABA": {"name": "Alibaba Group",  "name_zh": "阿里巴巴", "bg": "images/stocks/BABA.png", "exchange": "NYSE", "currency": "USD"},
+    "BIDU": {"name": "Baidu Inc.",     "name_zh": "百度",     "bg": "images/stocks/BIDU.png", "exchange": "NYSE", "currency": "USD"},
+    "NIO":  {"name": "NIO Inc.",       "name_zh": "蔚来",     "bg": "images/stocks/NIO.png",  "exchange": "NYSE", "currency": "USD"},
+    "JD":   {"name": "JD.com",         "name_zh": "京东",     "bg": "images/stocks/JD.png",   "exchange": "NYSE", "currency": "USD"},
+    "BILI": {"name": "Bilibili Inc.",  "name_zh": "哔哩哔哩", "bg": "images/stocks/BILI.png", "exchange": "NYSE", "currency": "USD"},
 }
+
+LSE_STOCKS = {
+    "HSBA.L": {"name": "HSBC Holdings",    "name_zh": "汇丰控股", "bg": "images/stocks/HSBA.L.png", "exchange": "LSE", "currency": "GBX"},
+    "BP.L":   {"name": "BP plc",           "name_zh": "英国石油", "bg": "images/stocks/BP.L.png",   "exchange": "LSE", "currency": "GBX"},
+    "ULVR.L": {"name": "Unilever plc",     "name_zh": "联合利华", "bg": "images/stocks/ULVR.L.png", "exchange": "LSE", "currency": "GBX"},
+}
+
+TSE_STOCKS = {
+    "7203.T": {"name": "Toyota Motor Corp.",   "name_zh": "丰田汽车",   "bg": "images/stocks/7203.T.png", "exchange": "TSE", "currency": "JPY"},
+    "6758.T": {"name": "Sony Group Corp.",     "name_zh": "索尼集团",   "bg": "images/stocks/6758.T.png", "exchange": "TSE", "currency": "JPY"},
+    "9984.T": {"name": "SoftBank Group Corp.", "name_zh": "软银集团",   "bg": "images/stocks/9984.T.png", "exchange": "TSE", "currency": "JPY"},
+}
+
+REAL_STOCKS = {**ADR_STOCKS, **LSE_STOCKS, **TSE_STOCKS}
+REAL_TICKERS = list(REAL_STOCKS.keys())
+
+FX_TICKERS = {
+    "USD": "USDCNY=X",
+    "GBP": "GBPCNY=X",
+    "JPY": "JPYCNY=X",
+}
+FX_FALLBACK_RATES = {
+    "USD": 7.25,
+    "GBP": 9.20,
+    "JPY": 0.048,
+}
+FX_REFRESH_INTERVAL = 600
 
 ETF_TICKER = "CNXF"
 ETF_INFO = {
@@ -58,5 +85,7 @@ _PERIOD_SECONDS = {
 }
 
 ADR_TICKERS   = list(ADR_STOCKS.keys())
+LSE_TICKERS   = list(LSE_STOCKS.keys())
+TSE_TICKERS   = list(TSE_STOCKS.keys())
 PENNY_TICKERS = list(PENNY_STOCKS.keys())
-ALL_TICKERS   = ADR_TICKERS + [ETF_TICKER] + PENNY_TICKERS
+ALL_TICKERS   = ADR_TICKERS + LSE_TICKERS + TSE_TICKERS + [ETF_TICKER] + PENNY_TICKERS

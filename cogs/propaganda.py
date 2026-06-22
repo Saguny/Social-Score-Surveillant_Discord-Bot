@@ -3,6 +3,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 from config.banned_topics import get_banned_match
+from cogs.achievements import unlock as unlock_achievement
 
 THUMBS_UP = "👍"
 THUMBS_DOWN = "👎"
@@ -117,6 +118,9 @@ class Propaganda(commands.Cog):
         embed.timestamp = discord.utils.utcnow()
         await channel.send(embed=embed)
 
+        if member:
+            await unlock_achievement(self.bot, guild, member, "propaganda_winner", channel=channel)
+
     propaganda_group = app_commands.Group(name="propaganda", description="Propaganda event commands")
 
     @propaganda_group.command(name="start", description="Start a propaganda submission event (mod only)")
@@ -203,6 +207,7 @@ class Propaganda(commands.Cog):
                 ephemeral=True,
             )
             self.bot.dispatch("score_change", interaction.guild, interaction.user, interaction.channel, old, new)
+            await unlock_achievement(self.bot, interaction.guild, interaction.user, "propaganda_banned", channel=interaction.channel)
             return
 
         await self.db.add_propaganda_submission(event["id"], gid, uid, text)

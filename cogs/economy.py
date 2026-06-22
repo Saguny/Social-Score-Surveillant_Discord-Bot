@@ -5,6 +5,7 @@ import asyncio
 from discord import app_commands
 from discord.ext import commands
 from config.shop import SHOP_ITEMS, BADGE_DISPLAY, COSMETIC_META
+from cogs.achievements import unlock as unlock_achievement
 
 _INVESTIGATION_BOUNTY_REWARD = 8000
 
@@ -305,6 +306,95 @@ class RequestView(discord.ui.View):
         self.clear_items()
 
 
+class BattleView(discord.ui.View):
+    def __init__(self, bot: commands.Bot, challenger: discord.Member, opponent: discord.Member, amount: int, guild_id: int):
+        super().__init__(timeout=300)
+        self.bot = bot
+        self.challenger = challenger
+        self.opponent = opponent
+        self.amount = amount
+        self.guild_id = guild_id
+        self.done = False
+
+    async def _refund_challenger(self):
+        await self.bot.db.adjust_yuan(self.guild_id, self.challenger.id, self.amount)
+
+    async def _finish(self, interaction: discord.Interaction, accepted: bool):
+        if self.done:
+            try:
+                await interaction.response.defer()
+            except discord.HTTPException:
+                pass
+            return
+        self.done = True
+        self.clear_items()
+        try:
+            await interaction.response.defer()
+        except discord.HTTPException:
+            pass
+
+        db = interaction.client.db
+        gid = self.guild_id
+
+        if not accepted:
+            await self._refund_challenger()
+            embed = discord.Embed(color=0x333333, title="中华人民共和国社会信用局 · 决斗")
+            embed.add_field(
+                name="BATTLE DECLINED",
+                value=f"{self.opponent.mention} declined {self.challenger.mention}'s challenge. ¥{self.amount:,} refunded.",
+                inline=False,
+            )
+            await interaction.edit_original_response(embed=embed, view=self)
+            return
+
+        if not await db.spend_yuan(gid, self.opponent.id, self.amount):
+            await self._refund_challenger()
+            opponent_data = await db.get_user(gid, self.opponent.id)
+            embed = discord.Embed(color=0x8B0000, title="中华人民共和国社会信用局 · 决斗")
+            embed.add_field(
+                name="BATTLE CANCELLED",
+                value=f"{self.opponent.mention} has insufficient funds. Balance: ¥{opponent_data['yuan']:,} · Required: ¥{self.amount:,}\n{self.challenger.mention}'s stake has been refunded.",
+                inline=False,
+            )
+            await interaction.edit_original_response(embed=embed, view=self)
+            return
+
+        winner, loser = random.choice([(self.challenger, self.opponent), (self.opponent, self.challenger)])
+        payout = self.amount * 2
+        await db.adjust_yuan(gid, winner.id, payout)
+
+        embed = discord.Embed(color=0x2d5a27, title="中华人民共和国社会信用局 · 决斗")
+        embed.add_field(name="BATTLE RESOLVED", value=f"{self.challenger.mention} vs {self.opponent.mention} · ¥{self.amount:,} each", inline=False)
+        embed.add_field(name="WINNER", value=f"{winner.mention} · ¥{payout:,}", inline=True)
+        embed.add_field(name="LOSER", value=f"{loser.mention} · ¥0", inline=True)
+        embed.timestamp = discord.utils.utcnow()
+        await interaction.edit_original_response(embed=embed, view=self)
+
+    @discord.ui.button(label="Accept", style=discord.ButtonStyle.success)
+    async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.opponent.id:
+            await interaction.response.send_message("This challenge is not addressed to you.", ephemeral=True)
+            return
+        await self._finish(interaction, accepted=True)
+
+    @discord.ui.button(label="Decline", style=discord.ButtonStyle.danger)
+    async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.opponent.id:
+            await interaction.response.send_message("This challenge is not addressed to you.", ephemeral=True)
+            return
+        await self._finish(interaction, accepted=False)
+
+    async def on_timeout(self):
+        if self.done:
+            return
+        self.done = True
+        self.clear_items()
+        try:
+            await self._refund_challenger()
+        except Exception:
+            pass
+
+
 class Economy(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -362,6 +452,34 @@ class Economy(commands.Cog):
         embed.add_field(name="TOTAL SPENT",  value=f"¥{user['total_yuan_spent']:,}",  inline=True)
         await interaction.followup.send(embed=embed)
 
+    @app_commands.command(name="battle", description="Challenge a citizen to a 50/50 Yuan duel")
+    @app_commands.describe(opponent="Citizen to challenge", amount="Yuan stake (each side risks this much)")
+    async def battle(self, interaction: discord.Interaction, opponent: discord.Member, amount: app_commands.Range[int, 1000, None]):
+        await interaction.response.defer()
+        gid = interaction.guild.id
+        challenger = interaction.user
+
+        if opponent.id == challenger.id or opponent.bot:
+            await interaction.followup.send("Invalid opponent.", ephemeral=True)
+            return
+
+        if not await self.db.spend_yuan(gid, challenger.id, amount):
+            user = await self.db.get_user(gid, challenger.id)
+            await interaction.followup.send(
+                f"Insufficient funds. Balance: ¥{user['yuan']:,} · Required: ¥{amount:,}", ephemeral=True
+            )
+            return
+
+        view = BattleView(self.bot, challenger, opponent, amount, gid)
+        embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 决斗")
+        embed.add_field(
+            name="BATTLE CHALLENGE",
+            value=f"{challenger.mention} challenges {opponent.mention} to a 50/50 duel for ¥{amount:,} each.\nWinner takes ¥{amount * 2:,}.",
+            inline=False,
+        )
+        embed.timestamp = discord.utils.utcnow()
+        await interaction.followup.send(embed=embed, view=view)
+
     @app_commands.command(name="buy", description="Purchase an item from the shop")
     @app_commands.describe(
         item="Item ID (see /shop)",
@@ -410,9 +528,9 @@ class Economy(commands.Cog):
                     await interaction.followup.send("You have already purchased this global cosmetic.", ephemeral=True)
                     return
             else:
-                owned = await self.db.get_cosmetic_badges(gid, uid)
+                owned = await self.db.get_cosmetic_badges(uid)
                 if item in owned:
-                    await interaction.followup.send("You already have this cosmetic on this server.", ephemeral=True)
+                    await interaction.followup.send("You already have this cosmetic.", ephemeral=True)
                     return
 
         cost = cfg["cost"]
@@ -514,6 +632,13 @@ class Economy(commands.Cog):
         await interaction.followup.send("Your denouncement has been filed.", ephemeral=True)
         self._post_score(interaction, target, old, new)
 
+        distinct_targets = await self.db.count_distinct_denounce_targets(gid, uid)
+        if distinct_targets >= 5:
+            await unlock_achievement(self.bot, interaction.guild, interaction.user, "serial_denouncer", channel=interaction.channel)
+        distinct_denouncers = await self.db.count_distinct_denouncers(gid, target.id)
+        if distinct_denouncers >= 5:
+            await unlock_achievement(self.bot, interaction.guild, target, "frequently_denounced", channel=interaction.channel)
+
     async def _buy_surveillance(self, interaction, gid, uid, cfg, target, text, cost):
         expires_at = int(time.time()) + cfg["duration"]
         await self.db.add_effect(gid, uid, "surveillance", expires_at, {"target_id": target.id})
@@ -612,6 +737,7 @@ class Economy(commands.Cog):
             embed.add_field(name="RESULT", value="Better luck next time. The Party keeps your entry.", inline=False)
             embed.add_field(name="YUAN CHANGE", value=f"-¥{cost:,}", inline=False)
             await self.db.update_lottery_stats(gid, recipient.id, False, net)
+            await self._check_lottery_addict(interaction.guild, recipient, interaction.channel)
         elif roll < 0.9:
             winnings = random.randint(*tier["win"])
             net = winnings if gifted else winnings - cost
@@ -638,8 +764,14 @@ class Economy(commands.Cog):
             embed.add_field(name="JACKPOT", value="Extraordinary fortune. The state bestows its blessing.", inline=False)
             embed.add_field(name="YUAN CHANGE", value=f"+¥{winnings:,} · net {net:+,}", inline=False)
             await self.db.update_lottery_stats(gid, recipient.id, True, net)
+            await unlock_achievement(self.bot, interaction.guild, recipient, "jackpot_winner", channel=interaction.channel)
         embed.timestamp = discord.utils.utcnow()
         await interaction.followup.send(embed=embed)
+
+    async def _check_lottery_addict(self, guild, user, channel):
+        row = await self.db.get_user(guild.id, user.id)
+        if row and int(row.get("lottery_net", 0)) <= -100_000:
+            await unlock_achievement(self.bot, guild, user, "lottery_addict", channel=channel)
 
     async def _buy_lottery_dono(self, interaction, gid, uid, cfg, target, text, cost):
         user_row = await self.db.get_user(gid, uid)
@@ -660,6 +792,7 @@ class Economy(commands.Cog):
         else:
             await self.db.set_yuan(gid, uid, 0)
             await self.db.update_lottery_stats(gid, uid, False, -balance)
+            await self._check_lottery_addict(interaction.guild, interaction.user, interaction.channel)
             embed = discord.Embed(color=0x333333, title="中华人民共和国社会信用局 · 双倍或无")
             embed.add_field(name="CITIZEN", value=name, inline=False)
             embed.add_field(name="RESULT", value="The Party has confiscated your assets.", inline=False)
@@ -906,7 +1039,7 @@ class Economy(commands.Cog):
             await self.db.add_eternal_chairman(uid)
             self.bot.ec_users.add(uid)
         else:
-            await self.db.add_cosmetic_badge(gid, uid, item_id)
+            await self.db.add_cosmetic_badge(uid, item_id)
         embed = discord.Embed(color=color, title="中华人民共和国社会信用局")
         embed.add_field(name=f"STATUS GRANTED: {label}", value=note, inline=False)
         await interaction.followup.send(embed=embed, ephemeral=True)
@@ -1090,6 +1223,7 @@ class Economy(commands.Cog):
         embed.timestamp = discord.utils.utcnow()
         await interaction.followup.send(embed=embed)
         self._post_score(interaction, interaction.user, old, new)
+        await unlock_achievement(self.bot, interaction.guild, interaction.user, "first_confession", channel=interaction.channel)
 
     @buy.autocomplete("item")
     async def item_autocomplete(

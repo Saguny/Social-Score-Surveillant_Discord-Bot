@@ -12,6 +12,7 @@ from database._posters     import PostersMixin
 from database._stocks      import StocksMixin
 from database._voting      import VotingMixin
 from database._stats       import StatsMixin
+from database._achievements import AchievementsMixin
 
 
 TABLES = [
@@ -183,15 +184,6 @@ TABLES = [
     )
     """,
     """
-    CREATE TABLE IF NOT EXISTS cosmetic_badges (
-        guild_id     BIGINT,
-        user_id      BIGINT,
-        badge        TEXT,
-        purchased_at BIGINT,
-        PRIMARY KEY (guild_id, user_id, badge)
-    )
-    """,
-    """
     CREATE TABLE IF NOT EXISTS eternal_chairmen (
         user_id      BIGINT PRIMARY KEY,
         purchased_at BIGINT
@@ -212,6 +204,7 @@ class Database(
     StocksMixin,
     VotingMixin,
     StatsMixin,
+    AchievementsMixin,
 ):
     def __init__(self):
         self._dsn = os.getenv("DATABASE_URL", "")
@@ -342,6 +335,7 @@ class Database(
             await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS turbo_opened  INTEGER NOT NULL DEFAULT 0")
             await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS turbo_knocked INTEGER NOT NULL DEFAULT 0")
             await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS turbo_profit  BIGINT  NOT NULL DEFAULT 0")
+            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS traded_exchanges INTEGER NOT NULL DEFAULT 0")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_transactions_user   ON transactions (guild_id, user_id, item_id)")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_transactions_target ON transactions (guild_id, target_user_id, item_id, timestamp DESC)")
             await conn.execute("""
@@ -350,7 +344,6 @@ class Database(
                     remind_at BIGINT NOT NULL
                 )
             """)
-            await conn.execute("ALTER TABLE cosmetic_badges ADD COLUMN IF NOT EXISTS expires_at BIGINT")
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS topgg_votes (
                     user_id  BIGINT NOT NULL,
@@ -365,3 +358,32 @@ class Database(
                 )
             """)
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_guild_joins_joined_at ON guild_joins (joined_at)")
+            await conn.execute("ALTER TABLE IF EXISTS achievements RENAME TO achievements_legacy_per_guild")
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS achievements (
+                    user_id         BIGINT NOT NULL,
+                    achievement_id  TEXT   NOT NULL,
+                    unlocked_at     BIGINT NOT NULL,
+                    origin_guild_id BIGINT,
+                    PRIMARY KEY (user_id, achievement_id)
+                )
+            """)
+            await conn.execute("ALTER TABLE guild_config ADD COLUMN IF NOT EXISTS achievements_channel_id BIGINT")
+            await conn.execute("ALTER TABLE guild_config ADD COLUMN IF NOT EXISTS achievements_loud_enabled BOOLEAN NOT NULL DEFAULT TRUE")
+            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS execution_count INTEGER NOT NULL DEFAULT 0")
+            await conn.execute("ALTER TABLE IF EXISTS cosmetic_badges RENAME TO cosmetic_badges_legacy_per_guild")
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS cosmetic_badges (
+                    user_id      BIGINT NOT NULL,
+                    badge        TEXT   NOT NULL,
+                    purchased_at BIGINT NOT NULL,
+                    expires_at   BIGINT,
+                    PRIMARY KEY (user_id, badge)
+                )
+            """)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS badge_preferences (
+                    user_id  BIGINT PRIMARY KEY,
+                    badge_id TEXT
+                )
+            """)

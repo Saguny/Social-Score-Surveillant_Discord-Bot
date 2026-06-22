@@ -16,6 +16,18 @@ class EconomyMixin:
             guild_id, user_id,
         )
 
+    async def count_distinct_denounce_targets(self, guild_id, user_id) -> int:
+        return await self._pool.fetchval(
+            "SELECT COUNT(DISTINCT target_user_id) FROM transactions WHERE guild_id = $1 AND user_id = $2 AND item_id = 'denounce'",
+            guild_id, user_id,
+        )
+
+    async def count_distinct_denouncers(self, guild_id, target_user_id) -> int:
+        return await self._pool.fetchval(
+            "SELECT COUNT(DISTINCT user_id) FROM transactions WHERE guild_id = $1 AND target_user_id = $2 AND item_id = 'denounce'",
+            guild_id, target_user_id,
+        )
+
     async def get_rehabilitation_count(self, guild_id, user_id):
         return await self._pool.fetchval(
             "SELECT COUNT(*) FROM transactions WHERE guild_id = $1 AND user_id = $2 AND item_id = 'rehabilitate'",
@@ -62,33 +74,52 @@ class EconomyMixin:
             guild_id, user_id, f"[UNVERIFIED REPORT] {reason[:80]}", int(time.time()),
         )
 
-    async def add_cosmetic_badge(self, guild_id: int, user_id: int, badge: str):
+    async def add_cosmetic_badge(self, user_id: int, badge: str):
         await self._pool.execute(
-            "INSERT INTO cosmetic_badges (guild_id, user_id, badge, purchased_at) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING",
-            guild_id, user_id, badge, int(time.time()),
+            "INSERT INTO cosmetic_badges (user_id, badge, purchased_at) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
+            user_id, badge, int(time.time()),
         )
 
-    async def get_cosmetic_badges(self, guild_id: int, user_id: int) -> list[str]:
+    async def get_cosmetic_badges(self, user_id: int) -> list[str]:
         rows = await self._pool.fetch(
-            "SELECT badge FROM cosmetic_badges WHERE guild_id = $1 AND user_id = $2 AND (expires_at IS NULL OR expires_at > $3)",
-            guild_id, user_id, int(time.time()),
+            "SELECT badge FROM cosmetic_badges WHERE user_id = $1 AND (expires_at IS NULL OR expires_at > $2)",
+            user_id, int(time.time()),
         )
         return [row["badge"] for row in rows]
 
-    async def add_temporary_cosmetic_badge(self, guild_id: int, user_id: int, badge: str, expires_at: int):
+    async def add_temporary_cosmetic_badge(self, user_id: int, badge: str, expires_at: int):
         await self._pool.execute(
             """
-            INSERT INTO cosmetic_badges (guild_id, user_id, badge, purchased_at, expires_at)
-            VALUES ($1, $2, $3, $4, $5)
-            ON CONFLICT (guild_id, user_id, badge) DO UPDATE SET expires_at = $5
+            INSERT INTO cosmetic_badges (user_id, badge, purchased_at, expires_at)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (user_id, badge) DO UPDATE SET expires_at = $4
             """,
-            guild_id, user_id, badge, int(time.time()), expires_at,
+            user_id, badge, int(time.time()), expires_at,
         )
 
     async def clean_expired_cosmetic_badges(self):
         await self._pool.execute(
             "DELETE FROM cosmetic_badges WHERE expires_at IS NOT NULL AND expires_at <= $1",
             int(time.time()),
+        )
+
+    async def set_badge_preference(self, user_id: int, badge_id: str):
+        await self._pool.execute(
+            "INSERT INTO badge_preferences (user_id, badge_id) VALUES ($1, $2) ON CONFLICT (user_id) DO UPDATE SET badge_id = $2",
+            user_id, badge_id,
+        )
+
+    async def get_badge_preference(self, user_id: int) -> str | None:
+        row = await self._pool.fetchrow(
+            "SELECT badge_id FROM badge_preferences WHERE user_id = $1",
+            user_id,
+        )
+        return row["badge_id"] if row else None
+
+    async def clear_badge_preference(self, user_id: int):
+        await self._pool.execute(
+            "DELETE FROM badge_preferences WHERE user_id = $1",
+            user_id,
         )
 
     async def add_eternal_chairman(self, user_id: int):

@@ -196,6 +196,13 @@ class StocksMixin:
                 )
         return {"proceeds": proceeds, "pnl": pnl}
 
+    async def mark_exchange_traded(self, guild_id: int, user_id: int, bit: int) -> int:
+        row = await self._pool.fetchrow(
+            "UPDATE users SET traded_exchanges = traded_exchanges | $1 WHERE guild_id = $2 AND user_id = $3 RETURNING traded_exchanges",
+            bit, guild_id, user_id,
+        )
+        return row["traded_exchanges"] if row else 0
+
     async def replace_daily_turbos(self, day: int, turbo_list: list) -> None:
         if not turbo_list:
             return
