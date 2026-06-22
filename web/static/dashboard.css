@@ -17,11 +17,15 @@
 
   --green:#3DAA6E; --red:#E85454; --yellow:#F4E557; --orange:#F5A855;
 }
+html, body { overflow-x:hidden; max-width:100%; }
 body { background:var(--bg); color:var(--text); font-family:'Segoe UI',sans-serif; }
-.navbar { background:var(--bg); border-bottom:1px solid var(--border); }
-.navbar-brand { color:var(--text)!important; letter-spacing:2px; font-weight:700; }
+.navbar { background:var(--bg); border-bottom:1px solid var(--border); flex-wrap:wrap; }
+.navbar-brand { color:var(--text)!important; letter-spacing:2px; font-weight:700; white-space:normal; overflow-wrap:break-word; flex:1 1 260px; min-width:0; }
 .nav-link { color:var(--text-muted)!important; font-size:.85rem; letter-spacing:1px; }
 .nav-link:hover,.nav-link.active { color:var(--text)!important; }
+@media (max-width:576px) {
+  .navbar-brand { font-size:.78rem; letter-spacing:1px; }
+}
 
 .sc { background:var(--bg-panel); border:1px solid var(--border); border-radius:8px; padding:1.25rem 1.5rem; height:100%; }
 .sc.hero { padding:1.75rem 2rem; }

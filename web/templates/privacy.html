@@ -50,7 +50,15 @@
       <li><strong>Admin console access.</strong> The password-protected <code>/admin</code> panel is used by the bot operator to look up a Discord user's real ID, username, and per-guild stats for support and moderation purposes.</li>
     </ul>
 
-    <h2>2. What the public dashboard shows</h2>
+    <h2>2. Where your data is stored</h2>
+    <p>All bot and dashboard data lives in a single database, accessed only by the bot process and the admin
+    console described above — there is no separate analytics or third-party data warehouse. Our infrastructure
+    is currently located outside the European Economic Area (EEA) and the UK. If you are in the EEA or UK, this
+    means your data is transferred internationally when you use the bot. We are evaluating a move to EEA-based
+    hosting; if and when that happens, this section will be updated to reflect the new location and the
+    "Last updated" date above will change accordingly.</p>
+
+    <h2>3. What the public dashboard shows</h2>
     <p>The dashboard you are looking at (<a href="/">/</a>) is open to the public, but it never displays real Discord
     usernames, server names, or message text. Every user and server shown is replaced with a stable, salted-hash
     pseudonym (e.g. "User #1842"), so the figures cannot be reversed back into a real Discord identity without
@@ -59,14 +67,14 @@
     that disallows crawling, so it is not meant to be indexed by search engines even though it is technically
     reachable.</p>
 
-    <h2>3. Why we collect it</h2>
+    <h2>4. Why we collect it</h2>
     <p>Data is collected solely to operate the bot's features: calculating and displaying your social credit
     score, running the yuan economy, shop, lottery and stock market, tracking check-in streaks and achievements,
     enforcing per-target cooldowns (e.g. denounce/endorse/rebuke), running propaganda events, and showing
     aggregate, anonymized statistics on this dashboard. We do not sell data, and we do not use it for
     advertising.</p>
 
-    <h2>4. Who can see your data</h2>
+    <h2>5. Who can see your data</h2>
     <ul>
       <li><strong>You and other server members</strong> see whatever the bot's commands normally display (e.g. <code>/score</code>, <code>/leaderboard</code>), the same as any other Discord bot feature.</li>
       <li><strong>The public</strong> can only ever see pseudonymized, aggregate figures through this dashboard — never your real Discord ID, username, or message text.</li>
@@ -74,34 +82,50 @@
       <li><strong>Third-party services</strong> we rely on to run the bot: Discord (hosting the platform itself), top.gg (vote webhooks), and our hosting/database provider. We do not share your data with anyone beyond what is needed to operate the bot through these services.</li>
     </ul>
 
-    <h2>5. How long we keep it</h2>
+    <h2>6. How long we keep it</h2>
     <p>Game-state data (score, yuan, history, achievements, etc.) is kept for as long as you remain a member of a
     server using the bot, so your progress isn't lost between sessions. A server's data can be fully wiped by
     that server's moderators at any time. IP addresses used for rate limiting are never written to the database
     and age out of memory automatically.</p>
 
-    <h2>6. Your choices</h2>
+    <h2>7. Your choices</h2>
     <ul>
       <li>You can stop using the bot at any time by no longer interacting with it; this does not require any action on our part.</li>
       <li>Server moderators can reset all bot data for their server.</li>
       <li>To request deletion or a copy of your data, or to ask any question about this policy, contact us through our <a href="https://discord.gg/invite/k4W6YAPYhC" target="_blank" rel="noopener">Support Server</a>.</li>
     </ul>
 
-    <h2>7. Children's privacy</h2>
+    <h2>8. Your rights under GDPR (EU/EEA &amp; UK users)</h2>
+    <p>If you are located in the European Economic Area or the UK, data protection law (GDPR / UK GDPR) gives you
+    specific rights over your personal data, including the right to:</p>
+    <ul>
+      <li><strong>Access</strong> the personal data we hold about you.</li>
+      <li><strong>Rectify</strong> inaccurate data.</li>
+      <li><strong>Erasure</strong> ("right to be forgotten") — request that we delete your data.</li>
+      <li><strong>Restrict or object</strong> to certain processing.</li>
+      <li><strong>Data portability</strong> — receive your data in a portable format.</li>
+      <li><strong>Lodge a complaint</strong> with your local data protection supervisory authority.</li>
+    </ul>
+    <p>We honor erasure and access requests from EU/EEA/UK users as required by law. As a matter of policy, not
+    only legal obligation, we extend the same deletion and access rights to every user of the bot regardless of
+    where you are located — contact us through the Support Server to exercise any of these rights, wherever
+    you're writing in from.</p>
+
+    <h2>9. Children's privacy</h2>
     <p>This bot operates on Discord, which requires users to meet Discord's own minimum age requirement. We do not
     knowingly collect data from anyone below that age beyond what Discord itself already provides to bots
     operating on its platform.</p>
 
-    <h2>8. Security</h2>
+    <h2>10. Security</h2>
     <p>Public pseudonyms are derived using a salted hash with no stored mapping table back to real IDs. The admin
     console is protected by a token and, optionally, an IP allowlist. We take reasonable measures to protect
     stored data but, as with any online service, cannot guarantee absolute security.</p>
 
-    <h2>9. Changes to this policy</h2>
+    <h2>11. Changes to this policy</h2>
     <p>We may update this page as the bot's features change. Material changes will be reflected here with an
     updated "Last updated" date above.</p>
 
-    <h2>10. Contact</h2>
+    <h2>12. Contact</h2>
     <p>Questions about this policy or your data can be sent through our
     <a href="https://discord.gg/invite/k4W6YAPYhC" target="_blank" rel="noopener">Support Server</a>.</p>
 
