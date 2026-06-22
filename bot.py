@@ -224,7 +224,7 @@ async def console_loop(bot: commands.Bot):
 
 class SocialCreditBot(commands.Bot):
     def __init__(self):
-        super().__init__(command_prefix="ccp ", intents=intents, tree_cls=CreditCommandTree)
+        super().__init__(command_prefix="ccp ", intents=intents, tree_cls=CreditCommandTree, help_command=None)
         self.db = Database()
         self.ec_users: set[int] = set()
         self._cmd_cooldowns: dict[int, float] = {}

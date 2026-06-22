@@ -79,8 +79,7 @@ class Guide(commands.Cog):
     async def _before_refresh(self):
         await self.bot.wait_until_ready()
 
-    @app_commands.command(name="guide", description="Full guide to the Social Credit System")
-    async def guide(self, interaction: discord.Interaction):
+    def _build_guide_batches(self) -> list[list[discord.Embed]]:
         embeds = []
 
         e1 = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · SCORING RULES")
@@ -441,13 +440,17 @@ class Guide(commands.Cog):
         e9.set_footer(text="GLORY TO THE CCP!")
         embeds.append(e9)
 
-        batches = [
-            embeds[0:2],   # scoring rules + ranks/execution
-            embeds[2:4],   # stat commands + economy/shop
-            embeds[4:7],   # social rating + fundraisers + mod commands
-            embeds[7:9],   # markets + propaganda events
-            embeds[9:10],  # achievements
+        return [
+            embeds[0:2],
+            embeds[2:4],
+            embeds[4:7],
+            embeds[7:9],
+            embeds[9:10],
         ]
+
+    @app_commands.command(name="guide", description="Full guide to the Social Credit System")
+    async def guide(self, interaction: discord.Interaction):
+        batches = self._build_guide_batches()
         await interaction.response.defer(ephemeral=True)
         try:
             for batch in batches:
@@ -456,6 +459,23 @@ class Guide(commands.Cog):
         except discord.Forbidden:
             for batch in batches:
                 await interaction.followup.send(embeds=batch, ephemeral=True)
+
+    @app_commands.command(name="help", description="Full guide to the Social Credit System")
+    async def help(self, interaction: discord.Interaction):
+        await self.guide.callback(self, interaction)
+
+    @commands.command(name="help")
+    async def help_prefix(self, ctx: commands.Context):
+        try:
+            await ctx.message.add_reaction("🇨🇳")
+        except discord.HTTPException:
+            pass
+        batches = self._build_guide_batches()
+        try:
+            for batch in batches:
+                await ctx.author.send(embeds=batch)
+        except discord.Forbidden:
+            await ctx.send("Your DMs are closed. Run `/help` or `/guide` instead.")
 
     @app_commands.command(name="ping", description="Check the Bureau's response latency")
     async def ping(self, interaction: discord.Interaction):
