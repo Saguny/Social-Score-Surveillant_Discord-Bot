@@ -1,5 +1,6 @@
 import re
 import random
+import time
 from datetime import datetime, timezone, timedelta
 import aiohttp
 import discord
@@ -455,7 +456,8 @@ class Guide(commands.Cog):
             title="中华人民共和国社会信用局 · SIGNAL CHECK",
             description=f"The Bureau responds in **{latency_ms} ms**. Your transmission has been logged.",
         )
-        await interaction.response.send_message(embed=e, ephemeral=True)
+        e.set_thumbnail(url="attachment://bureau.png")
+        await interaction.response.send_message(embed=e, file=discord.File("images/bureau.png"), ephemeral=True)
 
     @app_commands.command(name="decree", description="Receive an official proclamation from the Bureau")
     async def decree(self, interaction: discord.Interaction):
@@ -477,6 +479,7 @@ class Guide(commands.Cog):
             title="中华人民共和国社会信用局 · ACKNOWLEDGEMENTS",
             description="The surveillance apparatus is built on the following open-source technologies. The Party is grateful.",
         )
+        e.set_thumbnail(url="attachment://bureau.png")
         for name, desc in CREDITS_LINES:
             e.add_field(name=name, value=desc, inline=False)
         e.add_field(
@@ -484,7 +487,7 @@ class Guide(commands.Cog):
             value=f"[GitHub]({REPO_URL})",
             inline=False,
         )
-        await interaction.response.send_message(embed=e, ephemeral=True)
+        await interaction.response.send_message(embed=e, file=discord.File("images/bureau.png"), ephemeral=True)
 
     @app_commands.command(name="disclaimer", description="Legal and ethical disclaimer for this bot")
     async def disclaimer(self, interaction: discord.Interaction):
@@ -501,7 +504,8 @@ class Guide(commands.Cog):
                 "This is a joke. The irony is the point."
             ),
         )
-        await interaction.response.send_message(embed=e)
+        e.set_thumbnail(url="attachment://bureau.png")
+        await interaction.response.send_message(embed=e, file=discord.File("images/bureau.png"))
 
     @app_commands.command(name="uptime", description="How long the Bureau has been active")
     async def uptime(self, interaction: discord.Interaction):
@@ -530,8 +534,9 @@ class Guide(commands.Cog):
             description=f"The Bureau has been vigilant for **{' '.join(parts)}**.",
         )
         e.add_field(name="ONLINE SINCE", value=f"<t:{int(start_time.timestamp())}:F>", inline=False)
+        e.set_thumbnail(url="attachment://bureau.png")
 
-        await interaction.followup.send(embed=e, ephemeral=True)
+        await interaction.followup.send(embed=e, file=discord.File("images/bureau.png"), ephemeral=True)
 
     @app_commands.command(name="botinfo", description="Information about Social Credit Surveillantr")
     async def botinfo(self, interaction: discord.Interaction):
@@ -539,7 +544,11 @@ class Guide(commands.Cog):
 
         guild_count  = len(self.bot.guilds)
         member_count = sum(g.member_count or 0 for g in self.bot.guilds)
-        latency_ms   = round(self.bot.latency * 1000)
+        discord_ms   = round(self.bot.latency * 1000)
+
+        t0 = time.time()
+        stats = await self.bot.db.get_global_stats()
+        db_ms = round((time.time() - t0) * 1000, 1)
 
         e = discord.Embed(
             color=0xCC0000,
@@ -549,11 +558,15 @@ class Guide(commands.Cog):
                 "Every citizen is monitored. Every message is evaluated. Glory awaits the compliant."
             ),
         )
+        e.set_thumbnail(url="attachment://bureau.png")
 
         e.add_field(name="VERSION",          value="1.0.3",                                    inline=True)
         e.add_field(name="CREATOR",          value="saguny",                                  inline=True)
         e.add_field(name="SERVERS · CITIZENS", value=f"{guild_count} servers · {member_count:,} citizens", inline=True)
-        e.add_field(name="LATENCY",          value=f"{latency_ms} ms",                        inline=True)
+        e.add_field(name="DISCORD · DB LATENCY", value=f"{discord_ms} ms · {db_ms} ms",         inline=True)
+        e.add_field(name="YUAN IN CIRCULATION", value=f"¥{stats['total_yuan']:,}",              inline=True)
+        e.add_field(name="MESSAGES RATED",   value=f"{stats['total_messages']:,}",              inline=True)
+        e.add_field(name="HIGHEST · LOWEST SCORE", value=f"{stats['highest_score']:.2f} · {stats['lowest_score']:.2f}", inline=True)
         e.add_field(
             name="TECHNOLOGY",
             value=(
@@ -569,7 +582,7 @@ class Guide(commands.Cog):
         )
 
         e.set_footer(text="Disclaimer: see /disclaimer")
-        await interaction.followup.send(embed=e)
+        await interaction.followup.send(embed=e, file=discord.File("images/bureau.png"))
 
 
 async def setup(bot: commands.Bot):

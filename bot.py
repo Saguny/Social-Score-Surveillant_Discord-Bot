@@ -118,6 +118,21 @@ async def _decay_task(bot: commands.Bot):
         await bot.db.apply_portfolio_score_bonus()
 
 
+_PRESENCE_CYCLE = [
+    discord.Activity(type=discord.ActivityType.watching, name="/guide | /shop"),
+    discord.Activity(type=discord.ActivityType.watching, name="/vote | /checkin"),
+    discord.Activity(type=discord.ActivityType.watching, name="/botinfo"),
+]
+
+
+async def _rotate_presence_task(bot: commands.Bot):
+    await bot.wait_until_ready()
+    while True:
+        await asyncio.sleep(600)
+        bot._presence_index = (bot._presence_index + 1) % len(_PRESENCE_CYCLE)
+        await bot.change_presence(activity=_PRESENCE_CYCLE[bot._presence_index])
+
+
 async def console_loop(bot: commands.Bot):
     loop = asyncio.get_event_loop()
     while True:
@@ -214,6 +229,7 @@ class SocialCreditBot(commands.Bot):
         self.ec_users: set[int] = set()
         self._cmd_cooldowns: dict[int, float] = {}
         self.start_time = None
+        self._presence_index = 0
 
     def format_user(self, user) -> str:
         name = str(user)
@@ -289,6 +305,7 @@ class SocialCreditBot(commands.Bot):
         from web.server import start_web_server
         asyncio.create_task(start_web_server(self))
         asyncio.create_task(_decay_task(self))
+        asyncio.create_task(_rotate_presence_task(self))
         self.loop.create_task(console_loop(self))
 
     async def on_ready(self):
@@ -344,9 +361,7 @@ class SocialCreditBot(commands.Bot):
         for cmd in _global_cmds:
             self.tree.add_command(cmd)
 
-        await self.change_presence(activity=discord.Activity(
-            type=discord.ActivityType.watching, name="/guide"
-        ))
+        await self.change_presence(activity=_PRESENCE_CYCLE[self._presence_index])
         print(f"Online: {self.user}  |  Guilds: {len(self.guilds)}  |  Slash commands synced.")
         print("Type 'help' for console commands.")
 

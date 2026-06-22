@@ -15,13 +15,6 @@ VOTE_YUAN_REWARD = 1500
 VOTE_BADGE = "voter"
 VOTE_COOLDOWN = 12 * 60 * 60
 
-_PRESENCE_CYCLE = [
-    discord.Activity(type=discord.ActivityType.watching, name="/guide | /shop"),
-    discord.Activity(type=discord.ActivityType.watching, name="/vote | /checkin"),
-    discord.Activity(type=discord.ActivityType.watching, name="/botinfo"),
-]
-
-
 class VoteReminderView(discord.ui.View):
     def __init__(self, user_id: int, db):
         super().__init__(timeout=300)
@@ -111,16 +104,13 @@ class Voting(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.db = bot.db
-        self._presence_index = 0
 
     async def cog_load(self):
         self._check_reminders.start()
-        self._rotate_presence.start()
         self._post_stats.start()
 
     async def cog_unload(self):
         self._check_reminders.cancel()
-        self._rotate_presence.cancel()
         self._post_stats.cancel()
 
     @app_commands.command(name="vote", description="Vote for this bot on Top.gg for a badge, score, and yuan")
@@ -161,15 +151,6 @@ class Voting(commands.Cog):
 
     @_check_reminders.before_loop
     async def _before_check(self):
-        await self.bot.wait_until_ready()
-
-    @tasks.loop(minutes=10)
-    async def _rotate_presence(self):
-        self._presence_index = (self._presence_index + 1) % len(_PRESENCE_CYCLE)
-        await self.bot.change_presence(activity=_PRESENCE_CYCLE[self._presence_index])
-
-    @_rotate_presence.before_loop
-    async def _before_rotate(self):
         await self.bot.wait_until_ready()
 
     @tasks.loop(minutes=30)
