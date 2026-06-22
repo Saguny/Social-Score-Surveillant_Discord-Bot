@@ -57,28 +57,36 @@ class Admin(commands.Cog):
             embed.add_field(name="EXECUTION CHANNEL", value=msg, inline=False)
         await ctx.send(embed=embed)
 
-    @commands.command(name="achievements_channel")
+    @commands.command(name="achievementnotification")
     @commands.has_permissions(manage_guild=True)
-    async def set_achievements_channel(self, ctx, channel_arg: str = None):
+    async def set_achievement_notifications(self, ctx, state: str = None):
         async with ctx.typing():
-            if channel_arg is None:
-                await self.db.set_achievements_channel(ctx.guild.id, None)
-                await self.db.set_achievements_loud_enabled(ctx.guild.id, True)
-                msg = "Achievements channel cleared · loud unlocks will post in the triggering channel."
-            elif channel_arg.lower() in ("off", "disable", "false", "no"):
-                await self.db.set_achievements_loud_enabled(ctx.guild.id, False)
-                msg = "Loud achievement announcements disabled · check `/achievements` to view unlocks."
+            current = await self.db.get_achievements_loud_enabled(ctx.guild.id)
+            if state is None:
+                enabled = not current
+            elif state.lower() in ("on", "enable", "true", "yes"):
+                enabled = True
+            elif state.lower() in ("off", "disable", "false", "no"):
+                enabled = False
             else:
-                try:
-                    channel = await commands.TextChannelConverter().convert(ctx, channel_arg)
-                except commands.BadArgument:
-                    await ctx.send("Usage: `ccp achievements_channel [#channel|off]`")
-                    return
-                await self.db.set_achievements_channel(ctx.guild.id, channel.id)
-                await self.db.set_achievements_loud_enabled(ctx.guild.id, True)
-                msg = f"Rare achievement announcements will be posted in {channel.mention}."
+                await ctx.send("Usage: `ccp achievementnotification [on|off]`")
+                return
+            await self.db.set_achievements_loud_enabled(ctx.guild.id, enabled)
+            msg = "Achievement unlock announcements enabled." if enabled else "Achievement unlock announcements disabled · check `/achievements` to view unlocks."
             embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")
-            embed.add_field(name="ACHIEVEMENTS CHANNEL", value=msg, inline=False)
+            embed.add_field(name="ACHIEVEMENT NOTIFICATIONS", value=msg, inline=False)
+            embed.set_footer(text="ccp achievementnotification [on|off] · ccp achievementchannel [#channel]")
+        await ctx.send(embed=embed)
+
+    @commands.command(name="achievementchannel")
+    @commands.has_permissions(manage_guild=True)
+    async def set_achievement_channel(self, ctx, channel: discord.TextChannel = None):
+        async with ctx.typing():
+            await self.db.set_achievements_channel(ctx.guild.id, channel.id if channel else None)
+            msg = f"Achievement unlocks will be announced in {channel.mention}." if channel else "Achievements channel cleared · unlocks will post in the triggering channel."
+            embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")
+            embed.add_field(name="ACHIEVEMENT CHANNEL", value=msg, inline=False)
+            embed.set_footer(text="ccp achievementnotification [on|off] · ccp achievementchannel [#channel]")
         await ctx.send(embed=embed)
 
     @commands.command(name="roles")

@@ -35,11 +35,7 @@ class AchievementsCog(commands.Cog, name="Achievements"):
         if data["badge"]:
             await self.db.add_cosmetic_badge(user.id, data["badge"])
         await self._apply_rewards_everywhere(user, data)
-        tier = data["tier"]
-        if tier == "reaction":
-            await self._notify_reaction(user, data, message=message, channel=channel)
-        elif tier == "announce":
-            self._queue_announce(guild, user, achievement_id, channel)
+        self._queue_announce(guild, user, achievement_id, channel)
         return True
 
     async def _apply_rewards_everywhere(self, user: discord.abc.User, data: dict):
@@ -54,19 +50,6 @@ class AchievementsCog(commands.Cog, name="Achievements"):
             tasks.append(self.db.update_score(guild_id, user_id, float(data["score_reward"]), f"achievement: {data['name']}"))
         if tasks:
             await asyncio.gather(*tasks)
-
-    async def _notify_reaction(self, user, data, message=None, channel=None):
-        if message is not None:
-            try:
-                await message.add_reaction("🏅")
-                return
-            except (discord.Forbidden, discord.HTTPException):
-                pass
-        if channel is not None:
-            try:
-                await channel.send(f"🏅 {user.mention} unlocked **{data['name']}**.", delete_after=30)
-            except (discord.Forbidden, discord.HTTPException):
-                pass
 
     def _queue_announce(self, guild: discord.Guild, user: discord.abc.User, achievement_id: str, channel):
         key = (guild.id, user.id)
@@ -94,22 +77,29 @@ class AchievementsCog(commands.Cog, name="Achievements"):
         if channel is None:
             return
 
-        title = "🏆 ACHIEVEMENT UNLOCKED 🏆" if len(ids) == 1 else "🏆 ACHIEVEMENTS UNLOCKED 🏆"
-        embed = discord.Embed(title=title, color=0xFFD700)
+        embeds = []
         for aid in ids:
             data = get_achievement(aid)
             if not data:
                 continue
-            embed.add_field(name=data["name"], value=data["description"], inline=False)
-        try:
-            embed.set_author(
-                name=await self.bot.format_user_full(user, guild.id),
-                icon_url=user.display_avatar.url,
+            parts = []
+            if data["score_reward"]:
+                parts.append(f"{data['score_reward']:.2f} credit score")
+            if data["yuan_reward"]:
+                parts.append(f"¥{data['yuan_reward']:,} Yuan")
+            reward_text = f" rewarding them with {' and '.join(parts)}" if parts else ""
+            embed = discord.Embed(
+                title="Achievement Unlocked!",
+                description=f"{user.mention} has unlocked the **{data['name']}** achievement{reward_text}.",
+                color=0xFFD700,
             )
-        except Exception:
-            pass
+            embed.set_thumbnail(url="attachment://achievement.png")
+            embeds.append(embed)
+        if not embeds:
+            return
+        file = discord.File("images/achievement.png", filename="achievement.png")
         try:
-            await channel.send(embed=embed)
+            await channel.send(file=file, embeds=embeds)
         except (discord.Forbidden, discord.HTTPException):
             pass
 

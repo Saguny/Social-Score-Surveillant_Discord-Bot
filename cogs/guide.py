@@ -296,6 +296,8 @@ class Guide(commands.Cog):
         e7.add_field(name="ccp threshold <n>",                      value="Set how many votes are required to resolve a fundraiser. Default is 3.", inline=False)
         e7.add_field(name="ccp executions [#channel]",              value="Set a dedicated channel for Execution List notices. Omit the channel to clear and revert to posting in the message channel.", inline=False)
         e7.add_field(name="ccp roles [on|off]",                     value="Toggle whether rank tier changes assign real Discord server roles. On by default. Execution List role is unaffected.", inline=False)
+        e7.add_field(name="ccp achievementnotification [on|off]",   value="Toggle public channel announcements when a citizen unlocks an achievement. On by default.", inline=False)
+        e7.add_field(name="ccp achievementchannel [#channel]",      value="Set a dedicated channel for achievement unlock announcements. Omit the channel to clear and revert to posting in the triggering channel.", inline=False)
         e7.add_field(name="ccp poster",                              value="Display a random propaganda poster.", inline=False)
         e7.add_field(name="ccp posters",                             value="Toggle daily propaganda poster broadcasts in this channel. React ❤️ for +3 score and ¥250 · React 😡 for -1 score.", inline=False)
         e7.add_field(
