@@ -12,6 +12,7 @@ import discord
 
 from web.cache import StatCache, format_event
 from web.sse import SSEHub
+from web.anonymize import redact_global_stats, using_fallback_salt
 
 PORT = int(os.getenv("PORT", 8080))
 _runner = None
@@ -20,6 +21,10 @@ _cache: StatCache | None = None
 _RATE_WINDOW  = 60 * 5
 _RATE_LIMIT   = 5
 _failed_attempts: dict[str, list[float]] = {}
+
+_PUBLIC_RATE_WINDOW = 60
+_PUBLIC_RATE_LIMIT  = 120
+_public_hits: dict[str, list[float]] = {}
 
 _TEMPLATE_DIR = Path(__file__).parent / 'templates'
 
@@ -37,11 +42,57 @@ def _is_authed(request):
     return bool(session_id) and hmac.compare_digest(cookie, session_id)
 
 
-def _require_auth(handler):
+def _client_ip(request) -> str:
+    xff = request.headers.get("X-Forwarded-For", "")
+    if xff:
+        hops = [h.strip() for h in xff.split(",") if h.strip()]
+        if hops:
+            return hops[-1]
+    return request.remote or ""
+
+
+def _admin_ip_allowed(request) -> bool:
+    allowlist = [ip.strip() for ip in os.getenv("ADMIN_ALLOWED_IPS", "").split(",") if ip.strip()]
+    if not allowlist:
+        return True
+    return _client_ip(request) in allowlist
+
+
+def _require_admin_ip(handler):
     async def middleware(request):
+        if not _admin_ip_allowed(request):
+            raise web.HTTPForbidden(text="Access denied.")
+        return await handler(request)
+    return middleware
+
+
+def _require_admin(handler):
+    async def middleware(request):
+        if not _admin_ip_allowed(request):
+            raise web.HTTPForbidden(text="Access denied.")
         if not _is_authed(request):
             next_url = str(request.rel_url)
             raise web.HTTPFound(f"/login?next={next_url}")
+        return await handler(request)
+    return middleware
+
+
+def _is_public_rate_limited(request) -> bool:
+    ip = _client_ip(request)
+    now = time.time()
+    hits = [t for t in _public_hits.get(ip, []) if now - t < _PUBLIC_RATE_WINDOW]
+    if len(hits) >= _PUBLIC_RATE_LIMIT:
+        _public_hits[ip] = hits
+        return True
+    hits.append(now)
+    _public_hits[ip] = hits
+    return False
+
+
+def _rate_limit_public(handler):
+    async def middleware(request):
+        if _is_public_rate_limited(request):
+            return web.json_response({"error": "Too many requests."}, status=429)
         return await handler(request)
     return middleware
 
@@ -52,7 +103,7 @@ async def _handle_login(request):
 
 async def _handle_auth(request):
     admin_token = os.getenv("ADMIN_TOKEN", "")
-    ip = request.headers.get("X-Forwarded-For", request.remote or "").split(",")[0].strip()
+    ip = _client_ip(request)
 
     now = time.time()
     attempts = _failed_attempts.get(ip, [])
@@ -248,6 +299,7 @@ async def _handle_stats(request):
     else:
         t0 = time.time()
         stats = await bot.db.get_global_stats()
+        redact_global_stats(stats)
         stats["db_query_ms"] = round((time.time() - t0) * 1000, 1)
         stats["uptime_seconds"] = int(time.time() - bot.start_time.timestamp()) if getattr(bot, "start_time", None) else 0
         stats["discord_ping_ms"] = round(bot.latency * 1000, 1) if bot.latency else None
@@ -287,7 +339,7 @@ async def _handle_recent_events(request):
             return web.json_response(cached)
 
     rows = await bot.db.get_recent_events(20)
-    events = [format_event(bot, r) for r in rows]
+    events = [format_event(r) for r in rows]
     return web.json_response({"events": events})
 
 
@@ -311,6 +363,10 @@ async def _handle_topgg_votes(request):
 async def _handle_sse(request):
     hub = request.app["sse_hub"]
     return await hub.stream(request)
+
+
+async def _handle_robots(request):
+    return web.Response(text="User-agent: *\nDisallow: /\n", content_type="text/plain")
 
 
 def _find_writable_channel(guild: discord.Guild) -> discord.TextChannel | None:
@@ -555,22 +611,28 @@ async def start_web_server(bot):
     app["session_id"] = secrets.token_hex(32)
     app["cache"] = cache
     app["sse_hub"] = hub
-    app.router.add_get("/login", _handle_login)
-    app.router.add_post("/api/auth", _handle_auth)
-    app.router.add_get("/", _require_auth(_handle_index))
-    app.router.add_get("/admin", _require_auth(_handle_admin))
-    app.router.add_post("/api/admin/command", _require_auth(_handle_admin_command))
-    app.router.add_get("/api/stats", _require_auth(_handle_stats))
-    app.router.add_get("/api/stats/timeline", _require_auth(_handle_stats_timeline))
-    app.router.add_get("/api/stats/recent-events", _require_auth(_handle_recent_events))
-    app.router.add_get("/api/stream", _require_auth(_handle_sse))
-    app.router.add_get("/api/admin/topgg-votes", _require_auth(_handle_topgg_votes))
-    app.router.add_get("/api/admin/guild-list", _require_auth(_handle_guild_list))
-    app.router.add_get("/api/admin/user-lookup", _require_auth(_handle_user_lookup))
-    app.router.add_post("/api/admin/user-yuan-adjust", _require_auth(_handle_user_yuan_adjust))
-    app.router.add_post("/api/admin/broadcast-embed", _require_auth(_handle_broadcast_embed))
+    app.router.add_get("/login", _require_admin_ip(_handle_login))
+    app.router.add_post("/api/auth", _require_admin_ip(_handle_auth))
+    app.router.add_get("/", _rate_limit_public(_handle_index))
+    app.router.add_get("/admin", _require_admin(_handle_admin))
+    app.router.add_post("/api/admin/command", _require_admin(_handle_admin_command))
+    app.router.add_get("/api/stats", _rate_limit_public(_handle_stats))
+    app.router.add_get("/api/stats/timeline", _rate_limit_public(_handle_stats_timeline))
+    app.router.add_get("/api/stats/recent-events", _rate_limit_public(_handle_recent_events))
+    app.router.add_get("/api/stream", _rate_limit_public(_handle_sse))
+    app.router.add_get("/api/admin/topgg-votes", _require_admin(_handle_topgg_votes))
+    app.router.add_get("/api/admin/guild-list", _require_admin(_handle_guild_list))
+    app.router.add_get("/api/admin/user-lookup", _require_admin(_handle_user_lookup))
+    app.router.add_post("/api/admin/user-yuan-adjust", _require_admin(_handle_user_yuan_adjust))
+    app.router.add_post("/api/admin/broadcast-embed", _require_admin(_handle_broadcast_embed))
     app.router.add_post("/webhooks/topgg", _handle_topgg_webhook)
+    app.router.add_get("/robots.txt", _handle_robots)
     app.router.add_static('/static', Path(__file__).parent / 'static', name='static')
+
+    if using_fallback_salt():
+        print("[web] WARNING: PSEUDONYM_SALT is not set — public stats are using a default, predictable salt. Set PSEUDONYM_SALT to a random secret.")
+    if not os.getenv("ADMIN_ALLOWED_IPS"):
+        print("[web] WARNING: ADMIN_ALLOWED_IPS is not set — /admin is reachable from any IP (still token-gated).")
 
     _runner = web.AppRunner(app)
     await _runner.setup()

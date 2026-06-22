@@ -26,6 +26,10 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',sans-seri
 .sc.hero { padding:2rem 2.2rem; }
 .sc.sc-auto { height:auto; }
 .lbl { color:var(--text-muted); font-size:.65rem; text-transform:uppercase; letter-spacing:1.5px; margin-bottom:.3rem; }
+.stat-tip { display:inline-flex; align-items:center; justify-content:center; width:13px; height:13px;
+            margin-left:.35rem; border-radius:50%; border:1px solid var(--text-faint); color:var(--text-faint);
+            font-size:.58rem; font-weight:700; text-transform:none; letter-spacing:0; cursor:help; vertical-align:1px; }
+.stat-tip:hover { color:var(--text); border-color:var(--text-muted); }
 .val { font-size:1.6rem; font-weight:700; line-height:1.1; }
 .val.xl { font-size:2.8rem; }
 .sub { color:var(--text-muted); font-size:.75rem; margin-top:.3rem; }

@@ -2,15 +2,15 @@ import asyncio
 import logging
 import time
 
+from web.anonymize import pseudonym_user, redact_global_stats
+
 logger = logging.getLogger(__name__)
 
 
-def format_event(bot, row) -> dict:
-    user = bot.get_user(row["user_id"])
+def format_event(row) -> dict:
     return {
-        "user": str(user) if user else f"User {row['user_id']}",
+        "user": pseudonym_user(row["user_id"]),
         "delta": round(float(row["delta"]), 2),
-        "reason": row["reason"],
         "timestamp": int(row["timestamp"]),
     }
 
@@ -81,6 +81,7 @@ class StatCache:
 
     async def _refresh_stats(self):
         stats = await self.bot.db.get_global_stats()
+        redact_global_stats(stats)
         self.augment_live_fields(stats)
         self._data["stats"] = stats
         if self.hub:
@@ -100,12 +101,13 @@ class StatCache:
         stats["sentiment_workers_active"] = active_workers if isinstance(active_workers, int) else None
 
     async def _refresh_timeline(self):
-        for rng in self.TIMELINE_RANGES:
-            self._data[f"timeline:{rng}"] = await self.bot.db.get_global_timeline(rng)
+        results = await asyncio.gather(*(self.bot.db.get_global_timeline(rng) for rng in self.TIMELINE_RANGES))
+        for rng, data in zip(self.TIMELINE_RANGES, results):
+            self._data[f"timeline:{rng}"] = data
 
     async def _refresh_votes(self):
-        for period in self.VOTE_PERIODS:
-            buckets = await self.bot.db.get_topgg_vote_timeline(period)
+        results = await asyncio.gather(*(self.bot.db.get_topgg_vote_timeline(period) for period in self.VOTE_PERIODS))
+        for period, buckets in zip(self.VOTE_PERIODS, results):
             total = sum(row["votes"] for row in buckets)
             self._data[f"votes:{period}"] = {"period": period, "buckets": buckets, "total": total}
 
@@ -131,7 +133,7 @@ class StatCache:
 
     async def _refresh_feed(self):
         rows = await self.bot.db.get_recent_events(20)
-        events = [format_event(self.bot, r) for r in rows]
+        events = [format_event(r) for r in rows]
         self._data["feed"] = {"events": events}
         if not rows:
             return
@@ -139,4 +141,4 @@ class StatCache:
         self._last_feed_ts = int(rows[0]["timestamp"])
         if self.hub and new_rows:
             for row in reversed(new_rows):
-                await self.hub.publish("feed", format_event(self.bot, row))
+                await self.hub.publish("feed", format_event(row))

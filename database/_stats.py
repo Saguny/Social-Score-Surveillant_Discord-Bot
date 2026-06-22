@@ -259,9 +259,12 @@ class StatsMixin:
         two_days = now - 172800
         week_ago = now - 604800
 
+        month_ago = now - 2592000
+
         (
             users_row,
-            hist_row,
+            hist_totals_row,
+            hist_window_row,
             misc_row,
             daily_7d,
             top_reasons,
@@ -307,7 +310,12 @@ class StatsMixin:
                 SELECT
                     COUNT(*) FILTER (WHERE delta > 0)                                              AS positive_events,
                     COUNT(*) FILTER (WHERE delta < 0)                                              AS negative_events,
-                    COALESCE(AVG(delta), 0)                                                        AS avg_delta,
+                    COALESCE(AVG(delta), 0)                                                        AS avg_delta
+                FROM score_history
+            """),
+
+            self._pool.fetchrow("""
+                SELECT
                     COUNT(*) FILTER (WHERE timestamp >= $1)                                        AS events_24h,
                     COUNT(*) FILTER (WHERE timestamp >= $2 AND timestamp < $1)                     AS events_prev_24h,
                     COUNT(*) FILTER (WHERE delta > 0 AND timestamp >= $1)                          AS pos_24h,
@@ -316,6 +324,7 @@ class StatsMixin:
                     COUNT(*) FILTER (WHERE delta < 0 AND timestamp >= $2 AND timestamp < $1)       AS neg_prev_24h,
                     COALESCE(SUM(delta) FILTER (WHERE timestamp >= $3), 0)                         AS net_delta_7d
                 FROM score_history
+                WHERE timestamp >= $3
             """, day_ago, two_days, week_ago),
 
             self._pool.fetchrow("""
@@ -338,10 +347,11 @@ class StatsMixin:
             self._pool.fetch("""
                 SELECT reason, COUNT(*) AS cnt, AVG(delta) AS avg_delta
                 FROM score_history
+                WHERE timestamp >= $1
                 GROUP BY reason
                 ORDER BY cnt DESC
                 LIMIT 10
-            """),
+            """, month_ago),
 
             self._pool.fetchrow("""
                 SELECT u.guild_id, COALESCE(gc.guild_name, '') AS guild_name, SUM(u.message_count) AS total
@@ -395,16 +405,16 @@ class StatsMixin:
             "checkins_yday":     int(users_row["checkins_yday"]),
             "dau":               int(users_row["dau"]),
             "wau":               int(users_row["wau"]),
-            "positive_events":   int(hist_row["positive_events"]),
-            "negative_events":   int(hist_row["negative_events"]),
-            "avg_delta":         round(float(hist_row["avg_delta"]), 4),
-            "events_24h":        int(hist_row["events_24h"]),
-            "events_prev_24h":   int(hist_row["events_prev_24h"]),
-            "pos_24h":           int(hist_row["pos_24h"]),
-            "neg_24h":           int(hist_row["neg_24h"]),
-            "pos_prev_24h":      int(hist_row["pos_prev_24h"]),
-            "neg_prev_24h":      int(hist_row["neg_prev_24h"]),
-            "net_delta_7d":      round(float(hist_row["net_delta_7d"]), 2),
+            "positive_events":   int(hist_totals_row["positive_events"]),
+            "negative_events":   int(hist_totals_row["negative_events"]),
+            "avg_delta":         round(float(hist_totals_row["avg_delta"]), 4),
+            "events_24h":        int(hist_window_row["events_24h"]),
+            "events_prev_24h":   int(hist_window_row["events_prev_24h"]),
+            "pos_24h":           int(hist_window_row["pos_24h"]),
+            "neg_24h":           int(hist_window_row["neg_24h"]),
+            "pos_prev_24h":      int(hist_window_row["pos_prev_24h"]),
+            "neg_prev_24h":      int(hist_window_row["neg_prev_24h"]),
+            "net_delta_7d":      round(float(hist_window_row["net_delta_7d"]), 2),
             "daily_7d":          [[int(r["day_num"]), int(r["cnt"])] for r in daily_7d],
             "top_reasons":       [{"reason": r["reason"], "cnt": int(r["cnt"]), "avg_delta": round(float(r["avg_delta"]), 4)} for r in top_reasons],
             "most_active_guild": {

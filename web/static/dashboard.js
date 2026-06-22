@@ -103,7 +103,7 @@ async function loadActivity(range) {
   });
 
   const res = await fetch('/api/stats/timeline?range=' + range);
-  if (res.status === 401 || res.status === 403) { location.href = '/login?next=/'; return; }
+  if (!res.ok) return;
   const d = await res.json();
   const labelFn = range === '24h' ? _hourLabel : _dayLabel;
 
@@ -127,7 +127,7 @@ async function loadActivity(range) {
   ], true);
 
   const socVals = eng.map(r => r.endorsements + r.rebukes);
-  set('tl-social-val', socVals.length ? fmt(socVals[socVals.length - 1]) : '—');
+  set('tl-social-val', socVals.length ? fmt(socVals.reduce((a, b) => a + b, 0)) : '—');
   _sparkChart('chart-social', labels, socVals, '#E85454');
   _hideIfEmpty('chart-social', socVals.length);
 
@@ -148,7 +148,7 @@ async function loadActivity(range) {
   const joins = d.joins || [];
   const joinLabels = joins.map(r => labelFn(r[0]));
   const joinVals = joins.map(r => r[1]);
-  set('tl-joins-val', joinVals.length ? fmt(joinVals[joinVals.length - 1]) : '—');
+  set('tl-joins-val', joinVals.length ? fmt(joinVals.reduce((a, b) => a + b, 0)) : '—');
   _sparkChart('chart-joins', joinLabels, joinVals, '#F4E557');
   _hideIfEmpty('chart-joins', joinVals.length);
 }
@@ -295,11 +295,10 @@ function _feedRow(ev) {
   const deltaStr = (ev.delta > 0 ? '+' : '') + ev.delta.toFixed(2);
   const t = new Date(ev.timestamp * 1000).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
   const countStr = ev._count > 1 ? ` <span class="feed-time">×${ev._count}</span>` : '';
-  return `<div class="feed-row" data-user="${ev.user}" data-reason="${ev.reason || ''}" data-count="${ev._count || 1}">
+  return `<div class="feed-row" data-user="${ev.user}" data-delta="${ev.delta}" data-count="${ev._count || 1}">
     <span class="feed-time">${t}</span>
     <span class="feed-delta ${sign}">${deltaStr}</span>
-    <span class="feed-user">${ev.user}</span>
-    <span class="feed-reason">${ev.reason || ''}</span>${countStr}
+    <span class="feed-user">${ev.user}</span>${countStr}
   </div>`;
 }
 
@@ -310,7 +309,7 @@ function _feedPrepend(ev) {
   if (!el) return;
   if (el.querySelector('.sub')) el.innerHTML = '';
   const top = el.firstElementChild;
-  if (top && top.dataset.user === String(ev.user) && top.dataset.reason === (ev.reason || '')) {
+  if (top && top.dataset.user === String(ev.user) && Number(top.dataset.delta) === ev.delta) {
     const count = (parseInt(top.dataset.count || '1', 10)) + 1;
     top.dataset.count = String(count);
     top.outerHTML = _feedRow({ ...ev, _count: count });
@@ -324,7 +323,7 @@ function _collapseRepeats(events) {
   const out = [];
   for (const ev of events) {
     const prev = out[out.length - 1];
-    if (prev && prev.user === ev.user && prev.reason === ev.reason) {
+    if (prev && prev.user === ev.user && prev.delta === ev.delta) {
       prev._count = (prev._count || 1) + 1;
     } else {
       out.push({ ...ev });
@@ -335,7 +334,7 @@ function _collapseRepeats(events) {
 
 async function loadFeed() {
   const res = await fetch('/api/stats/recent-events');
-  if (res.status === 401 || res.status === 403) { location.href = '/login?next=/'; return; }
+  if (!res.ok) return;
   const d = await res.json();
   const events = _collapseRepeats(d.events || []);
   setHtml('live-feed', events.length ? events.map(_feedRow).join('') : '<div class="sub">No data yet</div>');
@@ -452,7 +451,7 @@ function renderStats(d) {
 
 async function load() {
   const res = await fetch('/api/stats');
-  if (res.status === 401 || res.status === 403) { location.href = '/login?next=/'; return; }
+  if (!res.ok) return;
   renderStats(await res.json());
 }
 
@@ -476,8 +475,84 @@ function _connectStream() {
   stream.onerror = () => { _streamConnected = false; _startPollFallback(); };
 }
 
+const STAT_TIPS = {
+  'mc-users':   'Citizens who have sent at least one rated message, across every server.',
+  'mc-guilds':  'Number of Discord servers currently running this bot.',
+  'mc-dau':     'Citizens with at least one rated message in the last 24 hours.',
+  'mc-mps':     'Lifetime average messages processed per second since the bot first started.',
+  'mc-ping':    'Round-trip latency to Discord\'s gateway.',
+  'mc-db':      'Time for a trivial query to round-trip to the database.',
+  'mc-uptime':  'Time since the bot process last started.',
+  'mc-workers': 'Active / max sentiment-analysis worker processes.',
+  'mc-mag':     'The server with the most rated messages all-time. Server identity is anonymized.',
+  'mc-wau':     'Citizens with at least one rated message in the last 7 days.',
+  'tl-joins-val':       'New servers added over the selected time range.',
+  'act-ev':     'Score-changing events (messages, endorsements, etc.) in the last 24 hours.',
+  'act-pos':    'Positive score events in the last 24 hours.',
+  'act-neg':    'Negative score events in the last 24 hours.',
+  'act-net7':   'Sum of every citizen\'s score change over the last 7 days.',
+  'ci-today':   'Citizens who have checked in today.',
+  'ci-rate':    'Check-ins today divided by daily active users.',
+  'ci-streak':  'Longest check-in streak ever recorded by any single citizen.',
+  'ci-votes':   'Total top.gg votes received, all-time.',
+  'pr-ev':      'Propaganda events that have been run.',
+  'pr-subs':    'Total submissions across all propaganda events.',
+  'ec-circ':    'Total yuan currently held by all citizens combined.',
+  'ec-earn':    'Total yuan ever earned, all-time.',
+  'ec-spent':   'Total yuan ever spent in the shop, all-time.',
+  'ec-items':   'Total shop items purchased, all-time.',
+  'ec-fx':      'Currently active shop effects (freezes, etc.) across all citizens.',
+  'ec-fr':      'Total yuan raised through fundraisers, all-time.',
+  'tl-yuan-val':      'Total yuan in circulation over the selected time range.',
+  'tl-portfolio-val': 'Combined value of every citizen\'s stock and turbo holdings over the selected time range.',
+  'ec-rich':    'The highest yuan balance currently held by any single citizen.',
+  'mk-stocks':  'Total yuan currently invested in stocks across all portfolios.',
+  'mk-turbos':  'Total yuan currently committed to open turbo certificate positions.',
+  'mk-trades':  'Total stock trades executed, all-time.',
+  'lt-played':  'Total lottery tickets purchased, all-time.',
+  'lt-won':     'Lottery tickets won, all-time.',
+  'lt-net':     'Net yuan won or lost by all citizens combined, all-time.',
+  'lt-edge':    'House edge: net winnings or losses divided by tickets played.',
+  'mk-ko':      'Turbo certificate positions knocked out, all-time.',
+  'sc-avg':     'Average social credit score across all citizens who have chatted.',
+  'sc-high':    'Highest score ever reached by any citizen.',
+  'sc-low':     'Lowest score ever reached by any citizen.',
+  'sc-msgs':    'Total messages that have been scored, all-time.',
+  'sc-ampu':    'Average rated messages per citizen.',
+  'sc-end':     'Total endorsements given, all-time.',
+  'adv-pos':    'Total positive score events, all-time.',
+  'adv-neg':    'Total negative score events, all-time.',
+  'adv-avd':    'Average score change per event, all-time.',
+  'adv-pw':     'Citizens who have won a propaganda event.',
+  'adv-pe':     'Average submissions per propaganda event.',
+  'adv-er':     'Share of all endorsements and rebukes that were endorsements.',
+  'tl-social-val': 'Endorsements plus rebukes given over the selected time range.',
+  'sc-reb':     'Total rebukes given, all-time.',
+  'tl-dblatency-val': 'Rolling database round-trip time, sampled live.',
+};
+
+function _initTooltips() {
+  Object.entries(STAT_TIPS).forEach(([id, text]) => {
+    const valEl = document.getElementById(id);
+    if (!valEl) return;
+    const tile = valEl.closest('.sc');
+    if (!tile) return;
+    const lbl = tile.querySelector('.lbl');
+    if (!lbl || lbl.querySelector('.stat-tip')) return;
+    const icon = document.createElement('span');
+    icon.className = 'stat-tip';
+    icon.textContent = '?';
+    icon.setAttribute('data-bs-toggle', 'tooltip');
+    icon.setAttribute('data-bs-placement', 'top');
+    icon.setAttribute('title', text);
+    lbl.appendChild(icon);
+    if (window.bootstrap) new bootstrap.Tooltip(icon);
+  });
+}
+
 load();
 loadActivity('7d');
 loadFeed();
 _connectStream();
+_initTooltips();
 setInterval(() => loadActivity(_activityRange), 300000);
