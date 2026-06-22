@@ -143,20 +143,28 @@ class AchievementsCog(commands.Cog, name="Achievements"):
             return e
 
         class CategoryView(discord.ui.View):
-            def __init__(self_v):
+            def __init__(self_v, active: str):
                 super().__init__(timeout=180)
+                self_v.active = active
+                self_v._refresh_buttons()
+
+            def _refresh_buttons(self_v):
+                self_v.clear_items()
                 for cat in categories:
-                    btn = discord.ui.Button(label=cat.upper(), style=discord.ButtonStyle.secondary)
+                    style = discord.ButtonStyle.primary if cat == self_v.active else discord.ButtonStyle.secondary
+                    btn = discord.ui.Button(label=cat.upper(), style=style)
                     btn.callback = self_v._make_cb(cat)
                     self_v.add_item(btn)
 
             def _make_cb(self_v, cat: str):
                 async def callback(itr: discord.Interaction):
+                    self_v.active = cat
+                    self_v._refresh_buttons()
                     await itr.response.edit_message(embed=build_embed(cat), view=self_v)
                 return callback
 
         file = discord.File("images/achievement.png", filename="achievement.png")
-        await interaction.followup.send(file=file, embed=build_embed(categories[0]), view=CategoryView())
+        await interaction.followup.send(file=file, embed=build_embed(categories[0]), view=CategoryView(categories[0]))
 
 
 async def unlock(

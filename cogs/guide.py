@@ -11,6 +11,7 @@ from config.market_hours import all_exchange_status as _all_exchange_status, EXC
 
 REPO_URL      = "https://github.com/Saguny/Social-Score-Surveillant_Discord-Bot"
 INVITE_URL    = "https://discord.com/oauth2/authorize?client_id=856163780265902151&permissions=2416438352&integration_type=0&scope=bot"
+TOPGG_URL     = "https://top.gg/bot/856163780265902151/invite"
 SUPPORT_URL   = "https://discord.gg/invite/k4W6YAPYhC"
 WIKIQUOTE_API = "https://en.wikiquote.org/w/api.php"
 
@@ -179,6 +180,7 @@ class Guide(commands.Cog):
         e3.add_field(name="/ping",                   value="Check the Bureau's response latency.", inline=False)
         e3.add_field(name="/decree",                 value="Receive an official proclamation from the Bureau. May include decrees written by citizens.", inline=False)
         e3.add_field(name="/credits",                value="Open-source libraries powering the surveillance apparatus.", inline=False)
+        e3.add_field(name="/invite",                 value="Get a link to expand the Bureau's reach to another server.", inline=False)
         embeds.append(e3)
 
         e4 = discord.Embed(color=0xCC0000, title="YUAN AND ECONOMY")
@@ -506,6 +508,19 @@ class Guide(commands.Cog):
         )
         e.set_thumbnail(url="attachment://bureau.png")
         await interaction.response.send_message(embed=e, file=discord.File("images/bureau.png"))
+
+    @app_commands.command(name="invite", description="Invite the Bureau to expand to another server")
+    async def invite(self, interaction: discord.Interaction):
+        e = discord.Embed(
+            color=0xCC0000,
+            title="中华人民共和国社会信用局 · EXPAND THE BUREAU",
+            description="Bring social credit surveillance to your own server. Compliance is mandatory. Resistance is futile.",
+        )
+        e.set_thumbnail(url="attachment://bureau.png")
+        view = discord.ui.View()
+        view.add_item(discord.ui.Button(label="Add to Server", style=discord.ButtonStyle.link, url=TOPGG_URL))
+        view.add_item(discord.ui.Button(label="Support Server", style=discord.ButtonStyle.link, url=SUPPORT_URL))
+        await interaction.response.send_message(embed=e, file=discord.File("images/bureau.png"), view=view)
 
     @app_commands.command(name="uptime", description="How long the Bureau has been active")
     async def uptime(self, interaction: discord.Interaction):
