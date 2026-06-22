@@ -417,11 +417,9 @@ class Guide(commands.Cog):
             inline=False,
         )
         e9.add_field(
-            name="NOTIFICATION TIERS",
+            name="For Mods",
             value=(
-                "Silent · recorded with no announcement\n"
-                "Reaction · a quiet reaction on the triggering message\n"
-                "Announce · posted to the achievements channel, batched with other unlocks"
+                "Turn off by using `ccp achievementnotification off`, choose a channel by doing `ccp achievementchannel [channel]"
             ),
             inline=False,
         )

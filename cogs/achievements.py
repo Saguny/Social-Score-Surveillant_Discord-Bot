@@ -123,6 +123,7 @@ class AchievementsCog(commands.Cog, name="Achievements"):
                 color=0xFFD700,
             )
             e.set_author(name=author_name, icon_url=target.display_avatar.url)
+            e.set_thumbnail(url="attachment://achievement.png")
             for aid in grouped[category]:
                 data = get_achievement(aid)
                 if aid in unlocked:
@@ -153,7 +154,8 @@ class AchievementsCog(commands.Cog, name="Achievements"):
                     await itr.response.edit_message(embed=build_embed(cat), view=self_v)
                 return callback
 
-        await interaction.followup.send(embed=build_embed(categories[0]), view=CategoryView())
+        file = discord.File("images/achievement.png", filename="achievement.png")
+        await interaction.followup.send(file=file, embed=build_embed(categories[0]), view=CategoryView())
 
 
 async def unlock(

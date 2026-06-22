@@ -47,10 +47,9 @@ class Social(commands.Cog):
         old_score, new_score = await self.db.update_score(gid, target.id, delta, score_reason)
         await self.db.update_social_counts(gid, target.id, uid, etype)
 
-        giver = await self.db.get_user(gid, uid)
-        if etype == "endorse" and giver.get("endorsements_given", 0) == 1:
+        if etype == "endorse":
             await unlock_achievement(self.bot, interaction.guild, interaction.user, "first_endorsement", channel=interaction.channel)
-        elif etype == "rebuke" and giver.get("rebukes_given", 0) == 1:
+        else:
             await unlock_achievement(self.bot, interaction.guild, interaction.user, "first_rebuke", channel=interaction.channel)
 
         self.bot.dispatch("score_change", interaction.guild, target, interaction.channel, old_score, new_score)
