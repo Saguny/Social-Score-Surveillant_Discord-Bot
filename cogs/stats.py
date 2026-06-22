@@ -365,51 +365,55 @@ class Stats(commands.Cog):
         file = discord.File("images/ccpstats.png", filename="ccpstats.png")
         await interaction.followup.send(embed=build_overview(STATS_THUMBNAIL), view=StatsView("overview", STATS_THUMBNAIL), file=file)
 
-    @app_commands.command(name="state_report", description="View the official state report for this server")
+    @app_commands.command(name="state_report", description="View today's server-wide score and yuan activity")
     async def state_report(self, interaction: discord.Interaction):
         await interaction.response.defer()
-        data = await self.db.get_guild_stats(interaction.guild.id)
-        if not data:
-            await interaction.followup.send("Insufficient data for a state report.", ephemeral=True)
-            return
+        data = await self.db.get_guild_daily_report(interaction.guild.id)
 
-        def member_name(user_id: int) -> str:
-            m = interaction.guild.get_member(user_id)
-            return m.display_name if m else "Unknown"
+        net_today     = round(data["pos_today"] + data["neg_today"], 2)
+        net_yesterday = round(data["pos_yesterday"] + data["neg_yesterday"], 2)
+        net_diff      = round(net_today - net_yesterday, 2)
+        yuan_change   = data["yuan"] - data["prev_day_yuan"]
+
+        if net_diff > 0:   net_vs = f"▲ +{net_diff:.2f} better than yesterday"
+        elif net_diff < 0: net_vs = f"▼ {net_diff:.2f} worse than yesterday"
+        else:              net_vs = "= same as yesterday"
+
+        if yuan_change >= 0: yuan_vs = f"  ▲ +¥{yuan_change:,} vs yesterday"
+        else:                yuan_vs = f"  ▼ -¥{abs(yuan_change):,} vs yesterday"
+
+        ESC   = "\x1b"
+        RESET = f"{ESC}[0m"
+        GREEN = f"{ESC}[32m"
+        RED   = f"{ESC}[31m"
+        GRAY  = f"{ESC}[2;37m"
+
+        net_color  = GREEN if net_today >= 0 else RED
+        yuan_color = GREEN if yuan_change >= 0 else RED
+
+        pos  = f"+{data['pos_today']:.2f}"
+        neg  = f"{data['neg_today']:.2f}"
+        net  = f"{net_today:+.2f}"
+        yuan = f"¥{data['yuan']:,}"
+        pos_msgs     = f"{data['pos_msgs_today']}x"
+        neg_msgs     = f"{data['neg_msgs_today']}x"
+        neutral_msgs = f"{data['neutral_msgs_today']}x"
+        active       = f"{data['active_today']}/{data['citizens']}"
+        table = (
+            f"{GREEN}SCORE GAINED   {pos:>8}{RESET}\n"
+            f"{RED}SCORE LOST     {neg:>8}{RESET}\n"
+            f"{net_color}NET TODAY      {net:>8}{RESET}  {GRAY}{net_vs}{RESET}\n"
+            f"\n"
+            f"{GREEN}POSITIVE MSGS  {pos_msgs:>8}{RESET}\n"
+            f"{RED}NEGATIVE MSGS  {neg_msgs:>8}{RESET}\n"
+            f"{GRAY}NEUTRAL MSGS   {neutral_msgs:>8}{RESET}\n"
+            f"\n"
+            f"{GRAY}ACTIVE CITIZENS{active:>8}{RESET}\n"
+            f"{yuan_color}YUAN IN CIRC.  {yuan:>8}{RESET}{GRAY}{yuan_vs}{RESET}"
+        )
 
         embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 国家报告")
-
-        embed.add_field(
-            name="MOST COMPLIANT CITIZEN",
-            value=f"{member_name(data['top_score']['user_id'])} · {data['top_score']['score']:.2f}",
-            inline=False,
-        )
-        embed.add_field(
-            name="GREATEST THREAT TO SOCIETY",
-            value=f"{member_name(data['bottom_score']['user_id'])} · {data['bottom_score']['score']:.2f}",
-            inline=False,
-        )
-
-        if data["biggest_rise"]:
-            uid, val = data["biggest_rise"]
-            embed.add_field(name="GREATEST RISE (7D)", value=f"{member_name(uid)} ▲ +{val:.2f}", inline=True)
-
-        if data["biggest_fall"]:
-            uid, val = data["biggest_fall"]
-            embed.add_field(name="GREATEST FALL (7D)", value=f"{member_name(uid)} ▼ {val:.2f}", inline=True)
-
-        if data["biggest_rise"] or data["biggest_fall"]:
-            embed.add_field(name="​", value="​", inline=True)
-
-        embed.add_field(
-            name="MOST ACTIVE INFORMANT",
-            value=f"{member_name(data['top_snitch']['user_id'])} · {data['top_snitch']['times_filed_reports']} reports",
-            inline=False,
-        )
-        embed.add_field(name="TOTAL REPORTS",       value=str(data["total_reports"]),    inline=True)
-        embed.add_field(name="YUAN IN CIRCULATION", value=f"¥{data['total_yuan']}",      inline=True)
-        embed.add_field(name="AVERAGE SCORE",       value=f"{data['avg_score']:.2f}",   inline=True)
-        embed.add_field(name="ACTIVE CITIZENS",     value=str(data["active_count"]),     inline=True)
+        embed.add_field(name="", value=f"```ansi\n{table}\n```", inline=False)
         embed.set_thumbnail(url=STATS_THUMBNAIL)
         embed.timestamp = discord.utils.utcnow()
         file = discord.File("images/ccpstats.png", filename="ccpstats.png")

@@ -117,38 +117,50 @@ class StatsMixin:
         )
         return {"top": top, "bottom": bottom}
 
-    async def get_guild_stats(self, guild_id):
-        week_ago = int(time.time()) - 604800
-        agg, top_score, bottom_score, top_snitch, total_reports, rise_row, fall_row = await asyncio.gather(
+    async def get_guild_daily_report(self, guild_id: int) -> dict:
+        now = int(time.time())
+        today_start = now - (now % 86400)
+        yesterday_start = today_start - 86400
+        row, agg = await asyncio.gather(
             self._pool.fetchrow(
-                "SELECT COUNT(*) AS cnt, COALESCE(SUM(yuan),0) AS total_yuan, COALESCE(AVG(score),750.0) AS avg_score FROM users WHERE guild_id = $1 AND has_chatted = 1",
+                """
+                SELECT
+                    COALESCE(SUM(delta) FILTER (WHERE delta > 0 AND timestamp >= $2), 0)                         AS pos_today,
+                    COALESCE(SUM(delta) FILTER (WHERE delta < 0 AND timestamp >= $2), 0)                         AS neg_today,
+                    COALESCE(SUM(delta) FILTER (WHERE delta > 0 AND timestamp >= $3 AND timestamp < $2), 0)      AS pos_yesterday,
+                    COALESCE(SUM(delta) FILTER (WHERE delta < 0 AND timestamp >= $3 AND timestamp < $2), 0)      AS neg_yesterday,
+                    COUNT(*) FILTER (WHERE timestamp >= $2 AND reason ILIKE '%positive sentiment%')              AS pos_msgs_today,
+                    COUNT(*) FILTER (WHERE timestamp >= $2 AND reason ILIKE '%civic participation%')             AS neutral_msgs_today,
+                    COUNT(*) FILTER (
+                        WHERE timestamp >= $2 AND (
+                            reason ILIKE '%negative sentiment%'
+                            OR reason ILIKE '%counter-revolutionary speech%'
+                            OR reason ILIKE '%repeated transmission%'
+                            OR reason ILIKE '%disruptive formatting%'
+                        )
+                    )                                                                                            AS neg_msgs_today,
+                    COUNT(DISTINCT user_id) FILTER (WHERE timestamp >= $2)                                       AS active_today
+                FROM score_history WHERE guild_id = $1
+                """,
+                guild_id, today_start, yesterday_start,
+            ),
+            self._pool.fetchrow(
+                "SELECT COALESCE(SUM(yuan),0) AS yuan, COALESCE(SUM(prev_day_yuan),0) AS prev_day_yuan, COUNT(*) AS citizens FROM users WHERE guild_id = $1 AND has_chatted = 1",
                 guild_id,
             ),
-            self._pool.fetchrow("SELECT * FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY score DESC LIMIT 1", guild_id),
-            self._pool.fetchrow("SELECT * FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY score ASC LIMIT 1", guild_id),
-            self._pool.fetchrow("SELECT * FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY times_filed_reports DESC LIMIT 1", guild_id),
-            self._pool.fetchval("SELECT COUNT(*) FROM transactions WHERE guild_id = $1 AND item_id = 'report'", guild_id),
-            self._pool.fetchrow(
-                "SELECT user_id, SUM(delta) AS net FROM score_history WHERE guild_id = $1 AND timestamp > $2 AND delta > 0 GROUP BY user_id ORDER BY net DESC LIMIT 1",
-                guild_id, week_ago,
-            ),
-            self._pool.fetchrow(
-                "SELECT user_id, SUM(delta) AS net FROM score_history WHERE guild_id = $1 AND timestamp > $2 AND delta < 0 GROUP BY user_id ORDER BY net ASC LIMIT 1",
-                guild_id, week_ago,
-            ),
         )
-        if not agg or agg["cnt"] == 0:
-            return {}
         return {
-            "total_yuan":    int(agg["total_yuan"]),
-            "avg_score":     float(agg["avg_score"]),
-            "active_count":  int(agg["cnt"]),
-            "top_score":     top_score,
-            "bottom_score":  bottom_score,
-            "top_snitch":    top_snitch,
-            "total_reports": total_reports or 0,
-            "biggest_rise":  (rise_row["user_id"], float(rise_row["net"])) if rise_row else None,
-            "biggest_fall":  (fall_row["user_id"], float(fall_row["net"])) if fall_row else None,
+            "pos_today":          round(float(row["pos_today"]), 2),
+            "neg_today":          round(float(row["neg_today"]), 2),
+            "pos_yesterday":      round(float(row["pos_yesterday"]), 2),
+            "neg_yesterday":      round(float(row["neg_yesterday"]), 2),
+            "pos_msgs_today":     row["pos_msgs_today"],
+            "neg_msgs_today":     row["neg_msgs_today"],
+            "neutral_msgs_today": row["neutral_msgs_today"],
+            "active_today":       row["active_today"],
+            "yuan":               int(agg["yuan"]),
+            "prev_day_yuan":      int(agg["prev_day_yuan"]),
+            "citizens":           int(agg["citizens"]),
         }
 
     async def get_extended_leaderboard(self, guild_id):
