@@ -7,11 +7,24 @@ from web.anonymize import pseudonym_user, redact_global_stats
 logger = logging.getLogger(__name__)
 
 
+_REASON_MAX_LEN = 40
+
+
+def _safe_reason(raw) -> str | None:
+    if not raw:
+        return None
+    category = str(raw).split(":", 1)[0].strip()
+    if not category:
+        return None
+    return category[:_REASON_MAX_LEN]
+
+
 def format_event(row) -> dict:
     return {
         "user": pseudonym_user(row["user_id"]),
         "delta": round(float(row["delta"]), 2),
         "timestamp": int(row["timestamp"]),
+        "reason": _safe_reason(row["reason"]),
     }
 
 

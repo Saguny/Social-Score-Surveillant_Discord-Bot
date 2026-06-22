@@ -39,7 +39,11 @@ function _sparkChart(canvasId, labels, data, color, minPoints = 3) {
         legend: { display: false },
         tooltip: { displayColors: false, callbacks: { title: items => items[0].label } },
       },
-      scales: { x: { display: false }, y: { display: false } },
+      scales: {
+        x: { display: true, grid: { display: false }, border: { display: false },
+             ticks: { autoSkip: true, maxTicksLimit: 3, font: { size: 9 }, color: '#61677A' } },
+        y: { display: false },
+      },
       elements: { point: { radius: 0, hoverRadius: 3 }, line: { borderWidth: 2 } },
       interaction: { intersect: false, mode: 'index' },
     },
@@ -117,7 +121,7 @@ async function loadActivity(range) {
   const ciVals = eng.map(r => r.checkins);
 
   _multiLineChart('chart-activity-msgs', labels, [
-    { label: 'Messages',    data: msgVals,   borderColor: '#4B8EAF', backgroundColor: '#4B8EAF22', fill: false, tension: .3 },
+    { label: 'Messages',    data: msgVals,   borderColor: '#7D9D9C', backgroundColor: '#4B8EAF22', fill: false, tension: .3 },
   ]);
 
   _multiLineChart('chart-activity-eng', labels, [
@@ -128,7 +132,7 @@ async function loadActivity(range) {
 
   const socVals = eng.map(r => r.endorsements + r.rebukes);
   set('tl-social-val', socVals.length ? fmt(socVals.reduce((a, b) => a + b, 0)) : '—');
-  _sparkChart('chart-social', labels, socVals, '#E85454');
+  _sparkChart('chart-social', labels, socVals, '#7D9D9C');
   _hideIfEmpty('chart-social', socVals.length);
 
   const yuan = d.yuan || [];
@@ -149,7 +153,7 @@ async function loadActivity(range) {
   const joinLabels = joins.map(r => labelFn(r[0]));
   const joinVals = joins.map(r => r[1]);
   set('tl-joins-val', joinVals.length ? fmt(joinVals.reduce((a, b) => a + b, 0)) : '—');
-  _sparkChart('chart-joins', joinLabels, joinVals, '#F4E557');
+  _sparkChart('chart-joins', joinLabels, joinVals, '#7D9D9C');
   _hideIfEmpty('chart-joins', joinVals.length);
 }
 
@@ -165,18 +169,18 @@ function _pushLatencySample(dbMs, pingMs) {
   if (_dbLatencyBuf.length > _LATENCY_BUF_MAX) _dbLatencyBuf.shift();
   if (_pingBuf.length > _LATENCY_BUF_MAX) _pingBuf.shift();
   set('tl-dblatency-val', dbMs + 'ms');
-  _sparkChart('chart-dblatency', _dbLatencyBuf.map(r => r[0]), _dbLatencyBuf.map(r => r[1]), '#E85454', 2);
+  _sparkChart('chart-dblatency', _dbLatencyBuf.map(r => r[0]), _dbLatencyBuf.map(r => r[1]), '#7D9D9C', 2);
 }
 
 const TIERS = [
-  {label:'600–649', key:'t1', min:600,  max:650,  color:'#E85454'},
-  {label:'650–699', key:'t2', min:650,  max:700,  color:'#D47030'},
-  {label:'700–749', key:'t3', min:700,  max:750,  color:'#C49030'},
-  {label:'750–799', key:'t4', min:750,  max:800,  color:'#4B8EAF'},
-  {label:'800–849', key:'t5', min:800,  max:850,  color:'#3A9A60'},
-  {label:'850–899', key:'t6', min:850,  max:900,  color:'#3DAA6E'},
-  {label:'900–999', key:'t7', min:900,  max:1000, color:'#45C07A'},
-  {label:'1000+',   key:'t8', min:1000, max:1300, color:'#F4E557'},
+  {label:'Enemy of the State',   key:'t1', min:600,  max:700,  color:'#E85454'},
+  {label:'Person of Interest',   key:'t2', min:700,  max:775,  color:'#D47030'},
+  {label:'Unremarkable Citizen', key:'t3', min:775,  max:850,  color:'#C49030'},
+  {label:'Compliant Citizen',    key:'t4', min:850,  max:925,  color:'#7D9D9C'},
+  {label:'Model Citizen',        key:'t5', min:925,  max:1000, color:'#3A9A60'},
+  {label:'Party Loyalist',       key:'t6', min:1000, max:1100, color:'#3DAA6E'},
+  {label:'Cadre Member',         key:'t7', min:1100, max:1200, color:'#45C07A'},
+  {label:'General Secretary',    key:'t8', min:1200, max:1301, color:'#F4E557'},
 ];
 
 function fmt(n) {
@@ -295,10 +299,11 @@ function _feedRow(ev) {
   const deltaStr = (ev.delta > 0 ? '+' : '') + ev.delta.toFixed(2);
   const t = new Date(ev.timestamp * 1000).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
   const countStr = ev._count > 1 ? ` <span class="feed-time">×${ev._count}</span>` : '';
+  const reasonStr = ev.reason ? ` <span class="feed-reason">· ${ev.reason}</span>` : '';
   return `<div class="feed-row" data-user="${ev.user}" data-delta="${ev.delta}" data-count="${ev._count || 1}">
     <span class="feed-time">${t}</span>
     <span class="feed-delta ${sign}">${deltaStr}</span>
-    <span class="feed-user">${ev.user}</span>${countStr}
+    <span class="feed-user">${ev.user}</span>${reasonStr}${countStr}
   </div>`;
 }
 
@@ -406,7 +411,7 @@ function renderStats(d) {
   set('lt-wr',     ltPlayed > 0 ? ((ltWon/ltPlayed)*100).toFixed(1)+'% win rate' : '');
   const ltNetEl = document.getElementById('lt-net');
   if (ltNetEl) {
-    ltNetEl.textContent = (ltNet >= 0 ? '+' : '') + '¥' + fmt(Math.abs(ltNet));
+    ltNetEl.textContent = (ltNet >= 0 ? '+' : '-') + '¥' + fmt(Math.abs(ltNet));
     ltNetEl.className = 'val ' + (ltNet >= 0 ? 'trend-up' : 'trend-down');
   }
   const ltEdgeEl = document.getElementById('lt-edge');

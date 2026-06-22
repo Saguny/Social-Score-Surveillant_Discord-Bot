@@ -3,7 +3,8 @@
   --bg:var(--black); --bg-panel:#1E1F20; --bg-recessed:#161718;
   --text:var(--cream); --text-muted:var(--light-grey); --text-faint:var(--grey);
   --border-strong:var(--grey);
-  --accent:var(--grey); --accent-hover:#767C8F; --accent-soft:rgba(97,103,122,.16);
+  --sage:#7D9D9C; --slate:#576F72;
+  --accent:var(--slate); --accent-hover:var(--sage); --accent-soft:rgba(125,157,156,.16);
   --orange:#F5A855;
 }
 body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;}

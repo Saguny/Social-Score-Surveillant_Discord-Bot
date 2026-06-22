@@ -295,14 +295,14 @@ class StatsMixin:
                     COUNT(*) FILTER (WHERE last_checkin >= $2 AND last_checkin < $1)               AS checkins_yday,
                     COUNT(*) FILTER (WHERE last_active >= $1)                                      AS dau,
                     COUNT(*) FILTER (WHERE last_active >= $3)                                      AS wau,
-                    COUNT(*) FILTER (WHERE has_chatted = 1 AND score < 650)                        AS t1,
-                    COUNT(*) FILTER (WHERE has_chatted = 1 AND score >= 650 AND score < 700)       AS t2,
-                    COUNT(*) FILTER (WHERE has_chatted = 1 AND score >= 700 AND score < 750)       AS t3,
-                    COUNT(*) FILTER (WHERE has_chatted = 1 AND score >= 750 AND score < 800)       AS t4,
-                    COUNT(*) FILTER (WHERE has_chatted = 1 AND score >= 800 AND score < 850)       AS t5,
-                    COUNT(*) FILTER (WHERE has_chatted = 1 AND score >= 850 AND score < 900)       AS t6,
-                    COUNT(*) FILTER (WHERE has_chatted = 1 AND score >= 900 AND score < 1000)      AS t7,
-                    COUNT(*) FILTER (WHERE has_chatted = 1 AND score >= 1000)                      AS t8
+                    COUNT(*) FILTER (WHERE has_chatted = 1 AND score < 700)                        AS t1,
+                    COUNT(*) FILTER (WHERE has_chatted = 1 AND score >= 700  AND score < 775)      AS t2,
+                    COUNT(*) FILTER (WHERE has_chatted = 1 AND score >= 775  AND score < 850)      AS t3,
+                    COUNT(*) FILTER (WHERE has_chatted = 1 AND score >= 850  AND score < 925)      AS t4,
+                    COUNT(*) FILTER (WHERE has_chatted = 1 AND score >= 925  AND score < 1000)     AS t5,
+                    COUNT(*) FILTER (WHERE has_chatted = 1 AND score >= 1000 AND score < 1100)     AS t6,
+                    COUNT(*) FILTER (WHERE has_chatted = 1 AND score >= 1100 AND score < 1200)     AS t7,
+                    COUNT(*) FILTER (WHERE has_chatted = 1 AND score >= 1200)                      AS t8
                 FROM users
             """, day_ago, two_days, week_ago),
 
