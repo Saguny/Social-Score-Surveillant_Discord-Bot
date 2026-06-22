@@ -121,7 +121,7 @@ async def _decay_task(bot: commands.Bot):
 _PRESENCE_CYCLE = [
     discord.Activity(type=discord.ActivityType.watching, name="/guide | /shop"),
     discord.Activity(type=discord.ActivityType.watching, name="/vote | /checkin"),
-    discord.Activity(type=discord.ActivityType.watching, name="/botinfo"),
+    discord.Activity(type=discord.ActivityType.watching, name="/botinfo | /invite"),
 ]
 
 
