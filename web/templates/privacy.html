@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Privacy Policy · Social Credit Dashboard</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="/static/dashboard.css">
+<style>
+  .legal { max-width:880px; margin:0 auto; padding-bottom:2rem; }
+  .legal h2 { font-size:1.05rem; letter-spacing:.5px; margin:2.2rem 0 .8rem; color:var(--text); }
+  .legal h2:first-of-type { margin-top:0; }
+  .legal p, .legal li { color:var(--text-muted); font-size:.92rem; line-height:1.6; }
+  .legal ul { padding-left:1.3rem; margin-bottom:1rem; }
+  .legal li { margin-bottom:.4rem; }
+  .legal strong { color:var(--text); }
+  .legal .updated { color:var(--text-faint); font-size:.78rem; margin-bottom:1.8rem; }
+  .legal a { color:var(--accent-hover); text-decoration:none; }
+  .legal a:hover { text-decoration:underline; }
+</style>
+</head>
+<body>
+
+<nav class="navbar px-4 py-3 mb-3">
+  <span class="navbar-brand">中华人民共和国 &nbsp;&middot;&nbsp; SOCIAL CREDIT SURVEILLANT ANALYTICAL DASHBOARD</span>
+  <div class="d-flex gap-3 align-items-center">
+    <a class="nav-link" href="/">STATS</a>
+    <a class="nav-link active" href="/privacy">PRIVACY</a>
+  </div>
+</nav>
+
+<div class="container-fluid px-4">
+  <div class="legal">
+
+    <div class="updated">Last updated: 2026-06-22</div>
+
+    <p>Social Credit Bot is an unofficial, satirical Discord bot and is not affiliated with, endorsed by, or
+    associated with Discord Inc., the Communist Party of China, or any government. The "social credit score,"
+    "yuan," stock market, and related mechanics are a fictional in-game economy created for entertainment
+    purposes only. This page explains what data the bot and this dashboard collect, why, and how it is handled.</p>
+
+    <h2>1. What we collect</h2>
+    <ul>
+      <li><strong>Discord identifiers.</strong> Your Discord user ID and the ID of any server (guild) you use the bot in, so the bot can track your score, yuan balance, and other in-bot stats per server.</li>
+      <li><strong>In-bot activity.</strong> Message text is analyzed in memory for sentiment, language, and banned-topic matches to calculate score changes; the message content itself is not stored. Free-text you submit through commands such as <code>/confess</code>, <code>/endorse</code>, <code>/rebuke</code>, and similar reason fields is stored, since it is the content of that feature.</li>
+      <li><strong>Game-state data.</strong> Score history, yuan balance and transactions, check-in streaks, achievements, cosmetic badges, fictional stock/turbo portfolios, and similar records tied to your Discord ID.</li>
+      <li><strong>Top.gg votes.</strong> If you vote for the bot on top.gg, we receive your Discord user ID and the vote timestamp from top.gg's webhook so we can grant the in-bot reward and badge. No message content is involved.</li>
+      <li><strong>Technical/network data.</strong> The public dashboard's API endpoints log IP addresses transiently, in memory only, to enforce rate limiting. IP addresses are not stored in the database and are not linked to your Discord identity.</li>
+      <li><strong>Admin console access.</strong> The password-protected <code>/admin</code> panel is used by the bot operator to look up a Discord user's real ID, username, and per-guild stats for support and moderation purposes.</li>
+    </ul>
+
+    <h2>2. What the public dashboard shows</h2>
+    <p>The dashboard you are looking at (<a href="/">/</a>) is open to the public, but it never displays real Discord
+    usernames, server names, or message text. Every user and server shown is replaced with a stable, salted-hash
+    pseudonym (e.g. "User #1842"), so the figures cannot be reversed back into a real Discord identity without
+    the server's private salt. The live activity feed strips free-text reason fields entirely before anything is
+    sent to your browser. The page also carries a <code>noindex, nofollow</code> tag and a <code>robots.txt</code>
+    that disallows crawling, so it is not meant to be indexed by search engines even though it is technically
+    reachable.</p>
+
+    <h2>3. Why we collect it</h2>
+    <p>Data is collected solely to operate the bot's features: calculating and displaying your social credit
+    score, running the yuan economy, shop, lottery and stock market, tracking check-in streaks and achievements,
+    enforcing per-target cooldowns (e.g. denounce/endorse/rebuke), running propaganda events, and showing
+    aggregate, anonymized statistics on this dashboard. We do not sell data, and we do not use it for
+    advertising.</p>
+
+    <h2>4. Who can see your data</h2>
+    <ul>
+      <li><strong>You and other server members</strong> see whatever the bot's commands normally display (e.g. <code>/score</code>, <code>/leaderboard</code>), the same as any other Discord bot feature.</li>
+      <li><strong>The public</strong> can only ever see pseudonymized, aggregate figures through this dashboard — never your real Discord ID, username, or message text.</li>
+      <li><strong>The bot operator</strong> can see real, unredacted data through the password- and IP-restricted admin console, for support, moderation, and debugging purposes.</li>
+      <li><strong>Third-party services</strong> we rely on to run the bot: Discord (hosting the platform itself), top.gg (vote webhooks), and our hosting/database provider. We do not share your data with anyone beyond what is needed to operate the bot through these services.</li>
+    </ul>
+
+    <h2>5. How long we keep it</h2>
+    <p>Game-state data (score, yuan, history, achievements, etc.) is kept for as long as you remain a member of a
+    server using the bot, so your progress isn't lost between sessions. A server's data can be fully wiped by
+    that server's moderators at any time. IP addresses used for rate limiting are never written to the database
+    and age out of memory automatically.</p>
+
+    <h2>6. Your choices</h2>
+    <ul>
+      <li>You can stop using the bot at any time by no longer interacting with it; this does not require any action on our part.</li>
+      <li>Server moderators can reset all bot data for their server.</li>
+      <li>To request deletion or a copy of your data, or to ask any question about this policy, contact us through our <a href="https://discord.gg/invite/k4W6YAPYhC" target="_blank" rel="noopener">Support Server</a>.</li>
+    </ul>
+
+    <h2>7. Children's privacy</h2>
+    <p>This bot operates on Discord, which requires users to meet Discord's own minimum age requirement. We do not
+    knowingly collect data from anyone below that age beyond what Discord itself already provides to bots
+    operating on its platform.</p>
+
+    <h2>8. Security</h2>
+    <p>Public pseudonyms are derived using a salted hash with no stored mapping table back to real IDs. The admin
+    console is protected by a token and, optionally, an IP allowlist. We take reasonable measures to protect
+    stored data but, as with any online service, cannot guarantee absolute security.</p>
+
+    <h2>9. Changes to this policy</h2>
+    <p>We may update this page as the bot's features change. Material changes will be reflected here with an
+    updated "Last updated" date above.</p>
+
+    <h2>10. Contact</h2>
+    <p>Questions about this policy or your data can be sent through our
+    <a href="https://discord.gg/invite/k4W6YAPYhC" target="_blank" rel="noopener">Support Server</a>.</p>
+
+  </div>
+</div>
+
+<footer class="site-footer">
+  Made with <span class="footer-heart">&hearts;</span> by saguny &nbsp;&middot;&nbsp;
+  <a href="https://discord.gg/invite/k4W6YAPYhC" target="_blank" rel="noopener">Support Server</a> &nbsp;&middot;&nbsp;
+  <a href="https://discord.com/oauth2/authorize?client_id=856163780265902151&permissions=2416438352&integration_type=0&scope=bot" target="_blank" rel="noopener">Invite Bot</a> &nbsp;&middot;&nbsp;
+  <a href="/privacy">Privacy Policy</a>
+</footer>
+
+</body>
+</html>
