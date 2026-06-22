@@ -347,6 +347,70 @@ async def _handle_guild_list(request):
     })
 
 
+async def _handle_user_lookup(request):
+    bot = request.app["bot"]
+    user_id_raw = request.query.get("user_id", "").strip()
+    try:
+        user_id = int(user_id_raw)
+    except ValueError:
+        return web.json_response({"error": "Invalid user ID."}, status=400)
+
+    discord_user = bot.get_user(user_id)
+    if not discord_user:
+        try:
+            discord_user = await bot.fetch_user(user_id)
+        except discord.NotFound:
+            return web.json_response({"error": f"No Discord user found with ID {user_id}."}, status=404)
+        except discord.HTTPException as e:
+            return web.json_response({"error": str(e)}, status=502)
+
+    guilds = []
+    for guild in bot.guilds:
+        member = guild.get_member(user_id)
+        if not member:
+            continue
+        row = await bot.db.get_user(guild.id, user_id)
+        guilds.append({
+            "guild_id": str(guild.id),
+            "guild_name": guild.name,
+            "yuan": row["yuan"],
+            "score": row["score"],
+        })
+
+    return web.json_response({
+        "user_id": str(discord_user.id),
+        "username": str(discord_user),
+        "avatar_url": discord_user.display_avatar.url,
+        "guilds": guilds,
+    })
+
+
+async def _handle_user_yuan_adjust(request):
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "Invalid JSON"}, status=400)
+
+    bot = request.app["bot"]
+    try:
+        guild_id = int(body.get("guild_id"))
+        user_id = int(body.get("user_id"))
+        amount = int(body.get("amount"))
+    except (TypeError, ValueError):
+        return web.json_response({"error": "guild_id, user_id, and amount must be integers."}, status=400)
+
+    if amount == 0:
+        return web.json_response({"error": "Amount must be non-zero."}, status=400)
+
+    guild = bot.get_guild(guild_id)
+    if not guild:
+        return web.json_response({"error": f"Bot is not in guild {guild_id}."}, status=404)
+
+    await bot.db.adjust_yuan(guild_id, user_id, amount)
+    row = await bot.db.get_user(guild_id, user_id)
+    return web.json_response({"yuan": row["yuan"]})
+
+
 async def _handle_broadcast_embed(request):
     try:
         body = await request.json()
@@ -378,6 +442,47 @@ async def _handle_broadcast_embed(request):
             return web.json_response({"error": "Button URL must start with http:// or https://"}, status=400)
         view = discord.ui.View()
         view.add_item(discord.ui.Button(label=button_label[:80], url=button_url, style=discord.ButtonStyle.link))
+
+    if target.startswith("dm:"):
+        try:
+            dm_user_id = int(target[3:])
+        except ValueError:
+            return web.json_response({"error": "Invalid user id for DM target."}, status=400)
+
+        dm_user = bot.get_user(dm_user_id)
+        if not dm_user:
+            try:
+                dm_user = await bot.fetch_user(dm_user_id)
+            except discord.NotFound:
+                return web.json_response({"error": f"No Discord user found with ID {dm_user_id}."}, status=404)
+            except discord.HTTPException as e:
+                return web.json_response({"error": str(e)}, status=502)
+
+        embed = discord.Embed(title=title or None, description=description or None, color=color)
+        if image_url:
+            embed.set_image(url=image_url)
+        if thumbnail_url:
+            embed.set_thumbnail(url=thumbnail_url)
+        for f in fields[:25]:
+            name = (f.get("name") or "").strip()
+            value = (f.get("value") or "").strip()
+            if not name or not value:
+                continue
+            embed.add_field(name=name, value=value, inline=bool(f.get("inline")))
+
+        try:
+            if view is not None:
+                await dm_user.send(embed=embed, view=view)
+            else:
+                await dm_user.send(embed=embed)
+            results = [{"guild_id": "dm", "guild_name": f"DM: {dm_user}", "status": "sent", "detail": "Direct message"}]
+        except discord.Forbidden:
+            results = [{"guild_id": "dm", "guild_name": f"DM: {dm_user}", "status": "error", "detail": "User has DMs closed."}]
+        except discord.HTTPException as e:
+            results = [{"guild_id": "dm", "guild_name": f"DM: {dm_user}", "status": "error", "detail": str(e)}]
+
+        sent = sum(1 for r in results if r["status"] == "sent")
+        return web.json_response({"results": results, "sent": sent, "total": len(results)})
 
     if target == "all":
         guilds = list(bot.guilds)
@@ -461,6 +566,8 @@ async def start_web_server(bot):
     app.router.add_get("/api/stream", _require_auth(_handle_sse))
     app.router.add_get("/api/admin/topgg-votes", _require_auth(_handle_topgg_votes))
     app.router.add_get("/api/admin/guild-list", _require_auth(_handle_guild_list))
+    app.router.add_get("/api/admin/user-lookup", _require_auth(_handle_user_lookup))
+    app.router.add_post("/api/admin/user-yuan-adjust", _require_auth(_handle_user_yuan_adjust))
     app.router.add_post("/api/admin/broadcast-embed", _require_auth(_handle_broadcast_embed))
     app.router.add_post("/webhooks/topgg", _handle_topgg_webhook)
     app.router.add_static('/static', Path(__file__).parent / 'static', name='static')

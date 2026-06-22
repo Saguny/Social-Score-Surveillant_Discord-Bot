@@ -32,6 +32,81 @@ function confirmRun(command, args, msg) {
   if (confirm(msg)) run(command, args);
 }
 
+async function lookupUser() {
+  const userId = v('ul-user-id');
+  const out = document.getElementById('ul-result');
+  if (!userId) { out.innerHTML = '<div style="color:var(--red)">Enter a user ID.</div>'; return; }
+  out.innerHTML = '<div style="color:var(--text-muted)">Looking up...</div>';
+
+  const res = await fetch('/api/admin/user-lookup?user_id=' + encodeURIComponent(userId));
+  if (res.status === 401 || res.status === 403) { location.href = '/login?next=/admin'; return; }
+  const data = await res.json();
+  if (data.error) { out.innerHTML = `<div style="color:var(--red)">${_esc(data.error)}</div>`; return; }
+
+  const header = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <img src="${data.avatar_url}" style="width:32px;height:32px;border-radius:50%">
+      <strong>${_esc(data.username)}</strong>
+      <span style="color:var(--text-faint)">(${data.user_id})</span>
+    </div>
+  `;
+
+  const dmBtn = `<button class="btn btn-run btn-sm px-3 mt-2" onclick="prefillDm('${data.user_id}')">SEND DM VIA EMBED BROADCASTER</button>`;
+
+  if (!data.guilds.length) {
+    out.innerHTML = header +
+      `<div style="color:var(--text-faint);font-size:.85rem;margin-bottom:8px">Not currently a member of any server the bot shares.</div>` +
+      dmBtn;
+    return;
+  }
+
+  const rows = data.guilds.map(g => `
+    <div class="row g-2 align-items-end mb-2" data-guild="${g.guild_id}">
+      <div class="col-auto" style="min-width:220px">
+        <strong>${_esc(g.guild_name)}</strong>
+        <div id="ul-sub-${g.guild_id}" style="font-size:.75rem;color:var(--text-faint)">Score ${g.score.toFixed(2)} &middot; &yen;${g.yuan.toLocaleString()}</div>
+      </div>
+      <div class="col-2"><input type="number" class="form-control form-control-sm ul-amt" placeholder="+/- amount"></div>
+      <div class="col-auto"><button class="btn btn-run btn-sm px-3" onclick="applyYuan('${g.guild_id}','${data.user_id}', this)">APPLY</button></div>
+    </div>
+  `).join('');
+
+  out.innerHTML = header + rows + dmBtn;
+}
+
+async function applyYuan(guildId, userId, btn) {
+  const row = btn.closest('[data-guild]');
+  const amtInput = row.querySelector('.ul-amt');
+  const amount = parseInt(amtInput.value, 10);
+  if (!amount) { alert('Enter a non-zero amount.'); return; }
+
+  const res = await fetch('/api/admin/user-yuan-adjust', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ guild_id: guildId, user_id: userId, amount }),
+  });
+  if (res.status === 401 || res.status === 403) { location.href = '/login?next=/admin'; return; }
+  const data = await res.json();
+  if (data.error) { alert(data.error); return; }
+
+  const sub = document.getElementById('ul-sub-' + guildId);
+  sub.innerHTML = sub.innerHTML.replace(/&yen;[\d,]+/, '&yen;' + data.yuan.toLocaleString());
+  amtInput.value = '';
+}
+
+function toggleDmTargetInput() {
+  const isDm = document.getElementById('eb-target').value === 'dm';
+  document.getElementById('eb-dm-userid-wrap').style.display = isDm ? 'block' : 'none';
+}
+
+function prefillDm(userId) {
+  const sel = document.getElementById('eb-target');
+  sel.value = 'dm';
+  document.getElementById('eb-dm-userid').value = userId;
+  toggleDmTargetInput();
+  document.getElementById('eb-title').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
 let ebFields = [];
 
 function _esc(s) {
@@ -111,7 +186,7 @@ async function loadGuildListForBroadcast() {
   if (res.status === 401 || res.status === 403) { location.href = '/login?next=/admin'; return; }
   const data = await res.json();
   const sel = document.getElementById('eb-target');
-  sel.innerHTML = '<option value="all">All servers</option>';
+  sel.innerHTML = '<option value="all">All servers</option><option value="dm">DM a specific user</option>';
   (data.guilds || []).forEach(g => {
     const opt = document.createElement('option');
     opt.value = g.id;
@@ -126,8 +201,16 @@ async function sendBroadcastEmbed() {
   if (!title && !desc) { alert('Add a title or description first.'); return; }
 
   const sel = document.getElementById('eb-target');
-  const target = sel.value;
-  const targetLabel = sel.selectedOptions[0].textContent;
+  let target = sel.value;
+  let targetLabel = sel.selectedOptions[0].textContent;
+
+  if (target === 'dm') {
+    const dmUserId = v('eb-dm-userid');
+    if (!dmUserId) { alert('Enter a user ID to DM.'); return; }
+    target = 'dm:' + dmUserId;
+    targetLabel = `user ${dmUserId} via DM`;
+  }
+
   if (!confirm(`Send this embed to ${targetLabel}? This sends once, immediately, and cannot be undone.`)) return;
 
   const payload = {

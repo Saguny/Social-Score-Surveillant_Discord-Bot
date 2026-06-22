@@ -40,6 +40,20 @@
       <canvas id="vote-chart" height="90"></canvas>
     </div>
 
+    <div class="shdr">User Lookup &amp; Yuan Adjustment</div>
+    <div class="card-panel p-4 mb-3">
+      <div class="row g-2 align-items-end mb-3">
+        <div class="col-auto">
+          <label class="form-label">User ID</label>
+          <input type="text" id="ul-user-id" class="form-control" placeholder="123456789012345678" style="width:240px">
+        </div>
+        <div class="col-auto">
+          <button class="btn btn-run px-4" onclick="lookupUser()">LOOKUP</button>
+        </div>
+      </div>
+      <div id="ul-result" style="font-size:.85rem"></div>
+    </div>
+
     <div class="shdr">Embed Broadcaster</div>
     <div class="card-panel p-4 mb-3">
 
@@ -88,7 +102,13 @@
           <div class="row g-2 align-items-end mt-3">
             <div class="col-7">
               <label class="form-label">Send to</label>
-              <select id="eb-target" class="form-select"><option value="all">All servers</option></select>
+              <select id="eb-target" class="form-select" onchange="toggleDmTargetInput()">
+                <option value="all">All servers</option>
+                <option value="dm">DM a specific user</option>
+              </select>
+              <div id="eb-dm-userid-wrap" style="display:none;margin-top:6px">
+                <input type="text" id="eb-dm-userid" class="form-control form-control-sm" placeholder="User ID">
+              </div>
             </div>
             <div class="col-auto">
               <button class="btn btn-danger-soft px-4" onclick="sendBroadcastEmbed()">SEND EMBED</button>
@@ -101,7 +121,7 @@
           <label class="form-label">Preview</label>
           <div id="eb-preview" class="embed-preview"></div>
           <div style="color:var(--text-faint);font-size:.7rem;margin-top:8px">
-            Sends once, only to a channel @everyone can already write in. The bot's standard footer is appended automatically.
+            Sends once, either to a channel @everyone can already write in, or directly to a user's DMs. The bot's standard footer is appended automatically.
           </div>
         </div>
       </div>
