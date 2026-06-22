@@ -90,6 +90,7 @@ details[open] summary::before { content:'▼  '; }
 .spark-tile .lbl { margin-bottom:.2rem; }
 .spark-tile .val { font-size:1.35rem; }
 .spark-canvas-wrap { height:44px; margin-top:.5rem; position:relative; }
+.spark-canvas-wrap-axis { height:70px; }
 .spark-canvas-wrap canvas { width:100%!important; height:100%!important; }
 .spark-empty { height:44px; margin-top:.5rem; display:flex; align-items:center; color:var(--text-faint); font-size:.68rem; }
 

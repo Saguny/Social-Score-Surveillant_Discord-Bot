@@ -485,13 +485,23 @@ class StocksCog(commands.Cog, name="Stocks"):
 
         open_exchanges = {ex: is_market_hours(ex) for ex in EXCHANGE_TZ}
 
-        real_results = await asyncio.gather(
-            *[loop.run_in_executor(None, _yf_price_info, t) for t in REAL_TICKERS],
-            return_exceptions=True,
-        )
+        active_tickers = [
+            t for t in REAL_TICKERS
+            if open_exchanges[REAL_STOCKS[t]["exchange"]]
+            and t not in self._daily_locked
+            and not (t in self._halted and now < self._halted[t])
+        ]
+
+        fetched: dict = {}
+        if active_tickers:
+            fetch_results = await asyncio.gather(
+                *[loop.run_in_executor(None, _yf_price_info, t) for t in active_tickers],
+                return_exceptions=True,
+            )
+            fetched = dict(zip(active_tickers, fetch_results))
 
         real_pcts: dict[str, float] = {}
-        for ticker, res in zip(REAL_TICKERS, real_results):
+        for ticker in REAL_TICKERS:
             old = self._prices.get(ticker, 0.0)
             if old <= 0:
                 continue
@@ -503,8 +513,9 @@ class StocksCog(commands.Cog, name="Stocks"):
                 price_bars.append((ticker, now, old, old, old, old))
                 continue
 
+            res = fetched.get(ticker)
             yf_price = None
-            if not isinstance(res, Exception):
+            if res is not None and not isinstance(res, Exception):
                 yf_price, _ = res
 
             new_price = yf_price if (yf_price and yf_price > 0) else old

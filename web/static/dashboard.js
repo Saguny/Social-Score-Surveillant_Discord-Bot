@@ -14,7 +14,7 @@ function _hourLabel(ts) {
   return new Date(ts * 1000).toLocaleTimeString([], {hour: 'numeric'});
 }
 
-function _sparkChart(canvasId, labels, data, color, minPoints = 3) {
+function _sparkChart(canvasId, labels, data, color, minPoints = 3, showY = false) {
   const el = document.getElementById(canvasId);
   if (!el) return;
   const wrap = el.parentElement;
@@ -42,7 +42,11 @@ function _sparkChart(canvasId, labels, data, color, minPoints = 3) {
       scales: {
         x: { display: true, grid: { display: false }, border: { display: false },
              ticks: { autoSkip: true, maxTicksLimit: 3, font: { size: 9 }, color: '#61677A' } },
-        y: { display: false },
+        y: showY
+          ? { display: true, grid: { color: 'rgba(97,103,122,.15)' }, border: { display: false },
+              ticks: { maxTicksLimit: 3, font: { size: 9 }, color: '#61677A',
+                       callback: v => v + 'ms' } }
+          : { display: false },
       },
       elements: { point: { radius: 0, hoverRadius: 3 }, line: { borderWidth: 2 } },
       interaction: { intersect: false, mode: 'index' },
@@ -163,13 +167,13 @@ const _LATENCY_BUF_MAX = 60;
 
 function _pushLatencySample(dbMs, pingMs) {
   if (typeof dbMs !== 'number' || !isFinite(dbMs)) return;
-  const t = new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+  const t = new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', second: '2-digit'});
   _dbLatencyBuf.push([t, dbMs]);
   _pingBuf.push([t, pingMs || 0]);
   if (_dbLatencyBuf.length > _LATENCY_BUF_MAX) _dbLatencyBuf.shift();
   if (_pingBuf.length > _LATENCY_BUF_MAX) _pingBuf.shift();
   set('tl-dblatency-val', dbMs + 'ms');
-  _sparkChart('chart-dblatency', _dbLatencyBuf.map(r => r[0]), _dbLatencyBuf.map(r => r[1]), '#7D9D9C', 2);
+  _sparkChart('chart-dblatency', _dbLatencyBuf.map(r => r[0]), _dbLatencyBuf.map(r => r[1]), '#7D9D9C', 2, true);
 }
 
 const TIERS = [
