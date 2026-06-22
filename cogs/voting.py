@@ -34,9 +34,10 @@ class VoteReminderView(discord.ui.View):
             return
         self.done = True
         self.clear_items()
-        await self.db.set_vote_reminder(self.user_id, int(time.time()) + VOTE_COOLDOWN)
+        remind_at = int(time.time()) + VOTE_COOLDOWN
+        await self.db.set_vote_reminder(self.user_id, remind_at)
         try:
-            await interaction.response.edit_message(content="The bureau will remind you to vote again in 12 hours.", embed=None, view=self)
+            await interaction.response.edit_message(content=f"The bureau will remind you to vote again <t:{remind_at}:R> (<t:{remind_at}:f>).", embed=None, view=self)
         except discord.HTTPException:
             pass
 
@@ -141,9 +142,11 @@ class Voting(commands.Cog):
                 value="You may now vote for this bot on Top.gg again. Your continued loyalty is noted.",
                 inline=False,
             )
+            view = discord.ui.View()
+            view.add_item(discord.ui.Button(label="Vote", style=discord.ButtonStyle.link, url=VOTE_URL))
             try:
                 user = await self.bot.fetch_user(user_id)
-                await user.send(embed=embed)
+                await user.send(embed=embed, view=view)
             except discord.Forbidden:
                 continue
             except discord.HTTPException:

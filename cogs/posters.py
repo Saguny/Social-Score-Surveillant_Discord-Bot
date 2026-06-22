@@ -35,7 +35,7 @@ def _build_embed(poster: dict) -> discord.Embed:
     credit = poster["call_number"] or "chineseposters.net"
     if poster["collection"]:
         credit += f" · {poster['collection']}"
-    embed.set_footer(text=f"{credit} · chineseposters.net · GLORY TO THE CCP!")
+    embed.set_footer(text=f"{credit} · chineseposters.net · ccp posters [on|off] · ccp posterschannel [#channel] · GLORY TO THE CCP!")
     return embed
 
 
@@ -122,33 +122,74 @@ class Posters(commands.Cog):
             poster = self._pick_poster(last)
             await ctx.send(embed=_build_embed(poster))
 
+    def _next_noon_ts(self) -> int:
+        now = datetime.datetime.now(datetime.timezone.utc)
+        next_noon = now.replace(hour=12, minute=0, second=0, microsecond=0)
+        if now >= next_noon:
+            next_noon += datetime.timedelta(days=1)
+        return int(next_noon.timestamp())
+
+    async def _enable(self, ctx: commands.Context, channel: discord.TextChannel):
+        gid = ctx.guild.id
+        await self.db.enable_posters(gid, channel.id)
+        self._active[gid] = {"channel_id": channel.id, "last_slug": self._active.get(gid, {}).get("last_slug")}
+        embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")
+        ts = self._next_noon_ts()
+        embed.add_field(
+            name="PROPAGANDA BROADCAST · ENABLED",
+            value=f"Daily posters will be sent to {channel.mention} at <t:{ts}:t> every day.",
+            inline=False,
+        )
+        await ctx.send(embed=embed)
+
+    async def _disable(self, ctx: commands.Context):
+        gid = ctx.guild.id
+        await self.db.disable_posters(gid)
+        del self._active[gid]
+        embed = discord.Embed(color=0x333333, title="中华人民共和国社会信用局")
+        embed.add_field(name="PROPAGANDA BROADCAST · DISABLED", value="Daily posters have been suspended.", inline=False)
+        await ctx.send(embed=embed)
+
     @commands.command(name="posters")
     @commands.has_permissions(manage_guild=True)
-    async def toggle_posters(self, ctx: commands.Context):
+    async def toggle_posters(self, ctx: commands.Context, state: str = None):
         async with ctx.typing():
             gid = ctx.guild.id
-            if gid in self._active:
-                await self.db.disable_posters(gid)
-                del self._active[gid]
-                embed = discord.Embed(color=0x333333, title="中华人民共和国社会信用局")
-                embed.add_field(name="PROPAGANDA BROADCAST · DISABLED", value="Daily posters have been suspended.", inline=False)
-                await ctx.send(embed=embed)
+            if state is None:
+                if gid in self._active:
+                    await self._disable(ctx)
+                else:
+                    await self._enable(ctx, ctx.channel)
+                return
+            state = state.lower()
+            if state == "on":
+                if gid in self._active:
+                    channel = self.bot.get_channel(self._active[gid]["channel_id"])
+                    embed = discord.Embed(color=0x333333, title="中华人民共和国社会信用局")
+                    embed.add_field(
+                        name="PROPAGANDA BROADCAST · ALREADY ENABLED",
+                        value=f"Daily posters are already being sent to {channel.mention if channel else 'an unknown channel'}.",
+                        inline=False,
+                    )
+                    await ctx.send(embed=embed)
+                else:
+                    await self._enable(ctx, ctx.channel)
+            elif state == "off":
+                if gid in self._active:
+                    await self._disable(ctx)
+                else:
+                    embed = discord.Embed(color=0x333333, title="中华人民共和国社会信用局")
+                    embed.add_field(name="PROPAGANDA BROADCAST · ALREADY DISABLED", value="Daily posters are not currently enabled.", inline=False)
+                    await ctx.send(embed=embed)
             else:
-                channel = ctx.channel
-                await self.db.enable_posters(gid, channel.id)
-                self._active[gid] = {"channel_id": channel.id, "last_slug": None}
-                embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")
-                now = datetime.datetime.now(datetime.timezone.utc)
-                next_noon = now.replace(hour=12, minute=0, second=0, microsecond=0)
-                if now >= next_noon:
-                    next_noon += datetime.timedelta(days=1)
-                ts = int(next_noon.timestamp())
-                embed.add_field(
-                    name="PROPAGANDA BROADCAST · ENABLED",
-                    value=f"Daily posters will be sent to {channel.mention} at <t:{ts}:t> every day.",
-                    inline=False,
-                )
-                await ctx.send(embed=embed)
+                await ctx.send("Usage: `ccp posters [on|off]`")
+
+    @commands.command(name="posterschannel")
+    @commands.has_permissions(manage_guild=True)
+    async def set_posters_channel(self, ctx: commands.Context, channel: discord.TextChannel = None):
+        async with ctx.typing():
+            channel = channel or ctx.channel
+            await self._enable(ctx, channel)
 
 
 async def setup(bot: commands.Bot):

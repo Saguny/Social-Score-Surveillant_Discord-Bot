@@ -301,8 +301,8 @@ class Guide(commands.Cog):
         e7.add_field(name="ccp roles [on|off]",                     value="Toggle whether rank tier changes assign real Discord server roles. On by default. Execution List role is unaffected.", inline=False)
         e7.add_field(name="ccp achievementnotification [on|off]",   value="Toggle public channel announcements when a citizen unlocks an achievement. On by default.", inline=False)
         e7.add_field(name="ccp achievementchannel [#channel]",      value="Set a dedicated channel for achievement unlock announcements. Omit the channel to clear and revert to posting in the triggering channel.", inline=False)
-        e7.add_field(name="ccp poster",                              value="Display a random propaganda poster.", inline=False)
-        e7.add_field(name="ccp posters",                             value="Toggle daily propaganda poster broadcasts in this channel. React ❤️ for +3 score and ¥250 · React 😡 for -1 score.", inline=False)
+        e7.add_field(name="ccp posters [on|off]",                    value="Toggle daily propaganda poster broadcasts in this channel. Omit the argument to toggle.", inline=False)
+        e7.add_field(name="ccp posterschannel [#channel]",           value="Set a dedicated channel for daily poster broadcasts. Omit the channel to use the current one.", inline=False)
         e7.add_field(
             name="/propaganda start <submit_channel> <reveal_channel> <duration_hours>",
             value=(
@@ -386,6 +386,12 @@ class Guide(commands.Cog):
         embeds.append(e_stocks)
 
         e8 = discord.Embed(color=0xCC0000, title="PROPAGANDA EVENTS")
+        e8.add_field(name="ccp poster", value="Display a random propaganda poster. Available to all citizens.", inline=False)
+        e8.add_field(
+            name="DAILY PROPAGANDA BROADCASTS",
+            value="When enabled by a mod, a poster is posted daily. React ❤️ for +3 score and ¥250 · React 😡 for -1 score.",
+            inline=False,
+        )
         e8.add_field(
             name="/propaganda submit <text>",
             value=(
