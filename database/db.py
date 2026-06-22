@@ -358,7 +358,16 @@ class Database(
                 )
             """)
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_guild_joins_joined_at ON guild_joins (joined_at)")
-            await conn.execute("ALTER TABLE IF EXISTS achievements RENAME TO achievements_legacy_per_guild")
+            await conn.execute("""
+                DO $$
+                BEGIN
+                    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'achievements')
+                       AND NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'achievements_legacy_per_guild')
+                    THEN
+                        ALTER TABLE achievements RENAME TO achievements_legacy_per_guild;
+                    END IF;
+                END $$;
+            """)
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS achievements (
                     user_id         BIGINT NOT NULL,
@@ -371,7 +380,16 @@ class Database(
             await conn.execute("ALTER TABLE guild_config ADD COLUMN IF NOT EXISTS achievements_channel_id BIGINT")
             await conn.execute("ALTER TABLE guild_config ADD COLUMN IF NOT EXISTS achievements_loud_enabled BOOLEAN NOT NULL DEFAULT TRUE")
             await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS execution_count INTEGER NOT NULL DEFAULT 0")
-            await conn.execute("ALTER TABLE IF EXISTS cosmetic_badges RENAME TO cosmetic_badges_legacy_per_guild")
+            await conn.execute("""
+                DO $$
+                BEGIN
+                    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'cosmetic_badges')
+                       AND NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'cosmetic_badges_legacy_per_guild')
+                    THEN
+                        ALTER TABLE cosmetic_badges RENAME TO cosmetic_badges_legacy_per_guild;
+                    END IF;
+                END $$;
+            """)
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS cosmetic_badges (
                     user_id      BIGINT NOT NULL,
