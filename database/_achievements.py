@@ -34,6 +34,10 @@ class AchievementsMixin:
         )
         return {r["achievement_id"]: int(r["n"]) for r in rows}
 
+    async def get_total_citizen_count(self) -> int:
+        row = await self._pool.fetchrow("SELECT COUNT(DISTINCT user_id) AS n FROM users")
+        return int(row["n"]) if row else 0
+
     async def get_achievements_channel(self, guild_id: int) -> int | None:
         row = await self._pool.fetchrow(
             "SELECT achievements_channel_id, achievements_loud_enabled FROM guild_config WHERE guild_id = $1",

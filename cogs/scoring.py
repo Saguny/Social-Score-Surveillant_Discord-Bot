@@ -15,7 +15,7 @@ from config.rules import (
     SUPPORT_GUILD_ID, SUPPORT_YUAN_MULTIPLIER,
 )
 from config.banned_topics import contains_banned_topic
-from cogs.achievements import unlock as unlock_achievement
+from cogs.achievements import unlock as unlock_achievement, check_milestone
 
 TRANSLATE_URL = "https://translate.googleapis.com/translate_a/single"
 _LANG_CACHE_TTL = 3600
@@ -247,12 +247,15 @@ class Scoring(commands.Cog):
             pass
 
     async def _handle_execution_status(self, guild: discord.Guild, member: discord.Member, channel: discord.TextChannel, old: float, new: float):
-        entered = old > EXECUTION_THRESHOLD and new <= EXECUTION_THRESHOLD
-        recovered = old <= EXECUTION_THRESHOLD and new > EXECUTION_THRESHOLD + 1.0
+        exec_role_name = "Execution Date: Tomorrow"
+        existing_exec_role = discord.utils.get(guild.roles, name=exec_role_name)
+        has_exec_role = existing_exec_role in member.roles if existing_exec_role else False
+
+        entered = new <= EXECUTION_THRESHOLD and not has_exec_role
+        recovered = new > EXECUTION_THRESHOLD + 1.0 and has_exec_role
         if not entered and not recovered:
             return
 
-        exec_role_name = "Execution Date: Tomorrow"
         try:
             exec_channel_id = await self.db.get_execution_channel(guild.id)
             exec_channel = guild.get_channel(exec_channel_id) if exec_channel_id else None
@@ -302,9 +305,8 @@ class Scoring(commands.Cog):
                     await unlock_achievement(self.bot, guild, member, "execution_regular", channel=target)
 
             else:
-                exec_role = discord.utils.get(guild.roles, name=exec_role_name)
-                if exec_role and exec_role in member.roles:
-                    await member.remove_roles(exec_role)
+                if existing_exec_role and existing_exec_role in member.roles:
+                    await member.remove_roles(existing_exec_role)
                 
                 correct_rank = get_rank(new)
                 if await self.db.get_assign_rank_roles(guild.id):
@@ -349,6 +351,16 @@ class Scoring(commands.Cog):
 
         delta, reason = await self._evaluate(message)
 
+        if "positive sentiment" in reason:
+            val = await self.db.increment_counter(uid, "messages_positive")
+            await check_milestone(self.bot, message.guild, message.author, "messages_positive", val, channel=message.channel)
+        elif "negative sentiment" in reason:
+            val = await self.db.increment_counter(uid, "messages_negative")
+            await check_milestone(self.bot, message.guild, message.author, "messages_negative", val, channel=message.channel)
+        elif "civic participation" in reason:
+            val = await self.db.increment_counter(uid, "messages_neutral")
+            await check_milestone(self.bot, message.guild, message.author, "messages_neutral", val, channel=message.channel)
+
         if reason == "counter-revolutionary speech" and random.random() < 0.0001:
             try:
                 await message.channel.send("https://tenor.com/view/social-credit-gif-3627510818063303442")
@@ -389,6 +401,13 @@ class Scoring(commands.Cog):
             broadcast_media = True
 
         old_score, new_score = await self.db.update_score(gid, uid, delta, reason)
+
+        if delta < 0:
+            await self.db.record_negative_action(uid)
+        else:
+            clean_days = await self.db.get_clean_streak_days(uid)
+            if clean_days is not None:
+                await check_milestone(self.bot, message.guild, message.author, "clean_streak_days", clean_days, channel=message.channel)
 
         if broadcast_media:
             embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局 · 国家媒体报道")

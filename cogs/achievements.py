@@ -36,7 +36,19 @@ class AchievementsCog(commands.Cog, name="Achievements"):
             await self.db.add_cosmetic_badge(user.id, data["badge"])
         await self._apply_rewards_everywhere(user, data)
         self._queue_announce(guild, user, achievement_id, channel)
+        if achievement_id != "completionist":
+            await self._check_completionist(guild, user, channel)
         return True
+
+    async def _check_completionist(self, guild: discord.Guild, user: discord.abc.User, channel):
+        total = len(ACHIEVEMENTS) - 1
+        if total <= 0:
+            return
+        unlocked_rows = await self.db.get_unlocked_achievements(user.id)
+        unlocked_ids = {r["achievement_id"] for r in unlocked_rows}
+        unlocked_ids.discard("completionist")
+        if len(unlocked_ids) >= total:
+            await self.grant(guild, user, "completionist", channel=channel)
 
     async def _apply_rewards_everywhere(self, user: discord.abc.User, data: dict):
         targets = [g for g in self.bot.guilds if g.get_member(user.id) is not None]
@@ -117,6 +129,15 @@ class AchievementsCog(commands.Cog, name="Achievements"):
         grouped = achievements_by_category()
         categories = list(grouped.keys())
         author_name = await self.bot.format_user_full(target, gid)
+        unlock_counts, total_citizens = await asyncio.gather(
+            self.db.get_achievement_counts(), self.db.get_total_citizen_count()
+        )
+
+        def pct_line(aid: str) -> str:
+            if total_citizens <= 0:
+                return ""
+            pct = (unlock_counts.get(aid, 0) / total_citizens) * 100
+            return f"\n{pct:.1f}% of citizens have this achievement"
 
         def build_embed(category: str) -> discord.Embed:
             e = discord.Embed(
@@ -131,13 +152,17 @@ class AchievementsCog(commands.Cog, name="Achievements"):
                     ts = unlocked[aid]
                     e.add_field(
                         name=f"✅ {data['name']}",
-                        value=f"{data['description']}\n<t:{ts}:R>",
+                        value=f"{data['description']}\n<t:{ts}:R>{pct_line(aid)}",
                         inline=False,
                     )
                 elif data["secret"]:
                     e.add_field(name="🔒 ?????", value="A secret the Party keeps.", inline=False)
                 else:
-                    e.add_field(name="🔒 ?????", value=data["hint"] or "Unknown.", inline=False)
+                    e.add_field(
+                        name="🔒 ?????",
+                        value=f"{data['hint'] or 'Unknown.'}{pct_line(aid)}",
+                        inline=False,
+                    )
             unlocked_count = sum(1 for aid in grouped[category] if aid in unlocked)
             e.set_footer(text=f"{unlocked_count}/{len(grouped[category])} unlocked in this category")
             return e
@@ -180,6 +205,28 @@ async def unlock(
     if cog is None or guild is None:
         return False
     return await cog.grant(guild, user, achievement_id, channel=channel, message=message)
+
+
+async def check_milestone(
+    bot: commands.Bot,
+    guild: discord.Guild,
+    user: discord.abc.User,
+    milestone_key: str,
+    value: float,
+    *,
+    channel: discord.abc.Messageable | None = None,
+) -> bool:
+    if guild is None:
+        return False
+    unlocked_any = False
+    for achievement_id, data in ACHIEVEMENTS.items():
+        threshold = data.get("threshold")
+        if data.get("milestone_key") != milestone_key or threshold is None:
+            continue
+        if value >= threshold:
+            if await unlock(bot, guild, user, achievement_id, channel=channel):
+                unlocked_any = True
+    return unlocked_any
 
 
 async def setup(bot: commands.Bot):

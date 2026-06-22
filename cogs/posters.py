@@ -3,6 +3,7 @@ import datetime
 import discord
 from discord.ext import commands, tasks
 from config.poster_data import POSTERS
+from cogs.achievements import check_milestone
 
 HEART = "❤️"
 RAGE  = "😡"
@@ -109,9 +110,17 @@ class Posters(commands.Cog):
         if emoji == HEART:
             await self.db.tick_user(gid, uid, HEART_YUAN)
             old, new = await self.db.update_score(gid, uid, HEART_SCORE, "propaganda poster: supported")
+            streak, _ = await self.db.bump_daily_streak(uid, "poster_heart_streak")
+            if member:
+                await check_milestone(self.bot, guild, member, "poster_heart_streak", streak, channel=channel)
         else:
             rage_delta, _ = await self.db.apply_defense_chain(gid, uid, RAGE_SCORE)
             old, new = await self.db.update_score(gid, uid, rage_delta, "propaganda poster: resisted")
+            if rage_delta < 0:
+                await self.db.record_negative_action(uid)
+            streak, _ = await self.db.bump_daily_streak(uid, "poster_rage_streak")
+            if member:
+                await check_milestone(self.bot, guild, member, "poster_rage_streak", streak, channel=channel)
         if member and channel:
             self.bot.dispatch("score_change", guild, member, channel, old, new)
 

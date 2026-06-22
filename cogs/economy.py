@@ -5,7 +5,7 @@ import asyncio
 from discord import app_commands
 from discord.ext import commands
 from config.shop import SHOP_ITEMS, BADGE_DISPLAY, COSMETIC_META
-from cogs.achievements import unlock as unlock_achievement
+from cogs.achievements import unlock as unlock_achievement, check_milestone
 
 _INVESTIGATION_BOUNTY_REWARD = 8000
 
@@ -193,6 +193,13 @@ class TransferView(discord.ui.View):
             )
             public.timestamp = discord.utils.utcnow()
             await interaction.followup.send(embed=public)
+
+            bot = interaction.client
+            transfers = await db.increment_counter(self.sender.id, "transfers_completed")
+            await check_milestone(bot, interaction.guild, self.sender, "transfers_completed", transfers, channel=interaction.channel)
+            if self.amount >= 50_000:
+                large_transfers = await db.increment_counter(self.sender.id, "large_transfers_made")
+                await check_milestone(bot, interaction.guild, self.sender, "large_transfers_made", large_transfers, channel=interaction.channel)
             return
         else:
             embed = discord.Embed(color=0x333333, title="中华人民共和国社会信用局 · 转账")
@@ -274,8 +281,15 @@ class RequestView(discord.ui.View):
                 name=self.requester.display_name,
                 value=f"¥{requester_new - self.amount:,} -> ¥{requester_new:,}",
                 inline=True,
-            ) 
+            )
             embed.timestamp = discord.utils.utcnow()
+
+            bot = interaction.client
+            transfers = await db.increment_counter(self.target.id, "transfers_completed")
+            await check_milestone(bot, interaction.guild, self.target, "transfers_completed", transfers, channel=interaction.channel)
+            if self.amount >= 50_000:
+                large_transfers = await db.increment_counter(self.target.id, "large_transfers_made")
+                await check_milestone(bot, interaction.guild, self.target, "large_transfers_made", large_transfers, channel=interaction.channel)
         else:
             embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 资金申请")
             embed.add_field(
@@ -558,6 +572,8 @@ class Economy(commands.Cog):
 
         await self.db.log_transaction(gid, uid, item, cost, target.id if target else None)
         await self.db.increment_items_bought(gid, uid)
+        purchases = await self.db.increment_counter(uid, "purchases_made")
+        await check_milestone(self.bot, interaction.guild, interaction.user, "purchases_made", purchases, channel=interaction.channel)
         await self._dispatch(interaction, item, cfg, target, text, cost)
 
     async def _dispatch(self, interaction, item_id, cfg, target, text, cost):
@@ -770,8 +786,13 @@ class Economy(commands.Cog):
 
     async def _check_lottery_addict(self, guild, user, channel):
         row = await self.db.get_user(guild.id, user.id)
-        if row and int(row.get("lottery_net", 0)) <= -100_000:
+        if not row:
+            return
+        net = int(row.get("lottery_net", 0))
+        if net <= -100_000:
             await unlock_achievement(self.bot, guild, user, "lottery_addict", channel=channel)
+        if net <= -500_000:
+            await unlock_achievement(self.bot, guild, user, "high_roller_loss", channel=channel)
 
     async def _buy_lottery_dono(self, interaction, gid, uid, cfg, target, text, cost):
         user_row = await self.db.get_user(gid, uid)
@@ -1224,6 +1245,8 @@ class Economy(commands.Cog):
         await interaction.followup.send(embed=embed)
         self._post_score(interaction, interaction.user, old, new)
         await unlock_achievement(self.bot, interaction.guild, interaction.user, "first_confession", channel=interaction.channel)
+        confessions = await self.db.increment_counter(uid, "confessions_made")
+        await check_milestone(self.bot, interaction.guild, interaction.user, "confessions_made", confessions, channel=interaction.channel)
 
     @buy.autocomplete("item")
     async def item_autocomplete(

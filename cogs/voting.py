@@ -5,7 +5,7 @@ import aiohttp
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
-from cogs.achievements import unlock as unlock_achievement
+from cogs.achievements import unlock as unlock_achievement, check_milestone
 
 VOTE_URL = "https://top.gg/bot/856163780265902151/vote"
 TOPGG_BOT_ID = "856163780265902151"
@@ -53,7 +53,7 @@ class VoteReminderView(discord.ui.View):
             pass
 
 
-async def _reward_guild(bot, db, guild, user_id: int, expires_at: int) -> str | None:
+async def _reward_guild(bot, db, guild, user_id: int, expires_at: int, total_votes: int, vote_streak: int) -> str | None:
     member = guild.get_member(user_id)
     if not member:
         return None
@@ -62,15 +62,19 @@ async def _reward_guild(bot, db, guild, user_id: int, expires_at: int) -> str | 
         db.adjust_yuan(guild.id, user_id, VOTE_YUAN_REWARD),
     )
     await unlock_achievement(bot, guild, member, "first_vote")
+    await check_milestone(bot, guild, member, "topgg_votes_total", total_votes)
+    await check_milestone(bot, guild, member, "topgg_vote_streak", vote_streak)
     return guild.name
 
 
 async def process_vote(bot: commands.Bot, user_id: int):
     db = bot.db
     await db.log_topgg_vote(user_id)
+    total_votes = await db.increment_counter(user_id, "topgg_votes_total")
+    vote_streak, _ = await db.bump_daily_streak(user_id, "topgg_vote_streak")
     expires_at = int(time.time()) + VOTE_COOLDOWN
     results = await asyncio.gather(
-        *(_reward_guild(bot, db, guild, user_id, expires_at) for guild in bot.guilds)
+        *(_reward_guild(bot, db, guild, user_id, expires_at, total_votes, vote_streak) for guild in bot.guilds)
     )
     rewarded_guilds = [name for name in results if name is not None]
     print(f"[topgg vote] user {user_id} rewarded in {len(rewarded_guilds)}/{len(bot.guilds)} guilds: {rewarded_guilds}")

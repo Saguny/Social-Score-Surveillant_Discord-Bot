@@ -2,7 +2,7 @@ import time
 import discord
 from discord import app_commands
 from discord.ext import commands
-from cogs.achievements import unlock as unlock_achievement
+from cogs.achievements import unlock as unlock_achievement, check_milestone
 
 COOLDOWN_SECONDS = 86400
 ENDORSE_DELTA = 1.5
@@ -49,8 +49,14 @@ class Social(commands.Cog):
 
         if etype == "endorse":
             await unlock_achievement(self.bot, interaction.guild, interaction.user, "first_endorsement", channel=interaction.channel)
+            streak, _ = await self.db.bump_daily_streak(uid, "endorse_streak")
+            await check_milestone(self.bot, interaction.guild, interaction.user, "endorse_streak", streak, channel=interaction.channel)
         else:
             await unlock_achievement(self.bot, interaction.guild, interaction.user, "first_rebuke", channel=interaction.channel)
+            streak, _ = await self.db.bump_daily_streak(uid, "rebuke_streak")
+            await check_milestone(self.bot, interaction.guild, interaction.user, "rebuke_streak", streak, channel=interaction.channel)
+            if delta < 0:
+                await self.db.record_negative_action(target.id)
 
         self.bot.dispatch("score_change", interaction.guild, target, interaction.channel, old_score, new_score)
 

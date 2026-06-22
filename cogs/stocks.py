@@ -10,7 +10,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from cogs.achievements import unlock as unlock_achievement
+from cogs.achievements import unlock as unlock_achievement, check_milestone
 
 import matplotlib
 matplotlib.use("Agg")
@@ -655,6 +655,9 @@ class StocksCog(commands.Cog, name="Stocks"):
             await unlock_achievement(self.bot, guild, user, "realized_50k_profit")
 
     async def _track_exchange_trade(self, guild, user, exchange: str):
+        streak, _ = await self.bot.db.bump_daily_streak(user.id, "stock_invest_streak")
+        await check_milestone(self.bot, guild, user, "stock_invest_streak", streak)
+
         bit = {"NYSE": 1, "LSE": 2, "TSE": 4}.get(exchange, 0)
         if not bit:
             return

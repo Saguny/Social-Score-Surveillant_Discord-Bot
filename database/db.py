@@ -13,6 +13,7 @@ from database._stocks      import StocksMixin
 from database._voting      import VotingMixin
 from database._stats       import StatsMixin
 from database._achievements import AchievementsMixin
+from database._counters     import CountersMixin
 
 
 TABLES = [
@@ -205,6 +206,7 @@ class Database(
     VotingMixin,
     StatsMixin,
     AchievementsMixin,
+    CountersMixin,
 ):
     def __init__(self):
         self._dsn = os.getenv("DATABASE_URL", "")
@@ -403,5 +405,13 @@ class Database(
                 CREATE TABLE IF NOT EXISTS badge_preferences (
                     user_id  BIGINT PRIMARY KEY,
                     badge_id TEXT
+                )
+            """)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS user_counters (
+                    user_id     BIGINT NOT NULL,
+                    counter_key TEXT   NOT NULL,
+                    value       BIGINT NOT NULL DEFAULT 0,
+                    PRIMARY KEY (user_id, counter_key)
                 )
             """)
