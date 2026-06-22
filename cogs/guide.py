@@ -560,18 +560,23 @@ class Guide(commands.Cog):
         )
         e.set_thumbnail(url="attachment://bureau.png")
 
-        e.add_field(name="VERSION",          value="1.0.3",                                    inline=True)
-        e.add_field(name="CREATOR",          value="saguny",                                  inline=True)
-        e.add_field(name="SERVERS · CITIZENS", value=f"{guild_count} servers · {member_count:,} citizens", inline=True)
-        e.add_field(name="DISCORD · DB LATENCY", value=f"{discord_ms} ms · {db_ms} ms",         inline=True)
-        e.add_field(name="YUAN IN CIRCULATION", value=f"¥{stats['total_yuan']:,}",              inline=True)
-        e.add_field(name="MESSAGES RATED",   value=f"{stats['total_messages']:,}",              inline=True)
-        e.add_field(name="HIGHEST · LOWEST SCORE", value=f"{stats['highest_score']:.2f} · {stats['lowest_score']:.2f}", inline=True)
+        e.add_field(name="VERSION",  value="1.0.3",   inline=True)
+        e.add_field(name="CREATOR",  value="saguny",  inline=True)
+        e.add_field(name="LATENCY",  value=f"{discord_ms} ms discord · {db_ms} ms database", inline=True)
+        e.add_field(
+            name="GLOBAL STATISTICS",
+            value=(
+                f"**Servers · Citizens** · {guild_count} servers · {member_count:,} citizens\n"
+                f"**Yuan in Circulation** · ¥{stats['total_yuan']:,}\n"
+                f"**Messages Rated** · {stats['total_messages']:,}\n"
+                f"**Highest · Lowest Score** · {stats['highest_score']:.2f} · {stats['lowest_score']:.2f}"
+            ),
+            inline=False,
+        )
         e.add_field(
             name="TECHNOLOGY",
             value=(
-                "discord.py 2.x · PostgreSQL\n"
-                "vaderSentiment · langdetect · deep-translate"
+                "discord.py 2.x · PostgreSQL · vaderSentiment · langdetect · deep-translate"
             ),
             inline=False,
         )
