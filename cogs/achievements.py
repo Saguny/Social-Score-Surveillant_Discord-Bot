@@ -94,6 +94,7 @@ class AchievementsCog(commands.Cog, name="Achievements"):
                 color=0xFFD700,
             )
             embed.set_thumbnail(url="attachment://achievement.png")
+            embed.set_footer(text="ccp achievementnotification [on|off] · ccp achievementchannel [#channel]")
             embeds.append(embed)
         if not embeds:
             return
