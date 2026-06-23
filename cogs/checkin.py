@@ -2,6 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from cogs.achievements import unlock as unlock_achievement
+from infra.guild_notify import publish_guild_notify
 
 
 def _fallback_channel(guild: discord.Guild) -> discord.TextChannel | None:
@@ -19,7 +20,7 @@ class CheckIn(commands.Cog):
     async def checkin(self, interaction: discord.Interaction):
         await interaction.response.defer()
         uid = interaction.user.id
-        guild_ids = [g.id for g in self.bot.guilds if g.get_member(uid)]
+        guild_ids = await self.db.get_user_guild_ids(uid)
 
         if not guild_ids:
             await interaction.followup.send("You are not registered in the system.", ephemeral=True)
@@ -64,6 +65,10 @@ class CheckIn(commands.Cog):
             member = guild.get_member(uid) if guild else None
             if guild and member:
                 self.bot.dispatch("score_change", guild, member, _fallback_channel(guild), gr["old_score"], gr["new_score"])
+            else:
+                await publish_guild_notify(gr["guild_id"], "checkin_score_change", {
+                    "user_id": uid, "old_score": gr["old_score"], "new_score": gr["new_score"],
+                })
 
         if streak >= 100:
             await unlock_achievement(self.bot, interaction.guild, interaction.user, "checkin_streak_100", channel=interaction.channel)

@@ -4,28 +4,23 @@ import logging
 
 from aiohttp import web
 
+from infra.redis_client import get_redis
+
 logger = logging.getLogger(__name__)
+
+SSE_CHANNEL = "sse-events"
 
 
 class SSEHub:
     def __init__(self):
-        self._clients: set[asyncio.Queue] = set()
+        self._client_count = 0
 
     def client_count(self) -> int:
-        return len(self._clients)
+        return self._client_count
 
     async def publish(self, event: str, data) -> None:
-        if not self._clients:
-            return
-        payload = f"event: {event}\ndata: {json.dumps(data)}\n\n".encode("utf-8")
-        dead = []
-        for queue in list(self._clients):
-            try:
-                queue.put_nowait(payload)
-            except asyncio.QueueFull:
-                dead.append(queue)
-        for queue in dead:
-            self._clients.discard(queue)
+        r = get_redis()
+        await r.publish(SSE_CHANNEL, json.dumps({"event": event, "data": data}))
 
     async def stream(self, request) -> web.StreamResponse:
         response = web.StreamResponse(
@@ -38,18 +33,27 @@ class SSEHub:
             },
         )
         await response.prepare(request)
-        queue: asyncio.Queue = asyncio.Queue(maxsize=100)
-        self._clients.add(queue)
+        r = get_redis()
+        pubsub = r.pubsub()
+        await pubsub.subscribe(SSE_CHANNEL)
+        self._client_count += 1
         try:
             await response.write(b": connected\n\n")
             while True:
-                try:
-                    payload = await asyncio.wait_for(queue.get(), timeout=20)
-                    await response.write(payload)
-                except asyncio.TimeoutError:
+                message = await pubsub.get_message(timeout=20, ignore_subscribe_messages=True)
+                if message is None:
                     await response.write(b": keepalive\n\n")
+                    continue
+                try:
+                    payload = json.loads(message["data"])
+                except (TypeError, ValueError):
+                    continue
+                line = f"event: {payload['event']}\ndata: {json.dumps(payload['data'])}\n\n".encode("utf-8")
+                await response.write(line)
         except (ConnectionResetError, asyncio.CancelledError, ConnectionError):
             pass
         finally:
-            self._clients.discard(queue)
+            self._client_count -= 1
+            await pubsub.unsubscribe(SSE_CHANNEL)
+            await pubsub.aclose()
         return response

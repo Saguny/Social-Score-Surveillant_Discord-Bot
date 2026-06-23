@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 import asyncio
 import random
 import time
@@ -10,6 +11,9 @@ from discord.ext import commands
 from dotenv import load_dotenv
 from database.db import Database
 from config.ranks import RANKS
+from infra.run_mode import IS_SCHEDULER, SHARD_COUNT, SHARD_IDS
+from infra.redis_client import get_redis
+from infra.guild_notify import GUILD_NOTIFY_CHANNEL
 
 OWNER_ID = 544810950952353823
 OWNER_BADGE = " | 𝔻𝕖𝕧𝕖𝕝𝕠𝕡𝕖𝕣 "
@@ -49,16 +53,20 @@ _REQUIRED_PERMISSIONS = {
     "read_message_history": "Read Message History",
 }
 
+async def _check_cmd_cooldown(uid: int) -> bool:
+    if uid == OWNER_ID:
+        return True
+    r = get_redis()
+    ok = await r.set(f"cmdcd:{uid}", "1", nx=True, ex=int(CMD_COOLDOWN) or 1)
+    return bool(ok)
+
+
 class CreditCommandTree(discord.app_commands.CommandTree):
     async def call(self, interaction: discord.Interaction) -> None:
         _current_user_id.set(interaction.user.id)
-        cooldowns: dict[int, float] = self.client._cmd_cooldowns
-        now = time.time()
-        uid = interaction.user.id
-        if uid != OWNER_ID and now - cooldowns.get(uid, 0) < CMD_COOLDOWN:
+        if not await _check_cmd_cooldown(interaction.user.id):
             await interaction.response.send_message("Slow down, citizen.", ephemeral=True)
             return
-        cooldowns[uid] = now
         await super().call(interaction)
 
     async def on_error(self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError) -> None:
@@ -142,6 +150,51 @@ async def _rotate_presence_task(bot: commands.Bot):
         await asyncio.sleep(600)
         bot._presence_index = (bot._presence_index + 1) % len(_PRESENCE_CYCLE)
         await bot.change_presence(activity=_PRESENCE_CYCLE[bot._presence_index])
+
+
+def _fallback_guild_channel(guild: discord.Guild):
+    if guild.system_channel and guild.system_channel.permissions_for(guild.me).send_messages:
+        return guild.system_channel
+    return next((c for c in guild.text_channels if c.permissions_for(guild.me).send_messages), None)
+
+
+async def _handle_guild_notify(bot: commands.Bot, guild: discord.Guild, event_type: str, data: dict):
+    user_id = data.get("user_id")
+    member = guild.get_member(user_id) if user_id is not None else None
+    if event_type == "checkin_score_change":
+        if member:
+            bot.dispatch("score_change", guild, member, _fallback_guild_channel(guild), data.get("old_score"), data.get("new_score"))
+    elif event_type == "vote_achievement_check":
+        if member:
+            from cogs.achievements import unlock as unlock_achievement, check_milestone
+            await unlock_achievement(bot, guild, member, "first_vote")
+            await check_milestone(bot, guild, member, "topgg_votes_total", data.get("total_votes"))
+            await check_milestone(bot, guild, member, "topgg_vote_streak", data.get("vote_streak"))
+    elif event_type == "achievement_announce":
+        if member:
+            from cogs.achievements import deliver_achievement_announcements
+            await deliver_achievement_announcements(bot.db, guild, member, data.get("ids") or [], data.get("channel_id"))
+
+
+async def _guild_notify_listener(bot: commands.Bot):
+    await bot.wait_until_ready()
+    r = get_redis()
+    pubsub = r.pubsub()
+    await pubsub.subscribe(GUILD_NOTIFY_CHANNEL)
+    async for message in pubsub.listen():
+        if message.get("type") != "message":
+            continue
+        try:
+            payload = json.loads(message["data"])
+        except (TypeError, ValueError):
+            continue
+        guild = bot.get_guild(payload.get("guild_id"))
+        if guild is None:
+            continue
+        try:
+            await _handle_guild_notify(bot, guild, payload.get("event_type"), payload.get("data") or {})
+        except Exception as e:
+            print(f"[guild-notify] error handling {payload.get('event_type')}: {e!r}")
 
 
 async def console_loop(bot: commands.Bot):
@@ -234,8 +287,7 @@ async def console_loop(bot: commands.Bot):
                 print(f"Error: {e}")
 
         elif cmd == "web":
-            from web.server import start_web_server
-            asyncio.create_task(start_web_server(bot))
+            print("The web dashboard is now its own process — run web_service.py separately.")
 
         elif cmd == "help":
             print(HELP_TEXT)
@@ -244,14 +296,21 @@ async def console_loop(bot: commands.Bot):
             print(f"Unknown command: {cmd}. Type 'help' for a list.")
 
 
-class SocialCreditBot(commands.Bot):
+class SocialCreditBot(commands.AutoShardedBot):
     def __init__(self):
-        super().__init__(command_prefix="ccp ", intents=intents, tree_cls=CreditCommandTree, help_command=None)
+        super().__init__(
+            command_prefix="ccp ",
+            intents=intents,
+            tree_cls=CreditCommandTree,
+            help_command=None,
+            shard_count=SHARD_COUNT,
+            shard_ids=SHARD_IDS,
+        )
         self.db = Database()
         self.ec_users: set[int] = set()
-        self._cmd_cooldowns: dict[int, float] = {}
         self.start_time = None
         self._presence_index = 0
+        self._synced_once = False
 
     def format_user(self, user) -> str:
         name = str(user)
@@ -297,11 +356,8 @@ class SocialCreditBot(commands.Bot):
 
     async def process_commands(self, message: discord.Message) -> None:
         _current_user_id.set(message.author.id)
-        uid = message.author.id
-        now = time.time()
-        if uid != OWNER_ID and now - self._cmd_cooldowns.get(uid, 0) < CMD_COOLDOWN:
+        if not await _check_cmd_cooldown(message.author.id):
             return
-        self._cmd_cooldowns[uid] = now
         await super().process_commands(message)
 
     async def close(self):
@@ -324,10 +380,10 @@ class SocialCreditBot(commands.Bot):
         await self.load_extension("cogs.voting")
         await self.load_extension("cogs.achievements")
         await self.load_extension("cogs.badges")
-        from web.server import start_web_server
-        asyncio.create_task(start_web_server(self))
-        asyncio.create_task(_decay_task(self))
-        asyncio.create_task(_rotate_presence_task(self))
+        if IS_SCHEDULER:
+            asyncio.create_task(_decay_task(self))
+            asyncio.create_task(_rotate_presence_task(self))
+        asyncio.create_task(_guild_notify_listener(self))
         self.loop.create_task(console_loop(self))
 
     async def on_ready(self):
@@ -338,8 +394,9 @@ class SocialCreditBot(commands.Bot):
         for guild in self.guilds:
             member_ids = [m.id for m in guild.members if not m.bot]
             await self.db.register_guild_members(guild.id, member_ids)
-            self.tree.copy_global_to(guild=guild)
-            await self.tree.sync(guild=guild)
+            if not self._synced_once:
+                self.tree.copy_global_to(guild=guild)
+                await self.tree.sync(guild=guild)
             condemned = await self.db.get_condemned_users(guild.id)
             for row in condemned:
                 member = guild.get_member(row["user_id"])
@@ -377,14 +434,16 @@ class SocialCreditBot(commands.Bot):
                         await channel.send(embed=embed)
                     except discord.Forbidden:
                         pass
-        _global_cmds = self.tree.get_commands(guild=None)
-        self.tree.clear_commands(guild=None)
-        await self.tree.sync()
-        for cmd in _global_cmds:
-            self.tree.add_command(cmd)
+        if not self._synced_once:
+            _global_cmds = self.tree.get_commands(guild=None)
+            self.tree.clear_commands(guild=None)
+            await self.tree.sync()
+            for cmd in _global_cmds:
+                self.tree.add_command(cmd)
+            self._synced_once = True
 
         await self.change_presence(activity=_PRESENCE_CYCLE[self._presence_index])
-        print(f"Online: {self.user}  |  Guilds: {len(self.guilds)}  |  Slash commands synced.")
+        print(f"Online: {self.user}  |  Guilds: {len(self.guilds)}  |  Slash commands synced: {self._synced_once}")
         print("Type 'help' for console commands.")
 
     async def on_guild_join(self, guild: discord.Guild):
@@ -422,5 +481,6 @@ class SocialCreditBot(commands.Bot):
             await self.db.register_user(member.guild.id, member.id)
 
 
-bot = SocialCreditBot()
-bot.run(os.getenv("DISCORD_TOKEN"))
+if __name__ == "__main__":
+    bot = SocialCreditBot()
+    bot.run(os.getenv("DISCORD_TOKEN"))

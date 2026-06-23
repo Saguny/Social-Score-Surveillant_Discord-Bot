@@ -61,6 +61,13 @@ class CoreMixin:
             guild_id, user_id,
         )
 
+    async def get_user_guild_ids(self, user_id):
+        rows = await self._pool.fetch(
+            "SELECT guild_id FROM users WHERE user_id = $1",
+            user_id,
+        )
+        return [r["guild_id"] for r in rows]
+
     async def confiscate_yuan(self, guild_id, user_id):
         async with self._pool.acquire() as conn:
             async with conn.transaction():

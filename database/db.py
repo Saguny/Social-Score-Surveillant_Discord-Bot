@@ -211,11 +211,12 @@ class Database(
     def __init__(self):
         self._dsn = os.getenv("DATABASE_URL", "")
         self._pool: asyncpg.Pool | None = None
-        self._effect_cache: dict[tuple, tuple] = {}
         self._last_clean_effects: float = 0.0
+        self._pool_min = int(os.getenv("DB_POOL_MIN", "2"))
+        self._pool_max = int(os.getenv("DB_POOL_MAX", "10"))
 
     async def init(self):
-        self._pool = await asyncpg.create_pool(self._dsn, min_size=2, max_size=40)
+        self._pool = await asyncpg.create_pool(self._dsn, min_size=self._pool_min, max_size=self._pool_max)
         await self._create_tables()
         await self._migrate()
 

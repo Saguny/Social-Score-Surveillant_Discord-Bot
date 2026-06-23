@@ -726,7 +726,7 @@ class Economy(commands.Cog):
             return
         expires_at = int(time.time()) + cfg["duration"]
         await self.db.add_effect(gid, target.id, "freeze", expires_at)
-        self.db.invalidate_effect_cache(gid, target.id, "freeze")
+        await self.db.invalidate_effect_cache(gid, target.id, "freeze")
         embed = discord.Embed(color=0x8B0000, title="中华人民共和国社会信用局 · 再教育营")
         embed.add_field(
             name="RE-EDUCATION SENTENCE ISSUED",

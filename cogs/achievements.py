@@ -1,21 +1,22 @@
 import asyncio
+import time
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 
 from config.achievements import ACHIEVEMENTS, get_achievement, achievements_by_category
+from infra.redis_client import get_redis
+from infra.redis_cache import cache_set_nx
 
 _ANNOUNCE_DEBOUNCE_SECS = 2.0
+_ANNOUNCE_SAFETY_TTL = 30
 
 
 class AchievementsCog(commands.Cog, name="Achievements"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.db = bot.db
-        self._pending_ids: dict[tuple[int, int], list[str]] = {}
-        self._pending_channel: dict[tuple[int, int], discord.abc.Messageable | None] = {}
-        self._pending_tasks: dict[tuple[int, int], asyncio.Task] = {}
 
     async def grant(
         self,
@@ -35,7 +36,7 @@ class AchievementsCog(commands.Cog, name="Achievements"):
         if data["badge"]:
             await self.db.add_cosmetic_badge(user.id, data["badge"])
         await self._apply_rewards_everywhere(user, data)
-        self._queue_announce(guild, user, achievement_id, channel)
+        await self._queue_announce(guild, user, achievement_id, channel)
         if achievement_id != "completionist":
             await self._check_completionist(guild, user, channel)
         return True
@@ -51,8 +52,8 @@ class AchievementsCog(commands.Cog, name="Achievements"):
             await self.grant(guild, user, "completionist", channel=channel)
 
     async def _apply_rewards_everywhere(self, user: discord.abc.User, data: dict):
-        targets = [g for g in self.bot.guilds if g.get_member(user.id) is not None]
-        await asyncio.gather(*(self._apply_rewards(g.id, user.id, data) for g in targets))
+        guild_ids = await self.db.get_user_guild_ids(user.id)
+        await asyncio.gather(*(self._apply_rewards(gid, user.id, data) for gid in guild_ids))
 
     async def _apply_rewards(self, guild_id: int, user_id: int, data: dict):
         tasks = []
@@ -63,58 +64,17 @@ class AchievementsCog(commands.Cog, name="Achievements"):
         if tasks:
             await asyncio.gather(*tasks)
 
-    def _queue_announce(self, guild: discord.Guild, user: discord.abc.User, achievement_id: str, channel):
-        key = (guild.id, user.id)
-        self._pending_ids.setdefault(key, []).append(achievement_id)
-        self._pending_channel[key] = channel
-        existing = self._pending_tasks.get(key)
-        if existing and not existing.done():
-            return
-        self._pending_tasks[key] = asyncio.create_task(self._flush_announce(guild, user, key))
-
-    async def _flush_announce(self, guild: discord.Guild, user: discord.abc.User, key: tuple[int, int]):
-        await asyncio.sleep(_ANNOUNCE_DEBOUNCE_SECS)
-        ids = self._pending_ids.pop(key, [])
-        fallback_channel = self._pending_channel.pop(key, None)
-        self._pending_tasks.pop(key, None)
-        if not ids:
-            return
-
-        loud = await self.db.get_achievements_loud_enabled(guild.id)
-        if not loud:
-            return
-
-        configured_channel_id = await self.db.get_achievements_channel(guild.id)
-        channel = guild.get_channel(configured_channel_id) if configured_channel_id else fallback_channel
-        if channel is None:
-            return
-
-        embeds = []
-        for aid in ids:
-            data = get_achievement(aid)
-            if not data:
-                continue
-            parts = []
-            if data["score_reward"]:
-                parts.append(f"{data['score_reward']:.2f} credit score")
-            if data["yuan_reward"]:
-                parts.append(f"¥{data['yuan_reward']:,} Yuan")
-            reward_text = f" rewarding them with {' and '.join(parts)}" if parts else ""
-            embed = discord.Embed(
-                title="Achievement Unlocked!",
-                description=f"{user.mention} has unlocked the **{data['name']}** achievement{reward_text}.",
-                color=0xFFD700,
-            )
-            embed.set_thumbnail(url="attachment://achievement.png")
-            embed.set_footer(text="ccp achievementnotification [on|off] · ccp achievementchannel [#channel]")
-            embeds.append(embed)
-        if not embeds:
-            return
-        file = discord.File("images/achievement.png", filename="achievement.png")
-        try:
-            await channel.send(file=file, embeds=embeds)
-        except (discord.Forbidden, discord.HTTPException):
-            pass
+    async def _queue_announce(self, guild: discord.Guild, user: discord.abc.User, achievement_id: str, channel):
+        r = get_redis()
+        key_ids = f"ach:ids:{guild.id}:{user.id}"
+        key_channel = f"ach:channel:{guild.id}:{user.id}"
+        key_ready = f"ach:ready:{guild.id}:{user.id}"
+        await r.rpush(key_ids, achievement_id)
+        await r.expire(key_ids, _ANNOUNCE_SAFETY_TTL)
+        if channel is not None:
+            await cache_set_nx(key_channel, str(channel.id), ex=_ANNOUNCE_SAFETY_TTL)
+        ready_at = int(time.time()) + int(_ANNOUNCE_DEBOUNCE_SECS)
+        await cache_set_nx(key_ready, str(ready_at), ex=_ANNOUNCE_SAFETY_TTL)
 
     # ── /achievements ────────────────────────────────────────────────────────
 
@@ -190,6 +150,56 @@ class AchievementsCog(commands.Cog, name="Achievements"):
 
         file = discord.File("images/achievement.png", filename="achievement.png")
         await interaction.followup.send(file=file, embed=build_embed(categories[0]), view=CategoryView(categories[0]))
+
+
+def build_announce_embeds(ids: list[str], user: discord.abc.User) -> list[discord.Embed]:
+    embeds = []
+    for aid in ids:
+        data = get_achievement(aid)
+        if not data:
+            continue
+        parts = []
+        if data["score_reward"]:
+            parts.append(f"{data['score_reward']:.2f} credit score")
+        if data["yuan_reward"]:
+            parts.append(f"¥{data['yuan_reward']:,} Yuan")
+        reward_text = f" rewarding them with {' and '.join(parts)}" if parts else ""
+        embed = discord.Embed(
+            title="Achievement Unlocked!",
+            description=f"{user.mention} has unlocked the **{data['name']}** achievement{reward_text}.",
+            color=0xFFD700,
+        )
+        embed.set_thumbnail(url="attachment://achievement.png")
+        embed.set_footer(text="ccp achievementnotification [on|off] · ccp achievementchannel [#channel]")
+        embeds.append(embed)
+    return embeds
+
+
+async def deliver_achievement_announcements(
+    db,
+    guild: discord.Guild,
+    user: discord.abc.User,
+    ids: list[str],
+    fallback_channel_id: int | None = None,
+):
+    if not ids:
+        return
+    loud = await db.get_achievements_loud_enabled(guild.id)
+    if not loud:
+        return
+    configured_channel_id = await db.get_achievements_channel(guild.id)
+    channel_id = configured_channel_id or fallback_channel_id
+    channel = guild.get_channel(channel_id) if channel_id else None
+    if channel is None:
+        return
+    embeds = build_announce_embeds(ids, user)
+    if not embeds:
+        return
+    file = discord.File("images/achievement.png", filename="achievement.png")
+    try:
+        await channel.send(file=file, embeds=embeds)
+    except (discord.Forbidden, discord.HTTPException):
+        pass
 
 
 async def unlock(

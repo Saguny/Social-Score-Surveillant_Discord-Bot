@@ -3,6 +3,7 @@ import logging
 import time
 
 from web.anonymize import pseudonym_user, redact_global_stats
+from infra.admin_rpc import call_admin_rpc
 
 logger = logging.getLogger(__name__)
 
@@ -35,12 +36,13 @@ class StatCache:
     GUILD_LIST_INTERVAL = 600
     LATENCY_INTERVAL = 5
     FEED_INTERVAL = 5
+    BOT_STATUS_INTERVAL = 15
 
     TIMELINE_RANGES = ("24h", "7d", "30d", "90d")
     VOTE_PERIODS = ("1D", "7D", "1M", "TOTAL")
 
-    def __init__(self, bot, hub=None):
-        self.bot = bot
+    def __init__(self, db, hub=None):
+        self.db = db
         self.hub = hub
         self._data: dict[str, dict] = {}
         self._tasks: list[asyncio.Task] = []
@@ -51,6 +53,7 @@ class StatCache:
 
     async def start(self):
         await asyncio.gather(
+            self._safe(self._refresh_bot_status),
             self._safe(self._refresh_stats),
             self._safe(self._refresh_timeline),
             self._safe(self._refresh_votes),
@@ -59,6 +62,7 @@ class StatCache:
             self._safe(self._refresh_feed),
         )
         self._tasks = [
+            asyncio.create_task(self._loop(self._refresh_bot_status, self.BOT_STATUS_INTERVAL)),
             asyncio.create_task(self._loop(self._refresh_stats, self.STATS_INTERVAL)),
             asyncio.create_task(self._loop(self._refresh_timeline, self.TIMELINE_INTERVAL)),
             asyncio.create_task(self._loop(self._refresh_votes, self.VOTES_INTERVAL)),
@@ -92,8 +96,13 @@ class StatCache:
         except Exception:
             logger.exception("StatCache refresh failed: %s", getattr(fn, "__name__", fn))
 
+    async def _refresh_bot_status(self):
+        status = await call_admin_rpc("get_status")
+        if "error" not in status:
+            self._data["bot_status"] = status
+
     async def _refresh_stats(self):
-        stats = await self.bot.db.get_global_stats()
+        stats = await self.db.get_global_stats()
         redact_global_stats(stats)
         self.augment_live_fields(stats)
         self._data["stats"] = stats
@@ -102,50 +111,45 @@ class StatCache:
 
     def augment_live_fields(self, stats):
         latency = self._data.get("latency") or {}
+        bot_status = self._data.get("bot_status") or {}
         stats["db_query_ms"] = latency.get("db_query_ms")
-        stats["discord_ping_ms"] = latency.get("discord_ping_ms")
-        stats["uptime_seconds"] = int(time.time() - self.bot.start_time.timestamp()) if getattr(self.bot, "start_time", None) else 0
-        stats["total_guilds"] = len(self.bot.guilds)
-        scoring_cog = self.bot.get_cog("Scoring")
-        executor = getattr(scoring_cog, "_executor", None)
-        max_workers = getattr(executor, "_max_workers", None) if executor else None
-        active_workers = len(getattr(executor, "_processes", None) or {}) if executor else None
-        stats["sentiment_workers_max"] = max_workers if isinstance(max_workers, int) else None
-        stats["sentiment_workers_active"] = active_workers if isinstance(active_workers, int) else None
+        stats["discord_ping_ms"] = bot_status.get("discord_ping_ms")
+        stats["uptime_seconds"] = bot_status.get("uptime_seconds", 0)
+        stats["total_guilds"] = bot_status.get("total_guilds", 0)
+        stats["sentiment_workers_max"] = bot_status.get("sentiment_workers_max")
+        stats["sentiment_workers_active"] = bot_status.get("sentiment_workers_active")
 
     async def _refresh_timeline(self):
-        results = await asyncio.gather(*(self.bot.db.get_global_timeline(rng) for rng in self.TIMELINE_RANGES))
+        results = await asyncio.gather(*(self.db.get_global_timeline(rng) for rng in self.TIMELINE_RANGES))
         for rng, data in zip(self.TIMELINE_RANGES, results):
             self._data[f"timeline:{rng}"] = data
 
     async def _refresh_votes(self):
-        results = await asyncio.gather(*(self.bot.db.get_topgg_vote_timeline(period) for period in self.VOTE_PERIODS))
+        results = await asyncio.gather(*(self.db.get_topgg_vote_timeline(period) for period in self.VOTE_PERIODS))
         for period, buckets in zip(self.VOTE_PERIODS, results):
             total = sum(row["votes"] for row in buckets)
             self._data[f"votes:{period}"] = {"period": period, "buckets": buckets, "total": total}
 
     async def _refresh_guild_list(self):
-        guilds = sorted(self.bot.guilds, key=lambda g: g.name.lower())
-        self._data["guilds"] = {
-            "guilds": [
-                {"id": str(g.id), "name": g.name, "member_count": g.member_count or 0}
-                for g in guilds
-            ]
-        }
+        result = await call_admin_rpc("get_guild_list")
+        if "error" not in result:
+            self._data["guilds"] = result
 
     async def _refresh_latency(self):
         t0 = time.time()
-        await self.bot.db.ping()
+        await self.db.ping()
         payload = {
             "db_query_ms": round((time.time() - t0) * 1000, 1),
-            "discord_ping_ms": round(self.bot.latency * 1000, 1) if self.bot.latency else None,
         }
         self._data["latency"] = payload
         if self.hub:
-            await self.hub.publish("latency", payload)
+            await self.hub.publish("latency", {
+                **payload,
+                "discord_ping_ms": (self._data.get("bot_status") or {}).get("discord_ping_ms"),
+            })
 
     async def _refresh_feed(self):
-        rows = await self.bot.db.get_recent_events(20)
+        rows = await self.db.get_recent_events(20)
         events = [format_event(r) for r in rows]
         self._data["feed"] = {"events": events}
         if not rows:

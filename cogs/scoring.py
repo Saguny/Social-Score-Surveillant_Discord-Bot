@@ -1,11 +1,12 @@
 import asyncio
 import concurrent.futures
+import json
 import os
 import random
 import time
 import aiohttp
 import discord
-from discord.ext import commands, tasks
+from discord.ext import commands
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from config.ranks import get_rank, get_rank_index, RANKS, EXECUTION_THRESHOLD, RANK_YUAN
 from config.rules import (
@@ -16,6 +17,7 @@ from config.rules import (
 )
 from config.banned_topics import contains_banned_topic
 from cogs.achievements import unlock as unlock_achievement, check_milestone
+from infra.redis_cache import cache_get, cache_set, cache_delete, cache_incr
 
 TRANSLATE_URL = "https://translate.googleapis.com/translate_a/single"
 _LANG_CACHE_TTL = 3600
@@ -53,9 +55,6 @@ class Scoring(commands.Cog):
         self._last_messages: dict[tuple, str] = {}
         self._session: aiohttp.ClientSession | None = None
         self._executor: concurrent.futures.ProcessPoolExecutor | None = None
-        self._lang_cache: dict[tuple, tuple[str, float]] = {}
-        self._pos_streaks: dict[tuple[int, int], int] = {}
-        self._daily_tracking: dict[tuple[int, int], tuple[int, float, int]] = {}
 
     async def cog_load(self):
         self._session = aiohttp.ClientSession()
@@ -63,26 +62,14 @@ class Scoring(commands.Cog):
             max_workers=min(4, max(2, os.cpu_count() or 2)),
             initializer=_init_worker,
         )
-        self._cache_cleanup.start()
 
     async def cog_unload(self):
-        self._cache_cleanup.cancel()
         if self._session:
             await self._session.close()
             self._session = None
         if self._executor:
             self._executor.shutdown(wait=False)
             self._executor = None
-
-    @tasks.loop(hours=1)
-    async def _cache_cleanup(self):
-        now             = time.time()
-        today_start     = int(now) // 86400 * 86400
-        lang_cutoff     = now - _LANG_CACHE_TTL
-        stale_lang      = [k for k, v in self._lang_cache.items() if v[1] < lang_cutoff]
-        stale_tracking  = [k for k, v in self._daily_tracking.items() if v[0] < today_start]
-        for k in stale_lang:     del self._lang_cache[k]
-        for k in stale_tracking: del self._daily_tracking[k]
 
     async def _translate_to_english(self, text: str) -> str:
         try:
@@ -120,39 +107,37 @@ class Scoring(commands.Cog):
             return 0.0, None
 
         loop = asyncio.get_event_loop()
-        now = time.time()
-        cache_key = (guild_id, user_id)
-        cached = self._lang_cache.get(cache_key)
+        lang_key = f"lang:{guild_id}:{user_id}"
+        cached_lang = await cache_get(lang_key)
 
-        if cached and now - cached[1] < _LANG_CACHE_TTL:
-            lang = cached[0]
+        if cached_lang:
+            lang = cached_lang
             english = text if lang == "en" else await self._translate_to_english(text)
             if contains_banned_topic(english):
                 return BANNED_TOPIC_PENALTY, "counter-revolutionary speech"
             compound = await loop.run_in_executor(self._executor, _vader_only, english)
         else:
             lang, compound = await loop.run_in_executor(self._executor, _run_in_worker, text)
-            self._lang_cache[cache_key] = (lang, now)
+            await cache_set(lang_key, lang, ex=_LANG_CACHE_TTL)
             english = text if lang == "en" else await self._translate_to_english(text)
             if contains_banned_topic(english):
                 return BANNED_TOPIC_PENALTY, "counter-revolutionary speech"
             if lang != "en":
                 compound = await loop.run_in_executor(self._executor, _vader_only, english)
 
-        key = (guild_id, user_id)
+        streak_key = f"posstreak:{guild_id}:{user_id}"
         if abs(compound) < SENTIMENT_NEUTRAL_THRESHOLD:
-            self._pos_streaks.pop(key, None)
+            await cache_delete(streak_key)
             return NEUTRAL_BONUS, "civic participation"
 
         delta = round(compound * SENTIMENT_SCALE, 2)
         if delta > 0:
-            streak = self._pos_streaks.get(key, 0) + 1
-            self._pos_streaks[key] = streak
+            streak = await cache_incr(streak_key)
             if streak >= 3:
                 multiplier = 1.0 + min(streak // 3, 5) * 0.1
                 delta = round(delta * multiplier, 2)
         else:
-            self._pos_streaks.pop(key, None)
+            await cache_delete(streak_key)
         return delta, "positive sentiment" if compound > 0 else "negative sentiment"
 
     async def _evaluate(self, message: discord.Message) -> tuple[float, str]:
@@ -370,26 +355,44 @@ class Scoring(commands.Cog):
         if delta == 0:
             return
 
-        key = (gid, uid)
-        today_start = int(time.time()) // 86400 * 86400
-        tracking = self._daily_tracking.get(key)
-        if tracking is None or tracking[0] != today_start:
+        track_key = f"dailytrack:{gid}:{uid}"
+        now_ts = int(time.time())
+        today_start = now_ts // 86400 * 86400
+        seconds_to_midnight = 86400 - (now_ts % 86400)
+        raw_tracking = await cache_get(track_key)
+        if raw_tracking is None:
             daily_net, msg_count = 0.0, 0
         else:
-            _, daily_net, msg_count = tracking
+            tracking = json.loads(raw_tracking)
+            if tracking["day"] != today_start:
+                daily_net, msg_count = 0.0, 0
+            else:
+                daily_net, msg_count = tracking["net"], tracking["count"]
 
         if delta > 0:
             if daily_net >= DAILY_NET_DIMINISHING_THRESHOLD:
                 delta = round(delta * DAILY_MSG_DIMINISHING_FACTOR, 2)
             headroom = DAILY_MSG_SCORE_CAP - daily_net
             if headroom <= 0.0:
-                self._daily_tracking[key] = (today_start, daily_net, msg_count)
+                await cache_set(
+                    track_key,
+                    json.dumps({"day": today_start, "net": daily_net, "count": msg_count}),
+                    ex=seconds_to_midnight,
+                )
                 return
             delta = round(min(delta, headroom), 2)
-            self._daily_tracking[key] = (today_start, daily_net + delta, msg_count + 1)
+            await cache_set(
+                track_key,
+                json.dumps({"day": today_start, "net": daily_net + delta, "count": msg_count + 1}),
+                ex=seconds_to_midnight,
+            )
         else:
             delta, _ = await self.db.apply_defense_chain(gid, uid, delta)
-            self._daily_tracking[key] = (today_start, daily_net + delta, msg_count)
+            await cache_set(
+                track_key,
+                json.dumps({"day": today_start, "net": daily_net + delta, "count": msg_count}),
+                ex=seconds_to_midnight,
+            )
 
         if delta == 0:
             return

@@ -1,7 +1,7 @@
 import random
 import datetime
 import discord
-from discord.ext import commands, tasks
+from discord.ext import commands
 from config.poster_data import POSTERS
 from cogs.achievements import check_milestone
 
@@ -53,41 +53,10 @@ class Posters(commands.Cog):
                 "channel_id": row["channel_id"],
                 "last_slug":  row["last_slug"],
             }
-        self._daily_poster.start()
-
-    async def cog_unload(self):
-        self._daily_poster.cancel()
-
-    @tasks.loop(time=datetime.time(hour=12, minute=0, tzinfo=datetime.timezone.utc))
-    async def _daily_poster(self):
-        for guild_id, cfg in list(self._active.items()):
-            channel = self.bot.get_channel(cfg["channel_id"])
-            if not channel:
-                continue
-            await self._send_daily(channel, guild_id)
-
-    @_daily_poster.before_loop
-    async def _before_daily(self):
-        await self.bot.wait_until_ready()
 
     def _pick_poster(self, last_slug: str | None) -> dict:
         choices = [p for p in POSTERS if p["slug"] != last_slug]
         return random.choice(choices)
-
-    async def _send_daily(self, channel: discord.TextChannel, guild_id: int):
-        poster = self._pick_poster(self._active[guild_id].get("last_slug"))
-        try:
-            msg = await channel.send(embed=_build_embed(poster))
-        except discord.Forbidden:
-            return
-        try:
-            await msg.add_reaction(HEART)
-            await msg.add_reaction(RAGE)
-        except discord.Forbidden:
-            pass
-        await self.db.set_poster_last(guild_id, poster["slug"])
-        self._active[guild_id]["last_slug"] = poster["slug"]
-        await self.db.log_poster_message(guild_id, channel.id, msg.id)
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
