@@ -15,7 +15,7 @@ class CheckIn(commands.Cog):
         self.bot = bot
         self.db = bot.db
 
-    @app_commands.command(name="checkin", description="Perform your daily check-in for Yuan and score, applied across every server you share with the bureau")
+    @app_commands.command(name="checkin", description="Daily check-in for Yuan and score, applied in every server you share with the bureau")
     async def checkin(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         uid = interaction.user.id
