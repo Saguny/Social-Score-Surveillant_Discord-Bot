@@ -14,7 +14,7 @@ function _hourLabel(ts) {
   return new Date(ts * 1000).toLocaleTimeString([], {hour: 'numeric'});
 }
 
-function _sparkChart(canvasId, labels, data, color, minPoints = 3, showY = false) {
+function _sparkChart(canvasId, labels, data, color, minPoints = 3, yFormat = v => v) {
   const el = document.getElementById(canvasId);
   if (!el) return;
   const wrap = el.parentElement;
@@ -35,18 +35,16 @@ function _sparkChart(canvasId, labels, data, color, minPoints = 3, showY = false
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      layout: { padding: 0 },
       plugins: {
         legend: { display: false },
         tooltip: { displayColors: false, callbacks: { title: items => items[0].label } },
       },
       scales: {
-        x: { display: true, grid: { display: false }, border: { display: false },
+        x: { display: true, offset: false, grid: { display: false }, border: { display: false },
              ticks: { autoSkip: true, maxTicksLimit: 3, font: { size: 9 }, color: '#61677A' } },
-        y: showY
-          ? { display: true, grid: { color: 'rgba(97,103,122,.15)' }, border: { display: false },
-              ticks: { maxTicksLimit: 3, font: { size: 9 }, color: '#61677A',
-                       callback: v => v + 'ms' } }
-          : { display: false },
+        y: { display: true, grid: { color: 'rgba(97,103,122,.15)' }, border: { display: false },
+             ticks: { maxTicksLimit: 3, font: { size: 9 }, color: '#61677A', callback: yFormat } },
       },
       elements: { point: { radius: 0, hoverRadius: 3 }, line: { borderWidth: 2 } },
       interaction: { intersect: false, mode: 'index' },
@@ -136,28 +134,28 @@ async function loadActivity(range) {
 
   const socVals = eng.map(r => r.endorsements + r.rebukes);
   set('tl-social-val', socVals.length ? fmt(socVals.reduce((a, b) => a + b, 0)) : '—');
-  _sparkChart('chart-social', labels, socVals, '#7D9D9C');
+  _sparkChart('chart-social', labels, socVals, '#7D9D9C', 3, v => v);
   _hideIfEmpty('chart-social', socVals.length);
 
   const yuan = d.yuan || [];
   const yuanLabels = yuan.map(r => labelFn(r[0]));
   const yuanVals = yuan.map(r => r[1]);
   set('tl-yuan-val', yuanVals.length ? '¥' + fmt(yuanVals[yuanVals.length - 1]) : '—');
-  _sparkChart('chart-yuan', yuanLabels, yuanVals, '#F4E557');
+  _sparkChart('chart-yuan', yuanLabels, yuanVals, '#F4E557', 3, v => '¥' + fmt(v));
   _hideIfEmpty('chart-yuan', yuanVals.length);
 
   const port = d.portfolio || [];
   const portLabels = port.map(r => labelFn(r[0]));
   const portVals = port.map(r => r[1]);
   set('tl-portfolio-val', portVals.length ? '¥' + fmt(portVals[portVals.length - 1]) : '—');
-  _sparkChart('chart-portfolio', portLabels, portVals, '#F5A855');
+  _sparkChart('chart-portfolio', portLabels, portVals, '#F5A855', 3, v => '¥' + fmt(v));
   _hideIfEmpty('chart-portfolio', portVals.length);
 
   const joins = d.joins || [];
   const joinLabels = joins.map(r => labelFn(r[0]));
   const joinVals = joins.map(r => r[1]);
   set('tl-joins-val', joinVals.length ? fmt(joinVals.reduce((a, b) => a + b, 0)) : '—');
-  _sparkChart('chart-joins', joinLabels, joinVals, '#7D9D9C');
+  _sparkChart('chart-joins', joinLabels, joinVals, '#7D9D9C', 3, v => v);
   _hideIfEmpty('chart-joins', joinVals.length);
 }
 
@@ -173,7 +171,7 @@ function _pushLatencySample(dbMs, pingMs) {
   if (_dbLatencyBuf.length > _LATENCY_BUF_MAX) _dbLatencyBuf.shift();
   if (_pingBuf.length > _LATENCY_BUF_MAX) _pingBuf.shift();
   set('tl-dblatency-val', dbMs + 'ms');
-  _sparkChart('chart-dblatency', _dbLatencyBuf.map(r => r[0]), _dbLatencyBuf.map(r => r[1]), '#7D9D9C', 2, true);
+  _sparkChart('chart-dblatency', _dbLatencyBuf.map(r => r[0]), _dbLatencyBuf.map(r => r[1]), '#7D9D9C', 2, v => v + 'ms');
 }
 
 const TIERS = [
@@ -489,7 +487,7 @@ const STAT_TIPS = {
   'ec-items':   'Total shop items purchased, all-time.',
   'ec-fx':      'Currently active shop effects (freezes, etc.) across all citizens.',
   'ec-fr':      'Total yuan raised through fundraisers, all-time.',
-  'tl-yuan-val':      'Total yuan in circulation over the selected time range.',
+  'tl-yuan-val':      'Yuan in circulation trend, sampled once daily — may lag the live "In Circulation" total above by up to 24h.',
   'tl-portfolio-val': 'Combined value of every citizen\'s stock and turbo holdings over the selected time range.',
   'ec-rich':    'The highest yuan balance currently held by any single citizen.',
   'mk-stocks':  'Total yuan currently invested in stocks across all portfolios.',

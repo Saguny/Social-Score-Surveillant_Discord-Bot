@@ -87,16 +87,16 @@ details[open] summary::before { content:'▼  '; }
 .btn-run.active { background:var(--accent-hover); box-shadow:0 0 0 2px var(--accent-soft); }
 
 .chart-card { padding:1.25rem 1.5rem; }
-.chart-card canvas { width:100%!important; }
+.chart-card canvas { display:block; width:100%!important; }
 .chart-empty { display:flex; align-items:center; justify-content:center; height:160px; color:var(--text-faint); font-size:.8rem; }
 
 .spark-tile { padding:1.25rem 1.5rem; }
 .spark-tile .lbl { margin-bottom:.2rem; }
 .spark-tile .val { font-size:1.35rem; }
-.spark-canvas-wrap { height:44px; margin-top:.5rem; position:relative; }
+.spark-canvas-wrap { height:70px; margin-top:.5rem; position:relative; }
 .spark-canvas-wrap-axis { height:70px; }
-.spark-canvas-wrap canvas { width:100%!important; height:100%!important; }
-.spark-empty { height:44px; margin-top:.5rem; display:flex; align-items:center; color:var(--text-faint); font-size:.68rem; }
+.spark-canvas-wrap canvas { display:block; width:100%!important; height:100%!important; }
+.spark-empty { height:70px; margin-top:.5rem; display:flex; align-items:center; color:var(--text-faint); font-size:.68rem; }
 
 .hero .val { font-size:2.6rem; }
 .hero .lbl { font-size:.7rem; }
@@ -120,6 +120,7 @@ details[open] summary::before { content:'▼  '; }
 .nav-tabs .nav-link.active { color:var(--text); background:transparent; border-bottom:2px solid var(--accent-hover); }
 
 .activity-chart-wrap { height:280px; position:relative; }
+.activity-chart-wrap canvas { display:block; }
 .activity-chart-wrap-msgs { height:170px; }
 .activity-chart-wrap-eng { height:140px; }
 
