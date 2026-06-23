@@ -54,6 +54,12 @@ class CountersMixin:
 
         return current, best
 
+    async def get_top_by_counter(self, key: str, limit: int = 10):
+        return await self._pool.fetch(
+            "SELECT user_id, value FROM user_counters WHERE counter_key = $1 ORDER BY value DESC LIMIT $2",
+            key, limit,
+        )
+
     async def record_negative_action(self, user_id: int) -> None:
         await self.set_counter(user_id, "clean_streak:last_negative_at", int(time.time()))
 

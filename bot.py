@@ -1,6 +1,7 @@
 import os
 import sys
 import asyncio
+import random
 import time
 from contextvars import ContextVar
 from datetime import datetime, timezone
@@ -18,11 +19,16 @@ _current_user_id: ContextVar[int | None] = ContextVar("current_user_id", default
 
 _orig_embed_init = discord.Embed.__init__
 
+FOOTER_VOTE_NUDGE_CHANCE = 0.35
+
 def _embed_init(self, **kwargs):
     if _current_user_id.get() == OWNER_ID and "color" not in kwargs and "colour" not in kwargs:
         kwargs["color"] = OWNER_COLOR
     _orig_embed_init(self, **kwargs)
-    self.set_footer(text="GLORY TO THE CCP!")
+    if random.random() < FOOTER_VOTE_NUDGE_CHANCE:
+        self.set_footer(text="Use /vote for rewards!")
+    else:
+        self.set_footer(text="GLORY TO THE CCP!")
 
 discord.Embed.__init__ = _embed_init
 
