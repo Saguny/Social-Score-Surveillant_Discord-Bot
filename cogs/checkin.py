@@ -17,7 +17,7 @@ class CheckIn(commands.Cog):
 
     @app_commands.command(name="checkin", description="Daily check-in for Yuan and score, applied in every server you share with the bureau")
     async def checkin(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer()
         uid = interaction.user.id
         guild_ids = [g.id for g in self.bot.guilds if g.get_member(uid)]
 
@@ -57,7 +57,7 @@ class CheckIn(commands.Cog):
                 bonus_text = f"Tomorrow: ¥{next_yuan:,} · +{next_score:.2f} score"
             embed.add_field(name="STREAK BONUS", value=bonus_text, inline=False)
         embed.timestamp = discord.utils.utcnow()
-        await interaction.followup.send(embed=embed, ephemeral=True)
+        await interaction.followup.send(embed=embed,)
 
         for gr in result["guild_results"]:
             guild = self.bot.get_guild(gr["guild_id"])
