@@ -93,6 +93,12 @@ class AdminRpcScheduler(commands.Cog):
             executor = getattr(scoring_cog, "_executor", None)
             max_workers = getattr(executor, "_max_workers", None) if executor else None
             active_workers = len(getattr(executor, "_processes", None) or {}) if executor else None
+            if max_workers is None:
+                from infra.redis_cache import cache_get
+                cached = await cache_get("gateway:sentiment_workers")
+                if cached:
+                    max_workers = int(cached)
+                    active_workers = max_workers
             return {
                 "total_guilds": len(bot.guilds),
                 "uptime_seconds": uptime,

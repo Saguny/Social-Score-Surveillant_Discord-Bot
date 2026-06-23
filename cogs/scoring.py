@@ -62,6 +62,8 @@ class Scoring(commands.Cog):
             max_workers=min(4, max(2, os.cpu_count() or 2)),
             initializer=_init_worker,
         )
+        from infra.redis_cache import cache_set
+        await cache_set("gateway:sentiment_workers", str(self._executor._max_workers))
 
     async def cog_unload(self):
         if self._session:

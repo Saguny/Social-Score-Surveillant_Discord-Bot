@@ -470,7 +470,7 @@ const STAT_TIPS = {
   'mc-dau':     'Citizens with at least one rated message in the last 24 hours.',
   'mc-mps':     'Lifetime average messages processed per second since the bot first started.',
   'mc-ping':    'Round-trip latency to Discord\'s gateway.',
-  'mc-db':      'Time for a trivial query to round-trip to the database. The DB runs on a separate Railway project from the bot, so this is expected to sit higher (~150-250ms) than a same-project setup (~5ms) would.',
+  'mc-db':      'Time for a trivial query to round-trip to the database.',
   'mc-uptime':  'Time since the bot process last started.',
   'mc-workers': 'Active / max sentiment-analysis worker processes.',
   'mc-mag':     'The server with the most rated messages all-time. Server identity is anonymized.',
@@ -517,7 +517,7 @@ const STAT_TIPS = {
   'adv-er':     'Share of all endorsements and rebukes that were endorsements.',
   'tl-social-val': 'Endorsements plus rebukes given over the selected time range.',
   'sc-reb':     'Total rebukes given, all-time.',
-  'tl-dblatency-val': 'Rolling database round-trip time, sampled live. The DB runs on a separate Railway project from the bot, so this normally sits in the 150-250ms range rather than near-zero.',
+  'tl-dblatency-val': 'Rolling database round-trip time, sampled live.',
 };
 
 function _initTooltips() {
