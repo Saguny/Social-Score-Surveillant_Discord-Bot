@@ -20,13 +20,17 @@ _current_user_id: ContextVar[int | None] = ContextVar("current_user_id", default
 _orig_embed_init = discord.Embed.__init__
 
 FOOTER_VOTE_NUDGE_CHANCE = 0.35
+FOOTER_CHECKIN_NUDGE_CHANCE = 0.15
 
 def _embed_init(self, **kwargs):
     if _current_user_id.get() == OWNER_ID and "color" not in kwargs and "colour" not in kwargs:
         kwargs["color"] = OWNER_COLOR
     _orig_embed_init(self, **kwargs)
-    if random.random() < FOOTER_VOTE_NUDGE_CHANCE:
+    roll = random.random()
+    if roll < FOOTER_VOTE_NUDGE_CHANCE:
         self.set_footer(text="Use /vote for rewards!")
+    elif roll < FOOTER_VOTE_NUDGE_CHANCE + FOOTER_CHECKIN_NUDGE_CHANCE:
+        self.set_footer(text="Don't forget to /checkin!")
     else:
         self.set_footer(text="GLORY TO THE CCP!")
 
