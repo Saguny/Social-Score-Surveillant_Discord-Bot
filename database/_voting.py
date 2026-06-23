@@ -43,3 +43,37 @@ class VotingMixin:
             bucket_secs, since,
         )
         return [{"bucket": row["bucket"], "votes": row["votes"]} for row in rows]
+
+    async def get_top_voters_by_total(self, limit: int = 50) -> list[dict]:
+        rows = await self._pool.fetch(
+            """
+            SELECT user_id, COUNT(*) AS value
+            FROM topgg_votes
+            GROUP BY user_id
+            ORDER BY value DESC
+            LIMIT $1
+            """,
+            limit,
+        )
+        return [{"user_id": row["user_id"], "value": row["value"]} for row in rows]
+
+    async def get_top_voters_by_streak(self, limit: int = 50) -> list[dict]:
+        rows = await self._pool.fetch(
+            """
+            WITH days AS (
+                SELECT DISTINCT user_id, (voted_at / 86400) AS day FROM topgg_votes
+            ), grp AS (
+                SELECT user_id, day, day - ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY day) AS grp
+                FROM days
+            ), runs AS (
+                SELECT user_id, grp, COUNT(*) AS run_len FROM grp GROUP BY user_id, grp
+            )
+            SELECT user_id, MAX(run_len) AS value
+            FROM runs
+            GROUP BY user_id
+            ORDER BY value DESC
+            LIMIT $1
+            """,
+            limit,
+        )
+        return [{"user_id": row["user_id"], "value": row["value"]} for row in rows]

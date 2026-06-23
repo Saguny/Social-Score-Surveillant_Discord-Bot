@@ -98,25 +98,22 @@ class Stats(commands.Cog):
     @app_commands.command(name="leaderboard", description="View the social credit rankings")
     async def leaderboard(self, interaction: discord.Interaction):
         await interaction.response.defer()
-        data, market_data, top_voters, top_vote_streaks = await asyncio.gather(
+        data, market_data, top_voters_global, top_vote_streaks_global = await asyncio.gather(
             self.db.get_extended_leaderboard(interaction.guild.id),
             self.db.get_market_leaderboard(interaction.guild.id),
-            self.db.get_top_by_counter("topgg_votes_total", 5),
-            self.db.get_top_by_counter("topgg_vote_streak:best", 5),
+            self.db.get_top_voters_by_total(50),
+            self.db.get_top_voters_by_streak(50),
         )
 
         def name(uid):
             m = interaction.guild.get_member(uid)
             return m.display_name if m else "Unknown"
 
-        async def name_global(uid):
-            u = self.bot.get_user(uid)
-            if not u:
-                try:
-                    u = await self.bot.fetch_user(uid)
-                except discord.HTTPException:
-                    return f"User {uid}"
-            return str(u)
+        def in_guild(rows, limit=5):
+            return [r for r in rows if interaction.guild.get_member(r["user_id"])][:limit]
+
+        top_voters = in_guild(top_voters_global)
+        top_vote_streaks = in_guild(top_vote_streaks_global)
 
         def fmt_score(rows):
             return "\n".join(f"{i}. {name(r['user_id'])} · {r['score']:.2f}" for i, r in enumerate(rows, 1)) or "No data."
@@ -133,18 +130,11 @@ class Stats(commands.Cog):
         def fmt_pnl(rows):
             return "\n".join(f"{i}. {name(r['user_id'])} · ¥{int(r['total_pnl']):,}" for i, r in enumerate(rows, 1)) or "No data."
 
-        async def fmt_voters(rows):
-            lines = [f"{i}. {await name_global(r['user_id'])} · {r['value']} votes" for i, r in enumerate(rows, 1)]
-            return "\n".join(lines) or "No data."
+        def fmt_voters(rows):
+            return "\n".join(f"{i}. {name(r['user_id'])} · {r['value']} votes" for i, r in enumerate(rows, 1)) or "No data."
 
-        async def fmt_vote_streaks(rows):
-            lines = [f"{i}. {await name_global(r['user_id'])} · {r['value']}d" for i, r in enumerate(rows, 1)]
-            return "\n".join(lines) or "No data."
-
-        voters_val, vote_streaks_val = await asyncio.gather(
-            fmt_voters(top_voters),
-            fmt_vote_streaks(top_vote_streaks),
-        )
+        def fmt_vote_streaks(rows):
+            return "\n".join(f"{i}. {name(r['user_id'])} · {r['value']}d" for i, r in enumerate(rows, 1)) or "No data."
 
         pages = {
             "score":    ("MOST COMPLIANT",  fmt_score(data["top_score"]),                         "GREATEST THREATS", fmt_score(data["bottom_score"])),
@@ -152,7 +142,7 @@ class Stats(commands.Cog):
             "activity": ("MOST ACTIVE",      fmt_col(data["most_messages"], "message_count"),      "MOST ENDORSED",    fmt_col(data["most_endorsed"], "times_endorsed")),
             "social":   ("MOST REBUKED",     fmt_col(data["most_rebuked"], "times_rebuked"),       "TOP INFORMANTS",   fmt_col(data["top_snitches"], "times_filed_reports")),
             "markets":  ("TOP INVESTORS",    fmt_portfolio(market_data["top_portfolio"]),           "TOP TRADERS",      fmt_pnl(market_data["top_realized"])),
-            "voters":   ("TOP VOTERS · GLOBAL", voters_val,                                         "BEST VOTE STREAK · GLOBAL", vote_streaks_val),
+            "voters":   ("TOP VOTERS",       fmt_voters(top_voters),                                "BEST VOTE STREAK", fmt_vote_streaks(top_vote_streaks)),
         }
 
         def build_embed(page: str) -> discord.Embed:
