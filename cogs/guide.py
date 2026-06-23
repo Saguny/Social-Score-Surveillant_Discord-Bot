@@ -624,7 +624,12 @@ class Guide(commands.Cog):
         )
         e.add_field(
             name="LINKS",
-              value=f"[Source Code]({REPO_URL}) · [Invite to Server]({INVITE_URL}) · [Support Server]({SUPPORT_URL}) · [Public Dashboard]({DASHBOARD_URL})",
+              value=f"[Source Code]({REPO_URL}) · [Invite to Server]({INVITE_URL}) · [Public Dashboard]({DASHBOARD_URL})",
+            inline=False,
+        )
+        e.add_field(
+            name="★ SUPPORT SERVER ★",
+            value=f"[Join here]({SUPPORT_URL}) · changelogs and updates posted constantly, this is the place to follow.\nAlso join for a +15% yuan boost globally!",
             inline=False,
         )
 
