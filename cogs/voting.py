@@ -1,5 +1,6 @@
 import asyncio
 import os
+import random
 import time
 import aiohttp
 import discord
@@ -10,10 +11,33 @@ from cogs.achievements import unlock as unlock_achievement, check_milestone
 VOTE_URL = "https://top.gg/bot/856163780265902151/vote"
 TOPGG_BOT_ID = "856163780265902151"
 TOPGG_STATS_URL = f"https://top.gg/api/bots/{TOPGG_BOT_ID}/stats"
-VOTE_SCORE_DELTA = 2.0
-VOTE_YUAN_REWARD = 1500
+VOTE_SCORE_BASE = 2.0
+VOTE_YUAN_BASE = 1500
+VOTE_STREAK_YUAN_STEP = 150
+VOTE_STREAK_YUAN_CAP = 4500
+VOTE_STREAK_SCORE_STEP = 0.05
+VOTE_STREAK_SCORE_CAP = 4.0
+VOTE_WEEKEND_MULTIPLIER = 2
+VOTE_CHECKIN_COMBO_YUAN = 500
+VOTE_CHECKIN_COMBO_SCORE = 0.5
 VOTE_BADGE = "voter"
 VOTE_COOLDOWN = 12 * 60 * 60
+
+_VOTE_VARIANCE_TIERS = [
+    (0.80, 1.0),
+    (0.15, 1.5),
+    (0.05, 2.5),
+]
+
+
+def _roll_vote_multiplier() -> float:
+    r = random.random()
+    cumulative = 0.0
+    for weight, mult in _VOTE_VARIANCE_TIERS:
+        cumulative += weight
+        if r < cumulative:
+            return mult
+    return 1.0
 
 class VoteReminderView(discord.ui.View):
     def __init__(self, user_id: int, db):
@@ -53,18 +77,30 @@ class VoteReminderView(discord.ui.View):
             pass
 
 
-async def _reward_guild(bot, db, guild, user_id: int, expires_at: int, total_votes: int, vote_streak: int) -> str | None:
+async def _reward_guild(
+    bot, db, guild, user_id: int, expires_at: int, total_votes: int, vote_streak: int,
+    yuan_reward: int, score_delta: float,
+) -> tuple[str, bool] | None:
     member = guild.get_member(user_id)
     if not member:
         return None
+    combo = False
+    user_row = await db.get_user(guild.id, user_id)
+    if user_row:
+        now = int(time.time())
+        today_start = now - (now % 86400)
+        if user_row["last_checkin"] >= today_start:
+            combo = True
+    final_yuan = yuan_reward + (VOTE_CHECKIN_COMBO_YUAN if combo else 0)
+    final_score = round(score_delta + (VOTE_CHECKIN_COMBO_SCORE if combo else 0), 2)
     await asyncio.gather(
-        db.update_score(guild.id, user_id, VOTE_SCORE_DELTA, "topgg vote"),
-        db.adjust_yuan(guild.id, user_id, VOTE_YUAN_REWARD),
+        db.update_score(guild.id, user_id, final_score, "topgg vote"),
+        db.adjust_yuan(guild.id, user_id, final_yuan),
     )
     await unlock_achievement(bot, guild, member, "first_vote")
     await check_milestone(bot, guild, member, "topgg_votes_total", total_votes)
     await check_milestone(bot, guild, member, "topgg_vote_streak", vote_streak)
-    return guild.name
+    return guild.name, combo
 
 
 async def process_vote(bot: commands.Bot, user_id: int):
@@ -73,10 +109,24 @@ async def process_vote(bot: commands.Bot, user_id: int):
     total_votes = await db.increment_counter(user_id, "topgg_votes_total")
     vote_streak, _ = await db.bump_daily_streak(user_id, "topgg_vote_streak")
     expires_at = int(time.time()) + VOTE_COOLDOWN
+
+    yuan_base = min(VOTE_YUAN_BASE + (vote_streak - 1) * VOTE_STREAK_YUAN_STEP, VOTE_STREAK_YUAN_CAP)
+    score_base = min(VOTE_SCORE_BASE + (vote_streak - 1) * VOTE_STREAK_SCORE_STEP, VOTE_STREAK_SCORE_CAP)
+    multiplier = _roll_vote_multiplier()
+    yuan_reward = round(yuan_base * multiplier)
+    score_delta = round(score_base * multiplier, 2)
+
+    is_weekend = time.gmtime().tm_wday >= 5
+    if is_weekend:
+        yuan_reward *= VOTE_WEEKEND_MULTIPLIER
+        score_delta = round(score_delta * VOTE_WEEKEND_MULTIPLIER, 2)
+
     results = await asyncio.gather(
-        *(_reward_guild(bot, db, guild, user_id, expires_at, total_votes, vote_streak) for guild in bot.guilds)
+        *(_reward_guild(bot, db, guild, user_id, expires_at, total_votes, vote_streak, yuan_reward, score_delta) for guild in bot.guilds)
     )
-    rewarded_guilds = [name for name in results if name is not None]
+    rewarded = [r for r in results if r is not None]
+    rewarded_guilds = [name for name, _ in rewarded]
+    any_combo = any(combo for _, combo in rewarded)
     print(f"[topgg vote] user {user_id} rewarded in {len(rewarded_guilds)}/{len(bot.guilds)} guilds: {rewarded_guilds}")
 
     if not rewarded_guilds:
@@ -85,14 +135,27 @@ async def process_vote(bot: commands.Bot, user_id: int):
 
     await db.add_temporary_cosmetic_badge(user_id, VOTE_BADGE, expires_at)
 
+    lines = [
+        f"Your vote has been logged with the bureau. You have received +¥{yuan_reward:,}, "
+        f"+{score_delta:.2f} score, and the Loyal Patriot badge (12h) on every server you share with "
+        f"this bot ({len(rewarded_guilds)} total). This reward applies per server · once per vote."
+    ]
+    if is_weekend:
+        lines.append("🎉 Weekend bonus: rewards doubled today.")
+    if multiplier > 1.0:
+        lines.append(f"🎲 Lucky roll: a {multiplier:.1f}x bonus was applied.")
+    if vote_streak > 1:
+        lines.append(f"🔥 Vote streak: {vote_streak} days in a row.")
+    if any_combo:
+        lines.append(
+            f"✅ Checked in today too — an extra +¥{VOTE_CHECKIN_COMBO_YUAN:,} / +{VOTE_CHECKIN_COMBO_SCORE:.2f} "
+            f"combo bonus was applied in the server(s) where you checked in."
+        )
+
     embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")
     embed.add_field(
         name="VOTE RECEIVED · THANK YOU, COMRADE",
-        value=(
-            f"Your vote has been logged with the bureau. You have received +¥{VOTE_YUAN_REWARD:,}, "
-            f"+{VOTE_SCORE_DELTA:.2f} score, and the Loyal Patriot badge (12h) on every server you share with "
-            f"this bot ({len(rewarded_guilds)} total). This reward applies globally · once per vote."
-        ),
+        value="\n".join(lines),
         inline=False,
     )
 
@@ -125,9 +188,10 @@ class Voting(commands.Cog):
         embed.add_field(
             name="VOTE FOR THE BUREAU",
             value=(
-                "Cast your ballot for this bot on Top.gg to receive a badge, "
-                "+2.00 score, and ¥1,500 yuan on every server you share with the bureau. "
-                "You can vote again every 12 hours."
+                "Cast your ballot for this bot on Top.gg to receive a badge, score, and yuan "
+                "on every server you share with the bureau. Rewards scale with your vote streak, "
+                "carry a chance of a lucky bonus roll, are doubled on weekends, and stack further "
+                "if you've also checked in today. You can vote again every 12 hours."
             ),
             inline=False,
         )

@@ -137,13 +137,6 @@ async function loadActivity(range) {
   _sparkChart('chart-social', labels, socVals, '#7D9D9C', 3, v => v);
   _hideIfEmpty('chart-social', socVals.length);
 
-  const yuan = d.yuan || [];
-  const yuanLabels = yuan.map(r => labelFn(r[0]));
-  const yuanVals = yuan.map(r => r[1]);
-  set('tl-yuan-val', yuanVals.length ? '¥' + fmt(yuanVals[yuanVals.length - 1]) : '—');
-  _sparkChart('chart-yuan', yuanLabels, yuanVals, '#F4E557', 3, v => '¥' + fmt(v));
-  _hideIfEmpty('chart-yuan', yuanVals.length);
-
   const port = d.portfolio || [];
   const portLabels = port.map(r => labelFn(r[0]));
   const portVals = port.map(r => r[1]);
@@ -157,6 +150,18 @@ async function loadActivity(range) {
   set('tl-joins-val', joinVals.length ? fmt(joinVals.reduce((a, b) => a + b, 0)) : '—');
   _sparkChart('chart-joins', joinLabels, joinVals, '#7D9D9C', 3, v => v);
   _hideIfEmpty('chart-joins', joinVals.length);
+}
+
+async function loadYuanCirculation() {
+  const res = await fetch('/api/stats/timeline?range=7d');
+  if (!res.ok) return;
+  const d = await res.json();
+  const yuan = d.yuan || [];
+  const yuanLabels = yuan.map(r => _dayLabel(r[0]));
+  const yuanVals = yuan.map(r => r[1]);
+  set('tl-yuan-val', yuanVals.length ? '¥' + fmt(yuanVals[yuanVals.length - 1]) : '—');
+  _sparkChart('chart-yuan', yuanLabels, yuanVals, '#F4E557', 3, v => '¥' + fmt(v));
+  _hideIfEmpty('chart-yuan', yuanVals.length);
 }
 
 const _dbLatencyBuf = [];
@@ -536,7 +541,9 @@ function _initTooltips() {
 
 load();
 loadActivity('7d');
+loadYuanCirculation();
 loadFeed();
 _connectStream();
 _initTooltips();
 setInterval(() => loadActivity(_activityRange), 300000);
+setInterval(loadYuanCirculation, 300000);

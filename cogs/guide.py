@@ -174,7 +174,7 @@ class Guide(commands.Cog):
         e3.add_field(name="/leaderboard",            value="Rankings across 5 pages: Score, Economy, Activity, Social, and Markets (portfolio value and realized P&L).", inline=False)
         e3.add_field(name="/state_report",           value="Server-wide report: biggest rise/fall, top informant, yuan in circulation, avg score.", inline=False)
         e3.add_field(name="/graph <score|yuan> [citizen]", value="Generate a 30-day trend graph for score or yuan. Yuan graph populates once per day.", inline=False)
-        e3.add_field(name="/checkin",                value="Perform your daily check-in. Earns Yuan and a small score bump. Streak increases daily reward up to ¥2,000.", inline=False)
+        e3.add_field(name="/checkin",                value="Perform your daily check-in. Earns Yuan and a small score bump on every server you share with the bot. Streak increases daily reward up to ¥2,000.", inline=False)
         e3.add_field(name="/botinfo",                value="Technical information about the bot: creator, tech stack, server count, repo and invite links.", inline=False)
         e3.add_field(name="/uptime",                 value="How long the Bureau has been active since last restart.", inline=False)
         e3.add_field(name="/ping",                   value="Check the Bureau's response latency.", inline=False)

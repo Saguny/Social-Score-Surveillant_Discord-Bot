@@ -225,23 +225,45 @@ class CoreMixin:
                 await conn.execute("DELETE FROM fundraiser_votes WHERE fundraiser_id NOT IN (SELECT id FROM fundraisers)")
                 await conn.execute("UPDATE guild_config SET report_counter = 0 WHERE guild_id = $1", guild_id)
 
-    async def do_checkin(self, guild_id, user_id):
+    async def do_checkin(self, user_id, guild_ids):
         now = int(time.time())
-        today_start = now - (now % 86400)
-        yesterday_start = today_start - 86400
+        today = now // 86400
+
+        last_day = await self.get_counter(user_id, "checkin:last_day")
+        if last_day == today:
+            return {"already_checked_in": True}
+
+        prev_streak = await self.get_counter(user_id, "checkin:streak")
+        new_streak = prev_streak + 1 if last_day == today - 1 else 1
+        yuan_reward = min(250 + (new_streak - 1) * 100, 2000)
+        score_delta = round(min(2.0 + (new_streak - 1) * 0.1, 5.0), 2)
+
+        await asyncio.gather(
+            self.set_counter(user_id, "checkin:last_day", today),
+            self.set_counter(user_id, "checkin:streak", new_streak),
+        )
+
+        results = await asyncio.gather(*(
+            self._apply_checkin_guild(gid, user_id, now, new_streak, yuan_reward, score_delta)
+            for gid in guild_ids
+        ))
+        guild_results = [r for r in results if r]
+
+        return {
+            "already_checked_in": False, "streak": new_streak,
+            "yuan_reward": yuan_reward, "score_delta": score_delta,
+            "guilds_rewarded": len(guild_results), "guild_results": guild_results,
+        }
+
+    async def _apply_checkin_guild(self, guild_id, user_id, now, streak, yuan_reward, score_delta):
         async with self._pool.acquire() as conn:
             async with conn.transaction():
                 row = await conn.fetchrow(
-                    "SELECT last_checkin, checkin_streak, score FROM users WHERE guild_id = $1 AND user_id = $2",
+                    "SELECT score FROM users WHERE guild_id = $1 AND user_id = $2",
                     guild_id, user_id,
                 )
                 if not row:
                     return None
-                if row["last_checkin"] >= today_start:
-                    return {"already_checked_in": True}
-                new_streak = (row["checkin_streak"] + 1) if row["last_checkin"] >= yesterday_start else 1
-                yuan_reward = min(250 + (new_streak - 1) * 100, 2000)
-                score_delta = round(min(2.0 + (new_streak - 1) * 0.1, 5.0), 2)
                 old_score = row["score"]
                 new_score = min(1300.0, old_score + score_delta)
                 await conn.execute(
@@ -256,17 +278,13 @@ class CoreMixin:
                         highest_score          = GREATEST(highest_score, $4)
                     WHERE guild_id = $5 AND user_id = $6
                     """,
-                    now, new_streak, yuan_reward, new_score, guild_id, user_id,
+                    now, streak, yuan_reward, new_score, guild_id, user_id,
                 )
                 await conn.execute(
                     "INSERT INTO score_history (guild_id, user_id, delta, reason, timestamp) VALUES ($1, $2, $3, $4, $5)",
-                    guild_id, user_id, score_delta, f"daily check-in (streak: {new_streak})", now,
+                    guild_id, user_id, score_delta, f"daily check-in (streak: {streak})", now,
                 )
-        return {
-            "already_checked_in": False, "streak": new_streak,
-            "yuan_reward": yuan_reward, "score_delta": score_delta,
-            "old_score": old_score, "new_score": new_score,
-        }
+        return {"guild_id": guild_id, "old_score": old_score, "new_score": new_score}
 
     async def apply_score_decay(self):
         cutoff = int(time.time()) - (7 * 86400)
