@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Social Credit Leaderboards</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="/static/dashboard.css">
+</head>
+<body>
+
+<nav class="navbar px-4 py-3 mb-3">
+  <span class="navbar-brand">中华人民共和国 &nbsp;&middot;&nbsp; SOCIAL CREDIT SURVEILLANT ANALYTICAL DASHBOARD</span>
+  <div class="d-flex gap-3 align-items-center">
+    <a class="nav-link" href="/">STATS</a>
+    <a class="nav-link active" href="/leaderboards">LEADERBOARDS</a>
+    <a class="nav-link" href="/privacy">PRIVACY</a>
+  </div>
+</nav>
+
+<div class="container-fluid px-4">
+
+  <div class="row g-3 mb-3">
+
+    <div class="col-lg-3 col-md-6">
+      <div class="sc">
+        <div class="lbl">Top Balance</div>
+        <div class="sub" style="margin-bottom:.5rem">Current yuan across all servers</div>
+        <div id="lb-balance"><div class="sub">Loading…</div></div>
+      </div>
+    </div>
+
+    <div class="col-lg-3 col-md-6">
+      <div class="sc">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <div class="lbl mb-0">Top Earned</div>
+          <div class="btn-group btn-group-sm" id="lb-earned-range-group">
+            <button class="btn btn-run active" data-range="7d" onclick="_lbSetEarnedRange('7d')">7D</button>
+            <button class="btn btn-run" data-range="30d" onclick="_lbSetEarnedRange('30d')">30D</button>
+            <button class="btn btn-run" data-range="alltime" onclick="_lbSetEarnedRange('alltime')">ALL</button>
+          </div>
+        </div>
+        <div id="lb-earned"><div class="sub">Loading…</div></div>
+      </div>
+    </div>
+
+    <div class="col-lg-3 col-md-6">
+      <div class="sc">
+        <div class="lbl">Top Score</div>
+        <div class="sub" style="margin-bottom:.5rem">Average across all servers</div>
+        <div id="lb-score"><div class="sub">Loading…</div></div>
+      </div>
+    </div>
+
+    <div class="col-lg-3 col-md-6">
+      <div class="sc">
+        <div class="lbl">Top Citizens</div>
+        <div class="sub" style="margin-bottom:.5rem">Score + balance composite</div>
+        <div id="lb-citizens"><div class="sub">Loading…</div></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="sub" style="text-align:center;padding:.5rem 0 1.5rem">
+    All names are anonymized pseudonyms &nbsp;&middot;&nbsp; Use <code>/globalrank visibility on</code> in Discord to opt in
+  </div>
+
+</div>
+
+<footer class="site-footer">
+  Made with <span class="footer-heart">&hearts;</span> by saguny &nbsp;&middot;&nbsp;
+  <a href="https://discord.gg/invite/k4W6YAPYhC" target="_blank" rel="noopener">Support Server</a> &nbsp;&middot;&nbsp;
+  <a href="https://discord.com/oauth2/authorize?client_id=856163780265902151&permissions=2416438352&integration_type=0&scope=bot" target="_blank" rel="noopener">Invite Bot</a> &nbsp;&middot;&nbsp;
+  <a href="/privacy">Privacy Policy</a>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function setHtml(id, html) { const el = document.getElementById(id); if (el) el.innerHTML = html; }
+function fmt(n) { return Number(n).toLocaleString(); }
+
+let _lbData = null;
+let _lbEarnedRange = '7d';
+
+function _lbRankCls(i) {
+  return i === 0 ? 'lb-rank gold' : i === 1 ? 'lb-rank silver' : i === 2 ? 'lb-rank bronze' : 'lb-rank';
+}
+
+function _lbRow(i, name, valHtml, subHtml) {
+  const sub = subHtml ? ` <span class="lb-val-sub">${subHtml}</span>` : '';
+  return `<div class="lb-row">
+    <span class="${_lbRankCls(i)}">#${i + 1}</span>
+    <span class="lb-name">${name}</span>
+    <span class="lb-val">${valHtml}</span>${sub}
+  </div>`;
+}
+
+function _lbSetEarnedRange(range) {
+  _lbEarnedRange = range;
+  document.querySelectorAll('#lb-earned-range-group button').forEach(b => {
+    b.classList.toggle('active', b.dataset.range === range);
+  });
+  if (_lbData) _renderLbEarned(range);
+}
+
+function _renderLbBalance() {
+  const rows = _lbData.top_balance || [];
+  setHtml('lb-balance', rows.length
+    ? rows.map((r, i) => _lbRow(i, r.user, '¥' + fmt(r.yuan))).join('')
+    : '<div class="sub">No data yet</div>');
+}
+
+function _renderLbEarned(range) {
+  const rows = (_lbData.top_earned || {})[range] || [];
+  setHtml('lb-earned', rows.length
+    ? rows.map((r, i) => _lbRow(i, r.user, '¥' + fmt(r.earned))).join('')
+    : '<div class="sub">No data yet</div>');
+}
+
+function _renderLbScore() {
+  const rows = _lbData.top_score || [];
+  setHtml('lb-score', rows.length
+    ? rows.map((r, i) => _lbRow(i, r.user, r.score.toFixed(2))).join('')
+    : '<div class="sub">No data yet</div>');
+}
+
+function _renderLbCitizens() {
+  const rows = _lbData.top_citizens || [];
+  setHtml('lb-citizens', rows.length
+    ? rows.map((r, i) => _lbRow(i, r.user, r.score.toFixed(2), '¥' + fmt(r.yuan))).join('')
+    : '<div class="sub">No data yet</div>');
+}
+
+async function loadLeaderboard() {
+  try {
+    const res = await fetch('/api/leaderboard');
+    if (!res.ok) throw new Error(res.status);
+    _lbData = await res.json();
+    _renderLbBalance();
+    _renderLbEarned(_lbEarnedRange);
+    _renderLbScore();
+    _renderLbCitizens();
+  } catch (e) {
+    ['lb-balance','lb-earned','lb-score','lb-citizens'].forEach(id =>
+      setHtml(id, '<div class="sub">Failed to load</div>'));
+  }
+}
+
+document.addEventListener('DOMContentLoaded', loadLeaderboard);
+</script>
+</body>
+</html>

@@ -14,6 +14,7 @@
   <span class="navbar-brand">中华人民共和国 &nbsp;&middot;&nbsp; SOCIAL CREDIT SURVEILLANT ANALYTICAL DASHBOARD</span>
   <div class="d-flex gap-3 align-items-center">
     <a class="nav-link active" href="/">STATS</a>
+    <a class="nav-link" href="/leaderboards">LEADERBOARDS</a>
     <a class="nav-link" href="/privacy">PRIVACY</a>
     <span class="refresh-meta" id="last-updated"></span>
   </div>
@@ -117,9 +118,6 @@
     </li>
     <li class="nav-item" role="presentation">
       <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-scores" type="button">Scores</button>
-    </li>
-    <li class="nav-item" role="presentation">
-      <button class="nav-link" id="tab-leaderboards-btn" data-bs-toggle="tab" data-bs-target="#tab-leaderboards" type="button">Leaderboards</button>
     </li>
   </ul>
 
@@ -338,50 +336,6 @@
       </div>
     </div>
 
-    <div class="tab-pane fade" id="tab-leaderboards" role="tabpanel">
-      <div class="row g-3">
-
-        <div class="col-lg-3 col-md-6">
-          <div class="sc">
-            <div class="lbl">Top Balance</div>
-            <div class="sub" style="margin-bottom:.5rem">Current yuan across all servers</div>
-            <div id="lb-balance"><div class="sub">Loading…</div></div>
-          </div>
-        </div>
-
-        <div class="col-lg-3 col-md-6">
-          <div class="sc">
-            <div class="d-flex align-items-center justify-content-between mb-2">
-              <div class="lbl mb-0">Top Earned</div>
-              <div class="btn-group btn-group-sm" id="lb-earned-range-group">
-                <button class="btn btn-run active" data-range="7d" onclick="_lbSetEarnedRange('7d')">7D</button>
-                <button class="btn btn-run" data-range="30d" onclick="_lbSetEarnedRange('30d')">30D</button>
-                <button class="btn btn-run" data-range="alltime" onclick="_lbSetEarnedRange('alltime')">ALL</button>
-              </div>
-            </div>
-            <div id="lb-earned"><div class="sub">Loading…</div></div>
-          </div>
-        </div>
-
-        <div class="col-lg-3 col-md-6">
-          <div class="sc">
-            <div class="lbl">Top Score</div>
-            <div class="sub" style="margin-bottom:.5rem">Average across all servers</div>
-            <div id="lb-score"><div class="sub">Loading…</div></div>
-          </div>
-        </div>
-
-        <div class="col-lg-3 col-md-6">
-          <div class="sc">
-            <div class="lbl">Top Citizens</div>
-            <div class="sub" style="margin-bottom:.5rem">Score + balance composite</div>
-            <div id="lb-citizens"><div class="sub">Loading…</div></div>
-          </div>
-        </div>
-
-      </div>
-      <div class="sub" style="margin-top:.9rem;text-align:center">All names are anonymized pseudonyms &nbsp;·&nbsp; Use <code>/globalrank visibility on</code> in Discord to opt in</div>
-    </div>
 
   </div>
 

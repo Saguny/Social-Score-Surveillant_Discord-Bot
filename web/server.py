@@ -145,6 +145,10 @@ async def _handle_privacy(request):
     return web.Response(text=_load_template('privacy.html'), content_type='text/html')
 
 
+async def _handle_leaderboards_page(request):
+    return web.Response(text=_load_template('leaderboards.html'), content_type='text/html')
+
+
 _BOT_COMMANDS = {"sync", "guilds", "reload", "restart", "shutdown"}
 
 
@@ -437,6 +441,7 @@ async def start_web_server(db):
     app.router.add_post("/api/auth", _require_admin_ip(_handle_auth))
     app.router.add_get("/", _rate_limit_public(_handle_index))
     app.router.add_get("/privacy", _rate_limit_public(_handle_privacy))
+    app.router.add_get("/leaderboards", _rate_limit_public(_handle_leaderboards_page))
     app.router.add_get("/admin", _require_admin(_handle_admin))
     app.router.add_post("/api/admin/command", _require_admin(_handle_admin_command))
     app.router.add_get("/api/stats", _rate_limit_public(_handle_stats))
