@@ -80,7 +80,7 @@ class CreditCommandTree(discord.app_commands.CommandTree):
         await super().call(interaction)
 
     async def on_error(self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError) -> None:
-        cause = getattr(error, "__cause__", error)
+        cause = error.__cause__ or error
         if isinstance(cause, discord.Forbidden):
             missing = []
             if interaction.guild:
@@ -93,7 +93,8 @@ class CreditCommandTree(discord.app_commands.CommandTree):
             else:
                 msg = "The bot lacks a required permission for this action."
         else:
-            print(f"[error] /{getattr(error, 'command', None) and error.command.qualified_name}: {cause!r}")
+            qualified_name = interaction.command.qualified_name if interaction.command else None
+            print(f"[error] /{qualified_name}: {cause!r}")
             msg = "An internal error occurred. Please try again."
         try:
             if interaction.response.is_done():

@@ -65,10 +65,14 @@ class StatsMixin:
 
     async def get_yuan_graph_data(self, guild_id: int, user_id: int, days: int = 30):
         cutoff = int(time.time()) - (days * 86400)
-        return await self._pool.fetch(
-            "SELECT day, yuan FROM daily_yuan_snapshots WHERE guild_id = $1 AND user_id = $2 AND day > $3 ORDER BY day",
-            guild_id, user_id, cutoff,
+        rows, user = await asyncio.gather(
+            self._pool.fetch(
+                "SELECT day, yuan FROM daily_yuan_snapshots WHERE guild_id = $1 AND user_id = $2 AND day > $3 ORDER BY day",
+                guild_id, user_id, cutoff,
+            ),
+            self._pool.fetchrow("SELECT yuan FROM users WHERE guild_id = $1 AND user_id = $2", guild_id, user_id),
         )
+        return {"rows": rows, "current_yuan": int(user["yuan"]) if user else 0}
 
     async def get_daily_stats(self, guild_id: int, user_id: int) -> dict:
         now = int(time.time())

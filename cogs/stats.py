@@ -494,11 +494,29 @@ async def _build_graph(db, guild_id: int, user_id: int, graph_type: str, display
         ]
 
     else:
-        rows = await db.get_yuan_graph_data(guild_id, user_id, days=days_back)
+        data = await db.get_yuan_graph_data(guild_id, user_id, days=days_back)
+        rows = data["rows"]
+        current_yuan = data["current_yuan"]
         if not rows:
             return None
-        dates  = [datetime.datetime.fromtimestamp(r["day"], tz=datetime.timezone.utc) for r in rows]
-        values = [r["yuan"] for r in rows]
+
+        day_seconds = [
+            int((now - datetime.timedelta(days=days_back - i)).replace(hour=0, minute=0, second=0, microsecond=0).timestamp())
+            for i in range(days_back + 1)
+        ]
+        snap_by_day = {r["day"]: r["yuan"] for r in rows}
+        first_known = rows[0]["yuan"]
+
+        values = []
+        last_known = first_known
+        for ts in day_seconds:
+            if ts in snap_by_day:
+                last_known = snap_by_day[ts]
+            values.append(last_known)
+        if day_seconds[-1] not in snap_by_day:
+            values[-1] = current_yuan
+
+        dates = [datetime.datetime.fromtimestamp(ts, tz=datetime.timezone.utc) for ts in day_seconds]
         ylabel = "Yuan (¥)"
         line_color = "#FFD700"
         fill_color = "#FFD70022"
@@ -537,13 +555,13 @@ async def _build_graph(db, guild_id: int, user_id: int, graph_type: str, display
     ax.margins(x=0.01)
     ax.plot(dates, values, color=line_color, linewidth=2, zorder=3)
     
-    ax.fill_between(dates, values, y_lo + (padding * 0.1), color=fill_color, zorder=2)
+    ax.fill_between(dates, values, y_lo, color=fill_color, zorder=2)
 
     for y_val, color, style, label in ref_lines:
         ax.axhline(y=y_val, color=color, linestyle=style, linewidth=1, alpha=0.6, label=label)
 
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %d"))
-    ax.xaxis.set_major_locator(mdates.WeekdayLocator(interval=1))
+    ax.xaxis.set_major_locator(mdates.DayLocator(interval=max(1, days_back // 6)))
     fig.autofmt_xdate()
 
     ax.set_ylabel(ylabel, color="#aaaaaa", fontsize=9)
