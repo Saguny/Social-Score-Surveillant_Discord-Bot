@@ -34,15 +34,15 @@
 
     <div class="col-lg-3 col-md-6">
       <div class="sc">
-        <div class="d-flex align-items-center justify-content-between mb-1">
-          <div class="lbl mb-0">Top Earned</div>
+        <div class="lbl">Top Earned</div>
+        <div class="d-flex align-items-center justify-content-between" style="margin-bottom:.5rem">
+          <div class="sub mb-0">Yuan earned over time</div>
           <div class="btn-group btn-group-sm" id="lb-earned-range-group">
             <button class="btn btn-run active" data-range="7d" onclick="_lbSetEarnedRange('7d')">7D</button>
             <button class="btn btn-run" data-range="30d" onclick="_lbSetEarnedRange('30d')">30D</button>
             <button class="btn btn-run" data-range="alltime" onclick="_lbSetEarnedRange('alltime')">ALL</button>
           </div>
         </div>
-        <div class="sub" style="margin-bottom:.5rem">Total yuan earned over a specific period of time</div>
         <div id="lb-earned"><div class="sub">Loading…</div></div>
       </div>
     </div>
