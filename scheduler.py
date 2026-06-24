@@ -1,7 +1,7 @@
 import os
 import asyncio
 from discord.ext import commands
-from bot import intents, _decay_task, _rotate_presence_task, _guild_notify_listener, console_loop
+from bot import intents, _decay_task, _rotate_presence_task, console_loop
 from database.db import Database
 from infra.run_mode import SHARD_COUNT
 
@@ -52,7 +52,6 @@ class SchedulerBot(commands.Bot):
         await self.load_extension("cogs.admin_rpc_scheduler")
         asyncio.create_task(_decay_task(self))
         asyncio.create_task(_rotate_presence_task(self))
-        asyncio.create_task(_guild_notify_listener(self))
         self.loop.create_task(console_loop(self))
 
     async def on_command_error(self, ctx, error):
