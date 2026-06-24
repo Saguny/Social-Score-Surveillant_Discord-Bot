@@ -19,9 +19,10 @@ class RanksMixin:
                 rank_entered_at = (row["rank_entered_at"] or 0) if row else 0
                 eligible = prior == 0 or (now - rank_entered_at) >= 30 * 86400
                 if eligible:
+                    net, _tax = await self._credit_yuan_taxed(conn, guild_id, user_id, yuan_amount)
                     await conn.execute(
-                        "UPDATE users SET yuan = GREATEST(0, yuan + $1), total_yuan_earned = total_yuan_earned + $1 WHERE guild_id = $2 AND user_id = $3",
-                        yuan_amount, guild_id, user_id,
+                        "UPDATE users SET yuan = GREATEST(0, yuan + $1), total_yuan_earned = total_yuan_earned + $4 WHERE guild_id = $2 AND user_id = $3",
+                        net, guild_id, user_id, yuan_amount,
                     )
                     await conn.execute(
                         "INSERT INTO transactions (guild_id, user_id, item_id, cost, timestamp) VALUES ($1, $2, $3, $4, $5)",

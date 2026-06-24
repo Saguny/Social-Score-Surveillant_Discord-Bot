@@ -196,6 +196,10 @@ class Guide(commands.Cog):
         e3.add_field(name="/stats [citizen]",        value="Full breakdown across 3 pages: Overview (score, rank, trends, rank streak · total days at rank), Social (endorsements, rebukes, reports), Economy (yuan, items, lottery stats, check-in streak).", inline=False)
         e3.add_field(name="/daily_report [citizen]",  value="Today's score activity for any citizen: positive, negative, net change, message counts (positive/negative/neutral), and yuan compared to yesterday.", inline=False)
         e3.add_field(name="/leaderboard",            value="Rankings across 5 pages: Score, Economy, Activity, Social, and Markets (portfolio value and realized P&L).", inline=False)
+        e3.add_field(name="/globalrank me",           value="Your cross-server standing: total yuan earned, average score, and your global rank position among all citizens.", inline=False)
+        e3.add_field(name="/globalrank top",          value="Global leaderboard with 3 tabs: **Top Yuan** (Past 7 Days / Past 30 Days / All-Time window dropdown), **Top Score** (average score across all servers), **Top Citizens** (composite avg score + total yuan). Names are hidden by default.", inline=False)
+        e3.add_field(name="/globalrank visibility <on|off>", value="Show or hide your name on the global leaderboard. Hidden by default.", inline=False)
+        e3.add_field(name="/prestige",                value="When your score reaches **1290**, sacrifice it back to 750 and earn a prestige star displayed next to your name globally. Yuan balance resets to 0. No cooldown — reaching 1290 again is the only gate.", inline=False)
         e3.add_field(name="/state_report",           value="Server-wide report: biggest rise/fall, top informant, yuan in circulation, avg score.", inline=False)
         e3.add_field(name="/graph <score|yuan> [citizen]", value="Generate a 30-day trend graph for score or yuan. Yuan graph populates once per day.", inline=False)
         e3.add_field(name="/checkin",                value="Perform your daily check-in. Earns Yuan and a small score bump on every server you share with the bot. Streak increases daily reward up to ¥2,000.", inline=False)
@@ -212,7 +216,10 @@ class Guide(commands.Cog):
             name="Earning Yuan",
             value=(
                 "You earn ¥10 per message automatically. Check-ins and propaganda victories are additional sources.\n"
-                f"Members of the [support server]({SUPPORT_URL}) earn +15% Yuan per message, checked live, leave and it switches off."
+                "Messages that trigger a structural penalty (repeated or excessive caps) earn **¥0** that message.\n"
+                "After **25** yuan-earning messages per day, further messages pay **25%** of normal. Resets at midnight UTC.\n"
+                f"Members of the [support server]({SUPPORT_URL}) earn +15% yuan per message and are exempt from the daily diminishing curve.\n"
+                "**Wealth tax:** When your balance is ¥100,000 or above, 10% of every yuan credit is redirected to the Bureau Treasury."
             ),
             inline=False,
         )
@@ -515,14 +522,19 @@ class Guide(commands.Cog):
 
     @app_commands.command(name="decree", description="Receive an official proclamation from the Bureau")
     async def decree(self, interaction: discord.Interaction):
-        guild_decrees = await self.bot.db.get_guild_decrees(interaction.guild.id, limit=10)
-        guild_pool = [d["content"] for d in guild_decrees] if guild_decrees else []
-        xi_pool = self._quotes or FALLBACK_DECREES
-        pool = guild_pool + xi_pool
+        if random.random() < 0.15:
+            treasury_total = await self.bot.db.get_treasury_total()
+            description = f"*The Bureau Treasury holds ¥{treasury_total:,} in seized assets, awaiting redistribution to the deserving.*"
+        else:
+            guild_decrees = await self.bot.db.get_guild_decrees(interaction.guild.id, limit=10)
+            guild_pool = [d["content"] for d in guild_decrees] if guild_decrees else []
+            xi_pool = self._quotes or FALLBACK_DECREES
+            pool = guild_pool + xi_pool
+            description = f"*{random.choice(pool)}*"
         e = discord.Embed(
             color=0xCC0000,
             title="中华人民共和国社会信用局 · OFFICIAL DECREE",
-            description=f"*{random.choice(pool)}*",
+            description=description,
         )
         await interaction.response.send_message(embed=e)
 
@@ -635,6 +647,7 @@ class Guide(commands.Cog):
             value=(
                 f"**Servers · Citizens** · {guild_count} servers · {member_count:,} citizens\n"
                 f"**Yuan in Circulation** · ¥{stats['total_yuan']:,}\n"
+                f"**Bureau Treasury** · ¥{stats['treasury_total']:,}\n"
                 f"**Messages Rated** · {stats['total_messages']:,}\n"
                 f"**Highest · Lowest Score** · {stats['highest_score']:.2f} · {stats['lowest_score']:.2f}"
             ),

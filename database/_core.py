@@ -1,5 +1,8 @@
 import time
 import asyncio
+import math
+
+from config.rules import WEALTH_TAX_THRESHOLD, WEALTH_TAX_RATE, GLOBAL_YUAN_SNAPSHOT_RETENTION_DAYS
 
 
 class CoreMixin:
@@ -8,6 +11,26 @@ class CoreMixin:
             "INSERT INTO guild_config (guild_id) VALUES ($1) ON CONFLICT (guild_id) DO NOTHING",
             guild_id,
         )
+
+    async def _credit_yuan_taxed(self, conn, guild_id, user_id, gross_amount):
+        if gross_amount <= 0:
+            return gross_amount, 0
+        row = await conn.fetchrow(
+            "SELECT yuan FROM users WHERE guild_id = $1 AND user_id = $2 FOR UPDATE",
+            guild_id, user_id,
+        )
+        old_yuan = row["yuan"] if row else 0
+        tax = math.floor(gross_amount * WEALTH_TAX_RATE) if old_yuan >= WEALTH_TAX_THRESHOLD else 0
+        if tax > 0:
+            await conn.execute(
+                "UPDATE bureau_treasury SET total = total + $1 WHERE id = 1",
+                tax,
+            )
+        return gross_amount - tax, tax
+
+    async def get_treasury_total(self) -> int:
+        row = await self._pool.fetchrow("SELECT total FROM bureau_treasury WHERE id = 1")
+        return row["total"] if row else 0
 
     async def register_user(self, guild_id, user_id):
         async with self._pool.acquire() as conn:
@@ -38,20 +61,21 @@ class CoreMixin:
         async with self._pool.acquire() as conn:
             async with conn.transaction():
                 await self._ensure_guild(conn, guild_id)
+                net, _tax = await self._credit_yuan_taxed(conn, guild_id, user_id, yuan)
                 return await conn.fetchrow(
                     """
                     INSERT INTO users (guild_id, user_id, score, highest_score, lowest_score,
                                        message_count, yuan, total_yuan_earned, has_chatted, last_active)
-                    VALUES ($1, $2, 750.0, 750.0, 750.0, 1, $3, $3, 1, $4)
+                    VALUES ($1, $2, 750.0, 750.0, 750.0, 1, $3, $5, 1, $4)
                     ON CONFLICT (guild_id, user_id) DO UPDATE SET
                         message_count     = users.message_count + 1,
                         yuan              = users.yuan + $3,
-                        total_yuan_earned = users.total_yuan_earned + $3,
+                        total_yuan_earned = users.total_yuan_earned + $5,
                         has_chatted       = 1,
                         last_active       = $4
                     RETURNING *
                     """,
-                    guild_id, user_id, yuan, now,
+                    guild_id, user_id, net, now, yuan,
                 )
 
     async def get_user(self, guild_id, user_id):
@@ -103,10 +127,13 @@ class CoreMixin:
 
     async def adjust_yuan(self, guild_id, user_id, amount):
         if amount > 0:
-            await self._pool.execute(
-                "UPDATE users SET yuan = GREATEST(0, yuan + $3), total_yuan_earned = total_yuan_earned + $3 WHERE guild_id = $1 AND user_id = $2",
-                guild_id, user_id, amount,
-            )
+            async with self._pool.acquire() as conn:
+                async with conn.transaction():
+                    net, _tax = await self._credit_yuan_taxed(conn, guild_id, user_id, amount)
+                    await conn.execute(
+                        "UPDATE users SET yuan = GREATEST(0, yuan + $3), total_yuan_earned = total_yuan_earned + $4 WHERE guild_id = $1 AND user_id = $2",
+                        guild_id, user_id, net, amount,
+                    )
         else:
             await self._pool.execute(
                 "UPDATE users SET yuan = GREATEST(0, yuan + $3) WHERE guild_id = $1 AND user_id = $2",
@@ -132,10 +159,13 @@ class CoreMixin:
         )
 
     async def add_yuan(self, guild_id, user_id, amount):
-        await self._pool.execute(
-            "UPDATE users SET yuan = yuan + $1, total_yuan_earned = total_yuan_earned + $1 WHERE guild_id = $2 AND user_id = $3",
-            amount, guild_id, user_id,
-        )
+        async with self._pool.acquire() as conn:
+            async with conn.transaction():
+                net, _tax = await self._credit_yuan_taxed(conn, guild_id, user_id, amount)
+                await conn.execute(
+                    "UPDATE users SET yuan = yuan + $1, total_yuan_earned = total_yuan_earned + $2 WHERE guild_id = $3 AND user_id = $4",
+                    net, amount, guild_id, user_id,
+                )
 
     async def spend_yuan(self, guild_id, user_id, amount):
         row = await self._pool.fetchrow(
@@ -273,6 +303,7 @@ class CoreMixin:
                     return None
                 old_score = row["score"]
                 new_score = min(1300.0, old_score + score_delta)
+                net, _tax = await self._credit_yuan_taxed(conn, guild_id, user_id, yuan_reward)
                 await conn.execute(
                     """
                     UPDATE users SET
@@ -280,12 +311,12 @@ class CoreMixin:
                         checkin_streak         = $2,
                         longest_checkin_streak = GREATEST(longest_checkin_streak, $2),
                         yuan                   = yuan + $3,
-                        total_yuan_earned      = total_yuan_earned + $3,
+                        total_yuan_earned      = total_yuan_earned + $7,
                         score                  = $4,
                         highest_score          = GREATEST(highest_score, $4)
                     WHERE guild_id = $5 AND user_id = $6
                     """,
-                    now, streak, yuan_reward, new_score, guild_id, user_id,
+                    now, streak, net, new_score, guild_id, user_id, yuan_reward,
                 )
                 await conn.execute(
                     "INSERT INTO score_history (guild_id, user_id, delta, reason, timestamp) VALUES ($1, $2, $3, $4, $5)",
@@ -317,4 +348,24 @@ class CoreMixin:
             ON CONFLICT (guild_id, user_id, day) DO UPDATE SET yuan = EXCLUDED.yuan
             """,
             today,
+        )
+        await self.snapshot_global_yuan_earned()
+        await self.prune_global_yuan_earned_snapshots()
+
+    async def snapshot_global_yuan_earned(self):
+        today = int(time.time()) // 86400 * 86400
+        await self._pool.execute(
+            """
+            INSERT INTO global_yuan_earned_snapshots (user_id, day, total_yuan_earned)
+            SELECT user_id, $1, SUM(total_yuan_earned) FROM users GROUP BY user_id
+            ON CONFLICT (user_id, day) DO UPDATE SET total_yuan_earned = EXCLUDED.total_yuan_earned
+            """,
+            today,
+        )
+
+    async def prune_global_yuan_earned_snapshots(self):
+        cutoff = int(time.time()) // 86400 * 86400 - (GLOBAL_YUAN_SNAPSHOT_RETENTION_DAYS * 86400)
+        await self._pool.execute(
+            "DELETE FROM global_yuan_earned_snapshots WHERE day < $1",
+            cutoff,
         )

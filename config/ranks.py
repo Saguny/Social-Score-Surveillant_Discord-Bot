@@ -15,6 +15,14 @@ STARTING_SCORE     = 750.0
 EXECUTION_THRESHOLD = 610
 RANK_YUAN          = [1000 * (i + 1) ** 2 for i in range(len(RANKS))]
 
+PRESTIGE_THRESHOLD = 1290
+
+
+def prestige_stars(level: int) -> str:
+    if level <= 0:
+        return ""
+    return "".join("☆" if i % 2 else "★" for i in range(1, level + 1))
+
 
 def get_rank(score: float) -> dict:
     s = int(score)

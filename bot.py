@@ -152,6 +152,7 @@ _PRESENCE_CYCLE = [
     discord.Activity(type=discord.ActivityType.watching, name="/guide | /shop"),
     discord.Activity(type=discord.ActivityType.watching, name="/vote | /checkin"),
     discord.Activity(type=discord.ActivityType.watching, name="/botinfo | /invite"),
+    None,
 ]
 
 
@@ -160,7 +161,14 @@ async def _rotate_presence_task(bot: commands.Bot):
     while True:
         await asyncio.sleep(600)
         bot._presence_index = (bot._presence_index + 1) % len(_PRESENCE_CYCLE)
-        await bot.change_presence(activity=_PRESENCE_CYCLE[bot._presence_index])
+        activity = _PRESENCE_CYCLE[bot._presence_index]
+        if activity is None:
+            treasury_total = await bot.db.get_treasury_total()
+            activity = discord.Activity(
+                type=discord.ActivityType.watching,
+                name=f"¥{treasury_total:,} in the Bureau Treasury",
+            )
+        await bot.change_presence(activity=activity)
 
 
 def _fallback_guild_channel(guild: discord.Guild):
@@ -334,10 +342,14 @@ class SocialCreditBot(commands.AutoShardedBot):
 
     async def format_user_full(self, user, guild_id: int) -> str:
         if hasattr(user, 'id'):
+            from config.ranks import prestige_stars
+            prestige_level = await self.db.get_counter(user.id, "prestige_level")
+            star_suffix = f" {prestige_stars(prestige_level)}" if prestige_level > 0 else ""
+
             if user.id == OWNER_ID:
-                return f"{str(user)}{OWNER_BADGE}"
+                return f"{str(user)}{OWNER_BADGE}{star_suffix}"
             if user.id in self.ec_users:
-                return f"{str(user)} 【{_fullwidth('Winnie the Pooh')}】"
+                return f"{str(user)} 【{_fullwidth('Winnie the Pooh')}】{star_suffix}"
             from config.shop import COSMETIC_META
             from config.achievements import ACHIEVEMENTS
 
@@ -348,21 +360,22 @@ class SocialCreditBot(commands.AutoShardedBot):
 
             badge_set = set(await self.db.get_cosmetic_badges(user.id))
             if not badge_set:
-                return str(user)
+                return f"{str(user)}{star_suffix}"
 
             preferred = await self.db.get_badge_preference(user.id)
             if preferred and preferred in badge_set:
-                return f"{str(user)} {_suffix_for(preferred)}"
+                return f"{str(user)} {_suffix_for(preferred)}{star_suffix}"
 
             _ORDER = ["voter", "verified", "figure", "influencer", "associate", "asset"]
             for badge_id in reversed(_ORDER):
                 if badge_id in badge_set:
-                    return f"{str(user)} {_suffix_for(badge_id)}"
+                    return f"{str(user)} {_suffix_for(badge_id)}{star_suffix}"
 
             for data in ACHIEVEMENTS.values():
                 badge_id = data.get("badge")
                 if badge_id and badge_id in badge_set:
-                    return f"{str(user)} {_suffix_for(badge_id)}"
+                    return f"{str(user)} {_suffix_for(badge_id)}{star_suffix}"
+            return f"{str(user)}{star_suffix}"
         return str(user)
 
     async def process_commands(self, message: discord.Message) -> None:
@@ -400,6 +413,7 @@ class SocialCreditBot(commands.AutoShardedBot):
         await self.load_extension("cogs.achievements")
         await self.load_extension("cogs.badges")
         await self.load_extension("cogs.privacy")
+        await self.load_extension("cogs.prestige")
         if IS_SCHEDULER:
             asyncio.create_task(_decay_task(self))
             asyncio.create_task(_rotate_presence_task(self))

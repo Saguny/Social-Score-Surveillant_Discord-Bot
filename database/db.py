@@ -1,4 +1,5 @@
 import os
+import time
 import asyncpg
 
 from database._core        import CoreMixin
@@ -189,6 +190,13 @@ TABLES = [
     CREATE TABLE IF NOT EXISTS eternal_chairmen (
         user_id      BIGINT PRIMARY KEY,
         purchased_at BIGINT
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS bureau_treasury (
+        id    INTEGER PRIMARY KEY DEFAULT 1,
+        total BIGINT NOT NULL DEFAULT 0,
+        CONSTRAINT single_row CHECK (id = 1)
     )
     """,
 ]
@@ -424,3 +432,23 @@ class Database(
                     opted_out_at BIGINT NOT NULL
                 )
             """)
+            await conn.execute(
+                "INSERT INTO bureau_treasury (id, total) VALUES (1, 0) ON CONFLICT DO NOTHING"
+            )
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS global_yuan_earned_snapshots (
+                    user_id           BIGINT NOT NULL,
+                    day               BIGINT NOT NULL,
+                    total_yuan_earned BIGINT NOT NULL,
+                    PRIMARY KEY (user_id, day)
+                )
+            """)
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_global_yuan_earned_snapshots_user ON global_yuan_earned_snapshots (user_id, day)")
+            await conn.execute(
+                """
+                INSERT INTO global_yuan_earned_snapshots (user_id, day, total_yuan_earned)
+                SELECT user_id, $1, SUM(total_yuan_earned) FROM users GROUP BY user_id
+                ON CONFLICT (user_id, day) DO NOTHING
+                """,
+                int(time.time()) // 86400 * 86400,
+            )

@@ -14,6 +14,7 @@ from config.rules import (
     SENTIMENT_SCALE, SENTIMENT_NEUTRAL_THRESHOLD, NEUTRAL_BONUS, BANNED_TOPIC_PENALTY, YUAN_PER_MESSAGE,
     DAILY_MSG_SCORE_CAP, DAILY_NET_DIMINISHING_THRESHOLD, DAILY_MSG_DIMINISHING_FACTOR,
     SUPPORT_GUILD_ID, SUPPORT_YUAN_MULTIPLIER,
+    YUAN_DAILY_DIMINISHING_THRESHOLD, YUAN_DAILY_DIMINISHING_FACTOR,
 )
 from config.banned_topics import contains_banned_topic
 from cogs.achievements import unlock as unlock_achievement, check_milestone
@@ -84,6 +85,35 @@ class Scoring(commands.Cog):
         except Exception:
             return text
 
+    def _should_skip(self, message: discord.Message) -> bool:
+        content = message.content.lower().strip()
+        if content.startswith("http") and " " not in content:
+            return True
+        if not content and (message.attachments or message.stickers):
+            return True
+        return False
+
+    async def _apply_yuan_diminishing(self, guild_id: int, user_id: int, yuan_gain: int, exempt: bool) -> int:
+        key = f"yuandaily:{guild_id}:{user_id}"
+        now_ts = int(time.time())
+        today_start = now_ts // 86400 * 86400
+        seconds_to_midnight = 86400 - (now_ts % 86400)
+        raw = await cache_get(key)
+        if raw is None:
+            count = 0
+        else:
+            data = json.loads(raw)
+            count = data["count"] if data.get("day") == today_start else 0
+        count += 1
+        await cache_set(
+            key,
+            json.dumps({"day": today_start, "count": count}),
+            ex=seconds_to_midnight,
+        )
+        if not exempt and count > YUAN_DAILY_DIMINISHING_THRESHOLD:
+            yuan_gain = round(yuan_gain * YUAN_DAILY_DIMINISHING_FACTOR)
+        return yuan_gain
+
     def _structural_score(self, message: discord.Message) -> tuple[float, list[str]]:
         content = message.content.lower().strip()
         total = 0.0
@@ -142,15 +172,7 @@ class Scoring(commands.Cog):
             await cache_delete(streak_key)
         return delta, "positive sentiment" if compound > 0 else "negative sentiment"
 
-    async def _evaluate(self, message: discord.Message) -> tuple[float, str]:
-        content = message.content.lower().strip()
-
-        if content.startswith("http") and " " not in content:
-            return 0.0, "skipped"
-        if not content and (message.attachments or message.stickers):
-            return 0.0, "skipped"
-
-        struct_delta, reasons = self._structural_score(message)
+    async def _evaluate(self, message: discord.Message, struct_delta: float, reasons: list[str]) -> tuple[float, str]:
         sent_delta, sent_reason = await self._sentiment_score(
             message.guild.id, message.author.id, message.content
         )
@@ -331,15 +353,28 @@ class Scoring(commands.Cog):
         if await self.db.is_opted_out(uid):
             return
 
-        yuan_gain = YUAN_PER_MESSAGE
-        if self._is_support_member(uid):
-            yuan_gain = round(yuan_gain * SUPPORT_YUAN_MULTIPLIER)
+        skip = self._should_skip(message)
+        if skip:
+            struct_delta, reasons = 0.0, []
+        else:
+            struct_delta, reasons = self._structural_score(message)
+        is_flagged = bool(reasons)
+        is_support = self._is_support_member(uid)
+
+        yuan_gain = 0 if is_flagged else YUAN_PER_MESSAGE
+        if yuan_gain > 0:
+            if is_support:
+                yuan_gain = round(yuan_gain * SUPPORT_YUAN_MULTIPLIER)
+            yuan_gain = await self._apply_yuan_diminishing(gid, uid, yuan_gain, exempt=is_support)
         await self.db.tick_user(gid, uid, yuan_gain)
 
         if await self.db.get_effect(gid, uid, "freeze"):
             return
 
-        delta, reason = await self._evaluate(message)
+        if skip:
+            delta, reason = 0.0, "skipped"
+        else:
+            delta, reason = await self._evaluate(message, struct_delta, reasons)
 
         if "positive sentiment" in reason:
             val = await self.db.increment_counter(uid, "messages_positive")

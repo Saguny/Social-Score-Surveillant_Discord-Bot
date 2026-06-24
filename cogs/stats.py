@@ -15,6 +15,7 @@ from config.ranks import get_rank, EXECUTION_THRESHOLD
 from cogs.achievements import unlock as unlock_achievement
 
 STATS_THUMBNAIL = "attachment://ccpstats.png"
+GLOBALRANK_THUMBNAIL = "attachment://bureau.png"
 
 
 class Stats(commands.Cog):
@@ -27,6 +28,141 @@ class Stats(commands.Cog):
             await unlock_achievement(self.bot, guild, user, "first_10k_yuan", channel=channel)
         if total_earned >= 1_000_000:
             await unlock_achievement(self.bot, guild, user, "millionaire", channel=channel)
+
+    globalrank = app_commands.Group(name="globalrank", description="Cross-server social credit standing")
+
+    @globalrank.command(name="me", description="View your global rank across every server")
+    async def globalrank_me(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        rank = await self.db.get_global_user_rank(interaction.user.id)
+        if not rank:
+            await interaction.followup.send("You are not registered in any server yet.", ephemeral=True)
+            return
+
+        yuan_pct  = round(100 * rank["yuan_rank"] / rank["total_citizens"], 1)
+        score_pct = round(100 * rank["score_rank"] / rank["total_citizens"], 1)
+        visible   = await self.db.is_leaderboard_visible(interaction.user.id)
+
+        servers = rank["guild_count"]
+
+        embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 全球排名")
+        embed.set_author(name=await self.bot.format_user_full(interaction.user, interaction.guild.id), icon_url=interaction.user.display_avatar.url)
+        embed.add_field(name=f"TOTAL YUAN ACROSS {servers} SERVERS", value=f"¥{rank['total_yuan']:,}", inline=False)
+        embed.add_field(name="YUAN RANK",  value=f"#{rank['yuan_rank']} of {rank['total_citizens']} · top {yuan_pct}%", inline=False)
+        embed.add_field(name=f"AVG SCORE ACROSS {servers} SERVERS", value=f"{rank['avg_score']:.2f}", inline=False)
+        embed.add_field(name="SCORE RANK", value=f"#{rank['score_rank']} of {rank['total_citizens']} · top {score_pct}%", inline=False)
+        embed.set_thumbnail(url=GLOBALRANK_THUMBNAIL)
+        status_text = "Currently visible on the global leaderboard. Use `/globalrank visibility off` to hide your name" if visible else "Currently in private mode. Use `/globalrank visibility on` to show your name"
+        embed.set_footer(text=f"{status_text} · GLORY TO THE CCP!")
+        embed.timestamp = discord.utils.utcnow()
+        file = discord.File("images/bureau.png", filename="bureau.png")
+        await interaction.followup.send(embed=embed, file=file)
+
+    @globalrank.command(name="top", description="View the global social credit leaderboard")
+    async def globalrank_top(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+
+        yuan_week, yuan_month, yuan_all, score_data, citizens_rows = await asyncio.gather(
+            self.db.get_global_yuan_earned_leaderboard(7, 10),
+            self.db.get_global_yuan_earned_leaderboard(30, 10),
+            self.db.get_global_yuan_earned_leaderboard(None, 10),
+            self.db.get_global_leaderboard(10),
+            self.db.get_global_citizens_leaderboard(10),
+        )
+        yuan_by_window = {"week": yuan_week, "month": yuan_month, "all": yuan_all}
+        window_labels = {"week": "PAST 7 DAYS", "month": "PAST 30 DAYS", "all": "ALL-TIME"}
+        score_rows = score_data["by_score"]
+
+        uids = set()
+        for rows in (yuan_week, yuan_month, yuan_all, score_rows, citizens_rows):
+            uids |= {r["user_id"] for r in rows}
+
+        names = {}
+        for uid in uids:
+            if await self.db.is_leaderboard_visible(uid):
+                user = self.bot.get_user(uid)
+                if user is None:
+                    try:
+                        user = await self.bot.fetch_user(uid)
+                    except discord.HTTPException:
+                        user = None
+                names[uid] = user.name if user else "Unknown User"
+            else:
+                names[uid] = "Private User"
+
+        def build_embed(tab: str, window: str) -> discord.Embed:
+            embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 全球排行榜")
+            if tab == "yuan":
+                rows = yuan_by_window[window]
+                lines = [f"{i}. {names[r['user_id']]} · ¥{r['earned']:,}" for i, r in enumerate(rows, 1)]
+                embed.add_field(name=f"TOP YUAN EARNED (ALL SERVERS) · {window_labels[window]}", value="\n".join(lines) or "No data.", inline=False)
+            elif tab == "score":
+                lines = [f"{i}. {names[r['user_id']]} · {float(r['avg_score']):.2f}" for i, r in enumerate(score_rows, 1)]
+                embed.add_field(name="TOP SCORE (ALL SERVERS)", value="\n".join(lines) or "No data.", inline=False)
+            else:
+                lines = [f"{i}. {names[r['user_id']]} · {r['avg_score']:.2f} · ¥{r['total_yuan']:,}" for i, r in enumerate(citizens_rows, 1)]
+                embed.add_field(name="TOP CITIZENS (ALL SERVERS)", value="\n".join(lines) or "No data.", inline=False)
+            embed.set_thumbnail(url=GLOBALRANK_THUMBNAIL)
+            embed.set_footer(text="Some names hidden by default · /globalrank visibility on to display yours · GLORY TO THE CCP!")
+            embed.timestamp = discord.utils.utcnow()
+            return embed
+
+        tab_labels = {"yuan": "TOP YUAN", "score": "TOP SCORE", "citizens": "TOP CITIZENS"}
+
+        class GlobalRankTopView(discord.ui.View):
+            def __init__(self, tab: str, window: str):
+                super().__init__(timeout=60)
+                self.tab = tab
+                self.window = window
+                for tab_id, label in tab_labels.items():
+                    btn = discord.ui.Button(
+                        label=label,
+                        style=discord.ButtonStyle.primary if tab_id == tab else discord.ButtonStyle.secondary,
+                        custom_id=tab_id,
+                        row=0,
+                    )
+                    btn.callback = self.make_tab_callback(tab_id)
+                    self.add_item(btn)
+                if tab == "yuan":
+                    select = discord.ui.Select(
+                        placeholder=window_labels[window],
+                        options=[
+                            discord.SelectOption(label=label, value=win_id, default=win_id == window)
+                            for win_id, label in window_labels.items()
+                        ],
+                        row=1,
+                    )
+                    select.callback = self.make_window_callback()
+                    self.add_item(select)
+
+            def make_tab_callback(self, tab_id: str):
+                async def callback(btn_interaction: discord.Interaction):
+                    await btn_interaction.response.edit_message(embed=build_embed(tab_id, self.window), view=GlobalRankTopView(tab_id, self.window))
+                return callback
+
+            def make_window_callback(self):
+                async def callback(select_interaction: discord.Interaction):
+                    new_window = select_interaction.data["values"][0]
+                    await select_interaction.response.edit_message(embed=build_embed("yuan", new_window), view=GlobalRankTopView("yuan", new_window))
+                return callback
+
+            async def on_timeout(self):
+                for item in self.children:
+                    item.disabled = True
+
+        file = discord.File("images/bureau.png", filename="bureau.png")
+        await interaction.followup.send(embed=build_embed("yuan", "week"), view=GlobalRankTopView("yuan", "week"), file=file)
+
+    @globalrank.command(name="visibility", description="Choose whether your name appears on the global leaderboard")
+    @app_commands.describe(state="Show or hide your name on /globalrank top")
+    @app_commands.choices(state=[
+        app_commands.Choice(name="On (show my name)", value="on"),
+        app_commands.Choice(name="Off (stay hidden)", value="off"),
+    ])
+    async def globalrank_visibility(self, interaction: discord.Interaction, state: app_commands.Choice[str]):
+        await self.db.set_leaderboard_visible(interaction.user.id, state.value == "on")
+        msg = "Your name will now appear on `/globalrank top`." if state.value == "on" else "Your name is now hidden from `/globalrank top`."
+        await interaction.response.send_message(msg, ephemeral=True)
 
     @app_commands.command(name="score", description="View a citizen's social credit score")
     @app_commands.describe(citizen="Citizen to look up (defaults to yourself)")

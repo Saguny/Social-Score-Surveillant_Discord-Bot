@@ -383,6 +383,7 @@ function renderStats(d) {
   set('ec-items', fmt(d.total_items));
   set('ec-fx',    fmt(d.active_effects));
   set('ec-fr',    fmt(d.fundraiser_yuan));
+  set('ec-treasury', fmt(d.treasury_total || 0));
   set('ec-rich',  fmt(d.highest_yuan));
 
   const ltPlayed = d.lottery_played || 0;
@@ -492,6 +493,7 @@ const STAT_TIPS = {
   'ec-items':   'Total shop items purchased, all-time.',
   'ec-fx':      'Currently active shop effects (freezes, etc.) across all citizens.',
   'ec-fr':      'Total yuan raised through fundraisers, all-time.',
+  'ec-treasury': 'Total yuan seized by the Bureau wealth tax on high-balance citizens, all-time.',
   'tl-yuan-val':      'Yuan in circulation trend, sampled once daily — may lag the live "In Circulation" total above by up to 24h.',
   'tl-portfolio-val': 'Combined value of every citizen\'s stock and turbo holdings over the selected time range.',
   'ec-rich':    'The highest yuan balance currently held by any single citizen.',

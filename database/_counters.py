@@ -68,3 +68,9 @@ class CountersMixin:
         if not ts:
             return None
         return (int(time.time()) - ts) // 86400
+
+    async def is_leaderboard_visible(self, user_id: int) -> bool:
+        return bool(await self.get_counter(user_id, "leaderboard_visible"))
+
+    async def set_leaderboard_visible(self, user_id: int, visible: bool) -> None:
+        await self.set_counter(user_id, "leaderboard_visible", 1 if visible else 0)
