@@ -94,7 +94,7 @@ class CreditCommandTree(discord.app_commands.CommandTree):
                 msg = "The bot lacks a required permission for this action."
         else:
             qualified_name = interaction.command.qualified_name if interaction.command else None
-            print(f"[error] /{qualified_name}: {cause!r}")
+            print(f"[error] /{qualified_name}: {type(error).__name__}: {cause!r}")
             msg = "An internal error occurred. Please try again."
         try:
             if interaction.response.is_done():
