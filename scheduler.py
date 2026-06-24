@@ -33,6 +33,7 @@ class SchedulerBot(commands.Bot):
         )
         self.db = Database()
         self.ec_users: set[int] = set()
+        self._presence_index = 0
         self.start_time = None
 
     async def _tree_error(self, interaction, error):

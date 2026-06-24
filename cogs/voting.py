@@ -128,6 +128,9 @@ async def _reward_guild(
 
 async def process_vote(bot: commands.Bot, user_id: int):
     db = bot.db
+    if await db.is_opted_out(user_id):
+        print(f"[topgg vote] user {user_id} is opted out, ignoring vote")
+        return
     await db.log_topgg_vote(user_id)
     total_votes = await db.increment_counter(user_id, "topgg_votes_total")
     vote_streak, _ = await db.bump_daily_streak(user_id, "topgg_vote_streak")

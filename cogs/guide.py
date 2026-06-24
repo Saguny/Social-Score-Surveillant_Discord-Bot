@@ -82,6 +82,30 @@ class Guide(commands.Cog):
     def _build_guide_batches(self) -> list[list[discord.Embed]]:
         embeds = []
 
+        e0 = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · DATA AND PRIVACY")
+        e0.description = "Before anything else, citizens should know their rights regarding personal data."
+        e0.add_field(
+            name="/optout",
+            value=(
+                "Permanently opt out of the Social Credit System. This immediately stops your messages "
+                "from being scored and blocks you from using any other bot command. Every row of data tied "
+                "to your Discord ID is permanently deleted across every server the Bureau operates in: "
+                "score, yuan, transaction history, achievements, badges, fundraiser activity, stock "
+                "portfolios, vote history, and everything else. Requires confirmation before it takes effect."
+            ),
+            inline=False,
+        )
+        e0.add_field(
+            name="/optin",
+            value=(
+                "Reverses an opt-out. Since opting out permanently deletes your data, opting back in "
+                "re-registers you as a brand new citizen starting from scratch. Requires confirmation."
+            ),
+            inline=False,
+        )
+        e0.set_footer(text="GLORY TO THE CCP!")
+        embeds.append(e0)
+
         e1 = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · SCORING RULES")
         e1.description = (
             "Every message you send is evaluated by the Bureau. "
@@ -441,11 +465,12 @@ class Guide(commands.Cog):
         embeds.append(e9)
 
         return [
-            embeds[0:2],
-            embeds[2:4],
-            embeds[4:7],
-            embeds[7:9],
-            embeds[9:10],
+            embeds[0:1],
+            embeds[1:3],
+            embeds[3:5],
+            embeds[5:8],
+            embeds[8:10],
+            embeds[10:11],
         ]
 
     @app_commands.command(name="guide", description="Full guide to the Social Credit System")

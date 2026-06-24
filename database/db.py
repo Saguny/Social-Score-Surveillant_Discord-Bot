@@ -14,6 +14,7 @@ from database._voting      import VotingMixin
 from database._stats       import StatsMixin
 from database._achievements import AchievementsMixin
 from database._counters     import CountersMixin
+from database._privacy      import PrivacyMixin
 
 
 TABLES = [
@@ -207,6 +208,7 @@ class Database(
     StatsMixin,
     AchievementsMixin,
     CountersMixin,
+    PrivacyMixin,
 ):
     def __init__(self):
         self._dsn = os.getenv("DATABASE_URL", "")
@@ -414,5 +416,11 @@ class Database(
                     counter_key TEXT   NOT NULL,
                     value       BIGINT NOT NULL DEFAULT 0,
                     PRIMARY KEY (user_id, counter_key)
+                )
+            """)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS optouts (
+                    user_id      BIGINT PRIMARY KEY,
+                    opted_out_at BIGINT NOT NULL
                 )
             """)

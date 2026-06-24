@@ -14,6 +14,11 @@ from config.ranks import RANKS
 from infra.run_mode import IS_SCHEDULER, SHARD_COUNT, SHARD_IDS
 from infra.redis_client import get_redis
 from infra.guild_notify import GUILD_NOTIFY_CHANNEL
+from config.privacy import (
+    OPTOUT_ALLOWED_SLASH_COMMANDS,
+    OPTOUT_ALLOWED_PREFIX_COMMANDS,
+    OPTOUT_BLOCKED_MESSAGE,
+)
 
 OWNER_ID = 544810950952353823
 OWNER_BADGE = " | 𝔻𝕖𝕧𝕖𝕝𝕠𝕡𝕖𝕣 "
@@ -67,6 +72,11 @@ class CreditCommandTree(discord.app_commands.CommandTree):
         if not await _check_cmd_cooldown(interaction.user.id):
             await interaction.response.send_message("Slow down, citizen.", ephemeral=True)
             return
+        qualified_name = interaction.command.qualified_name if interaction.command else None
+        if qualified_name not in OPTOUT_ALLOWED_SLASH_COMMANDS:
+            if await self.client.db.is_opted_out(interaction.user.id):
+                await interaction.response.send_message(OPTOUT_BLOCKED_MESSAGE, ephemeral=True)
+                return
         await super().call(interaction)
 
     async def on_error(self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError) -> None:
@@ -358,7 +368,15 @@ class SocialCreditBot(commands.AutoShardedBot):
         _current_user_id.set(message.author.id)
         if not await _check_cmd_cooldown(message.author.id):
             return
-        await super().process_commands(message)
+        ctx = await self.get_context(message)
+        if ctx.command and ctx.command.qualified_name not in OPTOUT_ALLOWED_PREFIX_COMMANDS:
+            if await self.db.is_opted_out(message.author.id):
+                try:
+                    await message.channel.send(OPTOUT_BLOCKED_MESSAGE)
+                except discord.Forbidden:
+                    pass
+                return
+        await self.invoke(ctx)
 
     async def close(self):
         await super().close()
@@ -380,6 +398,7 @@ class SocialCreditBot(commands.AutoShardedBot):
         await self.load_extension("cogs.voting")
         await self.load_extension("cogs.achievements")
         await self.load_extension("cogs.badges")
+        await self.load_extension("cogs.privacy")
         if IS_SCHEDULER:
             asyncio.create_task(_decay_task(self))
             asyncio.create_task(_rotate_presence_task(self))
@@ -391,8 +410,9 @@ class SocialCreditBot(commands.AutoShardedBot):
             self.start_time = datetime.now(timezone.utc)
         rank_names = {r["name"] for r in RANKS}
         exec_role_name = "Execution Date: Tomorrow"
+        opted_out = await self.db.get_all_optouts()
         for guild in self.guilds:
-            member_ids = [m.id for m in guild.members if not m.bot]
+            member_ids = [m.id for m in guild.members if not m.bot and m.id not in opted_out]
             await self.db.register_guild_members(guild.id, member_ids)
             if not self._synced_once:
                 self.tree.copy_global_to(guild=guild)
@@ -477,7 +497,7 @@ class SocialCreditBot(commands.AutoShardedBot):
             raise error
 
     async def on_member_join(self, member: discord.Member):
-        if not member.bot:
+        if not member.bot and not await self.db.is_opted_out(member.id):
             await self.db.register_user(member.guild.id, member.id)
 
 

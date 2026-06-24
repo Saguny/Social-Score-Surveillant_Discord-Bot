@@ -328,6 +328,9 @@ class Scoring(commands.Cog):
 
         gid, uid = message.guild.id, message.author.id
 
+        if await self.db.is_opted_out(uid):
+            return
+
         yuan_gain = YUAN_PER_MESSAGE
         if self._is_support_member(uid):
             yuan_gain = round(yuan_gain * SUPPORT_YUAN_MULTIPLIER)
