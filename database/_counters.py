@@ -93,6 +93,7 @@ class CountersMixin:
         from config.shop import COSMETIC_META
         from config.ranks import prestige_stars
         from config.achievements import ACHIEVEMENTS
+        from config.owner import OWNER_ID, OWNER_BADGE
 
         profile_rows = await self._pool.fetch(
             """
@@ -157,6 +158,10 @@ class CountersMixin:
         for uid, base in base_names.items():
             level = prestiges.get(uid, 0)
             stars = f" {prestige_stars(level)}" if level > 0 else ""
+
+            if uid == OWNER_ID:
+                result[uid] = f"{base}{OWNER_BADGE}{stars}"
+                continue
 
             if uid in ec_set:
                 result[uid] = f"{base} 【{_fw('Winnie the Pooh')}】{stars}"

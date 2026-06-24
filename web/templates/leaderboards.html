@@ -16,7 +16,7 @@
     <a class="nav-link" href="/">STATS</a>
     <a class="nav-link active" href="/leaderboards">LEADERBOARDS</a>
     <a class="nav-link" href="/privacy">PRIVACY</a>
-    <span class="sub" id="lb-updated" style="font-size:.72rem;opacity:.55;white-space:nowrap"></span>
+    <span class="refresh-meta" id="lb-updated"></span>
   </div>
 </nav>
 
@@ -35,12 +35,12 @@
     <div class="col-lg-3 col-md-6">
       <div class="sc">
         <div class="lbl">Top Earned</div>
-        <div class="d-flex align-items-center justify-content-between" style="margin-bottom:.5rem">
-          <div class="sub mb-0">Yuan earned over time</div>
-          <div class="btn-group btn-group-sm" id="lb-earned-range-group">
-            <button class="btn btn-run active" data-range="7d" onclick="_lbSetEarnedRange('7d')">7D</button>
-            <button class="btn btn-run" data-range="30d" onclick="_lbSetEarnedRange('30d')">30D</button>
-            <button class="btn btn-run" data-range="alltime" onclick="_lbSetEarnedRange('alltime')">ALL</button>
+        <div class="d-flex align-items-center justify-content-between sub" style="margin-bottom:.5rem">
+          <span>Yuan earned over time</span>
+          <div class="btn-group" id="lb-earned-range-group">
+            <button class="btn btn-run btn-compact active" data-range="7d" onclick="_lbSetEarnedRange('7d')">7D</button>
+            <button class="btn btn-run btn-compact" data-range="30d" onclick="_lbSetEarnedRange('30d')">30D</button>
+            <button class="btn btn-run btn-compact" data-range="alltime" onclick="_lbSetEarnedRange('alltime')">ALL</button>
           </div>
         </div>
         <div id="lb-earned"><div class="sub">Loading…</div></div>

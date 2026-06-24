@@ -19,9 +19,8 @@ from config.privacy import (
     OPTOUT_ALLOWED_PREFIX_COMMANDS,
     OPTOUT_BLOCKED_MESSAGE,
 )
+from config.owner import OWNER_ID, OWNER_BADGE
 
-OWNER_ID = 544810950952353823
-OWNER_BADGE = " | 𝔻𝕖𝕧𝕖𝕝𝕠𝕡𝕖𝕣 "
 OWNER_COLOR = 0xE6E6FA
 
 _current_user_id: ContextVar[int | None] = ContextVar("current_user_id", default=None)

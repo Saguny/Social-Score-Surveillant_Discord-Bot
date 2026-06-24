@@ -436,7 +436,10 @@ function renderStats(d) {
 
   document.getElementById('spinner').style.display = 'none';
   document.getElementById('main').style.display    = 'block';
-  set('last-updated', 'Updated '+new Date().toLocaleTimeString());
+  const _now = new Date();
+  const _ts = _now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  const _ds = _now.toLocaleDateString([], {month:'short', day:'numeric'});
+  set('last-updated', `Updated ${_ds} at ${_ts}`);
 }
 
 async function load() {
