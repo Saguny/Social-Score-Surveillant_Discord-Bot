@@ -35,7 +35,13 @@ class SchedulerBot(commands.Bot):
         self.ec_users: set[int] = set()
         self.start_time = None
 
+    async def _tree_error(self, interaction, error):
+        from discord.app_commands import CommandNotFound
+        if isinstance(error, CommandNotFound):
+            return
+
     async def setup_hook(self):
+        self.tree.on_error = self._tree_error
         await self.db.init()
         self.ec_users = await self.db.get_all_eternal_chairmen()
         await self.load_extension("cogs.propaganda_scheduler")
@@ -47,6 +53,10 @@ class SchedulerBot(commands.Bot):
         asyncio.create_task(_rotate_presence_task(self))
         asyncio.create_task(_guild_notify_listener(self))
         self.loop.create_task(console_loop(self))
+
+    async def on_command_error(self, ctx, error):
+        if isinstance(error, commands.CommandNotFound):
+            return
 
     async def on_ready(self):
         if self.start_time is None:
