@@ -51,6 +51,21 @@ class StatsMixin:
         )
         return round(sum(r["delta"] for r in rows), 2)
 
+    async def get_lifetime_score_stats(self, guild_id: int, user_id: int) -> dict:
+        row = await self._pool.fetchrow(
+            """
+            SELECT
+                COALESCE(SUM(delta) FILTER (WHERE delta > 0), 0) AS total_gained,
+                COALESCE(SUM(delta) FILTER (WHERE delta < 0), 0) AS total_lost
+            FROM score_history WHERE guild_id = $1 AND user_id = $2
+            """,
+            guild_id, user_id,
+        )
+        return {
+            "total_gained": round(float(row["total_gained"]), 2),
+            "total_lost":   round(float(row["total_lost"]),   2),
+        }
+
     async def get_score_graph_data(self, guild_id: int, user_id: int, days: int = 30):
         cutoff = int(time.time()) - (days * 86400)
         rows, user = await asyncio.gather(
@@ -267,7 +282,7 @@ class StatsMixin:
         }
 
     async def get_global_user_rank(self, user_id: int) -> dict | None:
-        cache_key = f"globalrank:user:{user_id}"
+        cache_key = f"globalrank:user:v2:{user_id}"
         cached = await cache_get(cache_key)
         if cached is not None:
             return json.loads(cached) if cached != "null" else None
@@ -275,15 +290,27 @@ class StatsMixin:
         row = await self._pool.fetchrow(
             """
             WITH agg AS (
-                SELECT user_id, SUM(yuan) AS total_yuan, AVG(score) AS avg_score, COUNT(*) AS guild_count
-                FROM users GROUP BY user_id
+                SELECT u.user_id,
+                       SUM(u.yuan) AS total_yuan,
+                       AVG(u.score) AS avg_score,
+                       COUNT(*) AS guild_count,
+                       SUM(COALESCE(u.total_yuan_earned, 0)) AS total_earned
+                FROM users u GROUP BY u.user_id
+            ),
+            with_prestige AS (
+                SELECT agg.*,
+                       COALESCE(pc.value, 0) AS prestige_level
+                FROM agg
+                LEFT JOIN user_counters pc ON pc.user_id = agg.user_id AND pc.counter_key = 'prestige_level'
             ),
             ranked AS (
-                SELECT user_id, total_yuan, avg_score, guild_count,
-                       RANK() OVER (ORDER BY total_yuan DESC) AS yuan_rank,
-                       RANK() OVER (ORDER BY avg_score DESC) AS score_rank,
+                SELECT user_id, total_yuan, avg_score, guild_count, total_earned, prestige_level,
+                       RANK() OVER (ORDER BY total_yuan DESC) AS balance_rank,
+                       RANK() OVER (ORDER BY total_earned DESC) AS earned_rank,
+                       RANK() OVER (ORDER BY avg_score DESC, prestige_level DESC) AS score_rank,
+                       RANK() OVER (ORDER BY avg_score DESC, total_yuan DESC, prestige_level DESC) AS citizens_rank,
                        COUNT(*) OVER () AS total_citizens
-                FROM agg
+                FROM with_prestige
             )
             SELECT * FROM ranked WHERE user_id = $1
             """,
@@ -294,10 +321,13 @@ class StatsMixin:
             return None
         result = {
             "total_yuan":     int(row["total_yuan"]),
+            "total_earned":   int(row["total_earned"]),
             "avg_score":      round(float(row["avg_score"]), 2),
             "guild_count":    int(row["guild_count"]),
-            "yuan_rank":      int(row["yuan_rank"]),
+            "balance_rank":   int(row["balance_rank"]),
+            "earned_rank":    int(row["earned_rank"]),
             "score_rank":     int(row["score_rank"]),
+            "citizens_rank":  int(row["citizens_rank"]),
             "total_citizens": int(row["total_citizens"]),
         }
         await cache_set(cache_key, json.dumps(result), ex=60)

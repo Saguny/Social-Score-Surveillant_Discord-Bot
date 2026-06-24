@@ -10,7 +10,7 @@ from aiohttp import web
 
 from web.cache import StatCache, format_event
 from web.sse import SSEHub
-from web.anonymize import redact_global_stats, using_fallback_salt
+from web.anonymize import redact_global_stats, pseudonym_user, using_fallback_salt
 from infra.redis_cache import cache_get, cache_set, cache_delete
 from infra.admin_rpc import call_admin_rpc, fire_admin_rpc
 
@@ -302,6 +302,36 @@ async def _handle_stats_timeline(request):
     return web.json_response(timeline)
 
 
+async def _handle_leaderboard(request):
+    db = request.app["db"]
+    earned_7d, earned_30d, earned_alltime, score_data, citizens = await asyncio.gather(
+        db.get_global_yuan_earned_leaderboard(7, 10),
+        db.get_global_yuan_earned_leaderboard(30, 10),
+        db.get_global_yuan_earned_leaderboard(None, 10),
+        db.get_global_leaderboard(10),
+        db.get_global_citizens_leaderboard(10),
+    )
+    return web.json_response({
+        "top_balance": [
+            {"user": pseudonym_user(r["user_id"]), "yuan": int(r["total_yuan"])}
+            for r in score_data["by_yuan"]
+        ],
+        "top_earned": {
+            "7d":      [{"user": pseudonym_user(r["user_id"]), "earned": r["earned"]} for r in earned_7d],
+            "30d":     [{"user": pseudonym_user(r["user_id"]), "earned": r["earned"]} for r in earned_30d],
+            "alltime": [{"user": pseudonym_user(r["user_id"]), "earned": r["earned"]} for r in earned_alltime],
+        },
+        "top_score": [
+            {"user": pseudonym_user(r["user_id"]), "score": round(float(r["avg_score"]), 2)}
+            for r in score_data["by_score"]
+        ],
+        "top_citizens": [
+            {"user": pseudonym_user(r["user_id"]), "score": round(float(r["avg_score"]), 2), "yuan": int(r["total_yuan"])}
+            for r in citizens
+        ],
+    })
+
+
 async def _handle_recent_events(request):
     db = request.app["db"]
     cache = request.app.get("cache")
@@ -412,6 +442,7 @@ async def start_web_server(db):
     app.router.add_get("/api/stats", _rate_limit_public(_handle_stats))
     app.router.add_get("/api/stats/timeline", _rate_limit_public(_handle_stats_timeline))
     app.router.add_get("/api/stats/recent-events", _rate_limit_public(_handle_recent_events))
+    app.router.add_get("/api/leaderboard", _rate_limit_public(_handle_leaderboard))
     app.router.add_get("/api/stream", _rate_limit_public(_handle_sse))
     app.router.add_get("/api/admin/topgg-votes", _require_admin(_handle_topgg_votes))
     app.router.add_get("/api/admin/guild-list", _require_admin(_handle_guild_list))

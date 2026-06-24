@@ -39,18 +39,39 @@ class Stats(commands.Cog):
             await interaction.followup.send("You are not registered in any server yet.", ephemeral=True)
             return
 
-        yuan_pct  = round(100 * rank["yuan_rank"] / rank["total_citizens"], 1)
-        score_pct = round(100 * rank["score_rank"] / rank["total_citizens"], 1)
-        visible   = await self.db.is_leaderboard_visible(interaction.user.id)
-
+        n = rank["total_citizens"]
         servers = rank["guild_count"]
+
+        def rank_line(r: int) -> str:
+            pct = round(100 * r / n, 1)
+            return f"#{r:,} of {n:,} · top {pct}%"
+
+        visible = await self.db.is_leaderboard_visible(interaction.user.id)
 
         embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 全球排名")
         embed.set_author(name=await self.bot.format_user_full(interaction.user, interaction.guild.id), icon_url=interaction.user.display_avatar.url)
-        embed.add_field(name=f"TOTAL YUAN ACROSS {servers} SERVERS", value=f"¥{rank['total_yuan']:,}", inline=False)
-        embed.add_field(name="YUAN RANK",  value=f"#{rank['yuan_rank']} of {rank['total_citizens']} · top {yuan_pct}%", inline=False)
-        embed.add_field(name=f"AVG SCORE ACROSS {servers} SERVERS", value=f"{rank['avg_score']:.2f}", inline=False)
-        embed.add_field(name="SCORE RANK", value=f"#{rank['score_rank']} of {rank['total_citizens']} · top {score_pct}%", inline=False)
+        embed.add_field(
+            name=f"BALANCE · {servers} SERVERS",
+            value=f"¥{rank['total_yuan']:,}\n{rank_line(rank['balance_rank'])}",
+            inline=True,
+        )
+        embed.add_field(
+            name=f"AVG SCORE · {servers} SERVERS",
+            value=f"{rank['avg_score']:.2f}\n{rank_line(rank['score_rank'])}",
+            inline=True,
+        )
+        embed.add_field(name="​", value="​", inline=True)
+        embed.add_field(
+            name="TOTAL EARNED (ALL-TIME)",
+            value=f"¥{rank['total_earned']:,}\n{rank_line(rank['earned_rank'])}",
+            inline=True,
+        )
+        embed.add_field(
+            name="TOP CITIZENS",
+            value=rank_line(rank["citizens_rank"]),
+            inline=True,
+        )
+        embed.add_field(name="​", value="​", inline=True)
         embed.set_thumbnail(url=GLOBALRANK_THUMBNAIL)
         status_text = "Currently visible on the global leaderboard. Use `/globalrank visibility off` to hide your name" if visible else "Currently in private mode. Use `/globalrank visibility on` to show your name"
         embed.set_footer(text=f"{status_text} · GLORY TO THE CCP!")
@@ -62,19 +83,21 @@ class Stats(commands.Cog):
     async def globalrank_top(self, interaction: discord.Interaction):
         await interaction.response.defer()
 
-        yuan_week, yuan_month, yuan_all, score_data, citizens_rows = await asyncio.gather(
+        yuan_week, yuan_month, yuan_all, score_data, citizens_rows, user_rank = await asyncio.gather(
             self.db.get_global_yuan_earned_leaderboard(7, 10),
             self.db.get_global_yuan_earned_leaderboard(30, 10),
             self.db.get_global_yuan_earned_leaderboard(None, 10),
             self.db.get_global_leaderboard(10),
             self.db.get_global_citizens_leaderboard(10),
+            self.db.get_global_user_rank(interaction.user.id),
         )
-        yuan_by_window = {"week": yuan_week, "month": yuan_month, "all": yuan_all}
+        balance_rows = score_data["by_yuan"]
+        earned_by_window = {"week": yuan_week, "month": yuan_month, "all": yuan_all}
         window_labels = {"week": "PAST 7 DAYS", "month": "PAST 30 DAYS", "all": "ALL-TIME"}
         score_rows = score_data["by_score"]
 
         uids = set()
-        for rows in (yuan_week, yuan_month, yuan_all, score_rows, citizens_rows):
+        for rows in (balance_rows, yuan_week, yuan_month, yuan_all, score_rows, citizens_rows):
             uids |= {r["user_id"] for r in rows}
 
         names = {}
@@ -91,15 +114,19 @@ class Stats(commands.Cog):
                 names[uid] = "Private User"
 
         tab_titles = {
-            "yuan":     "中华人民共和国社会信用局 · TOP YUAN",
-            "score":    "中华人民共和国社会信用局 · TOP SCORE",
-            "citizens": "中华人民共和国社会信用局 · TOP CITIZENS",
+            "balance": "中华人民共和国社会信用局 · TOP BALANCE",
+            "earned":  "中华人民共和国社会信用局 · TOP EARNED",
+            "score":   "中华人民共和国社会信用局 · TOP SCORE",
+            "citizens":"中华人民共和国社会信用局 · TOP CITIZENS",
         }
 
         def build_embed(tab: str, window: str) -> discord.Embed:
             embed = discord.Embed(color=0xCC0000, title=tab_titles[tab])
-            if tab == "yuan":
-                rows = yuan_by_window[window]
+            if tab == "balance":
+                lines = [f"{i}. {names[r['user_id']]} · ¥{int(r['total_yuan']):,}" for i, r in enumerate(balance_rows, 1)]
+                embed.add_field(name="TOP BALANCE (ALL SERVERS)", value="\n".join(lines) or "No data.", inline=False)
+            elif tab == "earned":
+                rows = earned_by_window[window]
                 lines = [f"{i}. {names[r['user_id']]} · ¥{r['earned']:,}" for i, r in enumerate(rows, 1)]
                 embed.add_field(name=f"TOP YUAN EARNED (ALL SERVERS) · {window_labels[window]}", value="\n".join(lines) or "No data.", inline=False)
             elif tab == "score":
@@ -108,12 +135,25 @@ class Stats(commands.Cog):
             else:
                 lines = [f"{i}. {names[r['user_id']]} · {r['avg_score']:.2f} · ¥{r['total_yuan']:,}" for i, r in enumerate(citizens_rows, 1)]
                 embed.add_field(name="TOP CITIZENS (ALL SERVERS)", value="\n".join(lines) or "No data.", inline=False)
+            if user_rank:
+                total = user_rank["total_citizens"]
+                def _pct(r: int) -> str:
+                    return f"#{r:,} of {total:,} · top {round(100 * r / total, 1)}%"
+                if tab == "balance":
+                    standing = f"{_pct(user_rank['balance_rank'])} · ¥{user_rank['total_yuan']:,}"
+                elif tab == "earned":
+                    standing = f"{_pct(user_rank['earned_rank'])} all-time · ¥{user_rank['total_earned']:,} earned"
+                elif tab == "score":
+                    standing = f"{_pct(user_rank['score_rank'])} · {user_rank['avg_score']:.2f} avg"
+                else:
+                    standing = _pct(user_rank["citizens_rank"])
+                embed.add_field(name="YOUR STANDING", value=standing, inline=False)
             embed.set_thumbnail(url=GLOBALRANK_THUMBNAIL)
             embed.set_footer(text="Some names hidden by default · /globalrank visibility on to display yours · GLORY TO THE CCP!")
             embed.timestamp = discord.utils.utcnow()
             return embed
 
-        tab_labels = {"yuan": "TOP YUAN", "score": "TOP SCORE", "citizens": "TOP CITIZENS"}
+        tab_labels = {"balance": "TOP BALANCE", "earned": "TOP EARNED", "score": "TOP SCORE", "citizens": "TOP CITIZENS"}
 
         class GlobalRankTopView(discord.ui.View):
             def __init__(self, tab: str, window: str):
@@ -129,7 +169,7 @@ class Stats(commands.Cog):
                     )
                     btn.callback = self.make_tab_callback(tab_id)
                     self.add_item(btn)
-                if tab == "yuan":
+                if tab == "earned":
                     select = discord.ui.Select(
                         placeholder=window_labels[window],
                         options=[
@@ -149,7 +189,7 @@ class Stats(commands.Cog):
             def make_window_callback(self):
                 async def callback(select_interaction: discord.Interaction):
                     new_window = select_interaction.data["values"][0]
-                    await select_interaction.response.edit_message(embed=build_embed("yuan", new_window), view=GlobalRankTopView("yuan", new_window))
+                    await select_interaction.response.edit_message(embed=build_embed("earned", new_window), view=GlobalRankTopView("earned", new_window))
                 return callback
 
             async def on_timeout(self):
@@ -157,7 +197,7 @@ class Stats(commands.Cog):
                     item.disabled = True
 
         file = discord.File("images/bureau.png", filename="bureau.png")
-        await interaction.followup.send(embed=build_embed("yuan", "week"), view=GlobalRankTopView("yuan", "week"), file=file)
+        await interaction.followup.send(embed=build_embed("balance", "week"), view=GlobalRankTopView("balance", "week"), file=file)
 
     @globalrank.command(name="visibility", description="Choose whether your name appears on the global leaderboard")
     @app_commands.describe(state="Show or hide your name on /globalrank top")
@@ -203,8 +243,11 @@ class Stats(commands.Cog):
             gid = ctx.guild.id
             user = await self.db.get_user(gid, target.id)
             rank = get_rank(user["score"])
-            trend_7d  = await self.db.get_score_trend(gid, target.id, 7)
-            trend_30d = await self.db.get_score_trend(gid, target.id, 30)
+            (trend_7d, trend_30d, lifetime) = await asyncio.gather(
+                self.db.get_score_trend(gid, target.id, 7),
+                self.db.get_score_trend(gid, target.id, 30),
+                self.db.get_lifetime_score_stats(gid, target.id),
+            )
 
             def trend_str(val):
                 if val > 0: return f"▲ +{val:.2f}"
@@ -213,15 +256,17 @@ class Stats(commands.Cog):
 
             embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 公民档案")
             embed.set_author(name=await self.bot.format_user_full(target, gid), icon_url=target.display_avatar.url)
-            embed.add_field(name="SCORE",     value=f"{user['score']:.2f}", inline=True)
-            embed.add_field(name="RANK",      value=rank["name"],            inline=True)
-            embed.add_field(name="YUAN",      value=f"¥{user['yuan']}",     inline=True)
-            embed.add_field(name="7D TREND",  value=trend_str(trend_7d),    inline=True)
-            embed.add_field(name="30D TREND", value=trend_str(trend_30d),   inline=True)
-            embed.add_field(name="MESSAGES",  value=str(user["message_count"]), inline=True)
-            embed.add_field(name="PEAK",      value=f"{user['highest_score']:.2f}", inline=True)
-            embed.add_field(name="LOW",       value=f"{user['lowest_score']:.2f}",  inline=True)
-            embed.add_field(name="ITEMS BOUGHT", value=str(user["items_bought"]), inline=True)
+            embed.add_field(name="SCORE",       value=f"{user['score']:.2f}",        inline=True)
+            embed.add_field(name="RANK",        value=rank["name"],                   inline=True)
+            embed.add_field(name="YUAN",        value=f"¥{user['yuan']}",            inline=True)
+            embed.add_field(name="7D TREND",    value=trend_str(trend_7d),            inline=True)
+            embed.add_field(name="30D TREND",   value=trend_str(trend_30d),           inline=True)
+            embed.add_field(name="MESSAGES",    value=str(user["message_count"]),     inline=True)
+            embed.add_field(name="PEAK",        value=f"{user['highest_score']:.2f}", inline=True)
+            embed.add_field(name="LOW",         value=f"{user['lowest_score']:.2f}",  inline=True)
+            embed.add_field(name="ITEMS BOUGHT", value=str(user["items_bought"]),     inline=True)
+            embed.add_field(name="SCORE GAINED", value=f"+{lifetime['total_gained']:.2f}", inline=True)
+            embed.add_field(name="SCORE LOST",   value=f"{lifetime['total_lost']:.2f}",    inline=True)
             embed.timestamp = discord.utils.utcnow()
         await ctx.send(embed=embed)
 
@@ -392,9 +437,12 @@ class Stats(commands.Cog):
         gid = interaction.guild.id
         user = await self.db.get_user(gid, target.id)
         rank = get_rank(user["score"])
-        trend_7d    = await self.db.get_score_trend(gid, target.id, 7)
-        trend_30d   = await self.db.get_score_trend(gid, target.id, 30)
-        rank_stats  = await self.db.get_rank_stats(gid, target.id, rank["name"])
+        trend_7d, trend_30d, rank_stats, lifetime = await asyncio.gather(
+            self.db.get_score_trend(gid, target.id, 7),
+            self.db.get_score_trend(gid, target.id, 30),
+            self.db.get_rank_stats(gid, target.id, rank["name"]),
+            self.db.get_lifetime_score_stats(gid, target.id),
+        )
         await self._check_yuan_milestones(interaction.guild, target, interaction.channel, user["total_yuan_earned"])
 
         def trend_str(val: float) -> str:
@@ -419,6 +467,8 @@ class Stats(commands.Cog):
             e.add_field(name="LOW",        value=f"{user['lowest_score']:.2f}",  inline=True)
             e.add_field(name="RANK STREAK",     value=f"{rank_stats['current_days']}d", inline=True)
             e.add_field(name="TOTAL AT RANK",   value=f"{rank_stats['total_days']}d",   inline=True)
+            e.add_field(name="SCORE GAINED",    value=f"+{lifetime['total_gained']:.2f}", inline=True)
+            e.add_field(name="SCORE LOST",      value=f"{lifetime['total_lost']:.2f}",   inline=True)
             if thumb_url:
                 e.set_thumbnail(url=thumb_url)
             e.timestamp = discord.utils.utcnow()
