@@ -47,9 +47,12 @@ class Stats(commands.Cog):
             return f"#{r:,} of {n:,} · top {pct}%"
 
         visible = await self.db.is_leaderboard_visible(interaction.user.id)
+        formatted_name = await self.bot.format_user_full(interaction.user, interaction.guild.id)
+        if visible:
+            await self.db.set_leaderboard_display_name(interaction.user.id, formatted_name)
 
         embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 全球排名")
-        embed.set_author(name=await self.bot.format_user_full(interaction.user, interaction.guild.id), icon_url=interaction.user.display_avatar.url)
+        embed.set_author(name=formatted_name, icon_url=interaction.user.display_avatar.url)
         embed.add_field(
             name=f"BALANCE · {servers} SERVERS",
             value=f"¥{rank['total_yuan']:,}\n{rank_line(rank['balance_rank'])}",
@@ -206,8 +209,12 @@ class Stats(commands.Cog):
         app_commands.Choice(name="Off (stay hidden)", value="off"),
     ])
     async def globalrank_visibility(self, interaction: discord.Interaction, state: app_commands.Choice[str]):
-        await self.db.set_leaderboard_visible(interaction.user.id, state.value == "on")
-        msg = "Your name will now appear on `/globalrank top`." if state.value == "on" else "Your name is now hidden from `/globalrank top`."
+        visible = state.value == "on"
+        await self.db.set_leaderboard_visible(interaction.user.id, visible)
+        if visible:
+            formatted_name = await self.bot.format_user_full(interaction.user, interaction.guild.id)
+            await self.db.set_leaderboard_display_name(interaction.user.id, formatted_name)
+        msg = "Your name will now appear on `/globalrank top` and the web leaderboard." if visible else "Your name is now hidden from `/globalrank top` and the web leaderboard."
         await interaction.response.send_message(msg, ephemeral=True)
 
     @app_commands.command(name="score", description="View a citizen's social credit score")

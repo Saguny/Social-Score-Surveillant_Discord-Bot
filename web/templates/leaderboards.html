@@ -16,6 +16,7 @@
     <a class="nav-link" href="/">STATS</a>
     <a class="nav-link active" href="/leaderboards">LEADERBOARDS</a>
     <a class="nav-link" href="/privacy">PRIVACY</a>
+    <span class="sub" id="lb-updated" style="font-size:.72rem;opacity:.55;white-space:nowrap"></span>
   </div>
 </nav>
 
@@ -35,6 +36,7 @@
       <div class="sc">
         <div class="d-flex align-items-center justify-content-between mb-2">
           <div class="lbl mb-0">Top Earned</div>
+          <div class="sub" style="margin-bottom:.5rem">Total yuan earned over a specific period of time</div>
           <div class="btn-group btn-group-sm" id="lb-earned-range-group">
             <button class="btn btn-run active" data-range="7d" onclick="_lbSetEarnedRange('7d')">7D</button>
             <button class="btn btn-run" data-range="30d" onclick="_lbSetEarnedRange('30d')">30D</button>
@@ -142,6 +144,12 @@ async function loadLeaderboard() {
     _renderLbEarned(_lbEarnedRange);
     _renderLbScore();
     _renderLbCitizens();
+    if (_lbData.generated_at) {
+      const d = new Date(_lbData.generated_at * 1000);
+      const ts = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+      const ds = d.toLocaleDateString([], {month:'short', day:'numeric'});
+      document.getElementById('lb-updated').textContent = `Updated ${ds} at ${ts}`;
+    }
   } catch (e) {
     ['lb-balance','lb-earned','lb-score','lb-citizens'].forEach(id =>
       setHtml(id, '<div class="sub">Failed to load</div>'));

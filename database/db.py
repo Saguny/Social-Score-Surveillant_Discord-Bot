@@ -452,3 +452,10 @@ class Database(
                 """,
                 int(time.time()) // 86400 * 86400,
             )
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS leaderboard_profiles (
+                    user_id      BIGINT PRIMARY KEY,
+                    display_name TEXT NOT NULL,
+                    updated_at   BIGINT NOT NULL
+                )
+            """)

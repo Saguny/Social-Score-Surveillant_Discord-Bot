@@ -74,3 +74,29 @@ class CountersMixin:
 
     async def set_leaderboard_visible(self, user_id: int, visible: bool) -> None:
         await self.set_counter(user_id, "leaderboard_visible", 1 if visible else 0)
+
+    async def set_leaderboard_display_name(self, user_id: int, display_name: str) -> None:
+        await self._pool.execute(
+            """
+            INSERT INTO leaderboard_profiles (user_id, display_name, updated_at)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (user_id) DO UPDATE
+                SET display_name = EXCLUDED.display_name, updated_at = EXCLUDED.updated_at
+            """,
+            user_id, display_name, int(time.time()),
+        )
+
+    async def get_leaderboard_display_names(self, user_ids: list) -> dict:
+        if not user_ids:
+            return {}
+        rows = await self._pool.fetch(
+            """
+            SELECT lp.user_id, lp.display_name
+            FROM leaderboard_profiles lp
+            JOIN user_counters uc
+              ON uc.user_id = lp.user_id AND uc.counter_key = 'leaderboard_visible'
+            WHERE lp.user_id = ANY($1) AND uc.value = 1
+            """,
+            user_ids,
+        )
+        return {r["user_id"]: r["display_name"] for r in rows}

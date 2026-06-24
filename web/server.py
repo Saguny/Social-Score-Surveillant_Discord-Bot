@@ -309,28 +309,39 @@ async def _handle_stats_timeline(request):
 async def _handle_leaderboard(request):
     db = request.app["db"]
     earned_7d, earned_30d, earned_alltime, score_data, citizens = await asyncio.gather(
-        db.get_global_yuan_earned_leaderboard(7, 10),
-        db.get_global_yuan_earned_leaderboard(30, 10),
-        db.get_global_yuan_earned_leaderboard(None, 10),
-        db.get_global_leaderboard(10),
-        db.get_global_citizens_leaderboard(10),
+        db.get_global_yuan_earned_leaderboard(7, 25),
+        db.get_global_yuan_earned_leaderboard(30, 25),
+        db.get_global_yuan_earned_leaderboard(None, 25),
+        db.get_global_leaderboard(25),
+        db.get_global_citizens_leaderboard(25),
     )
+    all_uids = list({
+        r["user_id"]
+        for rows in (earned_7d, earned_30d, earned_alltime, score_data["by_yuan"], score_data["by_score"], citizens)
+        for r in rows
+    })
+    display_names = await db.get_leaderboard_display_names(all_uids)
+
+    def _name(uid):
+        return display_names.get(uid) or pseudonym_user(uid)
+
     return web.json_response({
+        "generated_at": int(time.time()),
         "top_balance": [
-            {"user": pseudonym_user(r["user_id"]), "yuan": int(r["total_yuan"])}
+            {"user": _name(r["user_id"]), "yuan": int(r["total_yuan"])}
             for r in score_data["by_yuan"]
         ],
         "top_earned": {
-            "7d":      [{"user": pseudonym_user(r["user_id"]), "earned": r["earned"]} for r in earned_7d],
-            "30d":     [{"user": pseudonym_user(r["user_id"]), "earned": r["earned"]} for r in earned_30d],
-            "alltime": [{"user": pseudonym_user(r["user_id"]), "earned": r["earned"]} for r in earned_alltime],
+            "7d":      [{"user": _name(r["user_id"]), "earned": r["earned"]} for r in earned_7d],
+            "30d":     [{"user": _name(r["user_id"]), "earned": r["earned"]} for r in earned_30d],
+            "alltime": [{"user": _name(r["user_id"]), "earned": r["earned"]} for r in earned_alltime],
         },
         "top_score": [
-            {"user": pseudonym_user(r["user_id"]), "score": round(float(r["avg_score"]), 2)}
+            {"user": _name(r["user_id"]), "score": round(float(r["avg_score"]), 2)}
             for r in score_data["by_score"]
         ],
         "top_citizens": [
-            {"user": pseudonym_user(r["user_id"]), "score": round(float(r["avg_score"]), 2), "yuan": int(r["total_yuan"])}
+            {"user": _name(r["user_id"]), "score": round(float(r["avg_score"]), 2), "yuan": int(r["total_yuan"])}
             for r in citizens
         ],
     })
