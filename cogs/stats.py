@@ -47,12 +47,11 @@ class Stats(commands.Cog):
             return f"#{r:,} of {n:,} · top {pct}%"
 
         visible = await self.db.is_leaderboard_visible(interaction.user.id)
-        formatted_name = await self.bot.format_user_full(interaction.user, interaction.guild.id)
         if visible:
-            await self.db.set_leaderboard_display_name(interaction.user.id, formatted_name)
+            await self.db.set_leaderboard_display_name(interaction.user.id, str(interaction.user))
 
         embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 全球排名")
-        embed.set_author(name=formatted_name, icon_url=interaction.user.display_avatar.url)
+        embed.set_author(name=await self.bot.format_user_full(interaction.user, interaction.guild.id), icon_url=interaction.user.display_avatar.url)
         embed.add_field(
             name=f"BALANCE · {servers} SERVERS",
             value=f"¥{rank['total_yuan']:,}\n{rank_line(rank['balance_rank'])}",
@@ -212,8 +211,7 @@ class Stats(commands.Cog):
         visible = state.value == "on"
         await self.db.set_leaderboard_visible(interaction.user.id, visible)
         if visible:
-            formatted_name = await self.bot.format_user_full(interaction.user, interaction.guild.id)
-            await self.db.set_leaderboard_display_name(interaction.user.id, formatted_name)
+            await self.db.set_leaderboard_display_name(interaction.user.id, str(interaction.user))
         msg = "Your name will now appear on `/globalrank top` and the web leaderboard." if visible else "Your name is now hidden from `/globalrank top` and the web leaderboard."
         await interaction.response.send_message(msg, ephemeral=True)
 
@@ -222,12 +220,16 @@ class Stats(commands.Cog):
     async def score(self, interaction: discord.Interaction, citizen: discord.Member = None):
         await interaction.response.defer()
         target = citizen or interaction.user
-        user = await self.db.get_user(interaction.guild.id, target.id)
+        gid = interaction.guild.id
+        user, guild_rank = await asyncio.gather(
+            self.db.get_user(gid, target.id),
+            self.db.get_guild_user_rank(gid, target.id),
+        )
         rank = get_rank(user["score"])
 
         embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")
-        embed.set_author(name=await self.bot.format_user_full(target, interaction.guild.id), icon_url=target.display_avatar.url)
-        embed.add_field(name="SCORE", value=f"{user['score']:.2f}", inline=True)
+        embed.set_author(name=await self.bot.format_user_full(target, gid), icon_url=target.display_avatar.url)
+        embed.add_field(name="SCORE", value=f"{user['score']:.2f} · #{guild_rank['score_rank']} of {guild_rank['total']}", inline=True)
         embed.add_field(name="RANK", value=rank["name"], inline=True)
         await interaction.followup.send(embed=embed)
 
@@ -235,12 +237,16 @@ class Stats(commands.Cog):
     async def yuan_prefix(self, ctx, citizen: discord.Member = None):
         async with ctx.typing():
             target = citizen or ctx.author
-            user = await self.db.get_user(ctx.guild.id, target.id)
+            gid = ctx.guild.id
+            user, guild_rank = await asyncio.gather(
+                self.db.get_user(gid, target.id),
+                self.db.get_guild_user_rank(gid, target.id),
+            )
             embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")
-            embed.set_author(name=await self.bot.format_user_full(target, ctx.guild.id), icon_url=target.display_avatar.url)
-            embed.add_field(name="BALANCE", value=f"¥{user['yuan']}", inline=True)
-            embed.add_field(name="TOTAL EARNED", value=f"¥{user['total_yuan_earned']}", inline=True)
-            embed.add_field(name="TOTAL SPENT", value=f"¥{user['total_yuan_spent']}", inline=True)
+            embed.set_author(name=await self.bot.format_user_full(target, gid), icon_url=target.display_avatar.url)
+            embed.add_field(name="BALANCE", value=f"¥{user['yuan']:,} · #{guild_rank['yuan_rank']} of {guild_rank['total']}", inline=True)
+            embed.add_field(name="TOTAL EARNED", value=f"¥{user['total_yuan_earned']:,}", inline=True)
+            embed.add_field(name="TOTAL SPENT", value=f"¥{user['total_yuan_spent']:,}", inline=True)
         await ctx.send(embed=embed)
 
     @commands.command(name="stats")
@@ -281,11 +287,15 @@ class Stats(commands.Cog):
     async def score_prefix(self, ctx, citizen: discord.Member = None):
         async with ctx.typing():
             target = citizen or ctx.author
-            user = await self.db.get_user(ctx.guild.id, target.id)
+            gid = ctx.guild.id
+            user, guild_rank = await asyncio.gather(
+                self.db.get_user(gid, target.id),
+                self.db.get_guild_user_rank(gid, target.id),
+            )
             rank = get_rank(user["score"])
             embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")
-            embed.set_author(name=await self.bot.format_user_full(target, ctx.guild.id), icon_url=target.display_avatar.url)
-            embed.add_field(name="SCORE", value=f"{user['score']:.2f}", inline=True)
+            embed.set_author(name=await self.bot.format_user_full(target, gid), icon_url=target.display_avatar.url)
+            embed.add_field(name="SCORE", value=f"{user['score']:.2f} · #{guild_rank['score_rank']} of {guild_rank['total']}", inline=True)
             embed.add_field(name="RANK", value=rank["name"], inline=True)
         await ctx.send(embed=embed)
 

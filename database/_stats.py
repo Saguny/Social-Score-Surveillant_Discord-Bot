@@ -43,6 +43,24 @@ class StatsMixin:
             )
         return {"user": user, "history": history}
 
+    async def get_guild_user_rank(self, guild_id: int, user_id: int) -> dict:
+        row = await self._pool.fetchrow(
+            """
+            SELECT
+                COUNT(*) FILTER (WHERE score >= (SELECT score FROM users WHERE guild_id = $1 AND user_id = $2)) AS score_rank,
+                COUNT(*) FILTER (WHERE yuan  >= (SELECT yuan  FROM users WHERE guild_id = $1 AND user_id = $2)) AS yuan_rank,
+                COUNT(*) AS total
+            FROM users
+            WHERE guild_id = $1 AND has_chatted = 1
+            """,
+            guild_id, user_id,
+        )
+        return {
+            "score_rank": int(row["score_rank"]),
+            "yuan_rank":  int(row["yuan_rank"]),
+            "total":      int(row["total"]),
+        }
+
     async def get_score_trend(self, guild_id, user_id, days):
         cutoff = int(time.time()) - (days * 86400)
         rows = await self._pool.fetch(

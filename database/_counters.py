@@ -1,4 +1,5 @@
 import time
+import asyncio
 
 
 class CountersMixin:
@@ -89,7 +90,11 @@ class CountersMixin:
     async def get_leaderboard_display_names(self, user_ids: list) -> dict:
         if not user_ids:
             return {}
-        rows = await self._pool.fetch(
+        from config.shop import COSMETIC_META
+        from config.ranks import prestige_stars
+        from config.achievements import ACHIEVEMENTS
+
+        profile_rows = await self._pool.fetch(
             """
             SELECT lp.user_id, lp.display_name
             FROM leaderboard_profiles lp
@@ -99,4 +104,85 @@ class CountersMixin:
             """,
             user_ids,
         )
-        return {r["user_id"]: r["display_name"] for r in rows}
+        if not profile_rows:
+            return {}
+
+        visible_uids = [r["user_id"] for r in profile_rows]
+        base_names = {r["user_id"]: r["display_name"] for r in profile_rows}
+        now = int(time.time())
+
+        badge_rows, pref_rows, prestige_rows, ec_rows = await asyncio.gather(
+            self._pool.fetch(
+                "SELECT user_id, badge FROM cosmetic_badges WHERE user_id = ANY($1) AND (expires_at IS NULL OR expires_at > $2)",
+                visible_uids, now,
+            ),
+            self._pool.fetch(
+                "SELECT user_id, badge_id FROM badge_preferences WHERE user_id = ANY($1)",
+                visible_uids,
+            ),
+            self._pool.fetch(
+                "SELECT user_id, value FROM user_counters WHERE user_id = ANY($1) AND counter_key = 'prestige_level' AND value > 0",
+                visible_uids,
+            ),
+            self._pool.fetch(
+                "SELECT user_id FROM eternal_chairmen WHERE user_id = ANY($1)",
+                visible_uids,
+            ),
+        )
+
+        owned: dict[int, set] = {}
+        for r in badge_rows:
+            owned.setdefault(r["user_id"], set()).add(r["badge"])
+        prefs = {r["user_id"]: r["badge_id"] for r in pref_rows}
+        prestiges = {r["user_id"]: int(r["value"]) for r in prestige_rows}
+        ec_set = {r["user_id"] for r in ec_rows}
+
+        _ORDER = ["voter", "verified", "figure", "influencer", "associate", "asset"]
+
+        def _fw(s: str) -> str:
+            out = []
+            for c in s:
+                if 'a' <= c <= 'z' or 'A' <= c <= 'Z':
+                    out.append(chr(ord(c) + 0xFEE0))
+                elif c == ' ':
+                    out.append('　')
+                else:
+                    out.append(c)
+            return ''.join(out)
+
+        def _sfx(badge_id: str) -> str:
+            return COSMETIC_META[badge_id]["suffix"] if badge_id in COSMETIC_META else badge_id
+
+        result = {}
+        for uid, base in base_names.items():
+            level = prestiges.get(uid, 0)
+            stars = f" {prestige_stars(level)}" if level > 0 else ""
+
+            if uid in ec_set:
+                result[uid] = f"{base} 【{_fw('Winnie the Pooh')}】{stars}"
+                continue
+
+            badge_set = owned.get(uid, set())
+            if not badge_set:
+                result[uid] = f"{base}{stars}"
+                continue
+
+            pref = prefs.get(uid)
+            if pref and pref in badge_set:
+                result[uid] = f"{base} {_sfx(pref)}{stars}"
+                continue
+
+            for badge_id in reversed(_ORDER):
+                if badge_id in badge_set:
+                    result[uid] = f"{base} {_sfx(badge_id)}{stars}"
+                    break
+            else:
+                for data in ACHIEVEMENTS.values():
+                    bid = data.get("badge")
+                    if bid and bid in badge_set:
+                        result[uid] = f"{base} {_sfx(bid)}{stars}"
+                        break
+                else:
+                    result[uid] = f"{base}{stars}"
+
+        return result
