@@ -86,12 +86,18 @@ class Stats(commands.Cog):
                         user = await self.bot.fetch_user(uid)
                     except discord.HTTPException:
                         user = None
-                names[uid] = user.name if user else "Unknown User"
+                names[uid] = await self.bot.format_user_full(user, 0) if user else "Unknown User"
             else:
                 names[uid] = "Private User"
 
+        tab_titles = {
+            "yuan":     "中华人民共和国社会信用局 · TOP YUAN",
+            "score":    "中华人民共和国社会信用局 · TOP SCORE",
+            "citizens": "中华人民共和国社会信用局 · TOP CITIZENS",
+        }
+
         def build_embed(tab: str, window: str) -> discord.Embed:
-            embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 全球排行榜")
+            embed = discord.Embed(color=0xCC0000, title=tab_titles[tab])
             if tab == "yuan":
                 rows = yuan_by_window[window]
                 lines = [f"{i}. {names[r['user_id']]} · ¥{r['earned']:,}" for i, r in enumerate(rows, 1)]

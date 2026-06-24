@@ -11,6 +11,7 @@ class PrestigeView(discord.ui.View):
         self.db = db
         self.bot = bot
         self.done = False
+        self.message = None
 
     async def _finish(self, interaction: discord.Interaction, confirmed: bool):
         if self.done:
@@ -75,7 +76,13 @@ class PrestigeView(discord.ui.View):
 
     async def on_timeout(self):
         self.done = True
-        self.clear_items()
+        for item in self.children:
+            item.disabled = True
+        if self.message:
+            try:
+                await self.message.edit(view=self)
+            except discord.HTTPException:
+                pass
 
 
 class Prestige(commands.Cog):
@@ -97,6 +104,7 @@ class Prestige(commands.Cog):
             )
             return
 
+        expiry = int(discord.utils.utcnow().timestamp()) + 60
         embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 晋升")
         embed.add_field(
             name="PRESTIGE AVAILABLE",
@@ -107,8 +115,10 @@ class Prestige(commands.Cog):
             ),
             inline=False,
         )
+        embed.add_field(name="EXPIRES", value=f"<t:{expiry}:R>", inline=False)
         view = PrestigeView(interaction.user, self.db, self.bot)
-        await interaction.followup.send(embed=embed, view=view)
+        msg = await interaction.followup.send(embed=embed, view=view)
+        view.message = msg
 
 
 async def setup(bot: commands.Bot):

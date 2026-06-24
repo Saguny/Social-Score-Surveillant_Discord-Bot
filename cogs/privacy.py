@@ -58,7 +58,8 @@ class OptOutConfirmView(discord.ui.View):
         await self._finish(interaction, False)
 
     async def on_timeout(self):
-        self.clear_items()
+        for item in self.children:
+            item.disabled = True
         try:
             await self._original_interaction.edit_original_response(view=self)
         except discord.HTTPException:
@@ -109,7 +110,8 @@ class OptInConfirmView(discord.ui.View):
         await self._finish(interaction, False)
 
     async def on_timeout(self):
-        self.clear_items()
+        for item in self.children:
+            item.disabled = True
         try:
             await self._original_interaction.edit_original_response(view=self)
         except discord.HTTPException:
@@ -128,6 +130,7 @@ class Privacy(commands.Cog):
             await interaction.followup.send("You are already opted out. Use `/optin` to rejoin.", ephemeral=True)
             return
 
+        expiry = int(discord.utils.utcnow().timestamp()) + CONFIRM_TIMEOUT
         embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · CONFIRM OPT-OUT")
         embed.add_field(
             name="ARE YOU SURE?",
@@ -140,6 +143,7 @@ class Privacy(commands.Cog):
             ),
             inline=False,
         )
+        embed.add_field(name="EXPIRES", value=f"<t:{expiry}:R>", inline=False)
         embed.set_thumbnail(url="attachment://bureau.png")
         await interaction.followup.send(
             embed=embed,
@@ -155,6 +159,7 @@ class Privacy(commands.Cog):
             await interaction.followup.send("You are not opted out.", ephemeral=True)
             return
 
+        expiry = int(discord.utils.utcnow().timestamp()) + CONFIRM_TIMEOUT
         embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · CONFIRM OPT-IN")
         embed.add_field(
             name="ARE YOU SURE?",
@@ -165,6 +170,7 @@ class Privacy(commands.Cog):
             ),
             inline=False,
         )
+        embed.add_field(name="EXPIRES", value=f"<t:{expiry}:R>", inline=False)
         embed.set_thumbnail(url="attachment://bureau.png")
         await interaction.followup.send(
             embed=embed,

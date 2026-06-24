@@ -133,13 +133,14 @@ class ShopView(discord.ui.View):
 
 
 class TransferView(discord.ui.View):
-    def __init__(self, sender: discord.Member, recipient: discord.Member, amount: int, sender_balance: int):
+    def __init__(self, sender: discord.Member, recipient: discord.Member, amount: int, sender_balance: int, original_interaction: discord.Interaction):
         super().__init__(timeout=60)
         self.sender = sender
         self.recipient = recipient
         self.amount = amount
         self.sender_balance = sender_balance
         self.done = False
+        self._interaction = original_interaction
 
     async def _finish(self, interaction: discord.Interaction, confirmed: bool):
         if self.done:
@@ -222,7 +223,12 @@ class TransferView(discord.ui.View):
 
     async def on_timeout(self):
         self.done = True
-        self.clear_items()
+        for item in self.children:
+            item.disabled = True
+        try:
+            await self._interaction.edit_original_response(view=self)
+        except discord.HTTPException:
+            pass
 
 
 class RequestView(discord.ui.View):
@@ -232,6 +238,7 @@ class RequestView(discord.ui.View):
         self.target = target
         self.amount = amount
         self.done = False
+        self.message = None
 
     async def _finish(self, interaction: discord.Interaction, accepted: bool):
         if self.done:
@@ -317,7 +324,13 @@ class RequestView(discord.ui.View):
 
     async def on_timeout(self):
         self.done = True
-        self.clear_items()
+        for item in self.children:
+            item.disabled = True
+        if self.message:
+            try:
+                await self.message.edit(view=self)
+            except discord.HTTPException:
+                pass
 
 
 class BattleView(discord.ui.View):
@@ -329,6 +342,7 @@ class BattleView(discord.ui.View):
         self.amount = amount
         self.guild_id = guild_id
         self.done = False
+        self.message = None
 
     async def _refund_challenger(self):
         await self.bot.db.adjust_yuan(self.guild_id, self.challenger.id, self.amount)
@@ -402,11 +416,23 @@ class BattleView(discord.ui.View):
         if self.done:
             return
         self.done = True
-        self.clear_items()
         try:
             await self._refund_challenger()
         except Exception:
             pass
+        for item in self.children:
+            item.disabled = True
+        if self.message:
+            try:
+                embed = discord.Embed(color=0x333333, title="中华人民共和国社会信用局 · 决斗")
+                embed.add_field(
+                    name="BATTLE EXPIRED",
+                    value=f"{self.opponent.mention} did not respond in time. ¥{self.amount:,} refunded to {self.challenger.mention}.",
+                    inline=False,
+                )
+                await self.message.edit(embed=embed, view=self)
+            except discord.HTTPException:
+                pass
 
 
 class Economy(commands.Cog):
@@ -484,6 +510,7 @@ class Economy(commands.Cog):
             )
             return
 
+        expiry = int(discord.utils.utcnow().timestamp()) + 300
         view = BattleView(self.bot, challenger, opponent, amount, gid)
         embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 决斗")
         embed.add_field(
@@ -491,8 +518,10 @@ class Economy(commands.Cog):
             value=f"{challenger.mention} challenges {opponent.mention} to a 50/50 duel for ¥{amount:,} each.\nWinner takes ¥{amount * 2:,}.",
             inline=False,
         )
+        embed.add_field(name="EXPIRES", value=f"<t:{expiry}:R>", inline=False)
         embed.timestamp = discord.utils.utcnow()
-        await interaction.followup.send(embed=embed, view=view)
+        msg = await interaction.followup.send(embed=embed, view=view)
+        view.message = msg
 
     @app_commands.command(name="buy", description="Purchase an item from the shop")
     @app_commands.describe(
@@ -1086,15 +1115,17 @@ class Economy(commands.Cog):
             )
             return
 
+        expiry = int(discord.utils.utcnow().timestamp()) + 60
         embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 转账")
         embed.add_field(name="TRANSFER REQUEST", value=f"Send ¥{amount:,} to {recipient.mention}?", inline=False)
         embed.add_field(name="FROM", value=interaction.user.mention, inline=True)
         embed.add_field(name="TO", value=recipient.mention, inline=True)
         embed.add_field(name="AMOUNT", value=f"¥{amount:,}", inline=True)
-        embed.add_field(name="YOUR BALANCE AFTER", value=f"¥{user['yuan'] - amount:,}", inline=False)
+        embed.add_field(name="YOUR BALANCE AFTER", value=f"¥{user['yuan'] - amount:,}", inline=True)
+        embed.add_field(name="EXPIRES", value=f"<t:{expiry}:R>", inline=True)
         embed.timestamp = discord.utils.utcnow()
 
-        view = TransferView(interaction.user, recipient, amount, user["yuan"])
+        view = TransferView(interaction.user, recipient, amount, user["yuan"], interaction)
         await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
     @app_commands.command(name="requestyuan", description="Request Yuan from another citizen")
@@ -1111,6 +1142,7 @@ class Economy(commands.Cog):
             await interaction.followup.send("Amount must be greater than zero.", ephemeral=True)
             return
 
+        expiry = int(discord.utils.utcnow().timestamp()) + 300
         embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 资金申请")
         embed.add_field(name="YUAN REQUEST", value=f"{interaction.user.mention} is requesting ¥{amount:,} from {citizen.mention}", inline=False)
         embed.add_field(name="FROM", value=citizen.mention, inline=True)
@@ -1118,10 +1150,12 @@ class Economy(commands.Cog):
         embed.add_field(name="AMOUNT", value=f"¥{amount:,}", inline=True)
         if reason:
             embed.add_field(name="REASON", value=reason[:200], inline=False)
+        embed.add_field(name="EXPIRES", value=f"<t:{expiry}:R>", inline=False)
         embed.timestamp = discord.utils.utcnow()
 
         view = RequestView(interaction.user, citizen, amount)
-        await interaction.followup.send(embed=embed, view=view)
+        msg = await interaction.followup.send(embed=embed, view=view)
+        view.message = msg
 
     @app_commands.command(name="surveillance_report", description="Redeem your surveillance package for a full 30-day intelligence dossier")
     @app_commands.describe(target="The citizen to pull the dossier on")
