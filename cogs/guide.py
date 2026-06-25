@@ -51,12 +51,13 @@ _TOPIC_OPTIONS = [
 
 class GuideView(discord.ui.View):
     def __init__(self, exchange_status: dict):
-        super().__init__(timeout=600)
+        super().__init__(timeout=1800)
         self._exchange_status = exchange_status
 
     def build(self, topic: str) -> discord.Embed:
         e = getattr(self, f"_page_{topic}")()
         e.set_thumbnail(url="attachment://bureau.png")
+        e.set_footer(text=f"{len(_TOPIC_OPTIONS)} sections, select a topic from the menu below · GLORY TO THE CCP!")
         return e
 
     @discord.ui.select(placeholder="Select a topic...", options=_TOPIC_OPTIONS)
@@ -71,6 +72,7 @@ class GuideView(discord.ui.View):
         )
         e.add_field(name="SCORE",     value="Starts at **750**. Range: 600–1300. Rises with positive messages, falls with negative ones.", inline=False)
         e.add_field(name="YUAN",      value=f"Earn ¥10 per message. Spend at `/shop` on items, protections, and more. [Support server]({SUPPORT_URL}) members earn +15%.", inline=False)
+        e.add_field(name="FEATURES", value="Stocks · Achievements · Prestige · Global Rankings · Events", inline=False)
         e.add_field(name="GET STARTED", value="`/score` · `/stats` · `/checkin` · `/shop` · `/leaderboard`", inline=False)
         e.add_field(name="LINKS",     value=f"[Dashboard]({DASHBOARD_URL}) · [Support Server]({SUPPORT_URL}) · [Invite]({INVITE_URL})", inline=False)
         return e
