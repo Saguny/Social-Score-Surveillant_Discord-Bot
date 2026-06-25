@@ -50,11 +50,11 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',sans-seri
 .anomaly-warn { background:rgba(245,168,85,.12); border:1px solid rgba(245,168,85,.4); color:var(--orange); }
 .anomaly-ok   { background:rgba(61,170,110,.12); border:1px solid rgba(61,170,110,.4); color:var(--green); }
 
-.announce-overlay { position:fixed; top:14px; left:50%; transform:translateX(-50%); z-index:1050;
-                    max-width:92vw; display:flex; justify-content:center; pointer-events:none; }
+.announce-overlay { max-width:100%; display:flex; justify-content:center; padding:0 1rem;
+                    margin-bottom:1rem; }
 .announce-banner { padding:.6rem 1.2rem; border-radius:6px; font-size:.85rem; white-space:nowrap;
-                    overflow:hidden; text-overflow:ellipsis; box-shadow:0 4px 14px rgba(0,0,0,.9);
-                    background:var(--bg-panel); pointer-events:auto; }
+                    overflow:hidden; text-overflow:ellipsis; max-width:92vw;
+                    box-shadow:0 4px 14px rgba(0,0,0,.9); background:var(--bg-panel); }
 .announce-info   { background:rgba(244,229,87,.9); border:1px solid rgba(244,229,87,.9); color:var(--black); }
 .announce-warn   { background:rgba(245,168,85,.9); border:1px solid rgba(245,168,85,.9); color:var(--black); }
 .announce-danger { background:rgba(232,84,84,.9); border:1px solid rgba(232,84,84,.9); color:var(--black); }
