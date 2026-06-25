@@ -1,7 +1,8 @@
 :root {
     --background: #000;
-    --side-bar-background: #1b0000a6;
-    --side-bar-border: #460000a6;
+    --side-bar-background-top: #630000a6;
+    --side-bar-background-bottom: #e600002a;
+    --side-bar-border: #5f0000a6;
     --text: #fff;
     --text-secondary: #ffb200;
 }

@@ -10,13 +10,18 @@
     flex-direction: column;
     justify-content: space-between;
     padding: 0 30px;
-    left: 0;
+    top: 20px;
+    position: fixed;
+    width: 260px;
     height: calc(100vh - 40px);
-    width: fit-content;
     border: 3px solid var(--side-bar-border);
-    background-color: var(--side-bar-background);
-    box-shadow: 0 0 40px 0 var(--side-bar-background);
+    background: linear-gradient(180deg, var(--side-bar-background-top) 0%, var(--side-bar-background-bottom) 100%);
+    box-shadow: 0 0 40px 0 var(--side-bar-background-top);
     border-radius: 10px;
+}
+
+.side-bar:hover {
+    border: 3px solid var(--text-secondary);
 }
 
 .side-bar-elements {
@@ -41,7 +46,7 @@
 }
 
 router-outlet {
-    margin-left: 40px;
+    margin-left: 300px;
 }
 
 .app-title a {

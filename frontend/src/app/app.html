@@ -1,19 +1,18 @@
 <div class="app">
     <div class="side-bar">
-        <h1 class="app-title"><a [routerLink]="['/']">Social Credit<br>Surveillant</a></h1>
+        <h1 class="app-title"><a (click)="selectMenu()" [routerLink]="['/']">Social Credit<br>Surveillant</a></h1>
         <div class="side-bar-elements">
             <div class="side-bar-links">
-                <a [routerLink]="['/dashboard']">Dashboard</a>
-                <a [routerLink]="['/leaderboard']">Leaderboard</a>
+                <a id="link-dashboard" [routerLink]="['/dashboard']" (click)="selectMenu('dashboard')">{{ dashboardMenu }}</a>
+                <a id="link-leaderboard" [routerLink]="['/leaderboard']" (click)="selectMenu('leaderboard')">{{ leaderboardMenu }}</a>
                 <!-- falls logged in dann loginnamen anzeigen -->
                 <a (click)="login()">Login</a>
             </div>
             <div class="side-bar-infos">
-                <span (click)="theme()">Theme</span>
+                <span><a (click)="theme()">Theme</a></span>
                 <span>UI v1.0.0 ★ Bot v1.0.0</span>
-                <span><a [routerLink]="['/tos']">Terms of Service</a></span>
-                <span><a href="https://github.com/Saguny/Social-Score-Surveillant_Discord-Bot" target="_blank">Source
-                        Code</a> ★ <a [routerLink]="['/privacy']">Privacy Policy</a></span>
+                <span><a [routerLink]="['tos']" (click)="selectMenu()">Terms of Service</a> ★ <a [routerLink]="['about']" (click)="selectMenu()">About</a></span>
+                <span><a (click)="selectMenu()"href="https://github.com/Saguny/Social-Score-Surveillant_Discord-Bot" target="_blank">Source Code</a> ★ <a (click)="selectMenu()" [routerLink]="['privacy']">Privacy Policy</a></span>
             </div>
         </div>
     </div>
