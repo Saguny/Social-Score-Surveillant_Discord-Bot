@@ -18,6 +18,8 @@ PORT = int(os.getenv("PORT", 8080))
 _runner = None
 _cache: StatCache | None = None
 
+LEADERBOARD_LIMIT = 50
+
 _SESSION_TTL = 60 * 60 * 24 * 30
 
 _RATE_WINDOW  = 60 * 5
@@ -313,11 +315,11 @@ async def _handle_stats_timeline(request):
 async def _handle_leaderboard(request):
     db = request.app["db"]
     earned_7d, earned_30d, earned_alltime, score_data, citizens = await asyncio.gather(
-        db.get_global_yuan_earned_leaderboard(7, 25),
-        db.get_global_yuan_earned_leaderboard(30, 25),
-        db.get_global_yuan_earned_leaderboard(None, 25),
-        db.get_global_leaderboard(25),
-        db.get_global_citizens_leaderboard(25),
+        db.get_global_yuan_earned_leaderboard(7, LEADERBOARD_LIMIT),
+        db.get_global_yuan_earned_leaderboard(30, LEADERBOARD_LIMIT),
+        db.get_global_yuan_earned_leaderboard(None, LEADERBOARD_LIMIT),
+        db.get_global_leaderboard(LEADERBOARD_LIMIT),
+        db.get_global_citizens_leaderboard(LEADERBOARD_LIMIT),
     )
     all_uids = list({
         r["user_id"]

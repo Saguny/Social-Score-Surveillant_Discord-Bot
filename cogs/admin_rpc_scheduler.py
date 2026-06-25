@@ -241,36 +241,6 @@ class AdminRpcScheduler(commands.Cog):
                 embed.add_field(name=name, value=value, inline=bool(f.get("inline")))
             return embed
 
-        if target.startswith("dm:"):
-            try:
-                dm_user_id = int(target[3:])
-            except ValueError:
-                return {"error": "Invalid user id for DM target."}
-
-            dm_user = bot.get_user(dm_user_id)
-            if not dm_user:
-                try:
-                    dm_user = await bot.fetch_user(dm_user_id)
-                except discord.NotFound:
-                    return {"error": f"No Discord user found with ID {dm_user_id}."}
-                except discord.HTTPException as e:
-                    return {"error": str(e)}
-
-            embed = build_embed()
-            try:
-                if view is not None:
-                    await dm_user.send(embed=embed, view=view)
-                else:
-                    await dm_user.send(embed=embed)
-                results = [{"guild_id": "dm", "guild_name": f"DM: {dm_user}", "status": "sent", "detail": "Direct message"}]
-            except discord.Forbidden:
-                results = [{"guild_id": "dm", "guild_name": f"DM: {dm_user}", "status": "error", "detail": "User has DMs closed."}]
-            except discord.HTTPException as e:
-                results = [{"guild_id": "dm", "guild_name": f"DM: {dm_user}", "status": "error", "detail": str(e)}]
-
-            sent = sum(1 for r in results if r["status"] == "sent")
-            return {"results": results, "sent": sent, "total": len(results)}
-
         if target == "all":
             guilds = list(bot.guilds)
         else:

@@ -51,12 +51,9 @@ async function lookupUser() {
     </div>
   `;
 
-  const dmBtn = `<button class="btn btn-run btn-sm px-3 mt-2" onclick="prefillDm('${data.user_id}')">SEND DM VIA EMBED BROADCASTER</button>`;
-
   if (!data.guilds.length) {
     out.innerHTML = header +
-      `<div style="color:var(--text-faint);font-size:.85rem;margin-bottom:8px">Not currently a member of any server the bot shares.</div>` +
-      dmBtn;
+      `<div style="color:var(--text-faint);font-size:.85rem;margin-bottom:8px">Not currently a member of any server the bot shares.</div>`;
     return;
   }
 
@@ -71,7 +68,7 @@ async function lookupUser() {
     </div>
   `).join('');
 
-  out.innerHTML = header + rows + dmBtn;
+  out.innerHTML = header + rows;
 }
 
 async function applyYuan(guildId, userId, btn) {
@@ -92,19 +89,6 @@ async function applyYuan(guildId, userId, btn) {
   const sub = document.getElementById('ul-sub-' + guildId);
   sub.innerHTML = sub.innerHTML.replace(/&yen;[\d,]+/, '&yen;' + data.yuan.toLocaleString());
   amtInput.value = '';
-}
-
-function toggleDmTargetInput() {
-  const isDm = document.getElementById('eb-target').value === 'dm';
-  document.getElementById('eb-dm-userid-wrap').style.display = isDm ? 'block' : 'none';
-}
-
-function prefillDm(userId) {
-  const sel = document.getElementById('eb-target');
-  sel.value = 'dm';
-  document.getElementById('eb-dm-userid').value = userId;
-  toggleDmTargetInput();
-  document.getElementById('eb-title').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 let ebFields = [];
@@ -186,7 +170,7 @@ async function loadGuildListForBroadcast() {
   if (res.status === 401 || res.status === 403) { location.href = '/login?next=/admin'; return; }
   const data = await res.json();
   const sel = document.getElementById('eb-target');
-  sel.innerHTML = '<option value="all">All servers</option><option value="dm">DM a specific user</option>';
+  sel.innerHTML = '<option value="all">All servers</option>';
   (data.guilds || []).forEach(g => {
     const opt = document.createElement('option');
     opt.value = g.id;
@@ -201,15 +185,8 @@ async function sendBroadcastEmbed() {
   if (!title && !desc) { alert('Add a title or description first.'); return; }
 
   const sel = document.getElementById('eb-target');
-  let target = sel.value;
-  let targetLabel = sel.selectedOptions[0].textContent;
-
-  if (target === 'dm') {
-    const dmUserId = v('eb-dm-userid');
-    if (!dmUserId) { alert('Enter a user ID to DM.'); return; }
-    target = 'dm:' + dmUserId;
-    targetLabel = `user ${dmUserId} via DM`;
-  }
+  const target = sel.value;
+  const targetLabel = sel.selectedOptions[0].textContent;
 
   if (!confirm(`Send this embed to ${targetLabel}? This sends once, immediately, and cannot be undone.`)) return;
 
