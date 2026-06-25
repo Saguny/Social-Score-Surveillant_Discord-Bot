@@ -1,7 +1,7 @@
 import re
 import random
 import time
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 import aiohttp
 import discord
 from discord import app_commands
@@ -32,6 +32,286 @@ CREDITS_LINES = [
     ("aiohttp",           "Async HTTP · https://docs.aiohttp.org"),
     ("python-dotenv",     "Environment config · https://github.com/theskumar/python-dotenv"),
 ]
+
+_TOPIC_OPTIONS = [
+    discord.SelectOption(label="Overview",          value="overview",     description="What is the Social Credit System?"),
+    discord.SelectOption(label="Scoring Rules",     value="scoring",      description="How messages are evaluated"),
+    discord.SelectOption(label="Ranks & Execution", value="ranks",        description="Rank tiers, execution list, prestige"),
+    discord.SelectOption(label="Stat Commands",     value="stats",        description="/score, /stats, /leaderboard and more"),
+    discord.SelectOption(label="Economy",           value="economy",      description="Yuan earning, transfers, battle, vote"),
+    discord.SelectOption(label="Shop & Items",      value="shop",         description="/buy, key items, lottery tiers"),
+    discord.SelectOption(label="Social Rating",     value="social",       description="/endorse, /rebuke, fundraisers"),
+    discord.SelectOption(label="Markets",           value="markets",      description="Stocks, turbos, circuit breakers"),
+    discord.SelectOption(label="Events & Posters",  value="events",       description="Propaganda events and daily posters"),
+    discord.SelectOption(label="Achievements",      value="achievements", description="Achievement system overview"),
+    discord.SelectOption(label="Mod Commands",      value="mod",          description="Mod-only commands and server settings"),
+    discord.SelectOption(label="Privacy & Legal",   value="privacy",      description="/optout, /optin, and disclaimer"),
+]
+
+
+class GuideView(discord.ui.View):
+    def __init__(self, exchange_status: dict):
+        super().__init__(timeout=600)
+        self._exchange_status = exchange_status
+
+    def build(self, topic: str) -> discord.Embed:
+        e = getattr(self, f"_page_{topic}")()
+        e.set_thumbnail(url="attachment://bureau.png")
+        return e
+
+    @discord.ui.select(placeholder="Select a topic...", options=_TOPIC_OPTIONS)
+    async def select_topic(self, interaction: discord.Interaction, select: discord.ui.Select):
+        await interaction.response.edit_message(embed=self.build(select.values[0]))
+
+    def _page_overview(self) -> discord.Embed:
+        e = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · OVERVIEW")
+        e.description = (
+            "A CCP-themed social credit system for Discord. Every message you send is evaluated by the Bureau. "
+            "Your score determines your rank. Yuan is the currency of the state."
+        )
+        e.add_field(name="SCORE",     value="Starts at **750**. Range: 600–1300. Rises with positive messages, falls with negative ones.", inline=False)
+        e.add_field(name="YUAN",      value=f"Earn ¥10 per message. Spend at `/shop` on items, protections, and more. [Support server]({SUPPORT_URL}) members earn +15%.", inline=False)
+        e.add_field(name="GET STARTED", value="`/score` · `/stats` · `/checkin` · `/shop` · `/leaderboard`", inline=False)
+        e.add_field(name="LINKS",     value=f"[Dashboard]({DASHBOARD_URL}) · [Support Server]({SUPPORT_URL}) · [Invite]({INVITE_URL})", inline=False)
+        return e
+
+    def _page_scoring(self) -> discord.Embed:
+        e = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · SCORING RULES")
+        e.add_field(name="SENTIMENT",           value="Each message is analyzed for tone. Max impact: **+0.30** or **-0.30** per message. Neutral messages grant +0.03 for civic participation.", inline=False)
+        e.add_field(name="POSITIVE STREAK",     value="Consecutive positive messages build a multiplier. Up to **1.5×** at streak 15+.", inline=False)
+        e.add_field(name="STRUCTURAL",          value="Repeated message (10+ chars): **-0.70** · Excessive caps (80%+, 16+ chars): **-0.40**", inline=False)
+        e.add_field(name="BANNED TOPICS",       value="References to Tiananmen, Taiwan independence, Xinjiang, Tibet, Falun Gong, and similar: **-0.30** regardless of tone.", inline=False)
+        e.add_field(name="DAILY LIMIT",         value="Score gains cap at **+8.00 net per day**. At +6.00 net, further positive messages yield 25% effect. Penalties are always full strength.", inline=False)
+        e.add_field(name="INACTIVITY DECAY",    value="Citizens inactive for 7+ days are nudged back toward 750 each day until they return.", inline=False)
+        return e
+
+    def _page_ranks(self) -> discord.Embed:
+        e = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · RANKS & EXECUTION")
+        rank_lines = "\n".join(f"{r['min']:>4} – {r['max']:>4}  {r['name']}" for r in RANKS)
+        e.add_field(name="RANK TIERS",      value=f"```\n{rank_lines}\n```", inline=False)
+        e.add_field(name="EXECUTION LIST",  value="Score ≤ 610: assigned role **Execution Date: Tomorrow**, yuan confiscated and distributed. Recovery above 611 removes the role.", inline=False)
+        e.add_field(name="RANK REWARDS",    value="Promotions award Yuan scaling with tier. Demotions deduct Yuan based on the rank you leave.", inline=False)
+        e.add_field(name="RANK ROLES",      value="Rank roles auto-assign on score change. Mods can disable with `ccp roles off`. Execution List role is always active.", inline=False)
+        e.add_field(name="/prestige",       value="At score **1290**, sacrifice it back to 750 for a permanent prestige star shown globally. Yuan resets to 0.", inline=False)
+        return e
+
+    def _page_stats(self) -> discord.Embed:
+        e = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · STAT COMMANDS")
+        e.add_field(name="/score [citizen]",              value="Score, rank tier, server rank position (e.g. #3 of 120).", inline=False)
+        e.add_field(name="/stats [citizen]",              value="3 pages — **Overview** (score, trends, rank streak) · **Social** (endorsements, rebukes) · **Economy** (yuan, lottery, check-in streak).", inline=False)
+        e.add_field(name="/daily_report [citizen]",       value="Today's score: gains, losses, net, message counts, and yuan vs yesterday.", inline=False)
+        e.add_field(name="/leaderboard",                  value="5 pages: Score · Economy · Activity · Social · Markets.", inline=False)
+        e.add_field(name="/globalrank me",                value="Your cross-server standing: balance, avg score, total earned, global rank in all 4 categories.", inline=False)
+        e.add_field(name="/globalrank top",               value="Global leaderboard: Top Balance · Top Earned · Top Score · Top Citizens. Also live on the web dashboard.", inline=False)
+        e.add_field(name="/globalrank visibility <on|off>", value="Show or hide your name on the global leaderboard and dashboard.", inline=False)
+        e.add_field(name="/state_report",                 value="Server-wide report: biggest rise/fall, yuan in circulation, active citizens.", inline=False)
+        e.add_field(name="/graph <score|yuan> [citizen]", value="30-day trend graph. Yuan graph populates once per day.", inline=False)
+        e.add_field(name="/checkin",                      value="Daily check-in. Earns Yuan + score on every shared server. Streak builds up to ¥2,000/day.", inline=False)
+        return e
+
+    def _page_economy(self) -> discord.Embed:
+        e = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · ECONOMY")
+        e.add_field(
+            name="EARNING YUAN",
+            value=(
+                f"¥10 per message · [Support server]({SUPPORT_URL}) members earn +15% globally\n"
+                "After 25 yuan-earning messages/day, further messages pay 25% · Resets at midnight UTC\n"
+                "**Wealth tax:** balance ≥ ¥100,000 → 10% of every credit goes to the Bureau Treasury"
+            ),
+            inline=False,
+        )
+        e.add_field(name="/yuan",                           value="Balance, lifetime earned, and lifetime spent.", inline=False)
+        e.add_field(name="/transfer <citizen> <amount>",    value="Send Yuan directly. Confirmation prompt before executing.", inline=False)
+        e.add_field(name="/requestyuan <citizen> <amount>", value="Request Yuan from another citizen. They Accept or Decline. Expires in 5 min.", inline=False)
+        e.add_field(name="/battle <opponent> <amount>",     value="50/50 Yuan duel. Min ¥1,000. Both risk the same amount. Winner takes all. Opponent must Accept within 5 min.", inline=False)
+        e.add_field(name="/confess <text>",                 value="Public confession. Costs ¥200–¥750 scaled to score deficit. Grants +0.5 score. 1-hour cooldown.", inline=False)
+        e.add_field(
+            name="/vote",
+            value=(
+                "Vote on Top.gg. Earns the **Loyal Patriot** badge, +2.00 score, and ¥1,500+ on every shared server. "
+                "Scales with vote streak, weekend bonus, and lucky roll. Lasts 12 hours — vote again to renew."
+            ),
+            inline=False,
+        )
+        return e
+
+    def _page_shop(self) -> discord.Embed:
+        e = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · SHOP & ITEMS")
+        e.add_field(name="/shop",  value="Browse all items across 5 categories: **Core** · **Economy** · **Misc** · **Lottery** · **Cosmetic**.", inline=False)
+        e.add_field(
+            name="KEY ITEMS  ·  /buy <item_id> [target]",
+            value=(
+                "`report` ¥2,500 · Dock target 2 score\n"
+                "`denounce` ¥12,000 · Dock target 20 score · 48h cooldown per target\n"
+                "`rehabilitate` ¥3,000+ · +3 score, cost doubles each use\n"
+                "`appeal` ¥4,000 · Next penalty halved (12h)\n"
+                "`exception` ¥12,000 · Block the next negative action against you\n"
+                "`reeducation` ¥20,000 · Freeze a target's score for 2h\n"
+                "`surveillance` ¥2,000 · Unlock one `/surveillance_report` use on a target"
+            ),
+            inline=False,
+        )
+        e.add_field(
+            name="LOTTERY TIERS",
+            value=(
+                "All: 70% lose · 20% win · 10% jackpot. Add `target` to buy for someone else.\n"
+                "`lottery` ¥500 · `lottery_standard` ¥2,500 · `lottery_premium` ¥10,000\n"
+                "`lottery_elite` ¥50,000 · `lottery_chairman` ¥250,000"
+            ),
+            inline=False,
+        )
+        e.add_field(name="GIFTING", value="Add a `target` to any self-item (`rehabilitate`, `appeal`, `exception`, etc.) to gift it publicly. Add `text` for a message.", inline=False)
+        e.add_field(name="/surveillance_report <target>", value="Redeem a surveillance package. Shows a full 30-day dossier: score trend, yuan, all-time high/low, threat assessment.", inline=False)
+        return e
+
+    def _page_social(self) -> discord.Embed:
+        e = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · SOCIAL RATING")
+        e.add_field(name="/endorse <citizen> [reason]", value="Grant **+1.5 score**. One use per citizen per 24 hours. Reason is public.", inline=False)
+        e.add_field(name="/rebuke <citizen> [reason]",  value="Apply **-1.5 score**. One use per citizen per 24 hours. Reason is public.", inline=False)
+        e.add_field(
+            name="FUNDRAISERS",
+            value=(
+                "`/fundraise create <goal> <desc>` · Start a fundraiser with a Yuan goal\n"
+                "`/fundraise donate <id> <amount>` · Donate yuan (held in escrow)\n"
+                "`/fundraise complete <id>` · Mark yours as complete, opening the vote phase\n"
+                "`/fundraise vote <id> <confirm|deny>` · Vote on whether the organizer followed through\n"
+                "`/fundraise list` · Active fundraisers · `/fundraise info <id>` · Full details"
+            ),
+            inline=False,
+        )
+        return e
+
+    def _page_markets(self) -> discord.Embed:
+        hours_lines = []
+        for exchange, st in self._exchange_status.items():
+            tag = "Open" if st["open"] else "Closed"
+            event_lbl = "Closes" if st["next_event"] == "close" else "Opens"
+            hours_lines.append(f"**{_EXCHANGE_NAMES[exchange]}** ({exchange}) · {tag} · {event_lbl} <t:{st['next_ts']}:R>")
+
+        e = discord.Embed(color=0xCC0000, title="北京证券交易所 · MARKETS")
+        e.add_field(name="MARKET STATUS", value="\n".join(hours_lines), inline=False)
+        e.add_field(
+            name="STOCKS",
+            value=(
+                "5 China ADRs (NYSE) · 3 LSE blue chips · 3 TSE blue chips · 1 ETF (CNXF) · 5 Penny stocks\n"
+                "All prices in Yuan. Buy/sell blocked when exchange is closed.\n"
+                "Holding stocks at 2%+ unrealized gain boosts score up to +0.30/day."
+            ),
+            inline=False,
+        )
+        e.add_field(
+            name="STOCK COMMANDS",
+            value=(
+                "`/market` · Live prices for all tickers\n"
+                "`/stocks chart <ticker> [period]` · Price chart (1D 5D 1M 3M 6M 1Y)\n"
+                "`/stocks buy <ticker> <shares>` · Buy shares\n"
+                "`/stocks sell <ticker> <shares>` · Sell shares\n"
+                "`/stocks portfolio` · Open positions with live P&L"
+            ),
+            inline=False,
+        )
+        e.add_field(
+            name="TURBO CERTIFICATES",
+            value=(
+                "12 turbos generated daily. Leveraged long/short with a knockout barrier.\n"
+                "Leverage: 2x 3x 5x 7x 10x — knocked out if price crosses the barrier.\n"
+                "`/turbos list` · Today's turbos · `/turbos open <id> <yuan>` · `/turbos close <pos_id>`"
+            ),
+            inline=False,
+        )
+        e.add_field(name="CIRCUIT BREAKERS", value="7% intraday move → 15-min halt · 20% daily move → locked for the day.", inline=False)
+        return e
+
+    def _page_events(self) -> discord.Embed:
+        e = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · EVENTS & POSTERS")
+        e.add_field(name="ccp poster",         value="Display a random propaganda poster. Available to all citizens.", inline=False)
+        e.add_field(name="DAILY BROADCASTS",   value="Enabled by a mod. A new poster is broadcast daily. React ❤️ → +3 score and ¥250 · React 😡 → -1 score.", inline=False)
+        e.add_field(
+            name="PROPAGANDA EVENTS",
+            value=(
+                "1. Mod opens a submission event with `/propaganda start`\n"
+                "2. Citizens submit quotes via `/propaganda submit <text>` (max 280 chars)\n"
+                "3. After the deadline, all submissions are posted with 👍/👎 reaction voting\n"
+                "4. Most-approved quote becomes an official guild decree, retrievable via `/decree`"
+            ),
+            inline=False,
+        )
+        e.add_field(name="BANNED CONTENT", value="Submissions referencing banned topics: **−5.00 score** and a ban from that event.", inline=False)
+        return e
+
+    def _page_achievements(self) -> discord.Embed:
+        e = discord.Embed(color=0xCC0000, title="成就 · ACHIEVEMENTS")
+        e.add_field(name="/achievements [citizen]", value="View all unlocked and locked achievements. Secret ones show only a hint until earned.", inline=False)
+        e.add_field(name="CATEGORIES",             value="Score · Economy · Social · Markets · Propaganda · Joke", inline=False)
+        e.add_field(name="REWARDS",                value="Most achievements grant Yuan, score, or a cosmetic badge shown in your profile header.", inline=False)
+        e.add_field(name="RARITY",                 value="Each achievement shows the percentage of citizens who have unlocked it.", inline=False)
+        e.add_field(name="MOD SETTINGS",           value="`ccp achievementnotification [on|off]` · `ccp achievementchannel [#channel]`", inline=False)
+        return e
+
+    def _page_mod(self) -> discord.Embed:
+        e = discord.Embed(color=0x333333, title="中华人民共和国社会信用局 · MOD COMMANDS")
+        e.description = "Prefix commands typed directly in chat. Requires **Manage Server** permission."
+        e.add_field(
+            name="CITIZEN MANAGEMENT",
+            value=(
+                "`ccp initialize` · Register all current members\n"
+                "`ccp adjust <@citizen> <delta> <reason>` · Manual score adjustment\n"
+                "`ccp reset <@citizen>` · Reset score to 750"
+            ),
+            inline=False,
+        )
+        e.add_field(
+            name="SERVER SETTINGS",
+            value=(
+                "`ccp threshold <n>` · Fundraiser vote threshold (default 3)\n"
+                "`ccp executions [#channel]` · Dedicated execution notice channel\n"
+                "`ccp roles [on|off]` · Toggle rank role assignment"
+            ),
+            inline=False,
+        )
+        e.add_field(
+            name="ACHIEVEMENTS & POSTERS",
+            value=(
+                "`ccp achievementnotification [on|off]` · Toggle unlock announcements\n"
+                "`ccp achievementchannel [#channel]` · Dedicated achievement channel\n"
+                "`ccp posters [on|off]` · Toggle daily poster broadcast in this channel\n"
+                "`ccp posterschannel [#channel]` · Set dedicated poster channel"
+            ),
+            inline=False,
+        )
+        e.add_field(
+            name="/propaganda start <submit_ch> <reveal_ch> <hours>",
+            value="Open a propaganda submission event. Citizens submit quotes, voting runs 24h, winner becomes a guild decree.",
+            inline=False,
+        )
+        return e
+
+    def _page_privacy(self) -> discord.Embed:
+        e = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · PRIVACY & LEGAL")
+        e.add_field(
+            name="/optout",
+            value=(
+                "Permanently opt out of the Social Credit System. Stops message scoring and blocks all commands. "
+                "Permanently deletes all data tied to your Discord ID across every server: score, yuan, history, achievements, "
+                "badges, portfolios, and more. Requires confirmation."
+            ),
+            inline=False,
+        )
+        e.add_field(
+            name="/optin",
+            value="Reverse an opt-out. Re-registers you as a brand new citizen starting from scratch. Requires confirmation.",
+            inline=False,
+        )
+        e.add_field(
+            name="DISCLAIMER",
+            value=(
+                "This bot is a satirical meme project, not affiliated with or representative of the CCP or Chinese government. "
+                "The creator does not endorse authoritarianism or surveillance. This is a joke. The irony is the point. "
+                "Run `/disclaimer` for full text."
+            ),
+            inline=False,
+        )
+        return e
 
 
 class Guide(commands.Cog):
@@ -79,418 +359,15 @@ class Guide(commands.Cog):
     async def _before_refresh(self):
         await self.bot.wait_until_ready()
 
-    def _build_guide_batches(self) -> list[list[discord.Embed]]:
-        embeds = []
-
-        e0 = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · DATA AND PRIVACY")
-        e0.description = "Before anything else, citizens should know their rights regarding personal data."
-        e0.add_field(
-            name="/optout",
-            value=(
-                "Permanently opt out of the Social Credit System. This immediately stops your messages "
-                "from being scored and blocks you from using any other bot command. Every row of data tied "
-                "to your Discord ID is permanently deleted across every server the Bureau operates in: "
-                "score, yuan, transaction history, achievements, badges, fundraiser activity, stock "
-                "portfolios, vote history, and everything else. Requires confirmation before it takes effect."
-            ),
-            inline=False,
-        )
-        e0.add_field(
-            name="/optin",
-            value=(
-                "Reverses an opt-out. Since opting out permanently deletes your data, opting back in "
-                "re-registers you as a brand new citizen starting from scratch. Requires confirmation."
-            ),
-            inline=False,
-        )
-        e0.set_footer(text="GLORY TO THE CCP!")
-        embeds.append(e0)
-
-        e1 = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · SCORING RULES")
-        e1.description = (
-            "Every message you send is evaluated by the Bureau. "
-            "Score changes are silent and accumulate over time. The Bureau will notify you when something significant happens."
-        )
-        e1.add_field(
-            name="SENTIMENT",
-            value=(
-                "Each message is analyzed for tone. Positive messages nudge your score up, "
-                "negative ones nudge it down. Max impact per message is +0.30 or -0.30. "
-                "Neutral messages grant a small +0.03 bonus for civic participation.\n"
-                "Consecutive positive messages build a streak multiplier (up to 1.5x at streak 15+)."
-            ),
-            inline=False,
-        )
-        e1.add_field(
-            name="DAILY MESSAGE LIMITS",
-            value=(
-                "Score gains from messages are capped at **+8.00 net per day**. "
-                "Once reached, further positive messages yield nothing until penalties bring you below the cap.\n"
-                "Once your net score gained today reaches **+6.00**, further positive messages contribute at 25% effectiveness. "
-                "This reverses automatically if penalties bring your net back below +6.00 — it is not a one-way switch.\n"
-                "Negative penalties are always full strength regardless of net score today."
-            ),
-            inline=False,
-        )
-        e1.add_field(
-            name="COUNTER-REVOLUTIONARY SPEECH",
-            value=(
-                "Messages referencing banned topics (Tiananmen, Taiwan independence, Xinjiang, Tibet, "
-                "Falun Gong, and related subjects) are flagged regardless of tone. Penalty: -0.30."
-            ),
-            inline=False,
-        )
-        e1.add_field(
-            name="STRUCTURAL VIOLATIONS",
-            value=(
-                "Sending the same message twice in a row (10+ characters): -0.7\n"
-                "Excessive caps (16+ character messages, 80%+ uppercase): -0.4"
-            ),
-            inline=False,
-        )
-        e1.add_field(
-            name="INACTIVITY DECAY",
-            value="Citizens inactive for more than 7 days will have their score gently nudged toward 750 each day until they return.",
-            inline=False,
-        )
-        e1.set_footer(text="Disclaimer: see /disclaimer · GLORY TO THE CCP!")
-        embeds.append(e1)
-
-        e2 = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · CITIZEN GUIDE")
-        e2.description = (
-            "Score range: 600 (floor) to 1300 (ceiling). Everyone starts at 750. "
-            "Rank changes trigger an official bureau notification."
-        )
-        rank_lines = "\n".join(f"{r['min']} to {r['max']}   {r['name']}" for r in RANKS)
-        e2.add_field(name="RANKS", value=f"```\n{rank_lines}\n```", inline=False)
-        e2.add_field(
-            name="EXECUTION LIST",
-            value=(
-                "Citizens whose score falls to 610 or below are placed on the Execution List "
-                "and assigned the role **Execution Date: Tomorrow**. Their Yuan balance is confiscated and distributed to other citizens. "
-                "Check your score regularly with `/score` — recovery above 610 removes the role."
-            ),
-            inline=False,
-        )
-        e2.add_field(
-            name="RANK CHANGE REWARDS",
-            value=(
-                "Promotions award Yuan based on the rank you enter. Demotions deduct Yuan based on the rank you leave. "
-                "Amounts scale with rank tier. Higher tiers carry larger rewards and steeper penalties."
-            ),
-            inline=False,
-        )
-        e2.add_field(
-            name="RANK ROLES",
-            value=(
-                "By default the bot automatically creates and assigns a Discord server role for each rank tier, "
-                "keeping it in sync with your score. Mods can disable this with `ccp roles off` if the server "
-                "does not want role clutter. The Execution List role is always active regardless of this setting."
-            ),
-            inline=False,
-        )
-        embeds.append(e2)
-
-        e3 = discord.Embed(color=0xCC0000, title="SCORE AND STAT COMMANDS")
-        e3.add_field(name="/score [citizen]",        value="View your score, current rank tier, and your server rank position (e.g. #3 of 120).", inline=False)
-        e3.add_field(name="/stats [citizen]",        value="Full breakdown across 3 pages: Overview (score, rank, trends, rank streak · total days at rank), Social (endorsements, rebukes, reports), Economy (yuan, items, lottery stats, check-in streak).", inline=False)
-        e3.add_field(name="/daily_report [citizen]",  value="Today's score activity for any citizen: positive, negative, net change, message counts (positive/negative/neutral), and yuan compared to yesterday.", inline=False)
-        e3.add_field(name="/leaderboard",            value="Rankings across 5 pages: Score, Economy, Activity, Social, and Markets (portfolio value and realized P&L).", inline=False)
-        e3.add_field(name="/globalrank me",           value="Your cross-server standing: balance, average score, total earned, and your global rank position in all 4 categories.", inline=False)
-        e3.add_field(name="/globalrank top",          value="Global leaderboard with 4 tabs: **Top Balance** (current yuan held), **Top Earned** (yuan earned — 7D / 30D / All-Time), **Top Score** (avg score), **Top Citizens** (composite). Also mirrored live on the web dashboard. Names hidden by default.", inline=False)
-        e3.add_field(name="/globalrank visibility <on|off>", value="Show or hide your name on `/globalrank top` and the web leaderboard. Your badge and prestige stars are always kept current — no need to re-opt-in when they change.", inline=False)
-        e3.add_field(name="/prestige",                value="When your score reaches **1290**, sacrifice it back to 750 and earn a prestige star displayed next to your name globally. Yuan balance resets to 0. No cooldown — reaching 1290 again is the only gate.", inline=False)
-        e3.add_field(name="/state_report",           value="Server-wide report: biggest rise/fall, top informant, yuan in circulation, avg score.", inline=False)
-        e3.add_field(name="/graph <score|yuan> [citizen]", value="Generate a 30-day trend graph for score or yuan. Yuan graph populates once per day.", inline=False)
-        e3.add_field(name="/checkin",                value="Perform your daily check-in. Earns Yuan and a small score bump on every server you share with the bot. Streak increases daily reward up to ¥2,000.", inline=False)
-        e3.add_field(name="/botinfo",                value="Technical information about the bot: creator, tech stack, server count, repo and invite links.", inline=False)
-        e3.add_field(name="/uptime",                 value="How long the Bureau has been active since last restart.", inline=False)
-        e3.add_field(name="/ping",                   value="Check the Bureau's response latency.", inline=False)
-        e3.add_field(name="/decree",                 value="Receive an official proclamation from the Bureau. May include decrees written by citizens.", inline=False)
-        e3.add_field(name="/credits",                value="Open-source libraries powering the surveillance apparatus.", inline=False)
-        e3.add_field(name="/invite",                 value="Get a link to expand the Bureau's reach to another server.", inline=False)
-        embeds.append(e3)
-
-        e4 = discord.Embed(color=0xCC0000, title="YUAN AND ECONOMY")
-        e4.add_field(
-            name="Earning Yuan",
-            value=(
-                "You earn ¥10 per message automatically. Check-ins and propaganda victories are additional sources.\n"
-                "Messages that trigger a structural penalty (repeated or excessive caps) earn **¥0** that message.\n"
-                "After **25** yuan-earning messages per day, further messages pay **25%** of normal. Resets at midnight UTC.\n"
-                f"Members of the [support server]({SUPPORT_URL}) earn +15% yuan per message and are exempt from the daily diminishing curve.\n"
-                "**Wealth tax:** When your balance is ¥100,000 or above, 10% of every yuan credit is redirected to the Bureau Treasury."
-            ),
-            inline=False,
-        )
-        e4.add_field(name="/yuan",         value="Check your Yuan balance and lifetime earned/spent.", inline=False)
-        e4.add_field(name="/transfer <citizen> <amount>", value="Send Yuan directly to another citizen. A confirmation prompt shows the amount and your balance after transfer before executing.", inline=False)
-        e4.add_field(name="/requestyuan <citizen> <amount>", value="Request Yuan from another citizen. Posts a public embed they can Accept or Decline. Expires after 5 minutes.", inline=False)
-        e4.add_field(name="/battle <opponent> <amount>", value="Challenge a citizen to a 50/50 Yuan duel. Minimum ¥1,000 stake. Both sides risk the same amount, the opponent must Accept or Decline within 5 minutes, and the winner takes both stakes. Declining or letting it expire refunds the challenger in full.", inline=False)
-        e4.add_field(
-            name="/shop",
-            value=(
-                "Browse the full catalogue across 5 categories. Run `/shop` first to see what you can afford at your current balance.\n"
-                "Categories: **Core** (reports, defense, rehabilitation) · **Economy** (bounties, disputes) · "
-                "**Misc** (inspection, legal cover, fabricated evidence) · **Lottery** (5 tiers) · **Cosmetic** (prestige badges, Winnie the Pooh)"
-            ),
-            inline=False,
-        )
-        e4.add_field(
-            name="/buy <item> [target] [text]",
-            value=(
-                "Purchase any item by its ID. Key items:\n"
-                "`report` (¥2,500) · Dock a target 2 score points.\n"
-                "`denounce` (¥12,000) · Public denouncement. Docks target 20 score points. 48h cooldown per target.\n"
-                "`surveillance` (¥2,000) · Unlocks one `/surveillance_report` use on a target.\n"
-                "`rehabilitate` (¥3,000+) · Recover +3 score. Cost doubles each use.\n"
-                "`appeal` (¥4,000) · Next incoming penalty reduced 50% within 12 hours.\n"
-                "`exception` (¥12,000) · Completely cancels the next negative action against you.\n"
-                "`reeducation` (¥20,000) · Freeze a target's score for 2 hours.\n"
-                "**Gifting:** Add a `target` to any self-item (`rehabilitate`, `appeal`, `exception`, `model_citizen`, `legal_rep`, `immunity`, `media_coverage`) "
-                "to gift it to another citizen instead. A public announcement is posted. Add `text` as a gift message.\n"
-                "See `/shop` for all items."
-            ),
-            inline=False,
-        )
-        e4.add_field(
-            name="LOTTERY TIERS",
-            value=(
-                "Five tiers scaling with your wealth. All share the same 70/20/10 odds. Add a `target` to buy a ticket for someone else.\n"
-                "`lottery` ¥500 · win ¥600–1,000 · jackpot ¥2,000–4,000\n"
-                "`lottery_standard` ¥2,500 · win ¥3,000–5,000 · jackpot ¥10,000–20,000\n"
-                "`lottery_premium` ¥10,000 · win ¥12,000–18,000 · jackpot ¥40,000–80,000\n"
-                "`lottery_elite` ¥50,000 · win ¥60,000–90,000 · jackpot ¥200,000–400,000\n"
-                "`lottery_chairman` ¥250,000 · win ¥300,000–500,000 · jackpot ¥1,000,000–2,000,000"
-            ),
-            inline=False,
-        )
-        e4.add_field(
-            name="/surveillance_report <target>",
-            value="Redeem a purchased surveillance package. Shows a full 30-day intelligence dossier: score trend, yuan, all-time high/low, threat assessment, and top activity breakdown.",
-            inline=False,
-        )
-        e4.add_field(
-            name="/confess <text>",
-            value=(
-                "Publicly confess your crimes to the Bureau. Costs Yuan scaled to how far your score has fallen "
-                "(¥200 minimum · up to ¥750 at the floor). Grants +0.5 score on acceptance. 1 hour cooldown."
-            ),
-            inline=False,
-        )
-        e4.add_field(
-            name="/vote",
-            value=(
-                "Vote for this bot on Top.gg. Earns the Loyal Patriot badge, +2.00 score, and ¥1,500 yuan "
-                "on every server you share with the bureau. Lasts 12 hours · vote again to renew."
-            ),
-            inline=False,
-        )
-        embeds.append(e4)
-
-        e5 = discord.Embed(color=0xCC0000, title="SOCIAL RATING")
-        e5.add_field(
-            name="/endorse <citizen> [reason]",
-            value="Grant a citizen a positive rating. Adjusts their score by +1.5. One use per citizen per 24 hours. Optional reason is displayed in the embed and logged.",
-            inline=False,
-        )
-        e5.add_field(
-            name="/rebuke <citizen> [reason]",
-            value="Issue a negative rating against a citizen. Adjusts their score by -1.5. One use per citizen per 24 hours. Optional reason is displayed in the embed and logged.",
-            inline=False,
-        )
-        e5.set_footer(text="GLORY TO THE CCP!")
-        embeds.append(e5)
-
-        e6 = discord.Embed(color=0xCC0000, title="FUNDRAISERS")
-        e6.add_field(
-            name="LIFECYCLE",
-            value=(
-                "1. Organizer creates a fundraiser with a Yuan goal and a description of what they will do.\n"
-                "2. Citizens donate Yuan. Donated funds are held in escrow.\n"
-                "3. When the goal is reached, the organizer must follow through, then mark it complete.\n"
-                "4. Citizens vote to confirm or deny. If enough confirm, the organizer receives the funds. "
-                "If enough deny, all donors are refunded."
-            ),
-            inline=False,
-        )
-        e6.add_field(name="/fundraise create <goal> <description>", value="Start a fundraiser. Set a Yuan goal and describe what you will do.", inline=False)
-        e6.add_field(name="/fundraise donate <id> <amount>",        value="Donate Yuan to an open fundraiser. Cannot donate to your own.", inline=False)
-        e6.add_field(name="/fundraise complete <id>",               value="Mark your funded fundraiser as complete. Opens the voting phase.", inline=False)
-        e6.add_field(name="/fundraise vote <id> <confirm|deny>",    value="Vote on whether the organizer fulfilled their obligation. One vote per citizen.", inline=False)
-        e6.add_field(name="/fundraise list",                        value="List all active fundraisers in this server.", inline=False)
-        e6.add_field(name="/fundraise info <id>",                   value="View full details and vote tally for a specific fundraiser.", inline=False)
-        embeds.append(e6)
-
-        e7 = discord.Embed(color=0x333333, title="MOD COMMANDS")
-        e7.description = "Prefix commands are typed directly in chat. Slash commands marked with / require mod permissions."
-        e7.add_field(name="ccp initialize",                         value="Register all current server members into the system.", inline=False)
-        e7.add_field(name="ccp adjust <@citizen> <delta> <reason>", value="Manually adjust a citizen's score by any amount.", inline=False)
-        e7.add_field(name="ccp reset <@citizen>",                   value="Reset a citizen back to 750.", inline=False)
-        e7.add_field(name="ccp threshold <n>",                      value="Set how many votes are required to resolve a fundraiser. Default is 3.", inline=False)
-        e7.add_field(name="ccp executions [#channel]",              value="Set a dedicated channel for Execution List notices. Omit the channel to clear and revert to posting in the message channel.", inline=False)
-        e7.add_field(name="ccp roles [on|off]",                     value="Toggle whether rank tier changes assign real Discord server roles. On by default. Execution List role is unaffected.", inline=False)
-        e7.add_field(name="ccp achievementnotification [on|off]",   value="Toggle public channel announcements when a citizen unlocks an achievement. On by default.", inline=False)
-        e7.add_field(name="ccp achievementchannel [#channel]",      value="Set a dedicated channel for achievement unlock announcements. Omit the channel to clear and revert to posting in the triggering channel.", inline=False)
-        e7.add_field(name="ccp posters [on|off]",                    value="Toggle daily propaganda poster broadcasts in this channel. Omit the argument to toggle.", inline=False)
-        e7.add_field(name="ccp posterschannel [#channel]",           value="Set a dedicated channel for daily poster broadcasts. Omit the channel to use the current one.", inline=False)
-        e7.add_field(
-            name="/propaganda start <submit_channel> <reveal_channel> <duration_hours>",
-            value=(
-                "Open a propaganda submission event. Citizens submit quotes via `/propaganda submit`. "
-                "When the submission window closes, all entries are posted in the reveal channel with reaction voting. "
-                "After 24 hours, the winning quote is enshrined as an official guild decree."
-            ),
-            inline=False,
-        )
-        e7.set_footer(text="GLORY TO THE CCP!")
-        embeds.append(e7)
-
-        exchange_status = _all_exchange_status()
-        hours_lines = []
-        for exchange, st in exchange_status.items():
-            tag = "🟢 Open now" if st["open"] else "🔴 Closed now"
-            event_lbl = "Closes" if st["next_event"] == "close" else "Opens"
-            hours_lines.append(f"**{_EXCHANGE_NAMES[exchange]}** ({exchange})  {tag} · {event_lbl} <t:{st['next_ts']}:R>")
-
-        e_stocks = discord.Embed(color=0xCC0000, title="北京证券交易所 · MARKETS")
-        e_stocks.add_field(
-            name="MARKET HOURS",
-            value=(
-                "\n".join(hours_lines) + "\n"
-                "TSE observes a midday lunch recess (11:30–12:30 JST) where trading pauses.\n"
-                "When an exchange is closed, its tickers freeze at the last traded price — "
-                "charts and portfolio history hold a flat line until that exchange reopens, "
-                "exactly like a real broker."
-            ),
-            inline=False,
-        )
-        e_stocks.add_field(
-            name="STOCKS · PRICES SHOWN IN YUAN",
-            value=(
-                "New York · 5 China ADRs (BABA, BIDU, NIO, JD, BILI) · real prices via yfinance\n"
-                "London · 3 LSE blue chips (HSBA.L, BP.L, ULVR.L) · GBX converted to GBP then Yuan\n"
-                "Tokyo · 3 TSE blue chips (7203.T Toyota, 6758.T Sony, 9984.T SoftBank) · JPY to Yuan\n"
-                "1 ETF (CNXF) · tracks the basket average of all 11 real tickers across all 3 exchanges\n"
-                "5 Penny stocks (XMNG, DWJT, HQBC, RMKD, WSJZ) · high-volatility simulation, NYSE hours\n"
-                "Penny stocks may trigger a 🔥 PUMP · sudden drift followed by a -20% crash\n"
-                "All non-Yuan prices are converted live using USD/GBP/JPY to Yuan exchange rates."
-            ),
-            inline=False,
-        )
-        e_stocks.add_field(
-            name="SOCIAL CREDIT BONUS",
-            value=(
-                "Holding stocks at a 2%+ unrealized gain slowly raises your score. "
-                "Checked once every 24 hours alongside score decay. "
-                "Reward scales with your gain percentage, capped at +0.30 per day. Losses never penalize score."
-            ),
-            inline=False,
-        )
-        e_stocks.add_field(name="/market",           value="Live prices for all stocks with market status, opening hours, and day-open prices.", inline=False)
-        e_stocks.add_field(
-            name="/stocks chart <ticker> [period] [candlestick|line]",
-            value="Price chart for any stock. Periods: 1D · 5D · 1M · 3M · 6M · 1Y.",
-            inline=False,
-        )
-        e_stocks.add_field(name="/stocks buy <ticker> <shares>",   value="Buy shares. Deducted from your Yuan balance.", inline=False)
-        e_stocks.add_field(name="/stocks sell <ticker> <shares>",  value="Sell shares. Proceeds added to Yuan. P&L tracked.", inline=False)
-        e_stocks.add_field(name="/stocks portfolio",               value="View all open stock positions and turbo certificates with live P&L.", inline=False)
-        e_stocks.add_field(
-            name="TURBO CERTIFICATES",
-            value=(
-                "12 turbos generated daily across all tickers. Each is a leveraged directional instrument.\n"
-                "**LONG** · profits if price rises · **SHORT** · profits if price falls\n"
-                "Leverage: 2x 3x 5x 7x 10x · Knockout: price level that wipes the position\n"
-                "A 10x Long is knocked out at -10% · a 5x Short is knocked out at +20%"
-            ),
-            inline=False,
-        )
-        e_stocks.add_field(name="/turbos list",                    value="View today's 12 turbos with knockout levels and current value factor.", inline=False)
-        e_stocks.add_field(name="/turbos open <id> <yuan>",        value=f"Invest yuan in a turbo. Minimum ¥100. Value updates every 2 minutes.", inline=False)
-        e_stocks.add_field(name="/turbos close <position_id>",     value="Manually close a turbo position and collect proceeds.", inline=False)
-        e_stocks.add_field(
-            name="CIRCUIT BREAKERS",
-            value="7% intraday move halts trading 15 min · 20% daily move locks the stock for the day.",
-            inline=False,
-        )
-        embeds.append(e_stocks)
-
-        e8 = discord.Embed(color=0xCC0000, title="PROPAGANDA EVENTS")
-        e8.add_field(name="ccp poster", value="Display a random propaganda poster. Available to all citizens.", inline=False)
-        e8.add_field(
-            name="DAILY PROPAGANDA BROADCASTS",
-            value="When enabled by a mod, a poster is posted daily. React ❤️ for +3 score and ¥250 · React 😡 for -1 score.",
-            inline=False,
-        )
-        e8.add_field(
-            name="/propaganda submit <text>",
-            value=(
-                "Submit your propaganda quote to the active event (max 280 characters). One submission per citizen per event. "
-                "Submissions containing banned content result in a −5.00 score penalty and a ban from that event."
-            ),
-            inline=False,
-        )
-        e8.add_field(
-            name="EVENT LIFECYCLE",
-            value=(
-                "1. Mod starts event with a submission channel and reveal channel.\n"
-                "2. Citizens submit via `/propaganda submit` before the deadline.\n"
-                "3. On close, all submissions are posted in the reveal channel with 👍/👎 reactions.\n"
-                "4. After 24 hours, the most-approved submission becomes an official guild decree, "
-                "accessible via `/decree`. The winner's profile records a Propaganda Victory."
-            ),
-            inline=False,
-        )
-        e8.set_footer(text="Disclaimer: see /disclaimer · GLORY TO THE CCP!")
-        embeds.append(e8)
-
-        e9 = discord.Embed(color=0xCC0000, title="成就 · ACHIEVEMENTS")
-        e9.add_field(
-            name="/achievements [citizen]",
-            value="View your unlocked and locked achievements. Locked secret achievements show only a hint until earned.",
-            inline=False,
-        )
-        e9.add_field(
-            name="CATEGORIES",
-            value="Score · Economy · Social · Markets · Propaganda · Joke",
-            inline=False,
-        )
-        e9.add_field(
-            name="For Mods",
-            value=(
-                "Turn off by using `ccp achievementnotification off`, choose a channel by doing `ccp achievementchannel [channel]"
-            ),
-            inline=False,
-        )
-        e9.add_field(
-            name="REWARDS",
-            value="Most achievements grant Yuan, score, or a cosmetic badge shown in your profile header.",
-            inline=False,
-        )
-        e9.set_footer(text="GLORY TO THE CCP!")
-        embeds.append(e9)
-
-        return [
-            embeds[0:1],
-            embeds[1:3],
-            embeds[3:5],
-            embeds[5:8],
-            embeds[8:10],
-            embeds[10:11],
-        ]
+    def _make_guide_view(self) -> tuple[GuideView, discord.Embed]:
+        view = GuideView(_all_exchange_status())
+        return view, view.build("overview")
 
     @app_commands.command(name="guide", description="Full guide to the Social Credit System")
     async def guide(self, interaction: discord.Interaction):
-        batches = self._build_guide_batches()
         await interaction.response.defer(ephemeral=True)
-        try:
-            for batch in batches:
-                await interaction.user.send(embeds=batch)
-            await interaction.followup.send("The Bureau's orientation package has been dispatched to your private channel.", ephemeral=True)
-        except discord.Forbidden:
-            for batch in batches:
-                await interaction.followup.send(embeds=batch, ephemeral=True)
+        view, embed = self._make_guide_view()
+        await interaction.followup.send(embed=embed, view=view, file=discord.File("images/bureau.png"), ephemeral=True)
 
     @app_commands.command(name="help", description="Full guide to the Social Credit System")
     async def help(self, interaction: discord.Interaction):
@@ -502,12 +379,8 @@ class Guide(commands.Cog):
             await ctx.message.add_reaction("🇨🇳")
         except discord.HTTPException:
             pass
-        batches = self._build_guide_batches()
-        try:
-            for batch in batches:
-                await ctx.author.send(embeds=batch)
-        except discord.Forbidden:
-            await ctx.send("Your DMs are closed. Run `/help` or `/guide` instead.")
+        view, embed = self._make_guide_view()
+        await ctx.reply(embed=embed, view=view, file=discord.File("images/bureau.png"))
 
     @app_commands.command(name="ping", description="Check the Bureau's response latency")
     async def ping(self, interaction: discord.Interaction):
@@ -548,11 +421,7 @@ class Guide(commands.Cog):
         e.set_thumbnail(url="attachment://bureau.png")
         for name, desc in CREDITS_LINES:
             e.add_field(name=name, value=desc, inline=False)
-        e.add_field(
-            name="SOURCE CODE",
-            value=f"[GitHub]({REPO_URL})",
-            inline=False,
-        )
+        e.add_field(name="SOURCE CODE", value=f"[GitHub]({REPO_URL})", inline=False)
         await interaction.response.send_message(embed=e, file=discord.File("images/bureau.png"), ephemeral=True)
 
     @app_commands.command(name="disclaimer", description="Legal and ethical disclaimer for this bot")
@@ -614,7 +483,6 @@ class Guide(commands.Cog):
         )
         e.add_field(name="ONLINE SINCE", value=f"<t:{int(start_time.timestamp())}:F>", inline=False)
         e.set_thumbnail(url="attachment://bureau.png")
-
         await interaction.followup.send(embed=e, file=discord.File("images/bureau.png"), ephemeral=True)
 
     @app_commands.command(name="botinfo", description="Information about Social Credit Surveillantr")
@@ -638,7 +506,6 @@ class Guide(commands.Cog):
             ),
         )
         e.set_thumbnail(url="attachment://bureau.png")
-
         e.add_field(name="VERSION",  value="1.0.3",   inline=True)
         e.add_field(name="CREATOR",  value="saguny",  inline=True)
         e.add_field(name="LATENCY",  value=f"{discord_ms} ms discord · {db_ms} ms database", inline=True)
@@ -653,24 +520,13 @@ class Guide(commands.Cog):
             ),
             inline=False,
         )
-        e.add_field(
-            name="TECHNOLOGY",
-            value=(
-                "discord.py 2.x · PostgreSQL · vaderSentiment · langdetect · deep-translate"
-            ),
-            inline=False,
-        )
-        e.add_field(
-            name="LINKS",
-              value=f"[Source Code]({REPO_URL}) · [Invite to Server]({INVITE_URL}) · [Public Dashboard]({DASHBOARD_URL})",
-            inline=False,
-        )
+        e.add_field(name="TECHNOLOGY", value="discord.py 2.x · PostgreSQL · vaderSentiment · langdetect · deep-translate", inline=False)
+        e.add_field(name="LINKS",      value=f"[Source Code]({REPO_URL}) · [Invite to Server]({INVITE_URL}) · [Public Dashboard]({DASHBOARD_URL})", inline=False)
         e.add_field(
             name="★ SUPPORT SERVER ★",
             value=f"[Join here]({SUPPORT_URL}) · changelogs and updates posted constantly, this is the place to follow.\nAlso join for a +15% yuan boost globally!",
             inline=False,
         )
-
         e.set_footer(text="Disclaimer: see /disclaimer")
         await interaction.followup.send(embed=e, file=discord.File("images/bureau.png"))
 
