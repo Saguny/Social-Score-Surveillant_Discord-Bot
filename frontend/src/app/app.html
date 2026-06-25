@@ -1,1 +1,21 @@
-<router-outlet></router-outlet>
+<div class="app">
+    <div class="side-bar">
+        <h1 class="app-title"><a [routerLink]="['/']">Social Credit<br>Surveillant</a></h1>
+        <div class="side-bar-elements">
+            <div class="side-bar-links">
+                <a [routerLink]="['/dashboard']">Dashboard</a>
+                <a [routerLink]="['/leaderboard']">Leaderboard</a>
+                <!-- falls logged in dann loginnamen anzeigen -->
+                <a (click)="login()">Login</a>
+            </div>
+            <div class="side-bar-infos">
+                <span (click)="theme()">Theme</span>
+                <span>UI v1.0.0 ★ Bot v1.0.0</span>
+                <span><a [routerLink]="['/tos']">Terms of Service</a></span>
+                <span><a href="https://github.com/Saguny/Social-Score-Surveillant_Discord-Bot" target="_blank">Source
+                        Code</a> ★ <a [routerLink]="['/privacy']">Privacy Policy</a></span>
+            </div>
+        </div>
+    </div>
+    <router-outlet></router-outlet>
+</div>

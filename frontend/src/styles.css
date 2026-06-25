@@ -1,1 +1,52 @@
-/* You can add global styles to this file, and also import other style files */
+:root {
+    --background: #000;
+    --side-bar-background: #1b0000a6;
+    --side-bar-border: #460000a6;
+    --text: #fff;
+    --text-secondary: #ffb200;
+}
+
+* {
+    user-select: none;
+}
+
+body {
+    margin: 20px;
+    padding: 0;
+    background-color: var(--background);
+    font-size: 0.9em;
+    color: var(--text);
+    font-family: "Space Grotesk", sans-serif;
+    font-optical-sizing: auto;
+    font-weight: 500;
+    font-style: normal;
+    word-break: normal;
+}
+
+a {
+    color: var(--text);
+    text-decoration: none;
+}
+
+a:hover {
+    color: var(--text-secondary);
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.page-title{
+    font-size: 2em;
+    color: var(--text-secondary);
+}
+
+.page-title::before {
+    content: "★ ";
+}
+
+.page-title::after {
+    content: " ★";
+}
+
+.page-container {
+    font-size: 1.4em;
+}
