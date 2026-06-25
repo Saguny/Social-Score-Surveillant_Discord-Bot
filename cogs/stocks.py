@@ -742,16 +742,18 @@ class StocksCog(commands.Cog, name="Stocks"):
         day_open = self._day_opens.get(ticker)
         exchange = _exchange_for(ticker)
 
+        df = None
         if ticker in REAL_TICKERS:
             yf_period, yf_interval = _YF_PERIOD_MAP[period]
-            df = await loop.run_in_executor(None, _yf_history, ticker, yf_period, yf_interval)
-            if df is None or df.empty:
-                raise ValueError("No data from yfinance")
-            if period == "1D":
+            try:
+                df = await loop.run_in_executor(None, _yf_history, ticker, yf_period, yf_interval)
+            except Exception:
+                df = None
+            if df is not None and not df.empty and period == "1D":
                 open_ts = _last_market_open_ts(exchange)
                 df = df[df.index.astype("int64") // 10**9 >= open_ts]
-                if df.empty:
-                    raise ValueError("No price history yet for this period.")
+
+        if df is not None and not df.empty:
             opens      = [self._to_yuan(ticker, float(v)) for v in df["Open"]]
             highs      = [self._to_yuan(ticker, float(v)) for v in df["High"]]
             lows       = [self._to_yuan(ticker, float(v)) for v in df["Low"]]
