@@ -56,6 +56,31 @@
       <div id="ul-result" style="font-size:.85rem"></div>
     </div>
 
+    <div class="shdr">Dashboard Announcement</div>
+    <div class="card-panel p-4 mb-3">
+      <div class="row g-2 align-items-end mb-2">
+        <div class="col-auto form-check pt-4">
+          <input class="form-check-input" type="checkbox" id="an-enabled" onchange="renderAnnouncementPreview()">
+          <label class="form-check-label" for="an-enabled">Show on public dashboard</label>
+        </div>
+        <div class="col-3">
+          <label class="form-label">Severity</label>
+          <select id="an-severity" class="form-select" onchange="renderAnnouncementPreview()">
+            <option value="info">Info</option>
+            <option value="warn">Warning</option>
+            <option value="danger">Danger</option>
+          </select>
+        </div>
+      </div>
+      <div class="mb-2">
+        <label class="form-label">Message</label>
+        <textarea id="an-message" class="form-control" rows="2" maxlength="500" placeholder="Scheduled maintenance tonight at 22:00 UTC." oninput="renderAnnouncementPreview()"></textarea>
+      </div>
+      <div id="an-preview" class="mb-2"></div>
+      <button class="btn btn-run px-4" onclick="saveAnnouncement()">SAVE</button>
+      <div id="an-result" class="mt-2" style="font-size:.8rem"></div>
+    </div>
+
     <div class="shdr">Embed Broadcaster</div>
     <div class="card-panel p-4 mb-3">
 
@@ -242,6 +267,7 @@
   loadGuildListForBroadcast();
   renderEmbedFields();
   renderEmbedPreview();
+  loadAnnouncement();
 </script>
 </body>
 </html>

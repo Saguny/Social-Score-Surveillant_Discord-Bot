@@ -23,6 +23,8 @@
 
 <div class="container-fluid px-4">
 
+  <div id="announce-wrap"></div>
+
   <div class="row g-3 mb-3">
 
     <div class="col-lg-3 col-md-6">
@@ -85,6 +87,23 @@
 <script>
 function setHtml(id, html) { const el = document.getElementById(id); if (el) el.innerHTML = html; }
 function fmt(n) { return Number(n).toLocaleString(); }
+
+function _escAnnounce(s) {
+  return (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+async function loadAnnouncement() {
+  try {
+    const res = await fetch('/api/announcement');
+    if (!res.ok) return;
+    const d = await res.json();
+    if (d.enabled && d.message) {
+      setHtml('announce-wrap', `<div class="announce-banner announce-${d.severity || 'info'}">${_escAnnounce(d.message)}</div>`);
+    } else {
+      setHtml('announce-wrap', '');
+    }
+  } catch (e) {}
+}
 
 let _lbData = null;
 let _lbEarnedRange = '7d';
@@ -161,7 +180,9 @@ async function loadLeaderboard() {
 
 document.addEventListener('DOMContentLoaded', () => {
   loadLeaderboard();
+  loadAnnouncement();
   setInterval(loadLeaderboard, 60_000);
+  setInterval(loadAnnouncement, 60_000);
 });
 </script>
 </body>

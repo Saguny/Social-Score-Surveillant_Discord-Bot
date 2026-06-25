@@ -16,6 +16,7 @@ from database._stats       import StatsMixin
 from database._achievements import AchievementsMixin
 from database._counters     import CountersMixin
 from database._privacy      import PrivacyMixin
+from database._announcement import AnnouncementMixin
 
 
 TABLES = [
@@ -217,6 +218,7 @@ class Database(
     AchievementsMixin,
     CountersMixin,
     PrivacyMixin,
+    AnnouncementMixin,
 ):
     def __init__(self):
         self._dsn = os.getenv("DATABASE_URL", "")
@@ -459,3 +461,17 @@ class Database(
                     updated_at   BIGINT NOT NULL
                 )
             """)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS dashboard_announcement (
+                    id         INTEGER PRIMARY KEY DEFAULT 1,
+                    enabled    BOOLEAN NOT NULL DEFAULT FALSE,
+                    message    TEXT,
+                    severity   TEXT NOT NULL DEFAULT 'info',
+                    updated_at BIGINT NOT NULL DEFAULT 0,
+                    CONSTRAINT single_row CHECK (id = 1)
+                )
+            """)
+            await conn.execute(
+                "INSERT INTO dashboard_announcement (id, enabled, message, severity, updated_at) "
+                "VALUES (1, FALSE, '', 'info', 0) ON CONFLICT DO NOTHING"
+            )

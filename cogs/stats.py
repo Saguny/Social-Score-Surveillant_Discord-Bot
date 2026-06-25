@@ -229,8 +229,8 @@ class Stats(commands.Cog):
 
         embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")
         embed.set_author(name=await self.bot.format_user_full(target, gid), icon_url=target.display_avatar.url)
-        embed.add_field(name="SCORE", value=f"{user['score']:.2f} · #{guild_rank['score_rank']} of {guild_rank['total']}", inline=True)
-        embed.add_field(name="RANK", value=rank["name"], inline=True)
+        embed.add_field(name="SCORE", value=f"{user['score']:.2f} · #{guild_rank['score_rank']} of {guild_rank['total']}", inline=False)
+        embed.add_field(name="RANK", value=rank["name"], inline=False)
         await interaction.followup.send(embed=embed)
 
     @commands.command(name="yuan")
@@ -244,9 +244,9 @@ class Stats(commands.Cog):
             )
             embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")
             embed.set_author(name=await self.bot.format_user_full(target, gid), icon_url=target.display_avatar.url)
-            embed.add_field(name="BALANCE", value=f"¥{user['yuan']:,} · #{guild_rank['yuan_rank']} of {guild_rank['total']}", inline=True)
-            embed.add_field(name="TOTAL EARNED", value=f"¥{user['total_yuan_earned']:,}", inline=True)
-            embed.add_field(name="TOTAL SPENT", value=f"¥{user['total_yuan_spent']:,}", inline=True)
+            embed.add_field(name="BALANCE", value=f"¥{user['yuan']:,} · #{guild_rank['yuan_rank']} of {guild_rank['total']}", inline=False)
+            embed.add_field(name="TOTAL EARNED", value=f"¥{user['total_yuan_earned']:,}", inline=False)
+            embed.add_field(name="TOTAL SPENT", value=f"¥{user['total_yuan_spent']:,}", inline=False)
         await ctx.send(embed=embed)
 
     @commands.command(name="stats")
@@ -295,8 +295,8 @@ class Stats(commands.Cog):
             rank = get_rank(user["score"])
             embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")
             embed.set_author(name=await self.bot.format_user_full(target, gid), icon_url=target.display_avatar.url)
-            embed.add_field(name="SCORE", value=f"{user['score']:.2f} · #{guild_rank['score_rank']} of {guild_rank['total']}", inline=True)
-            embed.add_field(name="RANK", value=rank["name"], inline=True)
+            embed.add_field(name="SCORE", value=f"{user['score']:.2f} · #{guild_rank['score_rank']} of {guild_rank['total']}", inline=False)
+            embed.add_field(name="RANK", value=rank["name"], inline=False)
         await ctx.send(embed=embed)
 
     @app_commands.command(name="leaderboard", description="View the social credit rankings")

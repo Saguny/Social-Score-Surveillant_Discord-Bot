@@ -44,6 +44,10 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',sans-seri
 .btn-run.active { background:var(--accent-hover); box-shadow:0 0 0 2px var(--accent-soft); }
 .btn-danger-soft { background:rgba(232,84,84,.12); border:1px solid var(--red); color:var(--red); }
 .btn-danger-soft:hover { background:rgba(232,84,84,.22); color:var(--red); }
+.announce-banner { padding:10px 14px; border-radius:4px; font-size:.85rem; }
+.announce-info   { background:rgba(244,229,87,.12); border:1px solid rgba(244,229,87,.4); color:var(--yellow); }
+.announce-warn   { background:rgba(245,168,85,.12); border:1px solid rgba(245,168,85,.4); color:var(--orange); }
+.announce-danger { background:rgba(232,84,84,.12); border:1px solid rgba(232,84,84,.4); color:var(--red); }
 #terminal {
   background:var(--bg-recessed); border:1px solid var(--border-strong); border-radius:6px;
   font-family:'Courier New',monospace; font-size:.8rem;

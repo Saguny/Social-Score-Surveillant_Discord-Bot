@@ -50,6 +50,11 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',sans-seri
 .anomaly-warn { background:rgba(245,168,85,.12); border:1px solid rgba(245,168,85,.4); color:var(--orange); }
 .anomaly-ok   { background:rgba(61,170,110,.12); border:1px solid rgba(61,170,110,.4); color:var(--green); }
 
+.announce-banner { padding:.6rem 1rem; border-radius:6px; font-size:.85rem; margin-bottom:.75rem; }
+.announce-info   { background:rgba(244,229,87,.12); border:1px solid rgba(244,229,87,.4); color:var(--yellow); }
+.announce-warn   { background:rgba(245,168,85,.12); border:1px solid rgba(245,168,85,.4); color:var(--orange); }
+.announce-danger { background:rgba(232,84,84,.12); border:1px solid rgba(232,84,84,.4); color:var(--red); }
+
 .drow { display:flex; align-items:center; gap:.7rem; margin-bottom:.55rem; }
 .dlbl { width:140px; color:var(--text-muted); flex-shrink:0; text-align:right; font-size:.7rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .dbar-wrap { flex:1; background:var(--bg-recessed); border-radius:4px; height:20px; overflow:hidden; position:relative; }

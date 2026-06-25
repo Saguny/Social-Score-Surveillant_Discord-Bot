@@ -439,6 +439,30 @@ async def _handle_broadcast_embed(request):
     return web.json_response(result, status=status)
 
 
+async def _handle_announcement(request):
+    db = request.app["db"]
+    announcement = await db.get_dashboard_announcement()
+    return web.json_response(announcement)
+
+
+async def _handle_admin_announcement_set(request):
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "Invalid JSON"}, status=400)
+
+    enabled = bool(body.get("enabled"))
+    message = str(body.get("message") or "")[:500]
+    severity = body.get("severity") or "info"
+    if severity not in ("info", "warn", "danger"):
+        severity = "info"
+
+    db = request.app["db"]
+    await db.set_dashboard_announcement(enabled, message, severity)
+    announcement = await db.get_dashboard_announcement()
+    return web.json_response(announcement)
+
+
 async def start_web_server(db):
     global _runner, _cache
     if _runner:
@@ -472,6 +496,8 @@ async def start_web_server(db):
     app.router.add_get("/api/admin/user-lookup", _require_admin(_handle_user_lookup))
     app.router.add_post("/api/admin/user-yuan-adjust", _require_admin(_handle_user_yuan_adjust))
     app.router.add_post("/api/admin/broadcast-embed", _require_admin(_handle_broadcast_embed))
+    app.router.add_get("/api/announcement", _rate_limit_public(_handle_announcement))
+    app.router.add_post("/api/admin/announcement", _require_admin(_handle_admin_announcement_set))
     app.router.add_post("/webhooks/topgg", _handle_topgg_webhook)
     app.router.add_get("/robots.txt", _handle_robots)
     app.router.add_static('/static', Path(__file__).parent / 'static', name='static')

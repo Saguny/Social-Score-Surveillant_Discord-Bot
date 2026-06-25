@@ -225,6 +225,53 @@ async function sendBroadcastEmbed() {
     data.results.map(r => `${r.guild_name} (${r.guild_id}) -- ${r.status}${r.detail ? ': ' + r.detail : ''}`).join('\n');
 }
 
+async function loadAnnouncement() {
+  const res = await fetch('/api/announcement');
+  const data = await res.json();
+  document.getElementById('an-enabled').checked = !!data.enabled;
+  document.getElementById('an-severity').value = data.severity || 'info';
+  document.getElementById('an-message').value = data.message || '';
+  renderAnnouncementPreview();
+}
+
+function renderAnnouncementPreview() {
+  const enabled = document.getElementById('an-enabled').checked;
+  const severity = document.getElementById('an-severity').value;
+  const message = v('an-message');
+  const preview = document.getElementById('an-preview');
+  if (!enabled || !message) {
+    preview.innerHTML = '<div style="color:var(--text-faint);font-size:.75rem">Banner hidden (disabled or empty message).</div>';
+    return;
+  }
+  preview.innerHTML = `<div class="announce-banner announce-${severity}">${_esc(message)}</div>`;
+}
+
+async function saveAnnouncement() {
+  const payload = {
+    enabled: document.getElementById('an-enabled').checked,
+    severity: document.getElementById('an-severity').value,
+    message: v('an-message'),
+  };
+  const out = document.getElementById('an-result');
+  out.style.color = 'var(--text-muted)';
+  out.textContent = 'Saving...';
+
+  const res = await fetch('/api/admin/announcement', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (res.status === 401 || res.status === 403) { location.href = '/login?next=/admin'; return; }
+  const data = await res.json();
+  if (data.error) {
+    out.style.color = 'var(--red)';
+    out.textContent = 'Error: ' + data.error;
+    return;
+  }
+  out.style.color = 'var(--green)';
+  out.textContent = 'Saved. Live on the dashboard immediately, no restart needed.';
+}
+
 let _voteChart = null;
 
 function _formatBucket(ts, period) {

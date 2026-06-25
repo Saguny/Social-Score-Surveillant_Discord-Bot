@@ -204,6 +204,23 @@ function trunc(s,n){return s.length>n?s.slice(0,n)+'…':s;}
 function set(id,v){const e=document.getElementById(id);if(e)e.textContent=v;}
 function setHtml(id,v){const e=document.getElementById(id);if(e)e.innerHTML=v;}
 
+function _escAnnounce(s) {
+  return (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+async function loadAnnouncement() {
+  try {
+    const res = await fetch('/api/announcement');
+    if (!res.ok) return;
+    const d = await res.json();
+    if (d.enabled && d.message) {
+      setHtml('announce-wrap', `<div class="announce-banner announce-${d.severity || 'info'}">${_escAnnounce(d.message)}</div>`);
+    } else {
+      setHtml('announce-wrap', '');
+    }
+  } catch (e) {}
+}
+
 function trendHtml(now, prev) {
   if (!prev) return '';
   const pct = (now - prev) / prev * 100;
@@ -337,7 +354,7 @@ function renderStats(d) {
 
   renderAnomalies(d);
 
-  set('mc-users',  fmt(d.total_users));
+  set('mc-users',  Number(d.total_users || 0).toLocaleString());
   set('mc-users-sub', '');
   set('mc-guilds', fmt(d.total_guilds));
   set('mc-uptime', fmtUptime(uptime));
@@ -545,6 +562,7 @@ function _initTooltips() {
 }
 
 load();
+loadAnnouncement();
 loadActivity('7d');
 loadYuanCirculation();
 loadFeed();
@@ -552,3 +570,4 @@ _connectStream();
 _initTooltips();
 setInterval(() => loadActivity(_activityRange), 300000);
 setInterval(loadYuanCirculation, 300000);
+setInterval(loadAnnouncement, 60000);
