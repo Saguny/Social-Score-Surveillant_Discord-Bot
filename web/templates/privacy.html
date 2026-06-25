@@ -47,6 +47,7 @@
       <li><strong>Discord identifiers.</strong> Your Discord user ID and the ID of any server (guild) you use the bot in, so the bot can track your score, yuan balance, and other in-bot stats per server. Collection works at the server level, not the individual level: when the bot is added to a server, it initializes a starting record for every existing member of that server in one batch, and does the same for anyone who joins afterward. You can use <code>/optout</code> at any time to delete your data and stop further collection — see Section 7 for details.</li>
       <li><strong>In-bot activity.</strong> Message text is analyzed in memory for sentiment, language, and banned-topic matches to calculate score changes; the message content itself is not stored. Free-text you submit through commands such as <code>/confess</code>, <code>/endorse</code>, <code>/rebuke</code>, and similar reason fields is stored, since it is the content of that feature.</li>
       <li><strong>Game-state data.</strong> Score history, yuan balance and transactions, check-in streaks, achievements, cosmetic badges, fictional stock/turbo portfolios, and similar records tied to your Discord ID. A starting record (default score and yuan) is created for you automatically as soon as you are a member of any server the bot is in — this happens the moment you join, or the moment the bot is added to a server you're already in, whichever comes first. You do not need to send a message, run a command, or otherwise interact with the bot for this starting record to be created.</li>
+      <li><strong>Global leaderboard visibility.</strong> If you run <code>/globalrank visibility on</code>, we store your Discord username and display it next to your rank on the cross-server leaderboard, in Discord and on the public dashboard, until you opt back out. This is the only feature where your username is shown publicly under your real identity rather than a pseudonym.</li>
       <li><strong>Top.gg votes.</strong> If you vote for the bot on top.gg, we receive your Discord user ID and the vote timestamp from top.gg's webhook so we can grant the in-bot reward and badge. No message content is involved.</li>
       <li><strong>Technical/network data.</strong> The public dashboard's API endpoints log IP addresses transiently, in memory only, to enforce rate limiting. IP addresses are not stored in the database and are not linked to your Discord identity.</li>
       <li><strong>Admin console access.</strong> The password-protected <code>/admin</code> panel is used by the bot operator to look up a Discord user's real ID, username, and per-guild stats for support and moderation purposes.</li>
@@ -62,13 +63,17 @@
     be updated to reflect the new location and the "Last updated" date above will change accordingly.</p>
 
     <h2>3. What the public dashboard shows</h2>
-    <p>The dashboard you are looking at (<a href="/">/</a>) is open to the public, but it never displays real Discord
-    usernames, server names, or message text. Every user and server shown is replaced with a stable, salted-hash
-    pseudonym (e.g. "User #1842"), so the figures cannot be reversed back into a real Discord identity without
-    the server's private salt. The live activity feed strips free-text reason fields entirely before anything is
-    sent to your browser. The page also carries a <code>noindex, nofollow</code> tag and a <code>robots.txt</code>
-    that disallows crawling, so it is not meant to be indexed by search engines even though it is technically
-    reachable.</p>
+    <p>The dashboard you are looking at (<a href="/">/</a>) is open to the public. By default, it never displays
+    real Discord usernames, server names, or message text. Every user and server shown is replaced with a stable,
+    salted-hash pseudonym (e.g. "User #1842"), so the figures cannot be reversed back into a real Discord identity
+    without the server's private salt. The live activity feed strips free-text reason fields entirely before
+    anything is sent to your browser. The page also carries a <code>noindex, nofollow</code> tag and a
+    <code>robots.txt</code> that disallows crawling, so it is not meant to be indexed by search engines even
+    though it is technically reachable.</p>
+    <p>The global leaderboard (<a href="/leaderboards">/leaderboards</a>) works differently: it is opt-in. By
+    default your entry there is also pseudonymized, but if you run <code>/globalrank visibility on</code> in
+    Discord, we store your Discord username and display it next to your rank on the global leaderboard, both in
+    Discord and on this dashboard, until you opt back out with <code>/globalrank visibility off</code>.</p>
 
     <h2>4. Why we collect it</h2>
     <p>Data is collected solely to operate the bot's features: calculating and displaying your social credit
@@ -85,7 +90,7 @@
     <h2>5. Who can see your data</h2>
     <ul>
       <li><strong>You and other server members</strong> see whatever the bot's commands normally display (e.g. <code>/score</code>, <code>/leaderboard</code>), the same as any other Discord bot feature.</li>
-      <li><strong>The public</strong> can only ever see pseudonymized, aggregate figures through this dashboard — never your real Discord ID, username, or message text.</li>
+      <li><strong>The public</strong> sees pseudonymized, aggregate figures through this dashboard by default — never your real Discord ID, username, or message text — except on the global leaderboard if you've opted in with <code>/globalrank visibility on</code>, in which case your Discord username is shown there.</li>
       <li><strong>The bot operator</strong> can, through the password- and IP-restricted admin console, look up your real Discord ID, username, avatar, and per-guild score and yuan balance — the same fields listed under "Admin console access" in Section 1 — for support, moderation, and debugging purposes.</li>
       <li><strong>Third-party services</strong> we rely on to run the bot: Discord (hosting the platform itself — see Discord's own <a href="https://discord.com/privacy" target="_blank" rel="noopener">Privacy Policy</a> for how they handle your account data, separately from anything covered here), top.gg (vote webhooks), and our hosting/database provider. We do not share your data with anyone beyond what is needed to operate the bot through these services.</li>
     </ul>
@@ -177,7 +182,8 @@
   <a href="https://discord.gg/invite/k4W6YAPYhC" target="_blank" rel="noopener">Support Server</a> &nbsp;&middot;&nbsp;
   <a href="https://discord.com/oauth2/authorize?client_id=856163780265902151&permissions=2416438352&integration_type=0&scope=bot" target="_blank" rel="noopener">Invite Bot</a> &nbsp;&middot;&nbsp;
   <a href="/privacy">Privacy Policy</a> &nbsp;&middot;&nbsp;
-  <a href="/terms">Terms of Service</a>
+  <a href="/terms">Terms of Service</a> &nbsp;&middot;&nbsp;
+  <a href="https://github.com/Saguny/Social-Score-Surveillant_Discord-Bot" target="_blank" rel="noopener">Source Code</a>
 </footer>
 
 </body>
