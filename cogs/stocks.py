@@ -503,20 +503,26 @@ class StocksCog(commands.Cog, name="Stocks"):
         real_pcts: dict[str, float] = {}
         for ticker in REAL_TICKERS:
             old = self._prices.get(ticker, 0.0)
-            if old <= 0:
-                continue
-
             exchange = REAL_STOCKS[ticker]["exchange"]
-            if not open_exchanges[exchange] or ticker in self._daily_locked or (
-                ticker in self._halted and now < self._halted[ticker]
-            ):
-                price_bars.append((ticker, now, old, old, old, old))
-                continue
 
             res = fetched.get(ticker)
             yf_price = None
             if res is not None and not isinstance(res, Exception):
                 yf_price, _ = res
+
+            if old <= 0:
+                if yf_price and yf_price > 0:
+                    self._day_opens.setdefault(ticker, yf_price)
+                    self._prices[ticker] = yf_price
+                    price_updates.append((ticker, yf_price, self._day_opens[ticker]))
+                    price_bars.append((ticker, now, yf_price, yf_price, yf_price, yf_price))
+                continue
+
+            if not open_exchanges[exchange] or ticker in self._daily_locked or (
+                ticker in self._halted and now < self._halted[ticker]
+            ):
+                price_bars.append((ticker, now, old, old, old, old))
+                continue
 
             new_price = yf_price if (yf_price and yf_price > 0) else old
 
