@@ -55,9 +55,9 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',sans-seri
 .announce-banner { padding:.6rem 1.2rem; border-radius:6px; font-size:.85rem; white-space:nowrap;
                     overflow:hidden; text-overflow:ellipsis; box-shadow:0 4px 14px rgba(0,0,0,.9);
                     background:var(--bg-panel); pointer-events:auto; }
-.announce-info   { background:rgba(244,229,87,.16); border:1px solid rgba(244,229,87,.9); color:var(--yellow); }
-.announce-warn   { background:rgba(245,168,85,.16); border:1px solid rgba(245,168,85,.9); color:var(--orange); }
-.announce-danger { background:rgba(232,84,84,.16); border:1px solid rgba(232,84,84,.9); color:var(--red); }
+.announce-info   { background:rgba(244,229,87,.9); border:1px solid rgba(244,229,87,.9); color:var(--black); }
+.announce-warn   { background:rgba(245,168,85,.9); border:1px solid rgba(245,168,85,.9); color:var(--black); }
+.announce-danger { background:rgba(232,84,84,.9); border:1px solid rgba(232,84,84,.9); color:var(--black); }
 @media (max-width:576px) {
   .announce-banner { white-space:normal; }
 }
