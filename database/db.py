@@ -374,6 +374,18 @@ class Database(
             """)
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_guild_joins_joined_at ON guild_joins (joined_at)")
             await conn.execute("""
+                CREATE TABLE IF NOT EXISTS guild_leaves (
+                    guild_id       BIGINT NOT NULL,
+                    left_at        BIGINT NOT NULL,
+                    member_count   INTEGER,
+                    tenure_seconds BIGINT,
+                    citizens       INTEGER NOT NULL,
+                    score_events   INTEGER NOT NULL,
+                    category       TEXT NOT NULL
+                )
+            """)
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_guild_leaves_left_at ON guild_leaves (left_at)")
+            await conn.execute("""
                 DO $$
                 BEGIN
                     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'achievements')

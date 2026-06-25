@@ -65,6 +65,21 @@ async def _check_cmd_cooldown(uid: int) -> bool:
     return bool(ok)
 
 
+CMD_LOG_MAX = 10
+CMD_LOG_TTL = 60 * 86400
+
+
+async def _log_command_usage(guild_id: int | None, user_id: int, command_name: str | None) -> None:
+    if guild_id is None or not command_name:
+        return
+    r = get_redis()
+    entry = json.dumps({"command": command_name, "user_id": user_id, "ts": int(time.time())})
+    key = f"cmdlog:{guild_id}"
+    await r.lpush(key, entry)
+    await r.ltrim(key, 0, CMD_LOG_MAX - 1)
+    await r.expire(key, CMD_LOG_TTL)
+
+
 class CreditCommandTree(discord.app_commands.CommandTree):
     async def call(self, interaction: discord.Interaction) -> None:
         _current_user_id.set(interaction.user.id)
@@ -76,6 +91,7 @@ class CreditCommandTree(discord.app_commands.CommandTree):
             if await self.client.db.is_opted_out(interaction.user.id):
                 await interaction.response.send_message(OPTOUT_BLOCKED_MESSAGE, ephemeral=True)
                 return
+        await _log_command_usage(interaction.guild_id, interaction.user.id, qualified_name)
         await super().call(interaction)
 
     async def on_error(self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError) -> None:
@@ -389,6 +405,8 @@ class SocialCreditBot(commands.AutoShardedBot):
                 except discord.Forbidden:
                     pass
                 return
+        if ctx.command and message.guild:
+            await _log_command_usage(message.guild.id, message.author.id, ctx.command.qualified_name)
         await self.invoke(ctx)
 
     async def close(self):
@@ -487,6 +505,69 @@ class SocialCreditBot(commands.AutoShardedBot):
         self.tree.copy_global_to(guild=guild)
         await self.tree.sync(guild=guild)
         print(f"Joined {guild.name} · registered {len(member_ids)} members · slash commands synced.")
+
+    async def on_guild_remove(self, guild: discord.Guild):
+        try:
+            member_count = getattr(guild, "member_count", None)
+            now = int(time.time())
+            ctx = await self.db.get_guild_departure_context(guild.id)
+            joined_at = ctx["joined_at"]
+            citizens = ctx["citizens"]
+            score_events = ctx["score_events"]
+            tenure_seconds = (now - joined_at) if joined_at else None
+            engaged = citizens > 0 or score_events > 0
+            if not engaged and tenure_seconds is not None and tenure_seconds < 3600:
+                category = "Instant Kick"
+                color = 0xE85454
+                explanation = "Left within an hour with zero engagement · likely an immediate kick or rejection."
+            elif not engaged:
+                category = "Never Engaged"
+                color = 0xF5A855
+                explanation = "No messages or score activity were ever recorded here before it left."
+            else:
+                category = "Engaged Churn"
+                color = 0x3DAA6E
+                explanation = "Had real activity before leaving · an actual community churned, not a rejection."
+
+            await self.db.log_guild_leave(
+                guild.id, member_count, tenure_seconds, citizens, score_events, category,
+            )
+
+            r = get_redis()
+            cmd_key = f"cmdlog:{guild.id}"
+            raw_entries = await r.lrange(cmd_key, 0, CMD_LOG_MAX - 1)
+            await r.delete(cmd_key)
+            if raw_entries:
+                lines = []
+                for raw in raw_entries:
+                    entry = json.loads(raw)
+                    lines.append(f"`{entry['command']}` · <@{entry['user_id']}> · <t:{entry['ts']}:R>")
+                last_commands = "\n".join(lines)
+            else:
+                last_commands = "No commands logged before this guild left."
+
+            embed = discord.Embed(
+                title="中华人民共和国社会信用局 · GUILD DEPARTURE",
+                color=color,
+            )
+            embed.add_field(name="Guild", value=f"{guild.name}\n`{guild.id}`", inline=False)
+            embed.add_field(name="Member Count", value=str(member_count) if member_count is not None else "Unknown")
+            embed.add_field(
+                name="Joined",
+                value=f"<t:{joined_at}:R> (<t:{joined_at}:f>)" if joined_at else "No join record",
+            )
+            embed.add_field(name="Citizens", value=str(citizens))
+            embed.add_field(name="Score Events", value=str(score_events))
+            embed.add_field(name="Category", value=f"**{category}**\n{explanation}", inline=False)
+            embed.add_field(name="Last Commands Used", value=last_commands, inline=False)
+
+            try:
+                owner = await self.fetch_user(OWNER_ID)
+                await owner.send(embed=embed)
+            except (discord.Forbidden, discord.HTTPException):
+                pass
+        except Exception as e:
+            print(f"on_guild_remove failed for {getattr(guild, 'id', '?')}: {e}")
 
     async def on_command_error(self, ctx: commands.Context, error: commands.CommandError) -> None:
         cause = getattr(error, "__cause__", error)

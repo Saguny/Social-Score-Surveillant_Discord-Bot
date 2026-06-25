@@ -56,6 +56,33 @@ class CoreMixin:
             guild_id, int(time.time()),
         )
 
+    async def log_guild_leave(self, guild_id, member_count, tenure_seconds, citizens, score_events, category):
+        await self._pool.execute(
+            """
+            INSERT INTO guild_leaves (guild_id, left_at, member_count, tenure_seconds, citizens, score_events, category)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            """,
+            guild_id, int(time.time()), member_count, tenure_seconds, citizens, score_events, category,
+        )
+
+    async def get_guild_departure_context(self, guild_id) -> dict:
+        citizens, score_events, joined_row = await asyncio.gather(
+            self._pool.fetchval(
+                "SELECT COUNT(*) FROM users WHERE guild_id = $1 AND has_chatted = 1", guild_id
+            ),
+            self._pool.fetchval(
+                "SELECT COUNT(*) FROM score_history WHERE guild_id = $1", guild_id
+            ),
+            self._pool.fetchrow(
+                "SELECT joined_at FROM guild_joins WHERE guild_id = $1 ORDER BY joined_at DESC LIMIT 1", guild_id
+            ),
+        )
+        return {
+            "citizens": citizens or 0,
+            "score_events": score_events or 0,
+            "joined_at": joined_row["joined_at"] if joined_row else None,
+        }
+
     async def tick_user(self, guild_id, user_id, yuan):
         now = int(time.time())
         async with self._pool.acquire() as conn:
