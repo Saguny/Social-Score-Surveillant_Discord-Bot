@@ -507,7 +507,7 @@ class Guide(commands.Cog):
         )
         e.set_thumbnail(url="attachment://bureau.png")
         e.add_field(name="VERSION",  value="1.0.3",   inline=True)
-        e.add_field(name="CREATOR",  value="OFF-BY-ONE (saguny & digitwalwarpstar)",  inline=True)
+        e.add_field(name="CREATOR",  value="OFF-BY-ONE (saguny & digitalwarpstar)",  inline=True)
         e.add_field(name="LATENCY",  value=f"{discord_ms} ms discord · {db_ms} ms database", inline=True)
         e.add_field(
             name="GLOBAL STATISTICS",
