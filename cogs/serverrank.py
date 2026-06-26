@@ -264,18 +264,26 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
         visible = state.value == "on"
         if visible:
             await self.db.set_guild_name(interaction.guild.id, interaction.guild.name)
-        try:
-            await self.db.set_leaderboard_visible(interaction.guild.id, visible)
-            print(f"[visibility] set_leaderboard_visible returned OK")
-        except Exception as e:
-            print(f"[visibility] set_leaderboard_visible RAISED: {type(e).__name__}: {e}")
 
-        # debug: read back what we just wrote
+        # bypass the mixin — write directly
+        async with self.db._pool.acquire() as _conn:
+            await _conn.execute(
+                "UPDATE guild_config SET leaderboard_visible = $2 WHERE guild_id = $1",
+                interaction.guild.id, visible,
+            )
+            _row = await _conn.fetchrow(
+                "SELECT leaderboard_visible FROM guild_config WHERE guild_id = $1",
+                interaction.guild.id,
+            )
+            print(f"[visibility raw] same-conn read: {dict(_row) if _row else None}")
+
+        await self.db._invalidate_guild_rank_caches(interaction.guild.id)
+
         row = await self.db._pool.fetchrow(
             "SELECT guild_name, leaderboard_visible FROM guild_config WHERE guild_id = $1",
             interaction.guild.id,
         )
-        print(f"[visibility debug] guild_id={interaction.guild.id} db_row={dict(row) if row else None}")
+        print(f"[visibility debug] new-conn read: {dict(row) if row else None}")
 
         msg = (
             f"**{interaction.guild.name}** will now appear on `/serverrank top` and the web leaderboard."
