@@ -51,10 +51,6 @@ class GuildRankMixin:
                 "UPDATE guild_config SET leaderboard_visible = $2 WHERE guild_id = $1",
                 guild_id, visible,
             )
-            row = await conn.fetchrow(
-                "SELECT leaderboard_visible FROM guild_config WHERE guild_id = $1", guild_id
-            )
-            print(f"[set_leaderboard_visible] guild_id={guild_id} visible={visible} after_write={dict(row) if row else None}")
         await self._invalidate_guild_rank_caches(guild_id)
 
     async def _invalidate_guild_rank_caches(self, guild_id: int):

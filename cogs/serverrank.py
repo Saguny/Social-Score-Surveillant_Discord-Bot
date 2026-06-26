@@ -104,14 +104,10 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
             )
             embed.description = f"**{METRIC_LABELS[tab]}**"
 
-            print(f"[serverrank] visible_ids={visible_ids}")
-            print(f"[serverrank] row guild_ids={[r.get('guild_id') for r in rows[:3]]}")
-            print(f"[serverrank] bot.get_guild sample={[self.bot.get_guild(gid) for gid in list(visible_ids)[:3]]}")
-
             lines = []
             for i, row in enumerate(rows, 1):
                 gid = row.get("guild_id")
-                if gid in visible_ids:
+                if gid in visible_ids or gid == interaction.guild.id:
                     g = self.bot.get_guild(gid)
                     name = g.name if g else "Private Server"
                 else:
@@ -262,28 +258,15 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
     async def serverrank_visibility(self, interaction: discord.Interaction, state: app_commands.Choice[str]):
         await interaction.response.defer(ephemeral=True)
         visible = state.value == "on"
+        gid = interaction.guild.id
         if visible:
-            await self.db.set_guild_name(interaction.guild.id, interaction.guild.name)
-
-        # bypass the mixin — write directly
-        async with self.db._pool.acquire() as _conn:
-            await _conn.execute(
+            await self.db.set_guild_name(gid, interaction.guild.name)
+        async with self.db._pool.acquire() as conn:
+            await conn.execute(
                 "UPDATE guild_config SET leaderboard_visible = $2 WHERE guild_id = $1",
-                interaction.guild.id, visible,
+                gid, visible,
             )
-            _row = await _conn.fetchrow(
-                "SELECT leaderboard_visible FROM guild_config WHERE guild_id = $1",
-                interaction.guild.id,
-            )
-            print(f"[visibility raw] same-conn read: {dict(_row) if _row else None}")
-
-        await self.db._invalidate_guild_rank_caches(interaction.guild.id)
-
-        row = await self.db._pool.fetchrow(
-            "SELECT guild_name, leaderboard_visible FROM guild_config WHERE guild_id = $1",
-            interaction.guild.id,
-        )
-        print(f"[visibility debug] new-conn read: {dict(row) if row else None}")
+        await self.db._invalidate_guild_rank_caches(gid)
 
         msg = (
             f"**{interaction.guild.name}** will now appear on `/serverrank top` and the web leaderboard."
