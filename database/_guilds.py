@@ -55,7 +55,7 @@ class GuildRankMixin:
 
     async def _invalidate_guild_rank_caches(self, guild_id: int):
         await cache_delete(f"guildrank:{guild_id}")
-        brackets = [None, "Outpost", "Town", "Metropolis"]
+        brackets = [None, "Hamlet", "Village", "Town", "City", "Metropolis"]
         limits   = [10, 25, 100, 500]
         deletes  = [
             cache_delete(f"guildlb:{metric}:{bracket}:{limit}")
@@ -64,6 +64,26 @@ class GuildRankMixin:
             for limit in limits
         ]
         await asyncio.gather(*deletes)
+
+    async def check_and_update_bracket(self, guild_id: int) -> str | None:
+        async with self._pool.acquire() as conn:
+            citizens = await conn.fetchval(
+                "SELECT COUNT(*) FROM users WHERE guild_id = $1 AND has_chatted = 1",
+                guild_id,
+            )
+            new_bracket = _bracket_for(int(citizens or 0))
+            if new_bracket is None:
+                return None
+            old = await conn.fetchval(
+                "SELECT guild_bracket FROM guild_config WHERE guild_id = $1", guild_id
+            )
+            if old == new_bracket:
+                return None
+            await conn.execute(
+                "UPDATE guild_config SET guild_bracket = $2 WHERE guild_id = $1",
+                guild_id, new_bracket,
+            )
+            return new_bracket
 
     async def is_leaderboard_visible(self, guild_id: int) -> bool:
         row = await self._pool.fetchrow(

@@ -505,3 +505,4 @@ class Database(
             await conn.execute("ALTER TABLE guild_daily_snapshots ADD COLUMN IF NOT EXISTS literacy_rate DOUBLE PRECISION NOT NULL DEFAULT 0")
             await conn.execute("ALTER TABLE guild_daily_snapshots ADD COLUMN IF NOT EXISTS incarceration_rate DOUBLE PRECISION NOT NULL DEFAULT 0")
             await conn.execute("ALTER TABLE guild_daily_snapshots ADD COLUMN IF NOT EXISTS politburo_score DOUBLE PRECISION NOT NULL DEFAULT 0")
+            await conn.execute("ALTER TABLE guild_config ADD COLUMN IF NOT EXISTS guild_bracket TEXT DEFAULT NULL")

@@ -74,8 +74,12 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
     @app_commands.choices(
         metric=[app_commands.Choice(name=METRIC_LABELS[m], value=m) for m in METRICS],
         bracket=[
-            app_commands.Choice(name=_BRACKET_ALL, value=_BRACKET_ALL),
-            *[app_commands.Choice(name=b, value=b) for b in _BRACKET_NAMES],
+            app_commands.Choice(name=_BRACKET_ALL,            value=_BRACKET_ALL),
+            app_commands.Choice(name="Hamlet (10–24)",        value="Hamlet"),
+            app_commands.Choice(name="Village (25–49)",       value="Village"),
+            app_commands.Choice(name="Town (50–99)",          value="Town"),
+            app_commands.Choice(name="City (100–249)",        value="City"),
+            app_commands.Choice(name="Metropolis (250+)",     value="Metropolis"),
         ],
     )
     async def serverrank_top(

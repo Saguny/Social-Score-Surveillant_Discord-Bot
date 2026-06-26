@@ -457,7 +457,7 @@ class StocksCog(commands.Cog, name="Stocks"):
         if price_updates:
             await self.bot.db.batch_upsert_stock_prices(price_updates)
 
-        # last resort: any ticker still at 0 after DB + yfinance → use most recent price bar
+        # last resort: any ticker still at 0 after DB + yfinance -> use most recent price bar
         still_zero = [t for t in REAL_TICKERS if self._prices.get(t, 0) <= 0]
         if still_zero:
             history_prices = await self.bot.db.get_latest_prices_from_history()

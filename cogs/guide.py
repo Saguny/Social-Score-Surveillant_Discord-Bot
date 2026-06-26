@@ -118,7 +118,7 @@ class GuideView(discord.ui.View):
             value=(
                 f"¥10 per message · [Support server]({SUPPORT_URL}) members earn +15% globally\n"
                 "After 25 yuan-earning messages/day, further messages pay 25% · Resets at midnight UTC\n"
-                "**Wealth tax:** balance ≥ ¥100,000 → 10% of every credit goes to the Bureau Treasury"
+                "**Wealth tax:** balance ≥ ¥100,000 -> 10% of every credit goes to the Bureau Treasury"
             ),
             inline=False,
         )
@@ -221,13 +221,13 @@ class GuideView(discord.ui.View):
             ),
             inline=False,
         )
-        e.add_field(name="CIRCUIT BREAKERS", value="7% intraday move → 15-min halt · 20% daily move → locked for the day.", inline=False)
+        e.add_field(name="CIRCUIT BREAKERS", value="7% intraday move -> 15-min halt · 20% daily move -> locked for the day.", inline=False)
         return e
 
     def _page_events(self) -> discord.Embed:
         e = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · EVENTS & POSTERS")
         e.add_field(name="ccp poster",         value="Display a random propaganda poster. Available to all citizens.", inline=False)
-        e.add_field(name="DAILY BROADCASTS",   value="Enabled by a mod. A new poster is broadcast daily. React ❤️ → +3 score and ¥250 · React 😡 → -1 score.", inline=False)
+        e.add_field(name="DAILY BROADCASTS",   value="Enabled by a mod. A new poster is broadcast daily. React ❤️ -> +3 score and ¥250 · React 😡 -> -1 score.", inline=False)
         e.add_field(
             name="PROPAGANDA EVENTS",
             value=(

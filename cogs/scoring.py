@@ -193,6 +193,33 @@ class Scoring(commands.Cog):
             role = await guild.create_role(name=name)
         return role
 
+    async def _announce_bracket_promotion(self, guild: discord.Guild):
+        new_bracket = await self.db.check_and_update_bracket(guild.id)
+        if not new_bracket:
+            return
+        channel = guild.system_channel
+        if channel is None:
+            for ch in guild.text_channels:
+                if ch.permissions_for(guild.me).send_messages:
+                    channel = ch
+                    break
+        if channel is None:
+            return
+        embed = discord.Embed(
+            color=0xCC0000,
+            title=f"🏛️ {guild.name} has grown into a {new_bracket}!",
+            description=(
+                f"Your server has reached the **{new_bracket}** bracket on the Social Credit Almanac.\n\n"
+                f"You are now ranked among {new_bracket}-tier servers on `/serverrank top`.\n"
+                f"Use `/serverrank me` to view your full almanac profile."
+            ),
+        )
+        embed.set_thumbnail(url="attachment://bureau.png")
+        try:
+            await channel.send(embed=embed, file=discord.File("images/bureau.png", filename="bureau.png"))
+        except discord.Forbidden:
+            pass
+
     async def _handle_rank_change(self, guild: discord.Guild, member: discord.Member, channel: discord.TextChannel, old: float, new: float):
         old_rank = get_rank(old)
         if new >= old:
@@ -366,7 +393,10 @@ class Scoring(commands.Cog):
             if is_support:
                 yuan_gain = round(yuan_gain * SUPPORT_YUAN_MULTIPLIER)
             yuan_gain = await self._apply_yuan_diminishing(gid, uid, yuan_gain, exempt=is_support)
-        await self.db.tick_user(gid, uid, yuan_gain)
+        user_row = await self.db.tick_user(gid, uid, yuan_gain)
+
+        if user_row and user_row["message_count"] == 1:
+            asyncio.create_task(self._announce_bracket_promotion(message.guild))
 
         if await self.db.get_effect(gid, uid, "freeze"):
             return

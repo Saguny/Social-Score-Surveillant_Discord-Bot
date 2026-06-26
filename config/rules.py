@@ -32,11 +32,13 @@ GLOBAL_YUAN_SNAPSHOT_RETENTION_DAYS = 35
 
 CIVIC_PARTICIPATION_ACTIVE_DAYS = 14
 
-GUILD_RANK_MIN_CITIZENS = 3
+GUILD_RANK_MIN_CITIZENS = 10
 GUILD_RANK_BRACKETS = [
-    ("Outpost",    3,  14),
-    ("Town",      15,  49),
-    ("Metropolis", 50, None),
+    ("Hamlet",     10,  24),
+    ("Village",    25,  49),
+    ("Town",       50,  99),
+    ("City",      100, 249),
+    ("Metropolis", 250, None),
 ]
 GUILD_RANK_POLITBURO_MIN_CITIZENS = 10
 GUILD_RANK_POLITBURO_TOP_N = 10

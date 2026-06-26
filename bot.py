@@ -510,6 +510,17 @@ class SocialCreditBot(commands.AutoShardedBot):
         self.tree.copy_global_to(guild=guild)
         await self.tree.sync(guild=guild)
         print(f"Joined {guild.name} · registered {len(member_ids)} members · slash commands synced.")
+        channel = guild.system_channel
+        if channel is None:
+            for ch in guild.text_channels:
+                if ch.permissions_for(guild.me).send_messages:
+                    channel = ch
+                    break
+        if channel is not None:
+            try:
+                await channel.send("The Bureau has been added. Run `/guide` to get started.")
+            except discord.Forbidden:
+                pass
 
     async def on_guild_remove(self, guild: discord.Guild):
         try:
@@ -556,13 +567,14 @@ class SocialCreditBot(commands.AutoShardedBot):
                 color=color,
             )
             embed.add_field(name="Guild", value=f"{guild.name}\n`{guild.id}`", inline=False)
-            embed.add_field(name="Member Count", value=str(member_count) if member_count is not None else "Unknown")
             embed.add_field(
                 name="Joined",
                 value=f"<t:{joined_at}:R> (<t:{joined_at}:f>)" if joined_at else "No join record",
+                inline=False,
             )
-            embed.add_field(name="Citizens", value=str(citizens))
-            embed.add_field(name="Score Events", value=str(score_events))
+            embed.add_field(name="Members", value=str(member_count) if member_count is not None else "?", inline=True)
+            embed.add_field(name="Citizens", value=str(citizens), inline=True)
+            embed.add_field(name="Score Events", value=str(score_events), inline=True)
             embed.add_field(name="Category", value=f"**{category}**\n{explanation}", inline=False)
             embed.add_field(name="Last Commands Used", value=last_commands, inline=False)
 
