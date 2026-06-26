@@ -26,6 +26,15 @@ _METRIC_EMOJIS = {
     "politburo":    "⬆",
 }
 
+_METRIC_DESCRIPTIONS = {
+    "happiness":     "Average social credit score across all citizens",
+    "gdp":           "Total yuan held per citizen — higher means a wealthier server",
+    "civic":         "Messages sent per active citizen — measures how engaged your community is",
+    "literacy":      "Share of citizens who have unlocked at least one achievement",
+    "incarceration": "Share of citizens currently on the execution list — lower is better",
+    "politburo":     "Average score of the top 10 citizens — the strength of your server's elite",
+}
+
 
 def _fmt_metric(metric: str, value: float | None) -> str:
     if value is None:
@@ -117,7 +126,7 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
                 embed.add_field(name="YOUR STANDING", value="\n".join(standing_lines), inline=False)
 
             embed.set_thumbnail(url="attachment://bureau.png")
-            embed.set_footer(text="/serverrank me for your full profile · /serverrank visibility [on|off] · GLORY TO THE CCP!")
+            embed.set_footer(text=f"{_METRIC_DESCRIPTIONS[tab]} · /serverrank me for your full profile · /serverrank visibility [on|off] · GLORY TO THE CCP!")
             return embed
 
         class ServerRankTopView(discord.ui.View):
@@ -253,15 +262,6 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
         await interaction.response.defer()
         guild = interaction.guild
         tab = metric.value if metric else "happiness"
-
-        visible = await self.db.is_leaderboard_visible(guild.id)
-        if not visible:
-            await interaction.followup.send(
-                "Enable visibility first with `/serverrank visibility on` — the card shows your server's real name, "
-                "which requires opting in.",
-                ephemeral=True,
-            )
-            return
 
         data = await self.db.get_guild_rank(guild.id)
         if not data:

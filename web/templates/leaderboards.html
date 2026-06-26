@@ -84,28 +84,59 @@
 
   <!-- Server Rankings view -->
   <div id="lb-view-servers" style="display:none">
-    <div class="row g-3 mb-3">
-      <div class="col-12">
+    <div class="row g-3 mb-3 justify-content-center">
+      <div class="col-xl-7 col-lg-9">
         <div class="sc sc-auto">
-          <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+          <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
             <div class="lbl mb-0">Top Servers</div>
             <div class="d-flex flex-wrap gap-2 align-items-center">
               <div class="btn-group" id="srv-metric-group">
-                <button class="btn btn-run btn-compact active" data-metric="happiness"     onclick="_srvSetMetric('happiness')">Happiness</button>
-                <button class="btn btn-run btn-compact"        data-metric="gdp"           onclick="_srvSetMetric('gdp')">GDP/Capita</button>
-                <button class="btn btn-run btn-compact"        data-metric="civic"         onclick="_srvSetMetric('civic')">Civic Part.</button>
-                <button class="btn btn-run btn-compact"        data-metric="literacy"      onclick="_srvSetMetric('literacy')">Literacy</button>
-                <button class="btn btn-run btn-compact"        data-metric="incarceration" onclick="_srvSetMetric('incarceration')">Incarceration</button>
-                <button class="btn btn-run btn-compact"        data-metric="politburo"     onclick="_srvSetMetric('politburo')">Politburo</button>
+                <button class="btn btn-run btn-compact active" data-metric="happiness"
+                  onclick="_srvSetMetric('happiness')"
+                  data-bs-toggle="tooltip" data-bs-placement="bottom"
+                  title="Average social credit score across all citizens">Happiness</button>
+                <button class="btn btn-run btn-compact" data-metric="gdp"
+                  onclick="_srvSetMetric('gdp')"
+                  data-bs-toggle="tooltip" data-bs-placement="bottom"
+                  title="Total yuan held per citizen (higher = wealthier server)">GDP / Capita</button>
+                <button class="btn btn-run btn-compact" data-metric="civic"
+                  onclick="_srvSetMetric('civic')"
+                  data-bs-toggle="tooltip" data-bs-placement="bottom"
+                  title="Messages sent per active citizen — measures participation">Civic Part.</button>
+                <button class="btn btn-run btn-compact" data-metric="literacy"
+                  onclick="_srvSetMetric('literacy')"
+                  data-bs-toggle="tooltip" data-bs-placement="bottom"
+                  title="Share of citizens who have unlocked at least one achievement">Literacy</button>
+                <button class="btn btn-run btn-compact" data-metric="incarceration"
+                  onclick="_srvSetMetric('incarceration')"
+                  data-bs-toggle="tooltip" data-bs-placement="bottom"
+                  title="Share of citizens on the execution list — lower is better">Incarceration</button>
+                <button class="btn btn-run btn-compact" data-metric="politburo"
+                  onclick="_srvSetMetric('politburo')"
+                  data-bs-toggle="tooltip" data-bs-placement="bottom"
+                  title="Average score of the top 10 citizens — your server's elite">Politburo</button>
               </div>
               <div class="btn-group" id="srv-bracket-group">
-                <button class="btn btn-run btn-compact active" data-bracket=""           onclick="_srvSetBracket('')">All</button>
-                <button class="btn btn-run btn-compact"        data-bracket="Outpost"    onclick="_srvSetBracket('Outpost')">Outpost</button>
-                <button class="btn btn-run btn-compact"        data-bracket="Town"       onclick="_srvSetBracket('Town')">Town</button>
-                <button class="btn btn-run btn-compact"        data-bracket="Metropolis" onclick="_srvSetBracket('Metropolis')">Metropolis</button>
+                <button class="btn btn-run btn-compact active" data-bracket=""
+                  onclick="_srvSetBracket('')"
+                  data-bs-toggle="tooltip" data-bs-placement="bottom"
+                  title="All servers regardless of size">All</button>
+                <button class="btn btn-run btn-compact" data-bracket="Outpost"
+                  onclick="_srvSetBracket('Outpost')"
+                  data-bs-toggle="tooltip" data-bs-placement="bottom"
+                  title="Small servers (3–9 citizens)">Outpost</button>
+                <button class="btn btn-run btn-compact" data-bracket="Town"
+                  onclick="_srvSetBracket('Town')"
+                  data-bs-toggle="tooltip" data-bs-placement="bottom"
+                  title="Medium servers (10–49 citizens)">Town</button>
+                <button class="btn btn-run btn-compact" data-bracket="Metropolis"
+                  onclick="_srvSetBracket('Metropolis')"
+                  data-bs-toggle="tooltip" data-bs-placement="bottom"
+                  title="Large servers (50+ citizens)">Metropolis</button>
               </div>
             </div>
           </div>
+          <div id="srv-metric-desc" class="sub mb-3" style="font-size:.78rem"></div>
           <div id="lb-servers"><div class="sub">Loading…</div></div>
         </div>
       </div>
@@ -225,6 +256,15 @@ async function loadLeaderboard() {
 let _srvMetric  = 'happiness';
 let _srvBracket = '';
 
+const _SRV_METRIC_DESC = {
+  happiness:     'Average social credit score across all citizens',
+  gdp:           'Total yuan held per citizen — higher means a wealthier server',
+  civic:         'Messages sent per active citizen — measures how engaged your community is',
+  literacy:      'Share of citizens who have unlocked at least one achievement',
+  incarceration: 'Share of citizens currently on the execution list — lower is better',
+  politburo:     'Average score of the top 10 citizens — the strength of your server\'s elite',
+};
+
 const _SRV_METRIC_FMT = {
   happiness:     v => Number(v).toFixed(2),
   gdp:           v => '¥' + fmt(Math.round(v)),
@@ -244,6 +284,8 @@ function _srvSetMetric(m) {
   document.querySelectorAll('#srv-metric-group button').forEach(b => {
     b.classList.toggle('active', b.dataset.metric === m);
   });
+  const descEl = document.getElementById('srv-metric-desc');
+  if (descEl) descEl.textContent = _SRV_METRIC_DESC[m] || '';
   loadGuildLeaderboard();
 }
 
@@ -297,6 +339,15 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(loadLeaderboard, 60_000);
   setInterval(loadAnnouncement, 60_000);
   setInterval(loadGuildLeaderboard, 60_000);
+
+  // Bootstrap tooltips
+  document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+    new bootstrap.Tooltip(el, { trigger: 'hover' });
+  });
+
+  // Set initial metric description
+  const descEl = document.getElementById('srv-metric-desc');
+  if (descEl) descEl.textContent = _SRV_METRIC_DESC[_srvMetric] || '';
 });
 </script>
 </body>
