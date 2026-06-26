@@ -18,7 +18,7 @@ PORT = int(os.getenv("PORT", 8080))
 _runner = None
 _cache: StatCache | None = None
 
-LEADERBOARD_LIMIT = 50
+LEADERBOARD_LIMIT = 25
 
 _SESSION_TTL = 60 * 60 * 24 * 30
 
@@ -353,6 +353,27 @@ async def _handle_leaderboard(request):
     })
 
 
+_VALID_GUILD_METRICS  = {"happiness", "gdp", "civic", "literacy", "incarceration", "politburo"}
+_VALID_GUILD_BRACKETS = {"Outpost", "Town", "Metropolis"}
+
+async def _handle_guild_leaderboard(request):
+    db = request.app["db"]
+    metric  = request.rel_url.query.get("metric", "happiness")
+    bracket = request.rel_url.query.get("bracket", "")
+    if metric not in _VALID_GUILD_METRICS:
+        metric = "happiness"
+    bracket_arg = bracket if bracket in _VALID_GUILD_BRACKETS else None
+    rows = await db.get_guild_leaderboard(metric, bracket_arg, limit=10)
+    return web.json_response([
+        {
+            "guild_name": r.get("guild_name") or "Unknown Server",
+            "citizens":   int(r.get("citizens") or 0),
+            "value":      round(float(r["value"]), 4) if r.get("value") is not None else None,
+        }
+        for r in rows
+    ])
+
+
 async def _handle_recent_events(request):
     db = request.app["db"]
     cache = request.app.get("cache")
@@ -490,6 +511,7 @@ async def start_web_server(db):
     app.router.add_get("/api/stats/timeline", _rate_limit_public(_handle_stats_timeline))
     app.router.add_get("/api/stats/recent-events", _rate_limit_public(_handle_recent_events))
     app.router.add_get("/api/leaderboard", _rate_limit_public(_handle_leaderboard))
+    app.router.add_get("/api/leaderboards/guilds", _rate_limit_public(_handle_guild_leaderboard))
     app.router.add_get("/api/stream", _rate_limit_public(_handle_sse))
     app.router.add_get("/api/admin/topgg-votes", _require_admin(_handle_topgg_votes))
     app.router.add_get("/api/admin/guild-list", _require_admin(_handle_guild_list))

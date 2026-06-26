@@ -286,6 +286,14 @@ class GuideView(discord.ui.View):
             value="Open a propaganda submission event. Citizens submit quotes, voting runs 24h, winner becomes a guild decree.",
             inline=False,
         )
+        e.add_field(
+            name="SERVER RANKINGS",
+            value=(
+                "`/serverrank visibility [on|off]` · Show or hide this server on the public server leaderboard\n"
+                "`/serverrank me` · View this server's full almanac profile and bracket rankings"
+            ),
+            inline=False,
+        )
         return e
 
     def _page_privacy(self) -> discord.Embed:

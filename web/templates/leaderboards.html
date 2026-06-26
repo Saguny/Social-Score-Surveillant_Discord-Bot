@@ -25,51 +25,91 @@
 
 <div class="container-fluid px-4">
 
-  <div class="row g-3 mb-3">
-
-    <div class="col-lg-3 col-md-6">
-      <div class="sc">
-        <div class="lbl">Top Balance</div>
-        <div class="sub" style="margin-bottom:.5rem">Current yuan across all servers</div>
-        <div id="lb-balance"><div class="sub">Loading…</div></div>
-      </div>
+  <!-- View toggle -->
+  <div class="d-flex justify-content-center mb-3">
+    <div class="btn-group" id="lb-view-toggle">
+      <button class="btn btn-run active" data-view="citizens" onclick="_lbSetView('citizens')">Citizens</button>
+      <button class="btn btn-run"        data-view="servers"  onclick="_lbSetView('servers')">Server Rankings</button>
     </div>
-
-    <div class="col-lg-3 col-md-6">
-      <div class="sc">
-        <div class="lbl">Top Earned</div>
-        <div class="d-flex align-items-center justify-content-between sub" style="margin-bottom:.5rem">
-          <span>Yuan earned over time</span>
-          <div class="btn-group" id="lb-earned-range-group">
-            <button class="btn btn-run btn-compact active" data-range="7d" onclick="_lbSetEarnedRange('7d')">7D</button>
-            <button class="btn btn-run btn-compact" data-range="30d" onclick="_lbSetEarnedRange('30d')">30D</button>
-            <button class="btn btn-run btn-compact" data-range="alltime" onclick="_lbSetEarnedRange('alltime')">ALL</button>
-          </div>
-        </div>
-        <div id="lb-earned"><div class="sub">Loading…</div></div>
-      </div>
-    </div>
-
-    <div class="col-lg-3 col-md-6">
-      <div class="sc">
-        <div class="lbl">Top Score</div>
-        <div class="sub" style="margin-bottom:.5rem">Average across all servers</div>
-        <div id="lb-score"><div class="sub">Loading…</div></div>
-      </div>
-    </div>
-
-    <div class="col-lg-3 col-md-6">
-      <div class="sc">
-        <div class="lbl">Top Citizens</div>
-        <div class="sub" style="margin-bottom:.5rem">Score + balance composite</div>
-        <div id="lb-citizens"><div class="sub">Loading…</div></div>
-      </div>
-    </div>
-
   </div>
 
-  <div class="sub" style="text-align:center;padding:.5rem 0 1.5rem">
-    All names are anonymized pseudonyms &nbsp;&middot;&nbsp; Use <code>/globalrank visibility on</code> in Discord to opt in
+  <!-- Citizens view -->
+  <div id="lb-view-citizens">
+    <div class="row g-3 mb-3">
+
+      <div class="col-lg-3 col-md-6">
+        <div class="sc">
+          <div class="lbl">Top Balance</div>
+          <div class="sub" style="margin-bottom:.5rem">Current yuan across all servers</div>
+          <div id="lb-balance"><div class="sub">Loading…</div></div>
+        </div>
+      </div>
+
+      <div class="col-lg-3 col-md-6">
+        <div class="sc">
+          <div class="lbl">Top Earned</div>
+          <div class="d-flex align-items-center justify-content-between sub" style="margin-bottom:.5rem">
+            <span>Yuan earned over time</span>
+            <div class="btn-group" id="lb-earned-range-group">
+              <button class="btn btn-run btn-compact active" data-range="7d" onclick="_lbSetEarnedRange('7d')">7D</button>
+              <button class="btn btn-run btn-compact" data-range="30d" onclick="_lbSetEarnedRange('30d')">30D</button>
+              <button class="btn btn-run btn-compact" data-range="alltime" onclick="_lbSetEarnedRange('alltime')">ALL</button>
+            </div>
+          </div>
+          <div id="lb-earned"><div class="sub">Loading…</div></div>
+        </div>
+      </div>
+
+      <div class="col-lg-3 col-md-6">
+        <div class="sc">
+          <div class="lbl">Top Score</div>
+          <div class="sub" style="margin-bottom:.5rem">Average across all servers</div>
+          <div id="lb-score"><div class="sub">Loading…</div></div>
+        </div>
+      </div>
+
+      <div class="col-lg-3 col-md-6">
+        <div class="sc">
+          <div class="lbl">Top Citizens</div>
+          <div class="sub" style="margin-bottom:.5rem">Score + balance composite</div>
+          <div id="lb-citizens"><div class="sub">Loading…</div></div>
+        </div>
+      </div>
+
+    </div>
+    <div class="sub" style="text-align:center;padding:.5rem 0 1rem">
+      All names are anonymized pseudonyms &nbsp;&middot;&nbsp; Use <code>/globalrank visibility on</code> in Discord to opt in
+    </div>
+  </div>
+
+  <!-- Server Rankings view -->
+  <div id="lb-view-servers" style="display:none">
+    <div class="row g-3 mb-3">
+      <div class="col-12">
+        <div class="sc sc-auto">
+          <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+            <div class="lbl mb-0">Top Servers &nbsp;<span class="sub d-inline" style="text-transform:none;letter-spacing:0">· Social Credit Almanac &nbsp;·&nbsp; Opt in with <code>/serverrank visibility on</code></span></div>
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+              <div class="btn-group" id="srv-metric-group">
+                <button class="btn btn-run btn-compact active" data-metric="happiness"     onclick="_srvSetMetric('happiness')">Happiness</button>
+                <button class="btn btn-run btn-compact"        data-metric="gdp"           onclick="_srvSetMetric('gdp')">GDP/Capita</button>
+                <button class="btn btn-run btn-compact"        data-metric="civic"         onclick="_srvSetMetric('civic')">Civic Part.</button>
+                <button class="btn btn-run btn-compact"        data-metric="literacy"      onclick="_srvSetMetric('literacy')">Literacy</button>
+                <button class="btn btn-run btn-compact"        data-metric="incarceration" onclick="_srvSetMetric('incarceration')">Incarceration</button>
+                <button class="btn btn-run btn-compact"        data-metric="politburo"     onclick="_srvSetMetric('politburo')">Politburo</button>
+              </div>
+              <div class="btn-group" id="srv-bracket-group">
+                <button class="btn btn-run btn-compact active" data-bracket=""           onclick="_srvSetBracket('')">All</button>
+                <button class="btn btn-run btn-compact"        data-bracket="Outpost"    onclick="_srvSetBracket('Outpost')">Outpost</button>
+                <button class="btn btn-run btn-compact"        data-bracket="Town"       onclick="_srvSetBracket('Town')">Town</button>
+                <button class="btn btn-run btn-compact"        data-bracket="Metropolis" onclick="_srvSetBracket('Metropolis')">Metropolis</button>
+              </div>
+            </div>
+          </div>
+          <div id="lb-servers"><div class="sub">Loading…</div></div>
+        </div>
+      </div>
+    </div>
   </div>
 
 </div>
@@ -178,11 +218,82 @@ async function loadLeaderboard() {
   }
 }
 
+// ── Top Servers ────────────────────────────────────────────────────────────────
+let _srvMetric  = 'happiness';
+let _srvBracket = '';
+
+const _SRV_METRIC_FMT = {
+  happiness:     v => Number(v).toFixed(2),
+  gdp:           v => '¥' + fmt(Math.round(v)),
+  civic:         v => Number(v).toFixed(1) + ' msg/cit.',
+  literacy:      v => (Number(v) * 100).toFixed(1) + '%',
+  incarceration: v => (Number(v) * 100).toFixed(1) + '%',
+  politburo:     v => Number(v).toFixed(2),
+};
+
+function _srvFmt(metric, v) {
+  if (v === null || v === undefined) return '—';
+  return (_SRV_METRIC_FMT[metric] || (x => Number(x).toFixed(2)))(v);
+}
+
+function _srvSetMetric(m) {
+  _srvMetric = m;
+  document.querySelectorAll('#srv-metric-group button').forEach(b => {
+    b.classList.toggle('active', b.dataset.metric === m);
+  });
+  loadGuildLeaderboard();
+}
+
+function _srvSetBracket(b) {
+  _srvBracket = b;
+  document.querySelectorAll('#srv-bracket-group button').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.bracket === b);
+  });
+  loadGuildLeaderboard();
+}
+
+async function loadGuildLeaderboard() {
+  const el = document.getElementById('lb-servers');
+  if (!el) return;
+  const params = new URLSearchParams({ metric: _srvMetric });
+  if (_srvBracket) params.set('bracket', _srvBracket);
+  try {
+    const res = await fetch('/api/leaderboards/guilds?' + params);
+    if (!res.ok) throw new Error(res.status);
+    const rows = await res.json();
+    if (!rows.length) {
+      el.innerHTML = '<div class="sub">No opted-in servers yet · use <code>/serverrank visibility on</code> in Discord to appear here</div>';
+      return;
+    }
+    el.innerHTML = rows.map((r, i) => {
+      const val = _srvFmt(_srvMetric, r.value);
+      const sub = r.citizens != null ? `${fmt(r.citizens)} citizens` : '';
+      return _lbRow(i, r.guild_name || 'Unknown Server', val, sub);
+    }).join('');
+  } catch (e) {
+    el.innerHTML = '<div class="sub">Failed to load</div>';
+  }
+}
+
+// ── View toggle ────────────────────────────────────────────────────────────────
+let _lbView = 'citizens';
+
+function _lbSetView(v) {
+  _lbView = v;
+  document.querySelectorAll('#lb-view-toggle button').forEach(b => {
+    b.classList.toggle('active', b.dataset.view === v);
+  });
+  document.getElementById('lb-view-citizens').style.display = v === 'citizens' ? '' : 'none';
+  document.getElementById('lb-view-servers').style.display  = v === 'servers'  ? '' : 'none';
+  if (v === 'servers') loadGuildLeaderboard();
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   loadLeaderboard();
   loadAnnouncement();
   setInterval(loadLeaderboard, 60_000);
   setInterval(loadAnnouncement, 60_000);
+  setInterval(loadGuildLeaderboard, 60_000);
 });
 </script>
 </body>

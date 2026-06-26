@@ -161,6 +161,7 @@ async def _decay_task(bot: commands.Bot):
         await asyncio.sleep(next_run - now)
         await bot.db.apply_score_decay()
         await bot.db.apply_portfolio_score_bonus()
+        await bot.db.snapshot_guild_daily_stats()
 
 
 _PRESENCE_CYCLE = [
@@ -431,6 +432,7 @@ class SocialCreditBot(commands.AutoShardedBot):
         await self.load_extension("cogs.badges")
         await self.load_extension("cogs.privacy")
         await self.load_extension("cogs.prestige")
+        await self.load_extension("cogs.serverrank")
         if IS_SCHEDULER:
             asyncio.create_task(_decay_task(self))
             asyncio.create_task(_rotate_presence_task(self))
@@ -493,6 +495,8 @@ class SocialCreditBot(commands.AutoShardedBot):
             for cmd in _global_cmds:
                 self.tree.add_command(cmd)
             self._synced_once = True
+            for guild in self.guilds:
+                await self.db.set_guild_name(guild.id, guild.name)
 
         await self.change_presence(activity=_PRESENCE_CYCLE[self._presence_index])
         print(f"Online: {self.user}  |  Guilds: {len(self.guilds)}  |  Slash commands synced: {self._synced_once}")
@@ -502,6 +506,7 @@ class SocialCreditBot(commands.AutoShardedBot):
         member_ids = [m.id for m in guild.members if not m.bot]
         await self.db.register_guild_members(guild.id, member_ids)
         await self.db.log_guild_join(guild.id)
+        await self.db.set_guild_name(guild.id, guild.name)
         self.tree.copy_global_to(guild=guild)
         await self.tree.sync(guild=guild)
         print(f"Joined {guild.name} · registered {len(member_ids)} members · slash commands synced.")
@@ -568,6 +573,10 @@ class SocialCreditBot(commands.AutoShardedBot):
                 pass
         except Exception as e:
             print(f"on_guild_remove failed for {getattr(guild, 'id', '?')}: {e}")
+
+    async def on_guild_update(self, before: discord.Guild, after: discord.Guild):
+        if before.name != after.name:
+            await self.db.set_guild_name(after.id, after.name)
 
     async def on_command_error(self, ctx: commands.Context, error: commands.CommandError) -> None:
         cause = getattr(error, "__cause__", error)

@@ -17,6 +17,7 @@ from database._achievements import AchievementsMixin
 from database._counters     import CountersMixin
 from database._privacy      import PrivacyMixin
 from database._announcement import AnnouncementMixin
+from database._guilds       import GuildRankMixin
 
 
 TABLES = [
@@ -219,6 +220,7 @@ class Database(
     CountersMixin,
     PrivacyMixin,
     AnnouncementMixin,
+    GuildRankMixin,
 ):
     def __init__(self):
         self._dsn = os.getenv("DATABASE_URL", "")
@@ -487,3 +489,19 @@ class Database(
                 "INSERT INTO dashboard_announcement (id, enabled, message, severity, updated_at) "
                 "VALUES (1, FALSE, '', 'info', 0) ON CONFLICT DO NOTHING"
             )
+            await conn.execute("ALTER TABLE guild_config ADD COLUMN IF NOT EXISTS leaderboard_visible BOOLEAN NOT NULL DEFAULT FALSE")
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS guild_daily_snapshots (
+                    guild_id       BIGINT NOT NULL,
+                    day            BIGINT NOT NULL,
+                    total_yuan     BIGINT NOT NULL DEFAULT 0,
+                    avg_score      DOUBLE PRECISION NOT NULL DEFAULT 0,
+                    total_messages BIGINT NOT NULL DEFAULT 0,
+                    citizens       INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY (guild_id, day)
+                )
+            """)
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_guild_daily_snapshots_day ON guild_daily_snapshots (day)")
+            await conn.execute("ALTER TABLE guild_daily_snapshots ADD COLUMN IF NOT EXISTS literacy_rate DOUBLE PRECISION NOT NULL DEFAULT 0")
+            await conn.execute("ALTER TABLE guild_daily_snapshots ADD COLUMN IF NOT EXISTS incarceration_rate DOUBLE PRECISION NOT NULL DEFAULT 0")
+            await conn.execute("ALTER TABLE guild_daily_snapshots ADD COLUMN IF NOT EXISTS politburo_score DOUBLE PRECISION NOT NULL DEFAULT 0")

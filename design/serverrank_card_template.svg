@@ -1,0 +1,47 @@
+<svg viewBox="0 0 1080 1080" xmlns="http://www.w3.org/2000/svg" role="img">
+<title>Barebones template for /serverrank card</title>
+<desc>Layout-only template version of the share card with placeholder tokens instead of sample data, for wiring up real guild values.</desc>
+
+<defs>
+  <pattern id="starsT" width="120" height="120" patternUnits="userSpaceOnUse">
+    <text x="10" y="30" font-size="22" fill="#D4AF37" opacity="0.06">★</text>
+    <text x="70" y="90" font-size="22" fill="#D4AF37" opacity="0.06">★</text>
+  </pattern>
+</defs>
+
+<rect width="1080" height="1080" fill="#7A1F1F"/>
+<rect width="1080" height="1080" fill="url(#starsT)"/>
+
+<rect x="28" y="28" width="1024" height="1024" fill="none" stroke="#D4AF37" stroke-width="4"/>
+<rect x="44" y="44" width="992" height="992" fill="none" stroke="#D4AF37" stroke-width="1.5"/>
+
+<text x="540" y="100" text-anchor="middle" font-family="Georgia, serif" font-size="26" fill="#D4AF37" letter-spacing="4">中华人民共和国</text>
+<text x="540" y="135" text-anchor="middle" font-family="Georgia, serif" font-size="17" fill="#F0DDC0" letter-spacing="3">SOCIAL CREDIT ALMANAC</text>
+
+<line x1="160" y1="162" x2="920" y2="162" stroke="#D4AF37" stroke-width="2"/>
+
+<circle cx="540" cy="240" r="58" fill="#5C1414" stroke="#D4AF37" stroke-width="3" stroke-dasharray="6,5"/>
+<text x="540" y="248" text-anchor="middle" font-family="monospace" font-size="16" fill="#D4AF37">{icon}</text>
+<text x="540" y="335" text-anchor="middle" font-family="monospace" font-size="22" fill="#FFFFFF">{guild_name}</text>
+
+<g transform="translate(540,490)">
+  <path d="M0,-95 L28,-30 L98,-30 L42,12 L62,80 L0,38 L-62,80 L-42,12 L-98,-30 L-28,-30 Z" fill="#D4AF37"/>
+  <path d="M0,-95 L28,-30 L98,-30 L42,12 L62,80 L0,38 L-62,80 L-42,12 L-98,-30 L-28,-30 Z" fill="none" stroke="#7A1F1F" stroke-width="3"/>
+  <text x="0" y="14" text-anchor="middle" font-family="monospace" font-size="32" fill="#7A1F1F">{rank}</text>
+</g>
+<text x="540" y="615" text-anchor="middle" font-family="monospace" font-size="20" fill="#F0DDC0">{bracket_name}</text>
+
+<line x1="220" y1="660" x2="860" y2="660" stroke="#D4AF37" stroke-width="1" opacity="0.5"/>
+
+<text x="540" y="710" text-anchor="middle" font-family="monospace" font-size="18" fill="#C9A86A">{metric_name}</text>
+<text x="540" y="775" text-anchor="middle" font-family="monospace" font-size="42" fill="#FFFFFF">{metric_value}</text>
+<text x="540" y="805" text-anchor="middle" font-family="monospace" font-size="16" fill="#F0DDC0">{trend_arrow} {trend_delta} THIS WEEK</text>
+
+<text x="540" y="865" text-anchor="middle" font-family="monospace" font-size="30" fill="#D4AF37">TOP {percentile}%</text>
+
+<text x="540" y="920" text-anchor="middle" font-family="monospace" font-size="16" fill="#C9A86A">{rivals_line}</text>
+
+<text x="120" y="1000" font-family="monospace" font-size="14" fill="#9C7A40">{date}</text>
+<text x="540" y="1000" text-anchor="middle" font-family="monospace" font-size="14" fill="#8A6A38" letter-spacing="1.5">tracked by social credit surveillant</text>
+<text x="960" y="1000" text-anchor="end" font-family="monospace" font-size="14" fill="#9C7A40">GLORY TO THE CCP!</text>
+</svg>
