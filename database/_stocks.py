@@ -70,6 +70,17 @@ class StocksMixin:
             ticker, since,
         )
 
+    async def get_latest_prices_from_history(self) -> dict[str, float]:
+        rows = await self._pool.fetch(
+            """
+            SELECT DISTINCT ON (ticker) ticker, close
+            FROM stock_price_history
+            WHERE close > 0
+            ORDER BY ticker, ts DESC
+            """
+        )
+        return {r["ticker"]: float(r["close"]) for r in rows}
+
     async def get_all_portfolios(self) -> list:
         return await self._pool.fetch("SELECT guild_id, user_id, ticker, shares FROM portfolios")
 

@@ -107,7 +107,11 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
             lines = []
             for i, row in enumerate(rows, 1):
                 gid = row.get("guild_id")
-                name = row["guild_name"] if (gid in visible_ids and row.get("guild_name")) else "Private Server"
+                if gid in visible_ids:
+                    g = self.bot.get_guild(gid)
+                    name = g.name if g else row.get("guild_name") or "Private Server"
+                else:
+                    name = "Private Server"
                 val = _fmt_metric(tab, row.get("value"))
                 citizens = row.get("citizens", 0)
                 lines.append(f"`{i:>2}.` **{name}** · {val} · {citizens} citizens")

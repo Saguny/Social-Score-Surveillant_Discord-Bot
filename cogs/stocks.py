@@ -457,6 +457,17 @@ class StocksCog(commands.Cog, name="Stocks"):
         if price_updates:
             await self.bot.db.batch_upsert_stock_prices(price_updates)
 
+        # last resort: any ticker still at 0 after DB + yfinance → use most recent price bar
+        still_zero = [t for t in REAL_TICKERS if self._prices.get(t, 0) <= 0]
+        if still_zero:
+            history_prices = await self.bot.db.get_latest_prices_from_history()
+            for ticker in still_zero:
+                p = history_prices.get(ticker, 0)
+                if p > 0:
+                    self._prices[ticker] = p
+                    if self._day_opens.get(ticker, 0) <= 0:
+                        self._day_opens[ticker] = p
+
         if self._prices.get(ETF_TICKER, 0) <= 0:
             base = ETF_INFO["base_price"]
             self._prices[ETF_TICKER]    = base
