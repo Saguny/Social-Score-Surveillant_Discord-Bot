@@ -264,7 +264,11 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
         visible = state.value == "on"
         if visible:
             await self.db.set_guild_name(interaction.guild.id, interaction.guild.name)
-        await self.db.set_leaderboard_visible(interaction.guild.id, visible)
+        try:
+            await self.db.set_leaderboard_visible(interaction.guild.id, visible)
+            print(f"[visibility] set_leaderboard_visible returned OK")
+        except Exception as e:
+            print(f"[visibility] set_leaderboard_visible RAISED: {type(e).__name__}: {e}")
 
         # debug: read back what we just wrote
         row = await self.db._pool.fetchrow(
