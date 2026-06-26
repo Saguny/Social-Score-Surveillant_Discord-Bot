@@ -1,1 +1,9 @@
-<p>overlay works!</p>
+@if (overlayData.show) {
+     <div class="overlay">
+         <div class="overlay-content">
+             <h2>{{ overlayData.title }}</h2>
+             <p>{{ overlayData.message }}</p>
+             <button (click)="closeOverlay()">Close</button>
+         </div>
+     </div>
+ }

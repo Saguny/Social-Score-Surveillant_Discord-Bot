@@ -21,7 +21,7 @@
 }
 
 .side-bar:hover {
-    border: 3px solid var(--text-secondary);
+    border: 3px solid var(--highlight);
 }
 
 .side-bar-elements {
@@ -50,5 +50,5 @@ router-outlet {
 }
 
 .app-title a {
-    color: var(--text-secondary);
+    color: var(--highlight);
 }

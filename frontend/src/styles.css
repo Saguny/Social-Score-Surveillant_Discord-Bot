@@ -4,7 +4,8 @@
     --side-bar-background-bottom: #e600002a;
     --side-bar-border: #5f0000a6;
     --text: #fff;
-    --text-secondary: #ffb200;
+    --highlight: #ffb200;
+    --primary: #8f0000;
 }
 
 * {
@@ -30,14 +31,15 @@ a {
 }
 
 a:hover {
-    color: var(--text-secondary);
+    color: var(--highlight);
     text-decoration: underline;
     cursor: pointer;
 }
 
 .page-title{
     font-size: 2em;
-    color: var(--text-secondary);
+    color: var(--highlight);
+    text-shadow: 0 0 50px var(--primary);
 }
 
 .page-title::before {
