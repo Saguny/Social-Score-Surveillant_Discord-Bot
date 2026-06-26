@@ -153,7 +153,6 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
                             for b in _BRACKET_NAMES
                         ],
                     ],
-                    row=1,
                 )
                 bracket_select.callback = self_.make_bracket_callback()
                 self_.add_item(bracket_select)
