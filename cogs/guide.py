@@ -289,8 +289,10 @@ class GuideView(discord.ui.View):
         e.add_field(
             name="SERVER RANKINGS",
             value=(
-                "`/serverrank visibility [on|off]` · Show or hide this server on the public server leaderboard\n"
-                "`/serverrank me` · View this server's full almanac profile and bracket rankings"
+                "`/serverrank top` · Browse the server leaderboard by metric (Happiness, GDP, Civic Participation, Literacy, Incarceration, Politburo) and size bracket\n"
+                "`/serverrank me` · View this server's full almanac profile, bracket ranking, and rival server\n"
+                "`/serverrank card` · Generate a shareable rank card image for this server\n"
+                "`/serverrank visibility [on|off]` · Show your server's real name on the public leaderboard (anonymized by default)"
             ),
             inline=False,
         )

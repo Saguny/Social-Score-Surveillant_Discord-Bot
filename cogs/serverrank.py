@@ -134,17 +134,18 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
                 super().__init__(timeout=60)
                 self_.tab = tab
                 self_.bkt = bkt
-                for m in METRICS:
+                for i, m in enumerate(METRICS):
                     btn = discord.ui.Button(
                         label=METRIC_LABELS[m],
                         style=discord.ButtonStyle.primary if m == tab else discord.ButtonStyle.secondary,
                         custom_id=f"tab_{m}",
-                        row=0,
+                        row=0 if i < 3 else 1,
                     )
                     btn.callback = self_.make_tab_callback(m)
                     self_.add_item(btn)
                 bracket_select = discord.ui.Select(
                     placeholder=bkt,
+                    row=2,
                     options=[
                         discord.SelectOption(label=_BRACKET_ALL, value=_BRACKET_ALL, default=bkt == _BRACKET_ALL),
                         *[

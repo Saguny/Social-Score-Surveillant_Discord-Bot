@@ -2,7 +2,7 @@ import json
 import time
 import asyncio
 
-from infra.redis_cache import cache_get, cache_set
+from infra.redis_cache import cache_get, cache_set, cache_delete
 from config.rules import (
     CIVIC_PARTICIPATION_ACTIVE_DAYS,
     GUILD_RANK_MIN_CITIZENS,
@@ -46,6 +46,19 @@ class GuildRankMixin:
             "UPDATE guild_config SET leaderboard_visible = $2 WHERE guild_id = $1",
             guild_id, visible,
         )
+        await self._invalidate_guild_rank_caches(guild_id)
+
+    async def _invalidate_guild_rank_caches(self, guild_id: int):
+        await cache_delete(f"guildrank:{guild_id}")
+        brackets = [None, "Outpost", "Town", "Metropolis"]
+        limits   = [10]
+        deletes  = [
+            cache_delete(f"guildlb:{metric}:{bracket}:{limit}")
+            for metric in METRICS
+            for bracket in brackets
+            for limit in limits
+        ]
+        await asyncio.gather(*deletes)
 
     async def is_leaderboard_visible(self, guild_id: int) -> bool:
         row = await self._pool.fetchrow(

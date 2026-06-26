@@ -363,7 +363,11 @@ async def _handle_guild_leaderboard(request):
     if metric not in _VALID_GUILD_METRICS:
         metric = "happiness"
     bracket_arg = bracket if bracket in _VALID_GUILD_BRACKETS else None
-    rows = await db.get_guild_leaderboard(metric, bracket_arg, limit=10)
+    try:
+        limit = min(100, max(1, int(request.rel_url.query.get("limit", 25))))
+    except (ValueError, TypeError):
+        limit = 25
+    rows = await db.get_guild_leaderboard(metric, bracket_arg, limit=limit)
     return web.json_response([
         {
             "guild_name": r.get("guild_name") or pseudonym_guild(r["guild_id"]),
