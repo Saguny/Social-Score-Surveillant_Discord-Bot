@@ -90,8 +90,11 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
 
         async def build_embed(tab: str, bkt: str) -> discord.Embed:
             bracket_arg = None if bkt == _BRACKET_ALL else bkt
-            rows = await self.db.get_guild_leaderboard(tab, bracket_arg, limit=10)
-            this_guild = await self.db.get_guild_rank(interaction.guild.id)
+            rows, this_guild, visible = await asyncio.gather(
+                self.db.get_guild_leaderboard(tab, bracket_arg, limit=10),
+                self.db.get_guild_rank(interaction.guild.id),
+                self.db.is_leaderboard_visible(interaction.guild.id),
+            )
 
             title_bracket = f" · {bkt}" if bkt != _BRACKET_ALL else ""
             embed = discord.Embed(
@@ -116,7 +119,6 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
             if this_guild:
                 this_val = this_guild.get(tab)
                 this_bracket = this_guild.get("bracket") or "—"
-                visible = this_guild.get("leaderboard_visible", False)
                 standing_lines = [
                     f"Bracket: **{this_bracket}**",
                     f"{METRIC_LABELS[tab]}: **{_fmt_metric(tab, this_val)}**",
