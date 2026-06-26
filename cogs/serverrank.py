@@ -93,7 +93,7 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
 
             lines = []
             for i, row in enumerate(rows, 1):
-                name = row["guild_name"] or "Unknown Server"
+                name = row["guild_name"] or "Private Server"
                 val = _fmt_metric(tab, row.get("value"))
                 citizens = row.get("citizens", 0)
                 lines.append(f"`{i:>2}.` **{name}** · {val} · {citizens} citizens")
@@ -177,17 +177,15 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
             file=discord.File("images/bureau.png", filename="bureau.png"),
         )
 
-    @serverrank.command(name="me", description="View this server's full almanac profile and rankings (mod only)")
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @serverrank.command(name="me", description="View this server's full almanac profile and rankings")
     async def serverrank_me(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer()
         guild = interaction.guild
         data = await self.db.get_guild_rank(guild.id)
 
         if not data:
             await interaction.followup.send(
                 "This server has no citizens yet. Members need to chat to become citizens.",
-                ephemeral=True,
             )
             return
 
@@ -225,7 +223,7 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
             )
 
         embed.set_footer(text="/serverrank visibility [on|off] · /state_report for today's activity · GLORY TO THE CCP!")
-        await interaction.followup.send(embed=embed, file=discord.File("images/bureau.png", filename="bureau.png"), ephemeral=True)
+        await interaction.followup.send(embed=embed, file=discord.File("images/bureau.png", filename="bureau.png"))
 
     @serverrank.command(name="visibility", description="Show or hide this server on the public leaderboard (mod only)")
     @app_commands.checks.has_permissions(manage_guild=True)
@@ -360,7 +358,6 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
         )
         await interaction.followup.send(caption, file=file)
 
-    @serverrank_me.error
     @serverrank_visibility.error
     @serverrank_card.error
     async def _mod_only_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):

@@ -10,7 +10,7 @@ from aiohttp import web
 
 from web.cache import StatCache, format_event
 from web.sse import SSEHub
-from web.anonymize import redact_global_stats, pseudonym_user, using_fallback_salt
+from web.anonymize import redact_global_stats, pseudonym_user, pseudonym_guild, using_fallback_salt
 from infra.redis_cache import cache_get, cache_set, cache_delete
 from infra.admin_rpc import call_admin_rpc, fire_admin_rpc
 
@@ -366,7 +366,7 @@ async def _handle_guild_leaderboard(request):
     rows = await db.get_guild_leaderboard(metric, bracket_arg, limit=10)
     return web.json_response([
         {
-            "guild_name": r.get("guild_name") or "Unknown Server",
+            "guild_name": r.get("guild_name") or pseudonym_guild(r["guild_id"]),
             "citizens":   int(r.get("citizens") or 0),
             "value":      round(float(r["value"]), 4) if r.get("value") is not None else None,
         }

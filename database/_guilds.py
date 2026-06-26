@@ -73,7 +73,7 @@ class GuildRankMixin:
                     COUNT(*) FILTER (WHERE u.last_active >= $1) AS active_citizens,
                     AVG(u.score) FILTER (WHERE u.has_chatted = 1) AS avg_score,
                     COALESCE(SUM(u.yuan) FILTER (WHERE u.has_chatted = 1), 0) AS total_yuan,
-                    COALESCE(SUM(u.total_messages) FILTER (WHERE u.has_chatted = 1), 0) AS total_messages,
+                    COALESCE(SUM(u.message_count) FILTER (WHERE u.has_chatted = 1), 0) AS total_messages,
                     COUNT(*) FILTER (WHERE u.score <= 610 AND u.has_chatted = 1) AS execution_count
                 FROM guild_config gc
                 LEFT JOIN users u ON u.guild_id = gc.guild_id
@@ -81,7 +81,7 @@ class GuildRankMixin:
             ),
             literacy_stats AS (
                 SELECT u.guild_id,
-                    COUNT(DISTINCT u.user_id) FILTER (WHERE ach.user_id IS NOT NULL)::double precision
+                    (COUNT(DISTINCT u.user_id) FILTER (WHERE ach.user_id IS NOT NULL))::double precision
                     / NULLIF(COUNT(DISTINCT u.user_id), 0) AS literacy_rate
                 FROM users u
                 LEFT JOIN (SELECT DISTINCT user_id FROM achievements) ach ON ach.user_id = u.user_id
@@ -230,7 +230,7 @@ class GuildRankMixin:
                 """
                 SELECT
                     gc.guild_id,
-                    gc.guild_name,
+                    CASE WHEN gc.leaderboard_visible THEN gc.guild_name ELSE NULL END AS guild_name,
                     COUNT(*) FILTER (WHERE u.has_chatted = 1) AS citizens,
                     AVG(top.score) AS value
                 FROM guild_config gc
@@ -241,8 +241,7 @@ class GuildRankMixin:
                     LIMIT $1
                 ) top ON true
                 JOIN users u ON u.guild_id = gc.guild_id
-                WHERE gc.leaderboard_visible = TRUE
-                GROUP BY gc.guild_id, gc.guild_name
+                GROUP BY gc.guild_id, gc.guild_name, gc.leaderboard_visible
                 HAVING COUNT(*) FILTER (WHERE u.has_chatted = 1) >= $2
                 ORDER BY value DESC NULLS LAST
                 LIMIT $3
@@ -254,9 +253,9 @@ class GuildRankMixin:
             value_expr = {
                 "happiness":     "AVG(u.score) FILTER (WHERE u.has_chatted = 1)",
                 "gdp":           "CASE WHEN COUNT(*) FILTER (WHERE u.has_chatted = 1) > 0 THEN SUM(u.yuan) FILTER (WHERE u.has_chatted = 1)::double precision / COUNT(*) FILTER (WHERE u.has_chatted = 1) ELSE 0 END",
-                "civic":         f"CASE WHEN COUNT(*) FILTER (WHERE u.last_active >= {active_cutoff}) > 0 THEN SUM(u.total_messages) FILTER (WHERE u.has_chatted = 1)::double precision / COUNT(*) FILTER (WHERE u.last_active >= {active_cutoff}) ELSE 0 END",
-                "literacy":      "COUNT(*) FILTER (WHERE u.has_chatted = 1 AND a.achievement_count > 0)::double precision / NULLIF(COUNT(*) FILTER (WHERE u.has_chatted = 1), 0)",
-                "incarceration": "COUNT(*) FILTER (WHERE u.score <= 610 AND u.has_chatted = 1)::double precision / NULLIF(COUNT(*) FILTER (WHERE u.has_chatted = 1), 0)",
+                "civic":         f"CASE WHEN COUNT(*) FILTER (WHERE u.last_active >= {active_cutoff}) > 0 THEN (SUM(u.message_count) FILTER (WHERE u.has_chatted = 1))::double precision / COUNT(*) FILTER (WHERE u.last_active >= {active_cutoff}) ELSE 0 END",
+                "literacy":      "(COUNT(*) FILTER (WHERE u.has_chatted = 1 AND a.achievement_count > 0))::double precision / NULLIF(COUNT(*) FILTER (WHERE u.has_chatted = 1), 0)",
+                "incarceration": "(COUNT(*) FILTER (WHERE u.score <= 610 AND u.has_chatted = 1))::double precision / NULLIF(COUNT(*) FILTER (WHERE u.has_chatted = 1), 0)",
             }[metric]
 
             bracket_filter = ""
@@ -283,14 +282,13 @@ class GuildRankMixin:
                 f"""
                 SELECT
                     gc.guild_id,
-                    gc.guild_name,
+                    CASE WHEN gc.leaderboard_visible THEN gc.guild_name ELSE NULL END AS guild_name,
                     COUNT(*) FILTER (WHERE u.has_chatted = 1) AS citizens,
                     {value_expr} AS value
                 FROM guild_config gc
                 JOIN users u ON u.guild_id = gc.guild_id
                 {literacy_join}
-                WHERE gc.leaderboard_visible = TRUE
-                GROUP BY gc.guild_id, gc.guild_name
+                GROUP BY gc.guild_id, gc.guild_name, gc.leaderboard_visible
                 {bracket_filter}
                 ORDER BY value {order} NULLS LAST
                 LIMIT $1
@@ -312,16 +310,16 @@ class GuildRankMixin:
                     u.guild_id,
                     COALESCE(SUM(u.yuan) FILTER (WHERE u.has_chatted = 1), 0)            AS total_yuan,
                     COALESCE(AVG(u.score) FILTER (WHERE u.has_chatted = 1), 0)            AS avg_score,
-                    COALESCE(SUM(u.total_messages) FILTER (WHERE u.has_chatted = 1), 0)  AS total_messages,
+                    COALESCE(SUM(u.message_count) FILTER (WHERE u.has_chatted = 1), 0)   AS total_messages,
                     COUNT(*) FILTER (WHERE u.has_chatted = 1)                             AS citizens,
                     COALESCE(
-                        COUNT(DISTINCT u.user_id) FILTER (WHERE u.has_chatted = 1 AND ach.user_id IS NOT NULL)
-                        ::double precision / NULLIF(COUNT(*) FILTER (WHERE u.has_chatted = 1), 0),
+                        (COUNT(DISTINCT u.user_id) FILTER (WHERE u.has_chatted = 1 AND ach.user_id IS NOT NULL))::double precision
+                        / NULLIF(COUNT(*) FILTER (WHERE u.has_chatted = 1), 0),
                         0
                     ) AS literacy_rate,
                     COALESCE(
-                        COUNT(*) FILTER (WHERE u.score <= 610 AND u.has_chatted = 1)
-                        ::double precision / NULLIF(COUNT(*) FILTER (WHERE u.has_chatted = 1), 0),
+                        (COUNT(*) FILTER (WHERE u.score <= 610 AND u.has_chatted = 1))::double precision
+                        / NULLIF(COUNT(*) FILTER (WHERE u.has_chatted = 1), 0),
                         0
                     ) AS incarceration_rate
                 FROM users u
