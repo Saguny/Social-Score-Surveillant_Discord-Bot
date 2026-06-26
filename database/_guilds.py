@@ -1,3 +1,4 @@
+import json
 import time
 import asyncio
 
@@ -55,9 +56,9 @@ class GuildRankMixin:
 
     async def get_guild_rank(self, guild_id: int) -> dict | None:
         cache_key = f"guildrank:{guild_id}"
-        cached = await cache_get(cache_key)
-        if cached is not None:
-            return cached
+        raw = await cache_get(cache_key)
+        if raw is not None:
+            return json.loads(raw)
 
         now = int(time.time())
         active_cutoff = now - CIVIC_PARTICIPATION_ACTIVE_DAYS * 86400
@@ -213,14 +214,14 @@ class GuildRankMixin:
         result["rank_politburo"] = rank_politburo
         result["total_guilds_in_bracket"] = int(total_in_bracket or 1)
 
-        await cache_set(cache_key, result, _CACHE_TTL)
+        await cache_set(cache_key, json.dumps(result), _CACHE_TTL)
         return result
 
     async def get_guild_leaderboard(self, metric: str, bracket: str | None = None, limit: int = 10) -> list[dict]:
         cache_key = f"guildlb:{metric}:{bracket}:{limit}"
-        cached = await cache_get(cache_key)
-        if cached is not None:
-            return cached
+        raw = await cache_get(cache_key)
+        if raw is not None:
+            return json.loads(raw)
 
         now = int(time.time())
         active_cutoff = now - CIVIC_PARTICIPATION_ACTIVE_DAYS * 86400
@@ -297,7 +298,7 @@ class GuildRankMixin:
             )
 
         result = [dict(r) for r in rows]
-        await cache_set(cache_key, result, _CACHE_TTL)
+        await cache_set(cache_key, json.dumps(result), _CACHE_TTL)
         return result
 
     async def snapshot_guild_daily_stats(self):
