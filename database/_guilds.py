@@ -67,6 +67,12 @@ class GuildRankMixin:
         )
         return bool(row and row["leaderboard_visible"])
 
+    async def get_visible_guild_ids(self) -> set[int]:
+        rows = await self._pool.fetch(
+            "SELECT guild_id FROM guild_config WHERE leaderboard_visible = TRUE AND guild_name != ''"
+        )
+        return {r["guild_id"] for r in rows}
+
     async def get_guild_rank(self, guild_id: int) -> dict | None:
         cache_key = f"guildrank:{guild_id}"
         raw = await cache_get(cache_key)
@@ -245,7 +251,6 @@ class GuildRankMixin:
                 SELECT
                     gc.guild_id,
                     gc.guild_name,
-                    gc.leaderboard_visible,
                     COUNT(*) FILTER (WHERE u.has_chatted = 1) AS citizens,
                     AVG(top.score) AS value
                 FROM guild_config gc
@@ -256,7 +261,7 @@ class GuildRankMixin:
                     LIMIT $1
                 ) top ON true
                 JOIN users u ON u.guild_id = gc.guild_id
-                GROUP BY gc.guild_id, gc.guild_name, gc.leaderboard_visible
+                GROUP BY gc.guild_id, gc.guild_name
                 HAVING COUNT(*) FILTER (WHERE u.has_chatted = 1) >= $2
                 ORDER BY value DESC NULLS LAST
                 LIMIT $3
@@ -298,13 +303,12 @@ class GuildRankMixin:
                 SELECT
                     gc.guild_id,
                     gc.guild_name,
-                    gc.leaderboard_visible,
                     COUNT(*) FILTER (WHERE u.has_chatted = 1) AS citizens,
                     {value_expr} AS value
                 FROM guild_config gc
                 JOIN users u ON u.guild_id = gc.guild_id
                 {literacy_join}
-                GROUP BY gc.guild_id, gc.guild_name, gc.leaderboard_visible
+                GROUP BY gc.guild_id, gc.guild_name
                 {bracket_filter}
                 ORDER BY value {order} NULLS LAST
                 LIMIT $1

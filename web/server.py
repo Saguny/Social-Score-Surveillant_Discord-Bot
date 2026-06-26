@@ -367,10 +367,13 @@ async def _handle_guild_leaderboard(request):
         limit = min(100, max(1, int(request.rel_url.query.get("limit", 25))))
     except (ValueError, TypeError):
         limit = 25
-    rows = await db.get_guild_leaderboard(metric, bracket_arg, limit=limit)
+    rows, visible_ids = await asyncio.gather(
+        db.get_guild_leaderboard(metric, bracket_arg, limit=limit),
+        db.get_visible_guild_ids(),
+    )
     return web.json_response([
         {
-            "guild_name": r["guild_name"] if r.get("leaderboard_visible") and r.get("guild_name") else pseudonym_guild(r["guild_id"]),
+            "guild_name": r["guild_name"] if (r.get("guild_id") in visible_ids and r.get("guild_name")) else pseudonym_guild(r["guild_id"]),
             "citizens":   int(r.get("citizens") or 0),
             "value":      round(float(r["value"]), 4) if r.get("value") is not None else None,
         }

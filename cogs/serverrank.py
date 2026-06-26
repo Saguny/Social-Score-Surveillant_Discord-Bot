@@ -90,10 +90,11 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
 
         async def build_embed(tab: str, bkt: str) -> discord.Embed:
             bracket_arg = None if bkt == _BRACKET_ALL else bkt
-            rows, this_guild, visible = await asyncio.gather(
+            rows, this_guild, visible, visible_ids = await asyncio.gather(
                 self.db.get_guild_leaderboard(tab, bracket_arg, limit=10),
                 self.db.get_guild_rank(interaction.guild.id),
                 self.db.is_leaderboard_visible(interaction.guild.id),
+                self.db.get_visible_guild_ids(),
             )
 
             title_bracket = f" · {bkt}" if bkt != _BRACKET_ALL else ""
@@ -105,22 +106,29 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
 
             lines = []
             for i, row in enumerate(rows, 1):
-                name = row["guild_name"] if row.get("leaderboard_visible") and row.get("guild_name") else "Private Server"
+                gid = row.get("guild_id")
+                name = row["guild_name"] if (gid in visible_ids and row.get("guild_name")) else "Private Server"
                 val = _fmt_metric(tab, row.get("value"))
                 citizens = row.get("citizens", 0)
                 lines.append(f"`{i:>2}.` **{name}** · {val} · {citizens} citizens")
 
             embed.add_field(
-                name=f"TOP SERVERS",
-                value="\n".join(lines) if lines else "No opted-in servers yet.",
+                name="TOP SERVERS",
+                value="\n".join(lines) if lines else "No servers ranked yet.",
                 inline=False,
             )
 
             if this_guild:
                 this_val = this_guild.get(tab)
                 this_bracket = this_guild.get("bracket") or "—"
+                rank_val = this_guild.get(f"rank_{tab}")
+                total_guilds = this_guild.get("total_guilds") or "?"
+                rank_str = f"#{rank_val} of {total_guilds}" if rank_val else "unranked"
+                top_pct = 1.0 if rank_val == 1 else max(1.0, (rank_val / total_guilds * 100)) if isinstance(rank_val, int) and isinstance(total_guilds, int) else None
+                pct_str = f" · TOP {top_pct:.0f}%" if top_pct is not None else ""
                 standing_lines = [
                     f"Bracket: **{this_bracket}**",
+                    f"Rank: **{rank_str}{pct_str}**",
                     f"{METRIC_LABELS[tab]}: **{_fmt_metric(tab, this_val)}**",
                 ]
                 if not visible:
