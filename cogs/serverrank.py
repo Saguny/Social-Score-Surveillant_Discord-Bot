@@ -109,7 +109,7 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
                 gid = row.get("guild_id")
                 if gid in visible_ids:
                     g = self.bot.get_guild(gid)
-                    name = g.name if g else row.get("guild_name") or "Private Server"
+                    name = g.name if g else "Private Server"
                 else:
                     name = "Private Server"
                 val = _fmt_metric(tab, row.get("value"))

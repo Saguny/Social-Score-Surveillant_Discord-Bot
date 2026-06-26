@@ -77,7 +77,7 @@ class GuildRankMixin:
 
     async def get_visible_guild_ids(self) -> set[int]:
         rows = await self._pool.fetch(
-            "SELECT guild_id FROM guild_config WHERE leaderboard_visible = TRUE AND guild_name != ''"
+            "SELECT guild_id FROM guild_config WHERE leaderboard_visible = TRUE"
         )
         return {r["guild_id"] for r in rows}
 
