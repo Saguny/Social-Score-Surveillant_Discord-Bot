@@ -37,13 +37,21 @@ def _bracket_for(citizens: int) -> str | None:
 class GuildRankMixin:
     async def set_guild_name(self, guild_id: int, name: str):
         await self._pool.execute(
-            "UPDATE guild_config SET guild_name = $2 WHERE guild_id = $1",
+            """
+            INSERT INTO guild_config (guild_id, guild_name)
+            VALUES ($1, $2)
+            ON CONFLICT (guild_id) DO UPDATE SET guild_name = EXCLUDED.guild_name
+            """,
             guild_id, name,
         )
 
     async def set_leaderboard_visible(self, guild_id: int, visible: bool):
         await self._pool.execute(
-            "UPDATE guild_config SET leaderboard_visible = $2 WHERE guild_id = $1",
+            """
+            INSERT INTO guild_config (guild_id, leaderboard_visible)
+            VALUES ($1, $2)
+            ON CONFLICT (guild_id) DO UPDATE SET leaderboard_visible = EXCLUDED.leaderboard_visible
+            """,
             guild_id, visible,
         )
         await self._invalidate_guild_rank_caches(guild_id)
