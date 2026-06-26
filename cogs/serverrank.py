@@ -227,7 +227,7 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
         if rival_above and rival_gap is not None:
             embed.add_field(
                 name="NEARBY RIVAL",
-                value=f"Only {rival_gap:.2f} behind **{rival_above}** · pass them to move up",
+                value=f"Only **{rival_gap:.2f} happiness points** behind **{rival_above}** · pass them to move up",
                 inline=False,
             )
 
@@ -254,8 +254,7 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
         )
         await interaction.followup.send(msg, ephemeral=True)
 
-    @serverrank.command(name="card", description="Render a shareable rank card for this server (mod only)")
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @serverrank.command(name="card", description="Render a shareable rank card for this server")
     @app_commands.describe(metric="Which almanac stat to feature on the card")
     @app_commands.choices(metric=[app_commands.Choice(name=METRIC_LABELS[m], value=m) for m in METRICS])
     async def serverrank_card(self, interaction: discord.Interaction, metric: app_commands.Choice[str] = None):
@@ -308,16 +307,16 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
                 trend_arrow = "▲" if delta >= 0 else "▼"
                 trend_delta_str = _fmt_metric(tab, abs(delta))
 
-        # percentile within bracket (fix 3: use bracket-scoped total)
+        # percentile within bracket
         total = data.get("total_guilds_in_bracket") or data.get("total_guilds") or 1
-        top_pct = max(1.0, (rank_val or 1) / total * 100)
+        top_pct = 1.0 if (rank_val or 1) == 1 else max(1.0, (rank_val or 1) / total * 100)
 
         # rivals
         rival_name = data.get("rival_above_name")
         rival_gap = data.get("rival_above_gap")
         rivals_line = ""
         if rival_name and rival_gap is not None:
-            rivals_line = f"Only {rival_gap:.2f} behind {rival_name}"
+            rivals_line = f"Only {rival_gap:.2f} happiness pts behind {rival_name}"
 
         # fetch guild icon
         icon_bytes: bytes | None = None
@@ -359,7 +358,6 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
         await interaction.followup.send(caption, file=file)
 
     @serverrank_visibility.error
-    @serverrank_card.error
     async def _mod_only_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
         if isinstance(error, app_commands.MissingPermissions):
             await interaction.response.send_message("This command requires Manage Server permission.", ephemeral=True)
