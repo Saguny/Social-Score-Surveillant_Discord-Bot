@@ -104,6 +104,10 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
             )
             embed.description = f"**{METRIC_LABELS[tab]}**"
 
+            print(f"[serverrank] visible_ids={visible_ids}")
+            print(f"[serverrank] row guild_ids={[r.get('guild_id') for r in rows[:3]]}")
+            print(f"[serverrank] bot.get_guild sample={[self.bot.get_guild(gid) for gid in list(visible_ids)[:3]]}")
+
             lines = []
             for i, row in enumerate(rows, 1):
                 gid = row.get("guild_id")
