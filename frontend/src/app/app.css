@@ -14,9 +14,9 @@
     position: fixed;
     width: 260px;
     height: calc(100vh - 40px);
-    border: 3px solid var(--side-bar-border);
-    background: linear-gradient(180deg, var(--side-bar-background-top) 0%, var(--side-bar-background-bottom) 100%);
-    box-shadow: 0 0 40px 0 var(--side-bar-background-top);
+    border: 3px solid var(--border);
+    background: linear-gradient(180deg, var(--background-top) 0%, var(--background-bottom) 100%);
+    box-shadow: 0 0 40px 0 var(--background-top);
     border-radius: 10px;
 }
 

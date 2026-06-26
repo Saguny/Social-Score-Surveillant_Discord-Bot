@@ -2,7 +2,7 @@ import { Routes } from '@angular/router';
 
 import { HomePage } from './home-page/home-page';
 import { PrivacyPage } from './privacy-page/privacy-page';
-import { TosPage } from './tos-page/tos-page';
+import { TermsPage } from './terms-page/terms-page';
 import { LeaderboardPage } from './leaderboard-page/leaderboard-page';
 import { DashboardPage } from './dashboard-page/dashboard-page';
 import { AboutPage } from './about-page/about-page';
@@ -24,9 +24,9 @@ export const routes: Routes = [
         component: PrivacyPage
     },
     {
-        path: "tos",
+        path: "terms",
         title: "Terms of Service ★ SCS",
-        component: TosPage
+        component: TermsPage
     },
     {
         path: "leaderboard",

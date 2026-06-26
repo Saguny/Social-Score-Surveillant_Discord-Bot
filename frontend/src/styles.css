@@ -1,8 +1,8 @@
 :root {
     --background: #000;
-    --side-bar-background-top: #630000a6;
-    --side-bar-background-bottom: #e600002a;
-    --side-bar-border: #5f0000a6;
+    --background-top: #630000a6;
+    --background-bottom: #e600002a;
+    --border: #5f0000a6;
     --text: #fff;
     --highlight: #ffb200;
     --primary: #8f0000;
@@ -51,5 +51,34 @@ a:hover {
 }
 
 .page-container {
-    font-size: 1.4em;
+    font-size: 1.3em;
+}
+
+.button-primary {
+    font-size: 1.3em;
+    background-color: var(--highlight);
+    color: var(--background);
+    padding: 5px 10px;
+    border-radius: 10px;
+    text-decoration: none;
+    display: inline-block;
+    margin: 10px 0;
+    border: 3px solid var(--highlight);
+}
+
+.button-primary:hover {
+    background-color: var(--primary);
+    color: var(--highlight);
+    text-decoration: none;
+}
+
+.button-secondary {
+    background-color: var(--background-top);
+    color: var(--highlight);
+    padding: 5px 10px;
+    border-radius: 10px;
+    text-decoration: none;
+    display: inline-block;
+    margin: 10px 0;
+    border: 3px solid var(--border);
 }

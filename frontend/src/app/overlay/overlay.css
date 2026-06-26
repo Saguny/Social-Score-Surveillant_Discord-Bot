@@ -1,0 +1,60 @@
+.overlays {
+    position: fixed;
+    z-index: 1000;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+}
+
+.overlay-backdrop {
+    position: fixed;
+    z-index: 999;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    justify-content: center;
+    align-items: center;
+    display: flex;
+}
+
+.overlay {
+    color: var(--text);
+    padding: 0;
+    border-radius: 10px;
+    width: 100vw;
+    max-width: 500px;
+    height: auto;
+    padding: 0 30px 20px;
+    border: 3px solid var(--border);
+    background: linear-gradient(180deg, var(--background-top) 0%, var(--background-bottom) 100%);
+    box-shadow: 0 0 40px 0 var(--background-top);
+    border-radius: 10px;
+}
+
+.overlay-title {
+    margin-top: 20px;
+    font-size: 3em;
+    color: var(--highlight);
+    text-shadow: 0 0 10px var(--primary);
+}
+
+.overlay-title::before {
+    content: "★ ";
+}
+
+.overlay-title::after {
+    content: " ★";
+}
+
+.overlay-text {
+    margin: -10px 0 10px;
+    font-size: 1.5em;
+}
+
+.button-row {
+    display: flex;
+    flex-direction: row-reverse;
+}

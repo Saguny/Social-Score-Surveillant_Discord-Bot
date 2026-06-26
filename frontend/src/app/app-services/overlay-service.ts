@@ -10,7 +10,7 @@ export type OverlayType =
     | "login"
     | "debug";
 
-export type OverlayData = {
+export type OverlayState = {
     show: boolean;
     type: OverlayType;
     title: string;
@@ -18,9 +18,9 @@ export type OverlayData = {
     link?: string;
 }
 
-@Injectable()
+@Injectable({ providedIn: 'root' })
 export class OverlayService {
-    private stateSubject = new BehaviorSubject<OverlayData>({show: false, type: "info", title: "Overlay"});
+    private stateSubject = new BehaviorSubject<OverlayState>({show: false, type: "info", title: "Overlay"});
     public overlay$ = this.stateSubject.asObservable();
 
     showOverlay(type: OverlayType, title: string, message?: string, link?: string) {
@@ -31,7 +31,7 @@ export class OverlayService {
         this.stateSubject.next({show: false, type: "info", title: "Overlay"});
     }
 
-    getCurrentOverlay(): OverlayData {
+    getCurrentOverlay(): OverlayState {
         return this.stateSubject.value;
     }
 

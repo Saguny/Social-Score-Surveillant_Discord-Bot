@@ -1,9 +1,11 @@
-@if (overlayData.show) {
-     <div class="overlay">
-         <div class="overlay-content">
-             <h2>{{ overlayData.title }}</h2>
-             <p>{{ overlayData.message }}</p>
-             <button (click)="closeOverlay()">Close</button>
-         </div>
-     </div>
- }
+<div class="overlays">
+    <div class="overlay-backdrop">
+        <div class="overlay overlay-info">
+            <h1 class="overlay-title">INFO</h1>
+            <p class="overlay-text">This is some informational text. This is some informational text. This is some informational text. This is some informational text. This is some informational text. This is some informational text. This is some informational text. This is some informational text.</p>
+            <div class="button-row">
+                <a class="button-primary">Close</a>
+            </div>
+        </div>
+    </div>
+</div>
