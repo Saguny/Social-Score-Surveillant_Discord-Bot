@@ -46,14 +46,15 @@ class GuildRankMixin:
         )
 
     async def set_leaderboard_visible(self, guild_id: int, visible: bool):
-        await self._pool.execute(
-            """
-            INSERT INTO guild_config (guild_id, leaderboard_visible)
-            VALUES ($1, $2)
-            ON CONFLICT (guild_id) DO UPDATE SET leaderboard_visible = EXCLUDED.leaderboard_visible
-            """,
-            guild_id, visible,
-        )
+        async with self._pool.acquire() as conn:
+            await conn.execute(
+                "UPDATE guild_config SET leaderboard_visible = $2 WHERE guild_id = $1",
+                guild_id, visible,
+            )
+            row = await conn.fetchrow(
+                "SELECT leaderboard_visible FROM guild_config WHERE guild_id = $1", guild_id
+            )
+            print(f"[set_leaderboard_visible] guild_id={guild_id} visible={visible} after_write={dict(row) if row else None}")
         await self._invalidate_guild_rank_caches(guild_id)
 
     async def _invalidate_guild_rank_caches(self, guild_id: int):
