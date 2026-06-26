@@ -244,9 +244,9 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
     async def serverrank_visibility(self, interaction: discord.Interaction, state: app_commands.Choice[str]):
         await interaction.response.defer(ephemeral=True)
         visible = state.value == "on"
-        await self.db.set_leaderboard_visible(interaction.guild.id, visible)
         if visible:
             await self.db.set_guild_name(interaction.guild.id, interaction.guild.name)
+        await self.db.set_leaderboard_visible(interaction.guild.id, visible)
         msg = (
             f"**{interaction.guild.name}** will now appear on `/serverrank top` and the web leaderboard."
             if visible else
@@ -255,12 +255,27 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
         await interaction.followup.send(msg, ephemeral=True)
 
     @serverrank.command(name="card", description="Render a shareable rank card for this server")
-    @app_commands.describe(metric="Which almanac stat to feature on the card")
-    @app_commands.choices(metric=[app_commands.Choice(name=METRIC_LABELS[m], value=m) for m in METRICS])
-    async def serverrank_card(self, interaction: discord.Interaction, metric: app_commands.Choice[str] = None):
+    @app_commands.describe(
+        metric="Which almanac stat to feature on the card",
+        scope="Rank within your size bracket (default) or against all servers globally",
+    )
+    @app_commands.choices(
+        metric=[app_commands.Choice(name=METRIC_LABELS[m], value=m) for m in METRICS],
+        scope=[
+            app_commands.Choice(name="Bracket (your size tier)", value="bracket"),
+            app_commands.Choice(name="Global (all servers)",     value="global"),
+        ],
+    )
+    async def serverrank_card(
+        self,
+        interaction: discord.Interaction,
+        metric: app_commands.Choice[str] = None,
+        scope:  app_commands.Choice[str] = None,
+    ):
         await interaction.response.defer()
         guild = interaction.guild
-        tab = metric.value if metric else "happiness"
+        tab        = metric.value if metric else "happiness"
+        use_bracket = (scope.value if scope else "bracket") == "bracket"
 
         data = await self.db.get_guild_rank(guild.id)
         if not data:
@@ -307,9 +322,19 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
                 trend_arrow = "▲" if delta >= 0 else "▼"
                 trend_delta_str = _fmt_metric(tab, abs(delta))
 
-        # percentile within bracket
-        total = data.get("total_guilds_in_bracket") or data.get("total_guilds") or 1
-        top_pct = 1.0 if (rank_val or 1) == 1 else max(1.0, (rank_val or 1) / total * 100)
+        # rank and percentile — bracket-scoped or global depending on scope choice
+        if use_bracket and bracket:
+            bracket_rows = await self.db.get_guild_leaderboard(tab, bracket, limit=500)
+            display_rank = 1
+            for idx, r in enumerate(bracket_rows, 1):
+                if r.get("guild_id") == guild.id:
+                    display_rank = idx
+                    break
+            total = len(bracket_rows) or 1
+        else:
+            display_rank = rank_val or 1
+            total = data.get("total_guilds") or 1
+        top_pct = 1.0 if display_rank == 1 else max(1.0, display_rank / total * 100)
 
         # rivals
         rival_name = data.get("rival_above_name")
@@ -335,7 +360,7 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
         png = await loop.run_in_executor(
             None, lambda: render_card(
                 guild_name=guild.name,
-                rank=rank_val if rank_val is not None else 1,
+                rank=display_rank,
                 bracket=bracket,
                 metric=tab,
                 metric_label=METRIC_LABELS[tab],
@@ -350,10 +375,10 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
         )
 
         file = discord.File(io.BytesIO(png), filename="serverrank_card.png")
-        rank_display = f"#{rank_val}" if rank_val else "unranked"
+        scope_label = f"{bracket} bracket" if use_bracket and bracket else "global"
         caption = (
             f"**{guild.name}** · {METRIC_LABELS[tab]} · "
-            f"**{bracket}** {rank_display} · TOP {top_pct:.0f}%"
+            f"#{display_rank} {scope_label} · TOP {top_pct:.0f}%"
         )
         await interaction.followup.send(caption, file=file)
 
