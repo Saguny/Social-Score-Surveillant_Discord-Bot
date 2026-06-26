@@ -322,26 +322,33 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
                 trend_arrow = "▲" if delta >= 0 else "▼"
                 trend_delta_str = _fmt_metric(tab, abs(delta))
 
-        # rank and percentile — bracket-scoped or global depending on scope choice
+        # rank, percentile, and rival — bracket-scoped or global
+        rivals_line = ""
         if use_bracket and bracket:
             bracket_rows = await self.db.get_guild_leaderboard(tab, bracket, limit=500)
             display_rank = 1
+            my_value = raw_val
             for idx, r in enumerate(bracket_rows, 1):
                 if r.get("guild_id") == guild.id:
                     display_rank = idx
                     break
             total = len(bracket_rows) or 1
+            # rival is the server directly above in the bracket
+            if display_rank > 1:
+                above = bracket_rows[display_rank - 2]
+                above_name = above.get("guild_name") or "Private Server"
+                above_val = above.get("value")
+                if above_val is not None and my_value is not None:
+                    gap = abs(above_val - my_value)
+                    rivals_line = f"Only {gap:.2f} {METRIC_LABELS[tab].lower()} pts behind {above_name}"
         else:
             display_rank = rank_val or 1
             total = data.get("total_guilds") or 1
+            rival_name = data.get("rival_above_name")
+            rival_gap = data.get("rival_above_gap")
+            if rival_name and rival_gap is not None:
+                rivals_line = f"Only {rival_gap:.2f} happiness pts behind {rival_name}"
         top_pct = 1.0 if display_rank == 1 else max(1.0, display_rank / total * 100)
-
-        # rivals
-        rival_name = data.get("rival_above_name")
-        rival_gap = data.get("rival_above_gap")
-        rivals_line = ""
-        if rival_name and rival_gap is not None:
-            rivals_line = f"Only {rival_gap:.2f} happiness pts behind {rival_name}"
 
         # fetch guild icon
         icon_bytes: bytes | None = None
