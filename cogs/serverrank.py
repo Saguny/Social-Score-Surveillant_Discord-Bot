@@ -265,6 +265,14 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
         if visible:
             await self.db.set_guild_name(interaction.guild.id, interaction.guild.name)
         await self.db.set_leaderboard_visible(interaction.guild.id, visible)
+
+        # debug: read back what we just wrote
+        row = await self.db._pool.fetchrow(
+            "SELECT guild_name, leaderboard_visible FROM guild_config WHERE guild_id = $1",
+            interaction.guild.id,
+        )
+        print(f"[visibility debug] guild_id={interaction.guild.id} db_row={dict(row) if row else None}")
+
         msg = (
             f"**{interaction.guild.name}** will now appear on `/serverrank top` and the web leaderboard."
             if visible else
