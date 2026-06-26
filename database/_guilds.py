@@ -51,7 +51,7 @@ class GuildRankMixin:
     async def _invalidate_guild_rank_caches(self, guild_id: int):
         await cache_delete(f"guildrank:{guild_id}")
         brackets = [None, "Outpost", "Town", "Metropolis"]
-        limits   = [10]
+        limits   = [10, 25, 100, 500]
         deletes  = [
             cache_delete(f"guildlb:{metric}:{bracket}:{limit}")
             for metric in METRICS
@@ -244,7 +244,8 @@ class GuildRankMixin:
                 """
                 SELECT
                     gc.guild_id,
-                    CASE WHEN gc.leaderboard_visible THEN gc.guild_name ELSE NULL END AS guild_name,
+                    gc.guild_name,
+                    gc.leaderboard_visible,
                     COUNT(*) FILTER (WHERE u.has_chatted = 1) AS citizens,
                     AVG(top.score) AS value
                 FROM guild_config gc
@@ -296,7 +297,8 @@ class GuildRankMixin:
                 f"""
                 SELECT
                     gc.guild_id,
-                    CASE WHEN gc.leaderboard_visible THEN gc.guild_name ELSE NULL END AS guild_name,
+                    gc.guild_name,
+                    gc.leaderboard_visible,
                     COUNT(*) FILTER (WHERE u.has_chatted = 1) AS citizens,
                     {value_expr} AS value
                 FROM guild_config gc

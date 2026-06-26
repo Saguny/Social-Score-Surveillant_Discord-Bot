@@ -370,7 +370,7 @@ async def _handle_guild_leaderboard(request):
     rows = await db.get_guild_leaderboard(metric, bracket_arg, limit=limit)
     return web.json_response([
         {
-            "guild_name": r.get("guild_name") or pseudonym_guild(r["guild_id"]),
+            "guild_name": r["guild_name"] if r.get("leaderboard_visible") and r.get("guild_name") else pseudonym_guild(r["guild_id"]),
             "citizens":   int(r.get("citizens") or 0),
             "value":      round(float(r["value"]), 4) if r.get("value") is not None else None,
         }

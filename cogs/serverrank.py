@@ -102,7 +102,7 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
 
             lines = []
             for i, row in enumerate(rows, 1):
-                name = row["guild_name"] or "Private Server"
+                name = row["guild_name"] if row.get("leaderboard_visible") and row.get("guild_name") else "Private Server"
                 val = _fmt_metric(tab, row.get("value"))
                 citizens = row.get("citizens", 0)
                 lines.append(f"`{i:>2}.` **{name}** · {val} · {citizens} citizens")
