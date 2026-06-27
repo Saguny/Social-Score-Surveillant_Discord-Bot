@@ -78,7 +78,7 @@ class AnalyticsMixin:
             ),
             self._pool.fetch(
                 """
-                SELECT EXTRACT(HOUR FROM to_timestamp(timestamp))::int AS hour, COUNT(*) AS uses
+                SELECT EXTRACT(HOUR FROM to_timestamp(timestamp) AT TIME ZONE 'UTC')::int AS hour, COUNT(*) AS uses
                 FROM command_analytics
                 WHERE ($1 = 0 OR timestamp >= $1)
                 GROUP BY hour ORDER BY hour
