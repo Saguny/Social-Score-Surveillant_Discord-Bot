@@ -540,6 +540,8 @@ const STAT_TIPS = {
   'tl-social-val': 'Endorsements plus rebukes given over the selected time range.',
   'sc-reb':     'Total rebukes given, all-time.',
   'tl-dblatency-val': 'Rolling database round-trip time, sampled live.',
+  'cmd-today': 'Commands run since midnight UTC. Resets to 0 at 00:00 UTC.',
+  'cmd-24h':   'Rolling window: commands run in the last 24 hours, regardless of the calendar day.',
 };
 
 function _initTooltips() {

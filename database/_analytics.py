@@ -38,122 +38,121 @@ class AnalyticsMixin:
         today_start = (now // 86400) * 86400
         day_ago = now - 86400
 
-        async with self._pool.acquire() as conn:
-            (
-                top_cmds,
-                unique_users,
-                usage_per_day,
-                usage_per_hour,
-                avg_exec,
-                per_cmd_rates,
-                newest,
-                all_cmds,
-                totals,
-            ) = await asyncio.gather(
-                conn.fetch(
-                    """
-                    SELECT command_name, COUNT(*) AS uses
-                    FROM command_analytics
-                    WHERE ($1 = 0 OR timestamp >= $1)
-                    GROUP BY command_name ORDER BY uses DESC LIMIT 15
-                    """,
-                    since,
-                ),
-                conn.fetch(
-                    """
-                    SELECT command_name, COUNT(DISTINCT user_id) AS unique_users
-                    FROM command_analytics
-                    WHERE ($1 = 0 OR timestamp >= $1)
-                    GROUP BY command_name ORDER BY unique_users DESC LIMIT 15
-                    """,
-                    since,
-                ),
-                conn.fetch(
-                    """
-                    SELECT (timestamp / 86400 * 86400) AS day, COUNT(*) AS uses
-                    FROM command_analytics
-                    WHERE ($1 = 0 OR timestamp >= $1)
-                    GROUP BY day ORDER BY day
-                    """,
-                    since,
-                ),
-                conn.fetch(
-                    """
-                    SELECT EXTRACT(HOUR FROM to_timestamp(timestamp))::int AS hour, COUNT(*) AS uses
-                    FROM command_analytics
-                    WHERE ($1 = 0 OR timestamp >= $1)
-                    GROUP BY hour ORDER BY hour
-                    """,
-                    since,
-                ),
-                conn.fetch(
-                    """
-                    SELECT command_name,
-                           ROUND(AVG(execution_time_ms)::numeric, 1) AS avg_ms
-                    FROM command_analytics
-                    WHERE ($1 = 0 OR timestamp >= $1)
-                    GROUP BY command_name ORDER BY avg_ms DESC LIMIT 15
-                    """,
-                    since,
-                ),
-                conn.fetch(
-                    """
-                    SELECT command_name,
-                           COUNT(*) AS total,
-                           COUNT(*) FILTER (WHERE success) AS successes,
-                           COUNT(*) FILTER (WHERE NOT success) AS errors,
-                           ROUND(
-                               COUNT(*) FILTER (WHERE NOT success)::numeric
-                               / NULLIF(COUNT(*), 0) * 100, 2
-                           ) AS error_pct,
-                           ROUND(
-                               COUNT(*) FILTER (WHERE success)::numeric
-                               / NULLIF(COUNT(*), 0) * 100, 2
-                           ) AS success_pct
-                    FROM command_analytics
-                    WHERE ($1 = 0 OR timestamp >= $1)
-                    GROUP BY command_name ORDER BY total DESC LIMIT 15
-                    """,
-                    since,
-                ),
-                conn.fetch(
-                    """
-                    SELECT timestamp, user_id, command_name, subcommand, execution_time_ms, success, error_code
-                    FROM command_analytics
-                    ORDER BY timestamp DESC LIMIT 20
-                    """,
-                ),
-                conn.fetch(
-                    """
-                    SELECT command_name,
-                           COALESCE(subcommand, '') AS subcommand,
-                           COUNT(*) AS uses,
-                           COUNT(DISTINCT user_id) AS unique_users
-                    FROM command_analytics
-                    WHERE ($1 = 0 OR timestamp >= $1)
-                    GROUP BY command_name, subcommand
-                    ORDER BY uses DESC
-                    """,
-                    since,
-                ),
-                conn.fetchrow(
-                    """
-                    SELECT
-                        COUNT(*)                                          AS total_executions,
-                        COUNT(*) FILTER (WHERE timestamp >= $2)           AS executions_today,
-                        COUNT(*) FILTER (WHERE timestamp >= $3)           AS executions_24h,
-                        COUNT(DISTINCT user_id)                           AS unique_users,
-                        ROUND(AVG(execution_time_ms)::numeric, 1)        AS avg_execution_time_ms,
-                        ROUND(
-                            COUNT(*) FILTER (WHERE success)::numeric
-                            / NULLIF(COUNT(*), 0) * 100, 2
-                        )                                                 AS overall_success_rate
-                    FROM command_analytics
-                    WHERE ($1 = 0 OR timestamp >= $1)
-                    """,
-                    since, today_start, day_ago,
-                ),
-            )
+        (
+            top_cmds,
+            unique_users,
+            usage_per_day,
+            usage_per_hour,
+            avg_exec,
+            per_cmd_rates,
+            newest,
+            all_cmds,
+            totals,
+        ) = await asyncio.gather(
+            self._pool.fetch(
+                """
+                SELECT command_name, COUNT(*) AS uses
+                FROM command_analytics
+                WHERE ($1 = 0 OR timestamp >= $1)
+                GROUP BY command_name ORDER BY uses DESC LIMIT 15
+                """,
+                since,
+            ),
+            self._pool.fetch(
+                """
+                SELECT command_name, COUNT(DISTINCT user_id) AS unique_users
+                FROM command_analytics
+                WHERE ($1 = 0 OR timestamp >= $1)
+                GROUP BY command_name ORDER BY unique_users DESC LIMIT 15
+                """,
+                since,
+            ),
+            self._pool.fetch(
+                """
+                SELECT (timestamp / 86400 * 86400) AS day, COUNT(*) AS uses
+                FROM command_analytics
+                WHERE ($1 = 0 OR timestamp >= $1)
+                GROUP BY day ORDER BY day
+                """,
+                since,
+            ),
+            self._pool.fetch(
+                """
+                SELECT EXTRACT(HOUR FROM to_timestamp(timestamp))::int AS hour, COUNT(*) AS uses
+                FROM command_analytics
+                WHERE ($1 = 0 OR timestamp >= $1)
+                GROUP BY hour ORDER BY hour
+                """,
+                since,
+            ),
+            self._pool.fetch(
+                """
+                SELECT command_name,
+                       ROUND(AVG(execution_time_ms)::numeric, 1) AS avg_ms
+                FROM command_analytics
+                WHERE ($1 = 0 OR timestamp >= $1)
+                GROUP BY command_name ORDER BY avg_ms DESC LIMIT 15
+                """,
+                since,
+            ),
+            self._pool.fetch(
+                """
+                SELECT command_name,
+                       COUNT(*) AS total,
+                       COUNT(*) FILTER (WHERE success) AS successes,
+                       COUNT(*) FILTER (WHERE NOT success) AS errors,
+                       ROUND(
+                           COUNT(*) FILTER (WHERE NOT success)::numeric
+                           / NULLIF(COUNT(*), 0) * 100, 2
+                       ) AS error_pct,
+                       ROUND(
+                           COUNT(*) FILTER (WHERE success)::numeric
+                           / NULLIF(COUNT(*), 0) * 100, 2
+                       ) AS success_pct
+                FROM command_analytics
+                WHERE ($1 = 0 OR timestamp >= $1)
+                GROUP BY command_name ORDER BY total DESC LIMIT 15
+                """,
+                since,
+            ),
+            self._pool.fetch(
+                """
+                SELECT timestamp, user_id, command_name, subcommand, execution_time_ms, success, error_code
+                FROM command_analytics
+                ORDER BY timestamp DESC LIMIT 20
+                """,
+            ),
+            self._pool.fetch(
+                """
+                SELECT command_name,
+                       COALESCE(subcommand, '') AS subcommand,
+                       COUNT(*) AS uses,
+                       COUNT(DISTINCT user_id) AS unique_users
+                FROM command_analytics
+                WHERE ($1 = 0 OR timestamp >= $1)
+                GROUP BY command_name, subcommand
+                ORDER BY uses DESC
+                """,
+                since,
+            ),
+            self._pool.fetchrow(
+                """
+                SELECT
+                    COUNT(*)                                          AS total_executions,
+                    COUNT(*) FILTER (WHERE timestamp >= $2)           AS executions_today,
+                    COUNT(*) FILTER (WHERE timestamp >= $3)           AS executions_24h,
+                    COUNT(DISTINCT user_id)                           AS unique_users,
+                    ROUND(AVG(execution_time_ms)::numeric, 1)        AS avg_execution_time_ms,
+                    ROUND(
+                        COUNT(*) FILTER (WHERE success)::numeric
+                        / NULLIF(COUNT(*), 0) * 100, 2
+                    )                                                 AS overall_success_rate
+                FROM command_analytics
+                WHERE ($1 = 0 OR timestamp >= $1)
+                """,
+                since, today_start, day_ago,
+            ),
+        )
 
         return {
             "top_commands": [
