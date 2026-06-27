@@ -698,13 +698,13 @@ async function loadCommandAnalytics(range) {
         const dt  = new Date(r.timestamp * 1000);
         const mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][dt.getMonth()];
         const t   = `${mon} ${dt.getDate()} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}:${String(dt.getSeconds()).padStart(2,'0')}`;
-        const sub   = r.subcommand ? `<span class="text-muted">${r.subcommand}</span>` : '<span class="text-muted">—</span>';
+        const sub   = r.subcommand || '—';
         const ms    = r.execution_time_ms != null ? r.execution_time_ms + 'ms' : '—';
         const badge = r.success
           ? '<span class="cmd-badge-ok">OK</span>'
           : `<span class="cmd-badge-err">${r.error_code || 'ERR'}</span>`;
         return `<tr>
-          <td class="text-muted" style="font-size:.68rem">${t}</td>
+          <td style="font-size:.68rem;opacity:.6">${t}</td>
           <td><strong>/${r.command_name}</strong></td>
           <td>${sub}</td>
           <td>${ms}</td>
