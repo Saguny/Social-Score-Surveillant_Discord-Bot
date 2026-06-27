@@ -13,15 +13,18 @@ class AnalyticsMixin:
         success: bool,
         error_code: str | None = None,
     ) -> None:
-        await self._pool.execute(
-            """
-            INSERT INTO command_analytics
-                (timestamp, guild_id, user_id, command_name, subcommand, execution_time_ms, success, error_code)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            """,
-            int(time.time()), guild_id, user_id, command_name,
-            subcommand, execution_time_ms, success, error_code,
-        )
+        try:
+            await self._pool.execute(
+                """
+                INSERT INTO command_analytics
+                    (timestamp, guild_id, user_id, command_name, subcommand, execution_time_ms, success, error_code)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                """,
+                int(time.time()), guild_id, user_id, command_name,
+                subcommand, execution_time_ms, success, error_code,
+            )
+        except Exception as e:
+            print(f"[analytics] log_command failed: {e!r}")
 
     async def get_command_stats(self, range_: str = "7d") -> dict:
         now = int(time.time())
