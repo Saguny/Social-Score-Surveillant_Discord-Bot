@@ -618,6 +618,8 @@ async function loadCommandAnalytics(range) {
   set('cmd-avgms',   (t.avg_execution_time_ms || 0).toFixed(0) + 'ms');
   set('cmd-success', (t.overall_success_rate || 100).toFixed(1) + '%');
 
+  const topCmds = (d.top_commands || []).slice(0, 10);
+
   // Usage over time (line chart)
   const days      = d.usage_per_day || [];
   const dayLabels = days.map(r => _dayLabel(r.day));
