@@ -85,6 +85,8 @@ async def _log_command_usage(guild_id: int | None, user_id: int, command_name: s
 
 class CreditCommandTree(discord.app_commands.CommandTree):
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.type != discord.InteractionType.application_command:
+            return True
         _current_user_id.set(interaction.user.id)
         if not await _check_cmd_cooldown(interaction.user.id):
             await interaction.response.send_message("Slow down, citizen.", ephemeral=True)
