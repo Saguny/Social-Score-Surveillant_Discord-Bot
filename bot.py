@@ -109,6 +109,7 @@ class CreditCommandTree(discord.app_commands.CommandTree):
             parts = qualified_name.split(' ', 1)
             cmd = parts[0]
             sub = parts[1] if len(parts) > 1 else None
+            print(f"[analytics] logging command: {cmd} sub={sub} guild={interaction.guild_id} elapsed={elapsed_ms}ms success={success}")
             asyncio.create_task(
                 self.client.db.log_command(
                     interaction.guild_id, interaction.user.id,

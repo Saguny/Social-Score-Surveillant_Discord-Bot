@@ -752,4 +752,4 @@ _initTooltips();
 setInterval(() => loadActivity(_activityRange), 300000);
 setInterval(loadYuanCirculation, 300000);
 setInterval(loadAnnouncement, 60000);
-setInterval(() => { if (_cmdLoaded) loadCommandAnalytics(); }, 60000);
+setInterval(() => { if (_cmdLoaded) loadCommandAnalytics(); }, 30000);
