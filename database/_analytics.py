@@ -181,8 +181,8 @@ class AnalyticsMixin:
                     "total":       r["total"],
                     "successes":   r["successes"],
                     "errors":      r["errors"],
-                    "error_pct":   float(r["error_pct"] or 0),
-                    "success_pct": float(r["success_pct"] or 100),
+                    "error_pct":   float(r["error_pct"]) if r["error_pct"] is not None else 0.0,
+                    "success_pct": float(r["success_pct"]) if r["success_pct"] is not None else 100.0,
                 }
                 for r in per_cmd_rates
             ],

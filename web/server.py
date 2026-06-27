@@ -403,7 +403,7 @@ async def _handle_stats_commands(request):
     if range_ not in ("24h", "7d", "30d", "all"):
         range_ = "7d"
 
-    cache_key = f"cmd_stats_v2:{range_}"
+    cache_key = f"cmd_stats_v3:{range_}"
     cached = await cache_get(cache_key)
     if cached:
         try:

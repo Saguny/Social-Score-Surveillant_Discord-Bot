@@ -589,7 +589,7 @@ function _barChart(canvasId, labels, datasets, opts = {}) {
         tooltip: { mode: 'nearest', axis: horiz ? 'y' : 'x', intersect: true },
       },
       scales: {
-        x: { grid: { color: 'rgba(97,103,122,.15)' }, ticks: xTicks },
+        x: { grid: { color: 'rgba(97,103,122,.15)' }, ticks: xTicks, ...(opts.xMax != null ? { max: opts.xMax } : {}) },
         y: { grid: { color: 'rgba(97,103,122,.15)' }, ticks: yTicks },
       },
     },
@@ -653,7 +653,7 @@ async function loadCommandAnalytics(range) {
   _barChart('chart-cmd-rates', rateLabels, [
     { label: 'Success %', data: successPcts, backgroundColor: '#3DAA6E', borderRadius: 2, stack: 'r' },
     { label: 'Error %',   data: errorPcts,   backgroundColor: '#E85454', borderRadius: 2, stack: 'r' },
-  ], { legend: true, horizontal: true, yFmt: v => v, xFmt: v => v + '%' });
+  ], { legend: true, horizontal: true, xFmt: v => v + '%', xMax: 100 });
 
   // Build unique-users and avg-exec-time maps for the top-commands table
   const uniqueMap  = {};
@@ -687,41 +687,17 @@ async function loadCommandAnalytics(range) {
     }
   }
 
-  // All commands table
-  const allBody = document.getElementById('cmd-table-all');
-  if (allBody) {
-    const allRows = d.all_commands || [];
-    if (!allRows.length) {
-      allBody.innerHTML = '<tr><td colspan="5" class="sub text-center py-3">No commands recorded yet.</td></tr>';
-    } else {
-      let rank = 0;
-      let prevCmd = null;
-      allBody.innerHTML = allRows.map(r => {
-        const isNewCmd = r.command !== prevCmd;
-        if (isNewCmd) { rank++; prevCmd = r.command; }
-        const rankCell = isNewCmd
-          ? `<td class="rank-cell lb-rank" rowspan="1">${rank}</td>`
-          : '<td class="rank-cell lb-rank" style="color:transparent">·</td>';
-        const cmdCell = isNewCmd
-          ? `<td><strong>/${r.command}</strong></td>`
-          : '<td></td>';
-        const sub = r.subcommand ? `<span class="text-muted" style="font-size:.78rem">${r.subcommand}</span>` : '<span class="text-muted">—</span>';
-        return `<tr>${rankCell}${cmdCell}<td>${sub}</td><td>${fmt(r.uses)}</td><td>${fmt(r.unique_users)}</td></tr>`;
-      }).join('');
-    }
-  }
-
   // Recent activity table
   const recentBody = document.getElementById('cmd-table-recent');
   if (recentBody) {
     const rows = d.newest_commands || [];
     if (!rows.length) {
-      recentBody.innerHTML = '<tr><td colspan="6" class="sub text-center py-3">No recent activity.</td></tr>';
+      recentBody.innerHTML = '<tr><td colspan="5" class="sub text-center py-3">No recent activity.</td></tr>';
     } else {
       recentBody.innerHTML = rows.map(r => {
-        const dt    = new Date(r.timestamp * 1000);
-        const t     = dt.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        const user  = r.user || (r.user_id ? `User #${String(r.user_id).slice(-6)}` : '—');
+        const dt  = new Date(r.timestamp * 1000);
+        const mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][dt.getMonth()];
+        const t   = `${mon} ${dt.getDate()} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}:${String(dt.getSeconds()).padStart(2,'0')}`;
         const sub   = r.subcommand ? `<span class="text-muted">${r.subcommand}</span>` : '<span class="text-muted">—</span>';
         const ms    = r.execution_time_ms != null ? r.execution_time_ms + 'ms' : '—';
         const badge = r.success
@@ -729,7 +705,6 @@ async function loadCommandAnalytics(range) {
           : `<span class="cmd-badge-err">${r.error_code || 'ERR'}</span>`;
         return `<tr>
           <td class="text-muted" style="font-size:.68rem">${t}</td>
-          <td class="text-muted" style="font-size:.72rem">${user}</td>
           <td><strong>/${r.command_name}</strong></td>
           <td>${sub}</td>
           <td>${ms}</td>
