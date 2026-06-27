@@ -394,6 +394,67 @@ async def _handle_recent_events(request):
     return web.json_response({"events": events})
 
 
+async def _handle_stats_all(request):
+    db = request.app["db"]
+    cache = request.app.get("cache")
+    range_ = request.query.get("range", "30d")
+    if range_ not in ("24h", "7d", "30d", "90d"):
+        range_ = "30d"
+
+    async def _get_stats():
+        if cache:
+            s = dict(cache.get("stats") or {})
+            if not s:
+                s = await db.get_global_stats()
+                redact_global_stats(s)
+            cache.augment_live_fields(s)
+            if s.get("db_query_ms") is None:
+                t0 = time.time()
+                await db.ping()
+                s["db_query_ms"] = round((time.time() - t0) * 1000, 1)
+        else:
+            t0 = time.time()
+            s = await db.get_global_stats()
+            redact_global_stats(s)
+            s["db_query_ms"] = round((time.time() - t0) * 1000, 1)
+            bot_status = await call_admin_rpc("get_status")
+            s["uptime_seconds"] = bot_status.get("uptime_seconds", 0)
+            s["discord_ping_ms"] = bot_status.get("discord_ping_ms")
+            s["total_guilds"] = bot_status.get("total_guilds", 0)
+            s["sentiment_workers_max"] = bot_status.get("sentiment_workers_max")
+            s["sentiment_workers_active"] = bot_status.get("sentiment_workers_active")
+        return s
+
+    async def _get_timeline():
+        if cache:
+            cached = cache.get(f"timeline:{range_}")
+            if cached:
+                return cached
+        return await db.get_global_timeline(range_)
+
+    async def _get_events():
+        if cache:
+            cached = cache.get("feed")
+            if cached:
+                return cached
+        rows = await db.get_recent_events(20)
+        return {"events": [format_event(r) for r in rows]}
+
+    async def _get_announcement():
+        return await db.get_dashboard_announcement()
+
+    stats, timeline, events, announcement = await asyncio.gather(
+        _get_stats(), _get_timeline(), _get_events(), _get_announcement()
+    )
+    return web.json_response({
+        "stats": stats,
+        "timeline": timeline,
+        "events": events,
+        "announcement": announcement,
+        "range": range_,
+    })
+
+
 async def _handle_topgg_votes(request):
     db = request.app["db"]
     period = request.query.get("period", "7D").upper()
@@ -515,6 +576,7 @@ async def start_web_server(db):
     app.router.add_get("/admin", _require_admin(_handle_admin))
     app.router.add_post("/api/admin/command", _require_admin(_handle_admin_command))
     app.router.add_get("/api/stats", _rate_limit_public(_handle_stats))
+    app.router.add_get("/api/stats/all", _rate_limit_public(_handle_stats_all))
     app.router.add_get("/api/stats/timeline", _rate_limit_public(_handle_stats_timeline))
     app.router.add_get("/api/stats/recent-events", _rate_limit_public(_handle_recent_events))
     app.router.add_get("/api/leaderboard", _rate_limit_public(_handle_leaderboard))

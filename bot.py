@@ -450,7 +450,10 @@ class SocialCreditBot(commands.AutoShardedBot):
             await self.db.register_guild_members(guild.id, member_ids)
             if not self._synced_once:
                 self.tree.copy_global_to(guild=guild)
-                await self.tree.sync(guild=guild)
+                try:
+                    await self.tree.sync(guild=guild)
+                except discord.Forbidden:
+                    pass
             condemned = await self.db.get_condemned_users(guild.id)
             for row in condemned:
                 member = guild.get_member(row["user_id"])
