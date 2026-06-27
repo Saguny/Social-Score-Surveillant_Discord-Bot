@@ -89,18 +89,28 @@ class CreditCommandTree(discord.app_commands.CommandTree):
         if not await _check_cmd_cooldown(interaction.user.id):
             await interaction.response.send_message("Slow down, citizen.", ephemeral=True)
             return
-        qualified_name = interaction.command.qualified_name if interaction.command else None
-        if qualified_name not in OPTOUT_ALLOWED_SLASH_COMMANDS:
+
+        # interaction.command is not yet resolved at this point — read name from raw data
+        data = interaction.data or {}
+        pre_name: str | None = data.get('name') or None
+        if pre_name:
+            for opt in data.get('options', []):
+                if opt.get('type') in (1, 2):  # SUB_COMMAND / SUB_COMMAND_GROUP
+                    pre_name = f"{pre_name} {opt['name']}"
+                    break
+
+        if pre_name not in OPTOUT_ALLOWED_SLASH_COMMANDS:
             if await self.client.db.is_opted_out(interaction.user.id):
                 await interaction.response.send_message(OPTOUT_BLOCKED_MESSAGE, ephemeral=True)
                 return
-        await _log_command_usage(interaction.guild_id, interaction.user.id, qualified_name)
+        await _log_command_usage(interaction.guild_id, interaction.user.id, pre_name)
 
         t0 = time.time()
         _cmd_timing[interaction.id] = (t0, None)
         await super().call(interaction)
 
-        # on_error (if called) will have updated _cmd_timing[interaction.id] before this line
+        # interaction.command is now resolved after super().call()
+        qualified_name = (interaction.command.qualified_name if interaction.command else None) or pre_name
         t0_actual, error_code = _cmd_timing.pop(interaction.id, (t0, None))
         elapsed_ms = int((time.time() - t0_actual) * 1000)
         success = error_code is None
@@ -109,7 +119,6 @@ class CreditCommandTree(discord.app_commands.CommandTree):
             parts = qualified_name.split(' ', 1)
             cmd = parts[0]
             sub = parts[1] if len(parts) > 1 else None
-            print(f"[analytics] logging command: {cmd} sub={sub} guild={interaction.guild_id} elapsed={elapsed_ms}ms success={success}")
             asyncio.create_task(
                 self.client.db.log_command(
                     interaction.guild_id, interaction.user.id,
