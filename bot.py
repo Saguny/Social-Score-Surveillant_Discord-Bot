@@ -452,7 +452,20 @@ class SocialCreditBot(commands.AutoShardedBot):
                 return
         if ctx.command and message.guild:
             await _log_command_usage(message.guild.id, message.author.id, ctx.command.qualified_name)
+            _cmd_timing[message.id] = (time.time(), None)
         await self.invoke(ctx)
+        if ctx.command and message.guild and message.id in _cmd_timing:
+            t0, error_code = _cmd_timing.pop(message.id)
+            if error_code is None:
+                elapsed_ms = int((time.time() - t0) * 1000)
+                parts = ctx.command.qualified_name.split(' ', 1)
+                asyncio.create_task(
+                    self.db.log_command(
+                        message.guild.id, message.author.id,
+                        parts[0], parts[1] if len(parts) > 1 else None,
+                        elapsed_ms, True, None,
+                    )
+                )
 
     async def close(self):
         await super().close()
@@ -639,6 +652,17 @@ class SocialCreditBot(commands.AutoShardedBot):
 
     async def on_command_error(self, ctx: commands.Context, error: commands.CommandError) -> None:
         cause = getattr(error, "__cause__", error)
+        if ctx.command and ctx.guild and ctx.message.id in _cmd_timing:
+            t0, _ = _cmd_timing.pop(ctx.message.id)
+            elapsed_ms = int((time.time() - t0) * 1000)
+            parts = ctx.command.qualified_name.split(' ', 1)
+            asyncio.create_task(
+                self.db.log_command(
+                    ctx.guild.id, ctx.author.id,
+                    parts[0], parts[1] if len(parts) > 1 else None,
+                    elapsed_ms, False, type(cause).__name__,
+                )
+            )
         if isinstance(cause, discord.Forbidden) or isinstance(error, commands.BotMissingPermissions):
             missing = []
             if ctx.guild:

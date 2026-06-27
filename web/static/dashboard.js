@@ -572,20 +572,25 @@ function _barChart(canvasId, labels, datasets, opts = {}) {
   const el = document.getElementById(canvasId);
   if (!el) return;
   if (_charts[canvasId]) { _charts[canvasId].destroy(); delete _charts[canvasId]; }
+  const horiz = !!opts.horizontal;
+  // For the category axis (labels), don't set a callback — Chart.js handles it.
+  // Only apply a format callback to the value axis.
+  const xTicks = { font: { size: 9 }, color: '#61677A', ...(horiz && opts.xFmt ? { callback: opts.xFmt } : {}) };
+  const yTicks = { font: { size: 9 }, color: '#61677A', ...(!horiz && opts.yFmt ? { callback: opts.yFmt } : {}) };
   _charts[canvasId] = new Chart(el.getContext('2d'), {
     type: 'bar',
     data: { labels, datasets },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      indexAxis: opts.horizontal ? 'y' : 'x',
+      indexAxis: horiz ? 'y' : 'x',
       plugins: {
         legend: { display: !!opts.legend, position: 'top', labels: { boxWidth: 10, font: { size: 10 } } },
-        tooltip: { mode: 'index', intersect: false },
+        tooltip: { mode: 'nearest', axis: horiz ? 'y' : 'x', intersect: true },
       },
       scales: {
-        x: { grid: { color: 'rgba(97,103,122,.15)' }, ticks: { font: { size: 9 }, color: '#61677A', callback: opts.xFmt || (v => v) } },
-        y: { grid: { color: 'rgba(97,103,122,.15)' }, ticks: { font: { size: 9 }, color: '#61677A', callback: opts.yFmt || (v => v) } },
+        x: { grid: { color: 'rgba(97,103,122,.15)' }, ticks: xTicks },
+        y: { grid: { color: 'rgba(97,103,122,.15)' }, ticks: yTicks },
       },
     },
   });
@@ -612,14 +617,6 @@ async function loadCommandAnalytics(range) {
   set('cmd-users',   fmt(t.unique_users || 0));
   set('cmd-avgms',   (t.avg_execution_time_ms || 0).toFixed(0) + 'ms');
   set('cmd-success', (t.overall_success_rate || 100).toFixed(1) + '%');
-
-  // Top Commands bar chart (horizontal)
-  const topCmds  = (d.top_commands || []).slice(0, 10);
-  const cmdLabels = topCmds.map(r => r.command);
-  const cmdUses   = topCmds.map(r => r.uses);
-  _barChart('chart-cmd-top', cmdLabels, [
-    { label: 'Uses', data: cmdUses, backgroundColor: '#7D9D9C', borderRadius: 3 },
-  ], { horizontal: true, yFmt: v => v });
 
   // Usage over time (line chart)
   const days      = d.usage_per_day || [];
@@ -720,8 +717,9 @@ async function loadCommandAnalytics(range) {
       recentBody.innerHTML = '<tr><td colspan="6" class="sub text-center py-3">No recent activity.</td></tr>';
     } else {
       recentBody.innerHTML = rows.map(r => {
-        const t     = new Date(r.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        const user  = r.user || '—';
+        const dt    = new Date(r.timestamp * 1000);
+        const t     = dt.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const user  = r.user || (r.user_id ? `User #${String(r.user_id).slice(-6)}` : '—');
         const sub   = r.subcommand ? `<span class="text-muted">${r.subcommand}</span>` : '<span class="text-muted">—</span>';
         const ms    = r.execution_time_ms != null ? r.execution_time_ms + 'ms' : '—';
         const badge = r.success
