@@ -119,7 +119,7 @@ class AnalyticsMixin:
                 """
                 SELECT timestamp, user_id, command_name, subcommand, execution_time_ms, success, error_code
                 FROM command_analytics
-                ORDER BY timestamp DESC LIMIT 20
+                ORDER BY timestamp DESC LIMIT 10
                 """,
             ),
             self._pool.fetch(

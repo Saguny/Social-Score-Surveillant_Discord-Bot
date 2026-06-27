@@ -159,7 +159,7 @@ details[open] summary::before { content:'▼  '; }
 
 .cmd-table { color:var(--text); font-size:.78rem; }
 .cmd-table thead th { color:var(--text-muted); font-size:.65rem; text-transform:uppercase; letter-spacing:1px; border-bottom:1px solid var(--border); font-weight:600; }
-.cmd-table tbody td { border-bottom:1px solid var(--border); padding:.45rem .55rem; vertical-align:middle; }
+.cmd-table tbody td { border-bottom:1px solid var(--border); padding:.45rem .55rem; vertical-align:middle; color:var(--text) !important; background:transparent !important; }
 .cmd-table tbody tr:last-child td { border-bottom:none; }
 .cmd-table .rank-cell { color:var(--text-faint); width:28px; text-align:right; }
 .cmd-badge-ok  { display:inline-block; padding:.1rem .45rem; border-radius:3px; font-size:.65rem; background:rgba(61,170,110,.18); color:var(--green); }

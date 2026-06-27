@@ -690,7 +690,7 @@ async function loadCommandAnalytics(range) {
   // Recent activity table
   const recentBody = document.getElementById('cmd-table-recent');
   if (recentBody) {
-    const rows = d.newest_commands || [];
+    const rows = (d.newest_commands || []).slice(0, 10);
     if (!rows.length) {
       recentBody.innerHTML = '<tr><td colspan="5" class="sub text-center py-3">No recent activity.</td></tr>';
     } else {
