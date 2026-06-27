@@ -122,6 +122,9 @@
     <li class="nav-item" role="presentation">
       <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-scores" type="button">Scores</button>
     </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-commands" type="button" onclick="loadCommandAnalytics()">Commands</button>
+    </li>
   </ul>
 
   <div class="tab-content">
@@ -339,6 +342,108 @@
       </div>
     </div>
 
+
+    <div class="tab-pane fade" id="tab-commands" role="tabpanel">
+      <div class="d-flex justify-content-between align-items-center mt-2 mb-1">
+        <span class="shdr" style="margin:0;border:none">Command Analytics</span>
+        <div class="btn-group" role="group" id="cmd-range-group">
+          <button class="btn btn-run btn-sm px-3" data-range="24h" onclick="loadCommandAnalytics('24h')">24H</button>
+          <button class="btn btn-run btn-sm px-3 active" data-range="7d" onclick="loadCommandAnalytics('7d')">7D</button>
+          <button class="btn btn-run btn-sm px-3" data-range="30d" onclick="loadCommandAnalytics('30d')">30D</button>
+          <button class="btn btn-run btn-sm px-3" data-range="all" onclick="loadCommandAnalytics('all')">All Time</button>
+        </div>
+      </div>
+
+      <!-- Overview cards -->
+      <div class="row g-3 mb-1">
+        <div class="col-6 col-md-2"><div class="sc">
+          <div class="lbl">Total Executed</div><div class="val" id="cmd-total">—</div>
+        </div></div>
+        <div class="col-6 col-md-2"><div class="sc">
+          <div class="lbl">Today</div><div class="val" id="cmd-today">—</div>
+        </div></div>
+        <div class="col-6 col-md-2"><div class="sc">
+          <div class="lbl">Last 24h</div><div class="val" id="cmd-24h">—</div>
+        </div></div>
+        <div class="col-6 col-md-2"><div class="sc">
+          <div class="lbl">Unique Users</div><div class="val" id="cmd-users">—</div>
+        </div></div>
+        <div class="col-6 col-md-2"><div class="sc">
+          <div class="lbl">Avg Exec Time</div><div class="val" id="cmd-avgms">—</div>
+        </div></div>
+        <div class="col-6 col-md-2"><div class="sc">
+          <div class="lbl">Success Rate</div><div class="val trend-up" id="cmd-success">—</div>
+        </div></div>
+      </div>
+
+      <!-- Charts row 1 -->
+      <div class="shdr">Usage Charts</div>
+      <div class="row g-3 mb-1">
+        <div class="col-12 col-lg-6"><div class="sc sc-auto">
+          <div class="lbl" style="margin-bottom:.4rem">Top Commands</div>
+          <div style="height:220px"><canvas id="chart-cmd-top"></canvas></div>
+        </div></div>
+        <div class="col-12 col-lg-6"><div class="sc sc-auto">
+          <div class="lbl" style="margin-bottom:.4rem">Usage Over Time</div>
+          <div style="height:220px"><canvas id="chart-cmd-timeline"></canvas></div>
+        </div></div>
+      </div>
+
+      <!-- Charts row 2 -->
+      <div class="row g-3 mb-1">
+        <div class="col-12 col-lg-4"><div class="sc sc-auto">
+          <div class="lbl" style="margin-bottom:.4rem">Usage by Hour</div>
+          <div style="height:200px"><canvas id="chart-cmd-hour"></canvas></div>
+        </div></div>
+        <div class="col-12 col-lg-4"><div class="sc sc-auto">
+          <div class="lbl" style="margin-bottom:.4rem">Average Execution Time (ms)</div>
+          <div style="height:200px"><canvas id="chart-cmd-exectime"></canvas></div>
+        </div></div>
+        <div class="col-12 col-lg-4"><div class="sc sc-auto">
+          <div class="lbl" style="margin-bottom:.4rem">Success vs Error Rate</div>
+          <div style="height:200px"><canvas id="chart-cmd-rates"></canvas></div>
+        </div></div>
+      </div>
+
+      <!-- Top commands table -->
+      <div class="shdr">Top Commands</div>
+      <div class="sc sc-auto mb-3">
+        <div class="table-responsive">
+          <table class="table table-dark table-sm cmd-table mb-0" id="cmd-table-top">
+            <thead><tr>
+              <th>#</th><th>Command</th><th>Uses</th><th>Unique Users</th><th>Success %</th><th>Avg Exec Time</th>
+            </tr></thead>
+            <tbody id="cmd-table-top-body"><tr><td colspan="6" class="sub text-center py-3">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- All commands list -->
+      <div class="shdr">All Commands</div>
+      <div class="sc sc-auto mb-3">
+        <div class="table-responsive">
+          <table class="table table-dark table-sm cmd-table mb-0">
+            <thead><tr>
+              <th>#</th><th>Command</th><th>Subcommand</th><th>Uses</th><th>Unique Users</th>
+            </tr></thead>
+            <tbody id="cmd-table-all"><tr><td colspan="5" class="sub text-center py-3">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Recent activity table -->
+      <div class="shdr">Recent Command Activity</div>
+      <div class="sc sc-auto mb-3">
+        <div class="table-responsive">
+          <table class="table table-dark table-sm cmd-table mb-0">
+            <thead><tr>
+              <th>Time</th><th>User</th><th>Command</th><th>Subcommand</th><th>Exec Time</th><th>Status</th>
+            </tr></thead>
+            <tbody id="cmd-table-recent"><tr><td colspan="6" class="sub text-center py-3">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
 
   </div>
 

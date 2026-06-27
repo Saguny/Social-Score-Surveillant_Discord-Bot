@@ -68,6 +68,9 @@ async def _check_cmd_cooldown(uid: int) -> bool:
 CMD_LOG_MAX = 10
 CMD_LOG_TTL = 60 * 86400
 
+# Tracks {interaction_id: (start_time, error_code)} for timing + error correlation
+_cmd_timing: dict[int, tuple[float, str | None]] = {}
+
 
 async def _log_command_usage(guild_id: int | None, user_id: int, command_name: str | None) -> None:
     if guild_id is None or not command_name:
@@ -92,10 +95,32 @@ class CreditCommandTree(discord.app_commands.CommandTree):
                 await interaction.response.send_message(OPTOUT_BLOCKED_MESSAGE, ephemeral=True)
                 return
         await _log_command_usage(interaction.guild_id, interaction.user.id, qualified_name)
+
+        t0 = time.time()
+        _cmd_timing[interaction.id] = (t0, None)
         await super().call(interaction)
+
+        # on_error (if called) will have updated _cmd_timing[interaction.id] before this line
+        t0_actual, error_code = _cmd_timing.pop(interaction.id, (t0, None))
+        elapsed_ms = int((time.time() - t0_actual) * 1000)
+        success = error_code is None
+
+        if interaction.guild_id and qualified_name:
+            parts = qualified_name.split(' ', 1)
+            cmd = parts[0]
+            sub = parts[1] if len(parts) > 1 else None
+            asyncio.create_task(
+                self.client.db.log_command(
+                    interaction.guild_id, interaction.user.id,
+                    cmd, sub, elapsed_ms, success, error_code,
+                )
+            )
 
     async def on_error(self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError) -> None:
         cause = error.__cause__ or error
+        # Record the error so call() can pick it up after super().call() returns
+        if interaction.id in _cmd_timing:
+            _cmd_timing[interaction.id] = (_cmd_timing[interaction.id][0], type(cause).__name__)
         if isinstance(cause, discord.Forbidden):
             missing = []
             if interaction.guild:

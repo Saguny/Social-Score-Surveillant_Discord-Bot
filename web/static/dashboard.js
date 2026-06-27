@@ -561,6 +561,185 @@ function _initTooltips() {
   });
 }
 
+// ── Command Analytics ────────────────────────────────────────────────────────
+
+let _cmdRange = '7d';
+let _cmdLoaded = false;
+
+function _barChart(canvasId, labels, datasets, opts = {}) {
+  const el = document.getElementById(canvasId);
+  if (!el) return;
+  if (_charts[canvasId]) { _charts[canvasId].destroy(); delete _charts[canvasId]; }
+  _charts[canvasId] = new Chart(el.getContext('2d'), {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      indexAxis: opts.horizontal ? 'y' : 'x',
+      plugins: {
+        legend: { display: !!opts.legend, position: 'top', labels: { boxWidth: 10, font: { size: 10 } } },
+        tooltip: { mode: 'index', intersect: false },
+      },
+      scales: {
+        x: { grid: { color: 'rgba(97,103,122,.15)' }, ticks: { font: { size: 9 }, color: '#61677A', callback: opts.xFmt || (v => v) } },
+        y: { grid: { color: 'rgba(97,103,122,.15)' }, ticks: { font: { size: 9 }, color: '#61677A', callback: opts.yFmt || (v => v) } },
+      },
+    },
+  });
+}
+
+async function loadCommandAnalytics(range) {
+  if (range) {
+    _cmdRange = range;
+    document.querySelectorAll('#cmd-range-group button').forEach(b => {
+      b.classList.toggle('active', b.dataset.range === range);
+    });
+  }
+
+  const res = await fetch('/api/stats/commands?range=' + _cmdRange);
+  if (!res.ok) return;
+  const d = await res.json();
+  _cmdLoaded = true;
+
+  // Overview cards
+  const t = d.totals || {};
+  set('cmd-total',   fmt(t.total_executions || 0));
+  set('cmd-today',   fmt(t.executions_today || 0));
+  set('cmd-24h',     fmt(t.executions_24h || 0));
+  set('cmd-users',   fmt(t.unique_users || 0));
+  set('cmd-avgms',   (t.avg_execution_time_ms || 0).toFixed(0) + 'ms');
+  set('cmd-success', (t.overall_success_rate || 100).toFixed(1) + '%');
+
+  // Top Commands bar chart (horizontal)
+  const topCmds  = (d.top_commands || []).slice(0, 10);
+  const cmdLabels = topCmds.map(r => r.command);
+  const cmdUses   = topCmds.map(r => r.uses);
+  _barChart('chart-cmd-top', cmdLabels, [
+    { label: 'Uses', data: cmdUses, backgroundColor: '#7D9D9C', borderRadius: 3 },
+  ], { horizontal: true, yFmt: v => v });
+
+  // Usage over time (line chart)
+  const days      = d.usage_per_day || [];
+  const dayLabels = days.map(r => _dayLabel(r.day));
+  const dayUses   = days.map(r => r.uses);
+  _multiLineChart('chart-cmd-timeline', dayLabels, [
+    { label: 'Executions', data: dayUses, borderColor: '#F5A855', backgroundColor: '#F5A85522', fill: true, tension: .3 },
+  ]);
+
+  // Usage by hour bar chart
+  const hourBuckets = Array.from({ length: 24 }, (_, i) => ({ hour: i, uses: 0 }));
+  (d.usage_per_hour || []).forEach(r => { if (r.hour >= 0 && r.hour < 24) hourBuckets[r.hour].uses = r.uses; });
+  const hourLabels = hourBuckets.map(r => r.hour + ':00');
+  const hourUses   = hourBuckets.map(r => r.uses);
+  _barChart('chart-cmd-hour', hourLabels, [
+    { label: 'Uses', data: hourUses, backgroundColor: '#45C07A', borderRadius: 2 },
+  ], { xFmt: v => v });
+
+  // Avg execution time (horizontal bar)
+  const execRows    = (d.average_execution_time || []).slice(0, 8);
+  const execLabels  = execRows.map(r => r.command);
+  const execValues  = execRows.map(r => r.avg_ms);
+  _barChart('chart-cmd-exectime', execLabels, [
+    { label: 'Avg ms', data: execValues, backgroundColor: '#F4E557', borderRadius: 3 },
+  ], { horizontal: true, yFmt: v => v, xFmt: v => v + 'ms' });
+
+  // Success vs error rate (stacked bar per command, top 8)
+  const rateRows    = (d.per_command_rates || []).slice(0, 8);
+  const rateLabels  = rateRows.map(r => r.command);
+  const successPcts = rateRows.map(r => r.success_pct);
+  const errorPcts   = rateRows.map(r => r.error_pct);
+  _barChart('chart-cmd-rates', rateLabels, [
+    { label: 'Success %', data: successPcts, backgroundColor: '#3DAA6E', borderRadius: 2, stack: 'r' },
+    { label: 'Error %',   data: errorPcts,   backgroundColor: '#E85454', borderRadius: 2, stack: 'r' },
+  ], { legend: true, horizontal: true, yFmt: v => v, xFmt: v => v + '%' });
+
+  // Build unique-users and avg-exec-time maps for the top-commands table
+  const uniqueMap  = {};
+  (d.unique_users_per_command || []).forEach(r => { uniqueMap[r.command] = r.unique_users; });
+  const execMap    = {};
+  (d.average_execution_time || []).forEach(r => { execMap[r.command] = r.avg_ms; });
+  const rateMap    = {};
+  (d.per_command_rates || []).forEach(r => { rateMap[r.command] = r; });
+
+  // Top commands table
+  const tbody = document.getElementById('cmd-table-top-body');
+  if (tbody) {
+    if (!topCmds.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="sub text-center py-3">No data yet — commands will appear once the bot is used.</td></tr>';
+    } else {
+      tbody.innerHTML = topCmds.map((r, i) => {
+        const rate    = rateMap[r.command] || {};
+        const sucPct  = rate.success_pct != null ? rate.success_pct.toFixed(1) + '%' : '—';
+        const avgMs   = execMap[r.command] != null ? execMap[r.command].toFixed(0) + 'ms' : '—';
+        const uniq    = uniqueMap[r.command] != null ? fmt(uniqueMap[r.command]) : '—';
+        const rankCls = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+        return `<tr>
+          <td class="rank-cell lb-rank ${rankCls}">${i + 1}</td>
+          <td><strong>/${r.command}</strong></td>
+          <td>${fmt(r.uses)}</td>
+          <td>${uniq}</td>
+          <td class="${rate.success_pct >= 95 ? 'trend-up' : rate.success_pct < 80 ? 'trend-down' : ''}">${sucPct}</td>
+          <td>${avgMs}</td>
+        </tr>`;
+      }).join('');
+    }
+  }
+
+  // All commands table
+  const allBody = document.getElementById('cmd-table-all');
+  if (allBody) {
+    const allRows = d.all_commands || [];
+    if (!allRows.length) {
+      allBody.innerHTML = '<tr><td colspan="5" class="sub text-center py-3">No commands recorded yet.</td></tr>';
+    } else {
+      let rank = 0;
+      let prevCmd = null;
+      allBody.innerHTML = allRows.map(r => {
+        const isNewCmd = r.command !== prevCmd;
+        if (isNewCmd) { rank++; prevCmd = r.command; }
+        const rankCell = isNewCmd
+          ? `<td class="rank-cell lb-rank" rowspan="1">${rank}</td>`
+          : '<td class="rank-cell lb-rank" style="color:transparent">·</td>';
+        const cmdCell = isNewCmd
+          ? `<td><strong>/${r.command}</strong></td>`
+          : '<td></td>';
+        const sub = r.subcommand ? `<span class="text-muted" style="font-size:.78rem">${r.subcommand}</span>` : '<span class="text-muted">—</span>';
+        return `<tr>${rankCell}${cmdCell}<td>${sub}</td><td>${fmt(r.uses)}</td><td>${fmt(r.unique_users)}</td></tr>`;
+      }).join('');
+    }
+  }
+
+  // Recent activity table
+  const recentBody = document.getElementById('cmd-table-recent');
+  if (recentBody) {
+    const rows = d.newest_commands || [];
+    if (!rows.length) {
+      recentBody.innerHTML = '<tr><td colspan="6" class="sub text-center py-3">No recent activity.</td></tr>';
+    } else {
+      recentBody.innerHTML = rows.map(r => {
+        const t     = new Date(r.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const user  = r.user || '—';
+        const sub   = r.subcommand ? `<span class="text-muted">${r.subcommand}</span>` : '<span class="text-muted">—</span>';
+        const ms    = r.execution_time_ms != null ? r.execution_time_ms + 'ms' : '—';
+        const badge = r.success
+          ? '<span class="cmd-badge-ok">OK</span>'
+          : `<span class="cmd-badge-err">${r.error_code || 'ERR'}</span>`;
+        return `<tr>
+          <td class="text-muted" style="font-size:.68rem">${t}</td>
+          <td class="text-muted" style="font-size:.72rem">${user}</td>
+          <td><strong>/${r.command_name}</strong></td>
+          <td>${sub}</td>
+          <td>${ms}</td>
+          <td>${badge}</td>
+        </tr>`;
+      }).join('');
+    }
+  }
+}
+
+// ── End Command Analytics ────────────────────────────────────────────────────
+
 load();
 loadAnnouncement();
 loadActivity('7d');
@@ -571,3 +750,4 @@ _initTooltips();
 setInterval(() => loadActivity(_activityRange), 300000);
 setInterval(loadYuanCirculation, 300000);
 setInterval(loadAnnouncement, 60000);
+setInterval(() => { if (_cmdLoaded) loadCommandAnalytics(); }, 60000);

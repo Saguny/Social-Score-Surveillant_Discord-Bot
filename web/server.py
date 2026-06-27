@@ -394,6 +394,31 @@ async def _handle_recent_events(request):
     return web.json_response({"events": events})
 
 
+_CMD_STATS_CACHE_TTL = 60  # seconds
+
+
+async def _handle_stats_commands(request):
+    db = request.app["db"]
+    range_ = request.query.get("range", "7d")
+    if range_ not in ("24h", "7d", "30d", "all"):
+        range_ = "7d"
+
+    cache_key = f"cmd_stats:{range_}"
+    cached = await cache_get(cache_key)
+    if cached:
+        try:
+            return web.json_response(json.loads(cached))
+        except Exception:
+            pass
+
+    data = await db.get_command_stats(range_)
+    # Replace raw user_id with a pseudonym before it leaves the server
+    for row in data.get("newest_commands", []):
+        row["user"] = pseudonym_user(row.pop("user_id", 0))
+    await cache_set(cache_key, json.dumps(data), ex=_CMD_STATS_CACHE_TTL)
+    return web.json_response(data)
+
+
 async def _handle_stats_all(request):
     db = request.app["db"]
     cache = request.app.get("cache")
@@ -576,6 +601,7 @@ async def start_web_server(db):
     app.router.add_get("/admin", _require_admin(_handle_admin))
     app.router.add_post("/api/admin/command", _require_admin(_handle_admin_command))
     app.router.add_get("/api/stats", _rate_limit_public(_handle_stats))
+    app.router.add_get("/api/stats/commands", _rate_limit_public(_handle_stats_commands))
     app.router.add_get("/api/stats/all", _rate_limit_public(_handle_stats_all))
     app.router.add_get("/api/stats/timeline", _rate_limit_public(_handle_stats_timeline))
     app.router.add_get("/api/stats/recent-events", _rate_limit_public(_handle_recent_events))

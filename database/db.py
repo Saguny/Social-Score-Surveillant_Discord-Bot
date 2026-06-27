@@ -18,6 +18,7 @@ from database._counters     import CountersMixin
 from database._privacy      import PrivacyMixin
 from database._announcement import AnnouncementMixin
 from database._guilds       import GuildRankMixin
+from database._analytics    import AnalyticsMixin
 
 
 TABLES = [
@@ -221,6 +222,7 @@ class Database(
     PrivacyMixin,
     AnnouncementMixin,
     GuildRankMixin,
+    AnalyticsMixin,
 ):
     def __init__(self):
         self._dsn = os.getenv("DATABASE_URL", "")
@@ -506,3 +508,19 @@ class Database(
             await conn.execute("ALTER TABLE guild_daily_snapshots ADD COLUMN IF NOT EXISTS incarceration_rate DOUBLE PRECISION NOT NULL DEFAULT 0")
             await conn.execute("ALTER TABLE guild_daily_snapshots ADD COLUMN IF NOT EXISTS politburo_score DOUBLE PRECISION NOT NULL DEFAULT 0")
             await conn.execute("ALTER TABLE guild_config ADD COLUMN IF NOT EXISTS guild_bracket TEXT DEFAULT NULL")
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS command_analytics (
+                    id                SERIAL  PRIMARY KEY,
+                    timestamp         BIGINT  NOT NULL,
+                    guild_id          BIGINT  NOT NULL,
+                    user_id           BIGINT  NOT NULL,
+                    command_name      TEXT    NOT NULL,
+                    subcommand        TEXT,
+                    execution_time_ms INTEGER NOT NULL DEFAULT 0,
+                    success           BOOLEAN NOT NULL DEFAULT TRUE,
+                    error_code        TEXT
+                )
+            """)
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_cmd_analytics_ts      ON command_analytics (timestamp)")
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_cmd_analytics_cmd_ts  ON command_analytics (command_name, timestamp)")
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_cmd_analytics_guild   ON command_analytics (guild_id, timestamp)")
