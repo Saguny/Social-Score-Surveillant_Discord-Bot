@@ -85,46 +85,58 @@ async def _log_command_usage(guild_id: int | None, user_id: int, command_name: s
 
 class CreditCommandTree(discord.app_commands.CommandTree):
     async def call(self, interaction: discord.Interaction) -> None:
-        _current_user_id.set(interaction.user.id)
-        if not await _check_cmd_cooldown(interaction.user.id):
-            await interaction.response.send_message("Slow down, citizen.", ephemeral=True)
-            return
-
-        # interaction.command is not yet resolved at this point — read name from raw data
-        data = interaction.data or {}
-        pre_name: str | None = data.get('name') or None
-        if pre_name:
-            for opt in data.get('options', []):
-                if opt.get('type') in (1, 2):  # SUB_COMMAND / SUB_COMMAND_GROUP
-                    pre_name = f"{pre_name} {opt['name']}"
-                    break
-
-        if pre_name not in OPTOUT_ALLOWED_SLASH_COMMANDS:
-            if await self.client.db.is_opted_out(interaction.user.id):
-                await interaction.response.send_message(OPTOUT_BLOCKED_MESSAGE, ephemeral=True)
+        print(f"[tree.call] ENTER uid={interaction.user.id} type={interaction.type} data={interaction.data}")
+        try:
+            _current_user_id.set(interaction.user.id)
+            cooldown_ok = await _check_cmd_cooldown(interaction.user.id)
+            print(f"[tree.call] cooldown_ok={cooldown_ok}")
+            if not cooldown_ok:
+                await interaction.response.send_message("Slow down, citizen.", ephemeral=True)
                 return
-        await _log_command_usage(interaction.guild_id, interaction.user.id, pre_name)
 
-        t0 = time.time()
-        _cmd_timing[interaction.id] = (t0, None)
-        await super().call(interaction)
+            # interaction.command is not yet resolved at this point — read name from raw data
+            data = interaction.data or {}
+            pre_name: str | None = data.get('name') or None
+            if pre_name:
+                for opt in data.get('options', []):
+                    if opt.get('type') in (1, 2):  # SUB_COMMAND / SUB_COMMAND_GROUP
+                        pre_name = f"{pre_name} {opt['name']}"
+                        break
+            print(f"[tree.call] pre_name={pre_name!r}")
 
-        # interaction.command is now resolved after super().call()
-        qualified_name = (interaction.command.qualified_name if interaction.command else None) or pre_name
-        t0_actual, error_code = _cmd_timing.pop(interaction.id, (t0, None))
-        elapsed_ms = int((time.time() - t0_actual) * 1000)
-        success = error_code is None
+            if pre_name not in OPTOUT_ALLOWED_SLASH_COMMANDS:
+                opted_out = await self.client.db.is_opted_out(interaction.user.id)
+                print(f"[tree.call] opted_out={opted_out}")
+                if opted_out:
+                    await interaction.response.send_message(OPTOUT_BLOCKED_MESSAGE, ephemeral=True)
+                    return
+            await _log_command_usage(interaction.guild_id, interaction.user.id, pre_name)
 
-        if interaction.guild_id and qualified_name:
-            parts = qualified_name.split(' ', 1)
-            cmd = parts[0]
-            sub = parts[1] if len(parts) > 1 else None
-            asyncio.create_task(
-                self.client.db.log_command(
-                    interaction.guild_id, interaction.user.id,
-                    cmd, sub, elapsed_ms, success, error_code,
+            t0 = time.time()
+            _cmd_timing[interaction.id] = (t0, None)
+            print(f"[tree.call] calling super().call()")
+            await super().call(interaction)
+            print(f"[tree.call] super().call() returned")
+
+            # interaction.command is now resolved after super().call()
+            qualified_name = (interaction.command.qualified_name if interaction.command else None) or pre_name
+            t0_actual, error_code = _cmd_timing.pop(interaction.id, (t0, None))
+            elapsed_ms = int((time.time() - t0_actual) * 1000)
+            success = error_code is None
+            print(f"[tree.call] qualified_name={qualified_name!r} elapsed={elapsed_ms}ms success={success}")
+
+            if interaction.guild_id and qualified_name:
+                parts = qualified_name.split(' ', 1)
+                cmd = parts[0]
+                sub = parts[1] if len(parts) > 1 else None
+                asyncio.create_task(
+                    self.client.db.log_command(
+                        interaction.guild_id, interaction.user.id,
+                        cmd, sub, elapsed_ms, success, error_code,
+                    )
                 )
-            )
+        except Exception as e:
+            print(f"[tree.call] UNCAUGHT EXCEPTION: {type(e).__name__}: {e!r}")
 
     async def on_error(self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError) -> None:
         cause = error.__cause__ or error
