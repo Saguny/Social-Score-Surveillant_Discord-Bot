@@ -313,7 +313,7 @@ class GuildRankMixin:
                 SELECT
                     gc.guild_id,
                     gc.guild_name,
-                    COUNT(*) FILTER (WHERE u.has_chatted = 1) AS citizens,
+                    COUNT(DISTINCT u.user_id) FILTER (WHERE u.has_chatted = 1) AS citizens,
                     AVG(top.score) AS value
                 FROM guild_config gc
                 JOIN LATERAL (
@@ -324,7 +324,7 @@ class GuildRankMixin:
                 ) top ON true
                 JOIN users u ON u.guild_id = gc.guild_id
                 GROUP BY gc.guild_id, gc.guild_name
-                HAVING COUNT(*) FILTER (WHERE u.has_chatted = 1) >= $2
+                HAVING COUNT(DISTINCT u.user_id) FILTER (WHERE u.has_chatted = 1) >= $2
                 ORDER BY value DESC NULLS LAST
                 LIMIT $3
                 """,
