@@ -205,13 +205,24 @@ class Voting(commands.Cog):
         await interaction.response.defer()
         embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · CALL TO PATRIOTIC DUTY")
         embed.add_field(
-            name="VOTE FOR THE BUREAU",
-            value=(
-                "Cast your ballot for this bot on Top.gg to receive a badge, score, and yuan "
-                "on every server you share with the bureau. Rewards scale with your vote streak, "
-                "carry a chance of a lucky bonus roll, are doubled on weekends, and stack further "
-                "if you've also checked in today. You can vote again every 12 hours."
-            ),
+            name="BASE REWARD",
+            value=f"¥{VOTE_YUAN_BASE:,} Yuan · +{VOTE_SCORE_BASE:.1f} Score · Loyal Patriot badge",
+            inline=False,
+        )
+        embed.add_field(
+            name="STREAK BONUS",
+            value=f"Up to ¥{VOTE_STREAK_YUAN_CAP:,} · +{VOTE_STREAK_SCORE_CAP:.1f} score at max streak",
+            inline=False,
+        )
+        if time.gmtime().tm_wday >= 5:
+            embed.add_field(
+                name="WEEKEND BONUS ACTIVE",
+                value="2× all rewards right now · Today and tomorrow only",
+                inline=False,
+            )
+        embed.add_field(
+            name="STACKS WITH",
+            value="Checkin combo · Lucky roll (up to 2.5×) · Every server you share with the bureau · Every 12 hours",
             inline=False,
         )
         view = discord.ui.View()
