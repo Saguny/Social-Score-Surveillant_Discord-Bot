@@ -92,7 +92,7 @@ class GuideView(discord.ui.View):
         )
         e.add_field(name="YUAN",             value=f"The currency of the state. Earned through productivity. Spent on influence. [Support server]({SUPPORT_URL}) members earn +15% on every contribution.", inline=False)
         e.add_field(name="WHAT AWAITS YOU",  value="Party ranks · State Decorations · Prestige · Global Standing · Propaganda Events · The Beijing Stock Exchange", inline=False)
-        e.add_field(name="YOUR FIRST INSPECTION", value="Report to `/checkin`. Review your `/score`. Begin contributing to society. The Nation will determine your worth.", inline=False)
+        e.add_field(name="YOUR FIRST INSPECTION", value="Report to `/checkin` and cast your `/vote` on Top.gg on the same day - the two combine for a bonus payout on top of either reward alone. Review your `/score`. The Nation will determine your worth.", inline=False)
         e.add_field(name="BUREAU RESOURCES", value=f"[Public Dashboard]({DASHBOARD_URL}) · [Support Server]({SUPPORT_URL}) · [Invite the Bureau]({INVITE_URL})", inline=False)
         return e
 
