@@ -56,11 +56,10 @@ class GuildRankMixin:
         )
 
     async def set_leaderboard_visible(self, guild_id: int, visible: bool):
-        async with self._pool.acquire() as conn:
-            await conn.execute(
-                "UPDATE guild_config SET leaderboard_visible = $2 WHERE guild_id = $1",
-                guild_id, visible,
-            )
+        await self._pool.execute(
+            "UPDATE guild_config SET leaderboard_visible = $2 WHERE guild_id = $1",
+            guild_id, visible,
+        )
         await self._invalidate_guild_rank_caches(guild_id)
 
     async def _invalidate_guild_rank_caches(self, guild_id: int):
