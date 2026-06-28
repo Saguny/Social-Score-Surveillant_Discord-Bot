@@ -1,0 +1,83 @@
+<svg viewBox="0 0 900 280" xmlns="http://www.w3.org/2000/svg" role="img" style="width:100%;border-radius:4px;">
+  <title>Rank-up card with avatar</title>
+  <defs>
+    <pattern id="dots" x="0" y="0" width="45" height="45" patternUnits="userSpaceOnUse">
+      <text x="6" y="16" font-size="10" fill="#C8A84B" opacity="0.08" font-family="serif">★</text>
+      <text x="26" y="38" font-size="10" fill="#C8A84B" opacity="0.08" font-family="serif">★</text>
+    </pattern>
+    <clipPath id="av">
+      <circle cx="117" cy="139" r="42"/>
+    </clipPath>
+  </defs>
+
+  <!-- bg -->
+  <rect width="900" height="280" fill="#0b0606"/>
+  <rect width="900" height="280" fill="url(#dots)"/>
+
+  <!-- outer border -->
+  <rect x="8" y="8" width="884" height="264" fill="none" stroke="#C8A84B" stroke-width="2.5" rx="2"/>
+  <!-- inner border -->
+  <rect x="14" y="14" width="872" height="252" fill="none" stroke="#C8A84B" stroke-width="0.8" opacity="0.5" rx="1"/>
+
+  <!-- left panel bg -->
+  <rect x="8" y="8" width="220" height="264" fill="#130a0a" rx="2"/>
+  <rect x="14" y="14" width="208" height="252" fill="#130a0a"/>
+
+  <!-- vertical divider -->
+  <line x1="228" y1="30" x2="228" y2="250" stroke="#C8A84B" stroke-width="0.8" opacity="0.6"/>
+
+  <!-- LEFT PANEL: chinese header -->
+  <text x="117" y="52" text-anchor="middle" font-family="serif" font-size="13" fill="#C8A84B" letter-spacing="2">中华人民共和国</text>
+  <text x="117" y="70" text-anchor="middle" font-family="serif" font-size="11" fill="#9A7A35" letter-spacing="1">社会信用局</text>
+
+  <!-- thin rule under chinese -->
+  <line x1="50" y1="78" x2="184" y2="78" stroke="#C8A84B" stroke-width="0.5" opacity="0.4"/>
+
+  <!-- avatar -->
+  <circle cx="117" cy="139" r="48" fill="none" stroke="#C8A84B" stroke-width="1.4" stroke-dasharray="6 4" opacity="0.75"/>
+  <circle cx="117" cy="139" r="42" fill="#2a1212"/>
+  <image href="AVATAR_URL" x="75" y="97" width="84" height="84" clip-path="url(#av)" preserveAspectRatio="xMidYMid slice"/>
+
+  <!-- department label -->
+  <line x1="50" y1="196" x2="184" y2="196" stroke="#C8A84B" stroke-width="0.5" opacity="0.4"/>
+  <text x="117" y="214" text-anchor="middle" font-family="monospace" font-size="8.5" fill="#7A5A20" letter-spacing="0.5">DEPT. OF CITIZEN AFFAIRS</text>
+  <text x="117" y="228" text-anchor="middle" font-family="monospace" font-size="8" fill="#5A3A10" letter-spacing="0.3">SOCIAL CREDIT BUREAU</text>
+
+  <!-- RIGHT PANEL content area -->
+
+  <!-- STANDING ELEVATED header -->
+  <text x="256" y="50" font-family="monospace" font-size="11" fill="#9A7A35" letter-spacing="1.5">STANDING ELEVATED</text>
+  <line x1="256" y1="58" x2="875" y2="58" stroke="#C8A84B" stroke-width="0.5" opacity="0.3"/>
+
+  <!-- citizen name row -->
+  <text x="256" y="82" font-family="monospace" font-size="10" fill="#6A4A18">CITIZEN</text>
+  <text x="340" y="82" font-family="monospace" font-size="10" fill="#C8A84B">@exampleuser  ·  Propaganda Mouthpiece</text>
+
+  <!-- big rank change display -->
+  <text x="256" y="120" font-family="monospace" font-size="10" fill="#6A4A18">PREVIOUS</text>
+  <text x="256" y="142" font-family="monospace" font-size="20" fill="#888" font-weight="bold" letter-spacing="0.5">Diligent Worker</text>
+
+  <!-- arrow -->
+  <text x="556" y="142" font-family="monospace" font-size="22" fill="#C8A84B">-></text>
+
+  <!-- new rank -->
+  <text x="594" y="120" font-family="monospace" font-size="10" fill="#C8A84B">CURRENT</text>
+  <text x="594" y="142" font-family="monospace" font-size="20" fill="#E8C060" font-weight="bold" letter-spacing="0.5">Model Employee</text>
+
+  <!-- divider -->
+  <line x1="256" y1="162" x2="875" y2="162" stroke="#C8A84B" stroke-width="0.5" opacity="0.25"/>
+
+  <!-- stats row -->
+  <text x="256" y="185" font-family="monospace" font-size="10" fill="#6A4A18">RATING</text>
+  <text x="256" y="205" font-family="monospace" font-size="18" fill="#E0E0E0">784.20</text>
+
+  <line x1="370" y1="175" x2="370" y2="215" stroke="#C8A84B" stroke-width="0.5" opacity="0.3"/>
+
+  <text x="388" y="185" font-family="monospace" font-size="10" fill="#6A4A18">REWARD</text>
+  <text x="388" y="205" font-family="monospace" font-size="18" fill="#5CB85C">+¥1,331</text>
+
+  <!-- bottom rule + footer -->
+  <line x1="256" y1="234" x2="875" y2="234" stroke="#C8A84B" stroke-width="0.5" opacity="0.2"/>
+  <text x="256" y="252" font-family="monospace" font-size="8.5" fill="#3A2008">GLORY TO THE CCP!  ·  中华人民共和国社会信用局</text>
+  <text x="875" y="252" text-anchor="end" font-family="monospace" font-size="8.5" fill="#3A2008">SOCIAL CREDIT BUREAU</text>
+</svg>

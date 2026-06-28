@@ -1,8 +1,34 @@
+import random
 import discord
 from discord import app_commands
 from discord.ext import commands
 from cogs.achievements import unlock as unlock_achievement
 from infra.guild_notify import publish_guild_notify
+
+_CENSUS_EVENTS = [
+    # (weight, colour, flavour)
+    (8, 0xFFD700, "Inspection passed. Citizen record is satisfactory."),
+    (8, 0xFFD700, "Bureau found evidence of model productivity. Bonus disbursed."),
+    (8, 0xFFD700, "State subsidy approved. Loyalty index updated favorably."),
+    (8, 0xFFD700, "Neighbor filed a positive report. Commendation noted."),
+    (8, 0xFFD700, "Productivity report exceeded quarterly expectations."),
+    (8, 0xCC0000, "Census logged. You have been counted. Continue."),
+    (8, 0xCC0000, "Routine inspection completed. Nothing of note."),
+    (8, 0xCC0000, "Bureau acknowledges your continued existence."),
+    (8, 0xCC0000, "File reviewed. No action required at this time."),
+    (8, 0xCC0000, "Daily census confirmed. Allocation processed."),
+    (4, 0x888888, "Bureau detected accounting irregularities. Allocation unaffected."),
+    (4, 0x888888, "Inspection revealed minor compliance failures. Noted for the record."),
+    (4, 0x888888, "Anonymous report filed against this citizen. Under review."),
+    (4, 0x888888, "Suspicious patterns detected in citizen activity log. Monitoring continues."),
+]
+
+_WEIGHTS = [e[0] for e in _CENSUS_EVENTS]
+
+
+def _roll_event() -> tuple[int, str]:
+    event = random.choices(_CENSUS_EVENTS, weights=_WEIGHTS, k=1)[0]
+    return event[1], event[2]
 
 
 def _fallback_channel(guild: discord.Guild) -> discord.TextChannel | None:
@@ -29,12 +55,8 @@ class CheckIn(commands.Cog):
         result = await self.db.do_checkin(uid, guild_ids)
 
         if result["already_checked_in"]:
-            embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 日常汇报")
-            embed.add_field(
-                name="ALREADY REPORTED",
-                value="You have already completed your daily check-in. Return tomorrow.",
-                inline=False,
-            )
+            embed = discord.Embed(color=0x888888, title="CENSUS ALREADY LOGGED", description="中华人民共和国社会信用局")
+            embed.add_field(name="COMPLIANCE", value="Census recorded today. Report again tomorrow.", inline=False)
             await interaction.followup.send(embed=embed, ephemeral=True)
             return
 
@@ -47,18 +69,19 @@ class CheckIn(commands.Cog):
         next_score = round(min(2.0 + streak * 0.1, 5.0), 2)
         at_cap     = yuan >= 2000 and delta >= 5.0
 
-        embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局 · 日常汇报")
-        embed.add_field(name="CHECK-IN RECORDED", value=f"Day {streak} streak", inline=False)
-        embed.add_field(name="YUAN AWARDED",      value=f"¥{yuan:,} per server ({rewarded} total)", inline=True)
-        embed.add_field(name="SCORE",             value=f"+{delta:.2f} per server", inline=True)
-        if streak > 1:
-            if at_cap:
-                bonus_text = f"Maximum loyalty rewards reached · ¥{yuan:,} · +{delta:.2f} score per check-in"
-            else:
-                bonus_text = f"Tomorrow: ¥{next_yuan:,} · +{next_score:.2f} score"
-            embed.add_field(name="STREAK BONUS", value=bonus_text, inline=False)
+        event_color, event_text = _roll_event()
+
+        embed = discord.Embed(color=event_color, title="DAILY CENSUS RECORDED", description="中华人民共和国社会信用局")
+        embed.add_field(name="BUREAU REPORT", value=event_text, inline=False)
+        embed.add_field(name="STREAK", value=f"Day {streak}", inline=True)
+        embed.add_field(name="ALLOCATION", value=f"¥{yuan:,} · +{delta:.2f} rating · {rewarded} nations", inline=True)
+        if at_cap:
+            embed.add_field(name="NEXT", value="Maximum allocation reached.", inline=False)
+        elif streak > 1:
+            embed.add_field(name="NEXT", value=f"¥{next_yuan:,} · +{next_score:.2f}", inline=False)
+        embed.set_thumbnail(url="attachment://checkin.png")
         embed.timestamp = discord.utils.utcnow()
-        await interaction.followup.send(embed=embed,)
+        await interaction.followup.send(embed=embed, file=discord.File("images/checkin.png", filename="checkin.png"))
 
         for gr in result["guild_results"]:
             guild = self.bot.get_guild(gr["guild_id"])

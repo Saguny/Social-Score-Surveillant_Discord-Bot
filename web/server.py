@@ -620,9 +620,9 @@ async def start_web_server(db):
     app.router.add_static('/static', Path(__file__).parent / 'static', name='static')
 
     if using_fallback_salt():
-        print("[web] WARNING: PSEUDONYM_SALT is not set — public stats are using a default, predictable salt. Set PSEUDONYM_SALT to a random secret.")
+        print("[web] WARNING: PSEUDONYM_SALT is not set - public stats are using a default, predictable salt. Set PSEUDONYM_SALT to a random secret.")
     if not os.getenv("ADMIN_ALLOWED_IPS"):
-        print("[web] WARNING: ADMIN_ALLOWED_IPS is not set — /admin is reachable from any IP (still token-gated).")
+        print("[web] WARNING: ADMIN_ALLOWED_IPS is not set - /admin is reachable from any IP (still token-gated).")
 
     _runner = web.AppRunner(app)
     await _runner.setup()

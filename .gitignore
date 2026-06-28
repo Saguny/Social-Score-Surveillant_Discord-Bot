@@ -17,3 +17,5 @@ scripts/backup_db.sh
 Dockerfile
 docker-compose.yml
 .claude/*
+cogs/guide.py
+design/BUREAU_STYLE_GUIDE.md

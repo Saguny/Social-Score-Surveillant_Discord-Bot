@@ -48,6 +48,8 @@ class EffectsMixin:
     async def apply_defense_chain(self, guild_id: int, target_id: int, base_delta: float) -> tuple[float, str | None]:
         if base_delta >= 0:
             return base_delta, None
+        if base_delta > -1.0:
+            return base_delta, None
         if await self.get_effect(guild_id, target_id, "criticism"):
             base_delta *= 2
         if await self.consume_effect(guild_id, target_id, "exception"):
@@ -64,19 +66,6 @@ class EffectsMixin:
             reduction *= 0.5
         return round(base_delta * reduction, 2), None
 
-    async def consume_surveillance_for_target(self, guild_id: int, user_id: int, target_id: int) -> bool:
-        rows = await self._pool.fetch(
-            "SELECT id, metadata FROM active_effects WHERE guild_id = $1 AND user_id = $2 AND effect_type = 'surveillance' AND expires_at > $3",
-            guild_id, user_id, int(time.time()),
-        )
-        effect_id = next(
-            (row["id"] for row in rows if json.loads(row["metadata"]).get("target_id") == target_id),
-            None,
-        )
-        if effect_id is None:
-            return False
-        await self._pool.execute("DELETE FROM active_effects WHERE id = $1", effect_id)
-        return True
 
     async def consume_investigation_bounty(self, guild_id: int, target_id: int) -> dict | None:
         rows = await self._pool.fetch(

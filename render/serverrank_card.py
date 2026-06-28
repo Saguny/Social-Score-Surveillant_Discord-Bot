@@ -1,6 +1,6 @@
 """
 Renders a 1080x1080 share card for /serverrank card.
-Synchronous — call via loop.run_in_executor(None, render_card, ...).
+Synchronous - call via loop.run_in_executor(None, render_card, ...).
 """
 
 import io
@@ -138,7 +138,7 @@ def _draw_server_name(draw: ImageDraw.Draw, name: str, zone_top: int, zone_botto
             _text_center(draw, cy, name, font, WHITE)
             return
 
-        # try 2-line wrap — find best balanced split
+        # try 2-line wrap - find best balanced split
         if len(words) < 2:
             continue
         best_split: tuple[str, str] | None = None
@@ -164,7 +164,7 @@ def _draw_server_name(draw: ImageDraw.Draw, name: str, zone_top: int, zone_botto
                 _text_center(draw, y2, l2, font, WHITE)
                 return
 
-    # absolute fallback at min size — just draw, may clip
+    # absolute fallback at min size - just draw, may clip
     font = _font("mono-bold", 13)
     _text_center(draw, cy, name, font, WHITE)
 
@@ -272,7 +272,7 @@ def render_card(
         _paste_icon(card, icon_bytes, icon_cx, icon_cy, icon_r)
         draw = ImageDraw.Draw(card)
 
-    # server name — auto-sized, max 2 lines, no overlap with star
+    # server name - auto-sized, max 2 lines, no overlap with star
     star_cx, star_cy = 540, 490
     star_top = star_cy - 95             # 395
     name_zone_top    = icon_bottom + 14 # 312
@@ -284,7 +284,7 @@ def render_card(
     draw.polygon(star_pts, fill=gold)
     draw.polygon(star_pts, outline=_color(DARK_RED), width=3)
 
-    # rank inside star — visual center of star body is at (star_cx, star_cy)
+    # rank inside star - visual center of star body is at (star_cx, star_cy)
     _text_at(draw, star_cx, star_cy, f"#{rank}", f_mono_b, DARK_RED)
 
     # bracket
@@ -295,7 +295,7 @@ def render_card(
     _text_center(draw, 710, metric_label.upper(), f_mono_s, WARM)
     _text_center(draw, 775, metric_value, f_mono_xl, WHITE)
 
-    trend_text = f"{trend_arrow}  {trend_delta}  THIS WEEK" if trend_delta else "— NO HISTORY YET"
+    trend_text = f"{trend_arrow}  {trend_delta}  THIS WEEK" if trend_delta else "- NO HISTORY YET"
     _text_center(draw, 820, trend_text, f_mono_s, CREAM)
 
     pct_text = f"TOP {percentile:.0f}%"

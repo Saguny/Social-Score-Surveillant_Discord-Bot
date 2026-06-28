@@ -34,6 +34,16 @@ def _bracket_for(citizens: int) -> str | None:
     return GUILD_RANK_BRACKETS[-1][0]
 
 
+def _bracket_case_sql(citizens_expr: str) -> str:
+    parts = []
+    for name, lo, hi in GUILD_RANK_BRACKETS:
+        if hi is None:
+            parts.append(f"WHEN {citizens_expr} >= {lo} THEN '{name}'")
+        else:
+            parts.append(f"WHEN {citizens_expr} BETWEEN {lo} AND {hi} THEN '{name}'")
+    return "CASE " + " ".join(parts) + " ELSE NULL END"
+
+
 class GuildRankMixin:
     async def set_guild_name(self, guild_id: int, name: str):
         await self._pool.execute(
@@ -107,8 +117,10 @@ class GuildRankMixin:
         now = int(time.time())
         active_cutoff = now - CIVIC_PARTICIPATION_ACTIVE_DAYS * 86400
 
+        bracket_case = _bracket_case_sql("gs.citizens")
+
         row = await self._pool.fetchrow(
-            """
+            f"""
             WITH guild_stats AS (
                 SELECT
                     gc.guild_id,
@@ -136,6 +148,7 @@ class GuildRankMixin:
             guild_metrics AS (
                 SELECT
                     gs.guild_id, gs.guild_name, gs.leaderboard_visible, gs.citizens,
+                    {bracket_case} AS guild_bracket,
                     CASE WHEN gs.citizens >= $2 THEN COALESCE(gs.avg_score, 0) ELSE NULL END AS happiness,
                     CASE WHEN gs.citizens >= $2 THEN
                         CASE WHEN gs.citizens > 0 THEN gs.total_yuan::double precision / gs.citizens ELSE 0 END
@@ -152,7 +165,7 @@ class GuildRankMixin:
             ),
             ranked AS (
                 SELECT
-                    guild_id, guild_name, leaderboard_visible, citizens,
+                    guild_id, guild_name, leaderboard_visible, citizens, guild_bracket,
                     happiness, gdp, civic, literacy, incarceration,
                     RANK() OVER (ORDER BY happiness DESC NULLS LAST) AS rank_happiness,
                     RANK() OVER (ORDER BY gdp DESC NULLS LAST) AS rank_gdp,
@@ -160,6 +173,12 @@ class GuildRankMixin:
                     RANK() OVER (ORDER BY literacy DESC NULLS LAST) AS rank_literacy,
                     RANK() OVER (ORDER BY incarceration ASC NULLS LAST) AS rank_incarceration,
                     COUNT(*) OVER () AS total_guilds,
+                    RANK() OVER (PARTITION BY guild_bracket ORDER BY happiness DESC NULLS LAST) AS bracket_rank_happiness,
+                    RANK() OVER (PARTITION BY guild_bracket ORDER BY gdp DESC NULLS LAST) AS bracket_rank_gdp,
+                    RANK() OVER (PARTITION BY guild_bracket ORDER BY civic DESC NULLS LAST) AS bracket_rank_civic,
+                    RANK() OVER (PARTITION BY guild_bracket ORDER BY literacy DESC NULLS LAST) AS bracket_rank_literacy,
+                    RANK() OVER (PARTITION BY guild_bracket ORDER BY incarceration ASC NULLS LAST) AS bracket_rank_incarceration,
+                    COUNT(*) OVER (PARTITION BY guild_bracket) AS total_guilds_in_bracket,
                     LAG(guild_name) OVER (ORDER BY happiness DESC NULLS LAST) AS rival_above_name,
                     LAG(happiness)  OVER (ORDER BY happiness DESC NULLS LAST) AS rival_above_happiness
                 FROM guild_metrics
@@ -169,6 +188,9 @@ class GuildRankMixin:
                 happiness, gdp, civic, literacy, incarceration,
                 rank_happiness, rank_gdp, rank_civic, rank_literacy, rank_incarceration,
                 total_guilds,
+                bracket_rank_happiness, bracket_rank_gdp, bracket_rank_civic,
+                bracket_rank_literacy, bracket_rank_incarceration,
+                total_guilds_in_bracket,
                 rival_above_name,
                 CASE WHEN rival_above_happiness IS NOT NULL AND happiness IS NOT NULL
                      THEN rival_above_happiness - happiness
@@ -192,7 +214,7 @@ class GuildRankMixin:
 
         async def _get_politburo():
             if citizens < GUILD_RANK_POLITBURO_MIN_CITIZENS:
-                return None, None
+                return None, None, None
             pb = await self._pool.fetchval(
                 """
                 SELECT AVG(score) FROM (
@@ -204,59 +226,73 @@ class GuildRankMixin:
                 guild_id, GUILD_RANK_POLITBURO_TOP_N,
             )
             if pb is None:
-                return None, None
-            rank_pb = await self._pool.fetchval(
-                """
-                SELECT COUNT(*) + 1 FROM (
-                    SELECT u.guild_id, AVG(top.score) AS pb_score
-                    FROM guild_config gc
-                    JOIN LATERAL (
-                        SELECT score FROM users
-                        WHERE guild_id = gc.guild_id AND has_chatted = 1
-                        ORDER BY score DESC LIMIT $1
-                    ) top ON true
-                    JOIN users u ON u.guild_id = gc.guild_id
-                    WHERE gc.guild_id != $2
-                    GROUP BY u.guild_id
-                    HAVING COUNT(*) FILTER (WHERE u.has_chatted = 1) >= $3
-                ) sub WHERE sub.pb_score > $4
-                """,
-                GUILD_RANK_POLITBURO_TOP_N, guild_id, GUILD_RANK_POLITBURO_MIN_CITIZENS, pb,
-            )
-            return float(pb), int(rank_pb or 1)
+                return None, None, None
 
-        async def _get_bracket_total():
-            if bracket_lo is None:
-                return int(row["total_guilds"])
-            if bracket_hi is not None:
+            async def _global_rank():
                 return await self._pool.fetchval(
                     """
-                    SELECT COUNT(*) FROM (
-                        SELECT guild_id FROM users WHERE has_chatted = 1
-                        GROUP BY guild_id HAVING COUNT(*) BETWEEN $1 AND $2
-                    ) b
+                    SELECT COUNT(*) + 1 FROM (
+                        SELECT u.guild_id, AVG(top.score) AS pb_score
+                        FROM guild_config gc
+                        JOIN LATERAL (
+                            SELECT score FROM users
+                            WHERE guild_id = gc.guild_id AND has_chatted = 1
+                            ORDER BY score DESC LIMIT $1
+                        ) top ON true
+                        JOIN users u ON u.guild_id = gc.guild_id
+                        WHERE gc.guild_id != $2
+                        GROUP BY u.guild_id
+                        HAVING COUNT(*) FILTER (WHERE u.has_chatted = 1) >= $3
+                    ) sub WHERE sub.pb_score > $4
                     """,
-                    bracket_lo, bracket_hi,
+                    GUILD_RANK_POLITBURO_TOP_N, guild_id, GUILD_RANK_POLITBURO_MIN_CITIZENS, pb,
                 )
-            return await self._pool.fetchval(
-                """
-                SELECT COUNT(*) FROM (
-                    SELECT guild_id FROM users WHERE has_chatted = 1
-                    GROUP BY guild_id HAVING COUNT(*) >= $1
-                ) b
-                """,
-                bracket_lo,
+
+            async def _bracket_rank():
+                if bracket_lo is None:
+                    return None
+                having = (
+                    f"COUNT(*) FILTER (WHERE u.has_chatted = 1) BETWEEN {bracket_lo} AND {bracket_hi}"
+                    if bracket_hi is not None
+                    else f"COUNT(*) FILTER (WHERE u.has_chatted = 1) >= {bracket_lo}"
+                )
+                return await self._pool.fetchval(
+                    f"""
+                    SELECT COUNT(*) + 1 FROM (
+                        SELECT u.guild_id, AVG(top.score) AS pb_score
+                        FROM guild_config gc
+                        JOIN LATERAL (
+                            SELECT score FROM users
+                            WHERE guild_id = gc.guild_id AND has_chatted = 1
+                            ORDER BY score DESC LIMIT $1
+                        ) top ON true
+                        JOIN users u ON u.guild_id = gc.guild_id
+                        WHERE gc.guild_id != $2
+                        GROUP BY u.guild_id
+                        HAVING {having}
+                    ) sub WHERE sub.pb_score > $3
+                    """,
+                    GUILD_RANK_POLITBURO_TOP_N, guild_id, pb,
+                )
+
+            rank_pb, bracket_rank_pb = await asyncio.gather(_global_rank(), _bracket_rank())
+            return (
+                float(pb),
+                int(rank_pb or 1),
+                int(bracket_rank_pb) if bracket_rank_pb is not None else None,
             )
 
-        (politburo, rank_politburo), total_in_bracket = await asyncio.gather(
-            _get_politburo(), _get_bracket_total()
-        )
+        politburo, rank_politburo, bracket_rank_politburo = await _get_politburo()
 
         result = dict(row)
         result["bracket"] = bracket
         result["politburo"] = politburo
         result["rank_politburo"] = rank_politburo
-        result["total_guilds_in_bracket"] = int(total_in_bracket or 1)
+        result["bracket_rank_politburo"] = bracket_rank_politburo
+        if bracket is None:
+            result["total_guilds_in_bracket"] = None
+            for m in ("happiness", "gdp", "civic", "literacy", "incarceration"):
+                result[f"bracket_rank_{m}"] = None
 
         await cache_set(cache_key, json.dumps(result), _CACHE_TTL)
         return result

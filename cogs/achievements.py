@@ -78,7 +78,7 @@ class AchievementsCog(commands.Cog, name="Achievements"):
 
     # ── /achievements ────────────────────────────────────────────────────────
 
-    @app_commands.command(name="achievements", description="View unlocked and locked achievements")
+    @app_commands.command(name="achievements", description="View this citizen's Bureau decoration record")
     @app_commands.describe(citizen="Citizen to look up (defaults to yourself)")
     async def achievements(self, interaction: discord.Interaction, citizen: discord.Member = None):
         await interaction.response.defer()
@@ -101,30 +101,31 @@ class AchievementsCog(commands.Cog, name="Achievements"):
 
         def build_embed(category: str) -> discord.Embed:
             e = discord.Embed(
-                title=f"中华人民共和国社会信用局 · Achievements · {category.upper()}",
+                title="STATE DECORATIONS",
+                description="中华人民共和国社会信用局",
                 color=0xFFD700,
             )
-            e.set_author(name=author_name, icon_url=target.display_avatar.url)
-            e.set_thumbnail(url="attachment://achievement.png")
+            e.set_author(name=f"{author_name} · {category.upper()}", icon_url=target.display_avatar.url)
+            e.set_thumbnail(url="attachment://achievements.png")
             for aid in grouped[category]:
                 data = get_achievement(aid)
                 if aid in unlocked:
                     ts = unlocked[aid]
                     e.add_field(
-                        name=f"✅ {data['name']}",
+                        name=f"🔓 {data['name']}",
                         value=f"{data['description']}\n<t:{ts}:R>{pct_line(aid)}",
                         inline=False,
                     )
                 elif data["secret"]:
-                    e.add_field(name="🔒 ?????", value="A secret the Party keeps.", inline=False)
+                    e.add_field(name="📕 CLASSIFIED", value="Bureau records on this citation are sealed.", inline=False)
                 else:
                     e.add_field(
-                        name="🔒 ?????",
-                        value=f"{data['hint'] or 'Unknown.'}{pct_line(aid)}",
+                        name=f"🔒 RESTRICTED",
+                        value=f"{data['hint'] or 'Criteria unknown.'}{pct_line(aid)}",
                         inline=False,
                     )
             unlocked_count = sum(1 for aid in grouped[category] if aid in unlocked)
-            e.set_footer(text=f"{unlocked_count}/{len(grouped[category])} unlocked in this category")
+            e.set_footer(text=f"{unlocked_count}/{len(grouped[category])} citations on record in this category")
             return e
 
         class CategoryView(discord.ui.View):
@@ -148,7 +149,7 @@ class AchievementsCog(commands.Cog, name="Achievements"):
                     await itr.response.edit_message(embed=build_embed(cat), view=self_v)
                 return callback
 
-        file = discord.File("images/achievement.png", filename="achievement.png")
+        file = discord.File("images/achievements.png", filename="achievements.png")
         await interaction.followup.send(file=file, embed=build_embed(categories[0]), view=CategoryView(categories[0]))
 
 
@@ -158,18 +159,21 @@ def build_announce_embeds(ids: list[str], user: discord.abc.User) -> list[discor
         data = get_achievement(aid)
         if not data:
             continue
-        parts = []
-        if data["score_reward"]:
-            parts.append(f"{data['score_reward']:.2f} credit score")
-        if data["yuan_reward"]:
-            parts.append(f"¥{data['yuan_reward']:,} Yuan")
-        reward_text = f" rewarding them with {' and '.join(parts)}" if parts else ""
         embed = discord.Embed(
-            title="Achievement Unlocked!",
-            description=f"{user.mention} has unlocked the **{data['name']}** achievement{reward_text}.",
+            title="STATE DECORATION AWARDED",
+            description="中华人民共和国社会信用局",
             color=0xFFD700,
         )
-        embed.set_thumbnail(url="attachment://achievement.png")
+        embed.add_field(name="CITIZEN", value=user.mention, inline=True)
+        embed.add_field(name="DECORATION", value=data["name"], inline=True)
+        parts = []
+        if data["score_reward"]:
+            parts.append(f"{data['score_reward']:.2f} rating")
+        if data["yuan_reward"]:
+            parts.append(f"¥{data['yuan_reward']:,}")
+        if parts:
+            embed.add_field(name="REWARD", value=" · ".join(parts), inline=False)
+        embed.set_thumbnail(url="attachment://achievements.png")
         embed.set_footer(text="ccp achievementnotification [on|off] · ccp achievementchannel [#channel]")
         embeds.append(embed)
     return embeds
@@ -195,7 +199,7 @@ async def deliver_achievement_announcements(
     embeds = build_announce_embeds(ids, user)
     if not embeds:
         return
-    file = discord.File("images/achievement.png", filename="achievement.png")
+    file = discord.File("images/achievements.png", filename="achievements.png")
     try:
         await channel.send(file=file, embeds=embeds)
     except (discord.Forbidden, discord.HTTPException):

@@ -43,8 +43,8 @@ class Propaganda(commands.Cog):
             gid, interaction.user.id, submit_channel.id, reveal_channel.id, closes_at
         )
 
-        embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 宣传活动")
-        embed.add_field(name="EVENT OPENED", value=f"Event #{event_id}", inline=False)
+        embed = discord.Embed(color=0xCC0000, title="PROPAGANDA EVENT OPENED", description="中华人民共和国社会信用局")
+        embed.add_field(name="EVENT", value=f"#{event_id}", inline=False)
         embed.add_field(name="SUBMIT IN", value=submit_channel.mention, inline=True)
         embed.add_field(name="REVEALED IN", value=reveal_channel.mention, inline=True)
         embed.add_field(name="CLOSES", value=f"<t:{closes_at}:R>", inline=False)
@@ -102,9 +102,9 @@ class Propaganda(commands.Cog):
 
         await self.db.add_propaganda_submission(event["id"], gid, uid, text)
 
-        embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局 · 宣传活动")
+        embed = discord.Embed(color=0xFFD700, title="SUBMISSION RECORDED", description="中华人民共和国社会信用局")
         embed.add_field(
-            name="SUBMISSION RECORDED",
+            name="STATUS",
             value="Your propaganda has been received and will be revealed when the event closes.",
             inline=False,
         )

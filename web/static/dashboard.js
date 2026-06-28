@@ -133,21 +133,21 @@ async function loadActivity(range) {
   ]);
 
   const socVals = eng.map(r => r.endorsements + r.rebukes);
-  set('tl-social-val', socVals.length ? fmt(socVals.reduce((a, b) => a + b, 0)) : '—');
+  set('tl-social-val', socVals.length ? fmt(socVals.reduce((a, b) => a + b, 0)) : '-');
   _sparkChart('chart-social', labels, socVals, '#7D9D9C', 3, v => v);
   _hideIfEmpty('chart-social', socVals.length);
 
   const port = d.portfolio || [];
   const portLabels = port.map(r => labelFn(r[0]));
   const portVals = port.map(r => r[1]);
-  set('tl-portfolio-val', portVals.length ? '¥' + fmt(portVals[portVals.length - 1]) : '—');
+  set('tl-portfolio-val', portVals.length ? '¥' + fmt(portVals[portVals.length - 1]) : '-');
   _sparkChart('chart-portfolio', portLabels, portVals, '#F5A855', 3, v => '¥' + fmt(v));
   _hideIfEmpty('chart-portfolio', portVals.length);
 
   const joins = d.joins || [];
   const joinLabels = joins.map(r => labelFn(r[0]));
   const joinVals = joins.map(r => r[1]);
-  set('tl-joins-val', joinVals.length ? fmt(joinVals.reduce((a, b) => a + b, 0)) : '—');
+  set('tl-joins-val', joinVals.length ? fmt(joinVals.reduce((a, b) => a + b, 0)) : '-');
   _sparkChart('chart-joins', joinLabels, joinVals, '#7D9D9C', 3, v => v);
   _hideIfEmpty('chart-joins', joinVals.length);
 }
@@ -159,7 +159,7 @@ async function loadYuanCirculation() {
   const yuan = d.yuan || [];
   const yuanLabels = yuan.map(r => _dayLabel(r[0]));
   const yuanVals = yuan.map(r => r[1]);
-  set('tl-yuan-val', yuanVals.length ? '¥' + fmt(yuanVals[yuanVals.length - 1]) : '—');
+  set('tl-yuan-val', yuanVals.length ? '¥' + fmt(yuanVals[yuanVals.length - 1]) : '-');
   _sparkChart('chart-yuan', yuanLabels, yuanVals, '#F4E557', 3, v => '¥' + fmt(v));
   _hideIfEmpty('chart-yuan', yuanVals.length);
 }
@@ -272,7 +272,7 @@ function renderAnomalies(d) {
   if (ev_trend < -0.3)
     items.push({cls:'anomaly-warn', t:`⚠ Score event activity down ${Math.abs(ev_trend*100).toFixed(0)}% vs yesterday`});
   if (d.events_24h > 0 && d.neg_24h > d.pos_24h)
-    items.push({cls:'anomaly-warn', t:`⚠ More negative events than positive today — ${d.neg_24h} vs ${d.pos_24h} positive`});
+    items.push({cls:'anomaly-warn', t:`⚠ More negative events than positive today - ${d.neg_24h} vs ${d.pos_24h} positive`});
   if (d.wau > 0 && d.dau < d.wau/7 * 0.4)
     items.push({cls:'anomaly-warn', t:`⚠ DAU (${d.dau}) well below weekly average (${Math.round(d.wau/7)})`});
   if (d.net_delta_7d < -10)
@@ -349,7 +349,7 @@ async function loadFeed() {
 
 function renderStats(d) {
   const uptime  = d.uptime_seconds || 0;
-  const mps     = uptime > 0 ? (d.total_messages/uptime).toFixed(2) : '—';
+  const mps     = uptime > 0 ? (d.total_messages/uptime).toFixed(2) : '-';
   const tot_soc = (d.endorsements||0)+(d.rebukes||0);
 
   renderAnomalies(d);
@@ -364,17 +364,17 @@ function renderStats(d) {
   set('mc-wau',    fmt(d.wau));
 
   const mag = d.most_active_guild || {};
-  set('mc-mag',     mag.guild_name || mag.guild_id || '—');
+  set('mc-mag',     mag.guild_name || mag.guild_id || '-');
   set('mc-mag-sub', mag.total ? fmt(mag.total)+' msgs rated' : '');
 
-  set('mc-ping', d.discord_ping_ms ? d.discord_ping_ms+'ms' : '—');
+  set('mc-ping', d.discord_ping_ms ? d.discord_ping_ms+'ms' : '-');
   _setStatusClass('mc-ping', pingClass(d.discord_ping_ms));
 
   const dbCls = d.db_query_ms>600?'ping-bad':d.db_query_ms>350?'ping-warn':'ping-good';
-  set('mc-db', typeof d.db_query_ms === 'number' ? d.db_query_ms+'ms' : '—');
+  set('mc-db', typeof d.db_query_ms === 'number' ? d.db_query_ms+'ms' : '-');
   _setStatusClass('mc-db', typeof d.db_query_ms === 'number' ? dbCls : '');
 
-  set('mc-workers', d.sentiment_workers_max != null ? (d.sentiment_workers_active ?? 0)+'/'+d.sentiment_workers_max : '—');
+  set('mc-workers', d.sentiment_workers_max != null ? (d.sentiment_workers_active ?? 0)+'/'+d.sentiment_workers_max : '-');
 
   _pushLatencySample(d.db_query_ms, d.discord_ping_ms);
 
@@ -437,7 +437,7 @@ function renderStats(d) {
 
   set('ci-today',  fmt(d.checkins_today));
   setHtml('ci-t',  trendHtml(d.checkins_today, d.checkins_yday));
-  set('ci-rate',   d.dau > 0 ? Math.round(d.checkins_today / d.dau * 100) + '%' : '—');
+  set('ci-rate',   d.dau > 0 ? Math.round(d.checkins_today / d.dau * 100) + '%' : '-');
   set('ci-streak', fmt(d.highest_streak));
   set('ci-votes',  fmt(d.total_votes || 0));
   set('pr-ev',     fmt(d.prop_events));
@@ -448,8 +448,8 @@ function renderStats(d) {
   set('adv-neg', fmt(d.negative_events));
   set('adv-avd', (d.avg_delta>=0?'+':'')+d.avg_delta.toFixed(4));
   set('adv-pw',  fmt(d.prop_winners));
-  set('adv-pe',  d.prop_events > 0 ? (d.prop_subs/d.prop_events).toFixed(1) : '—');
-  set('adv-er',  tot_soc > 0 ? ((d.endorsements/tot_soc)*100).toFixed(1)+'%' : '—');
+  set('adv-pe',  d.prop_events > 0 ? (d.prop_subs/d.prop_events).toFixed(1) : '-');
+  set('adv-er',  tot_soc > 0 ? ((d.endorsements/tot_soc)*100).toFixed(1)+'%' : '-');
 
   document.getElementById('spinner').style.display = 'none';
   document.getElementById('main').style.display    = 'block';
@@ -514,7 +514,7 @@ const STAT_TIPS = {
   'ec-fx':      'Currently active shop effects (freezes, etc.) across all citizens.',
   'ec-fr':      'Total yuan raised through fundraisers, all-time.',
   'ec-treasury': 'Total yuan seized by the Bureau wealth tax on high-balance citizens, all-time.',
-  'tl-yuan-val':      'Yuan in circulation trend, sampled once daily — may lag the live "In Circulation" total above by up to 24h.',
+  'tl-yuan-val':      'Yuan in circulation trend, sampled once daily - may lag the live "In Circulation" total above by up to 24h.',
   'tl-portfolio-val': 'Combined value of every citizen\'s stock and turbo holdings over the selected time range.',
   'ec-rich':    'The highest yuan balance currently held by any single citizen.',
   'mk-stocks':  'Total yuan currently invested in stocks across all portfolios.',
@@ -573,7 +573,7 @@ function _barChart(canvasId, labels, datasets, opts = {}) {
   if (!el) return;
   if (_charts[canvasId]) { _charts[canvasId].destroy(); delete _charts[canvasId]; }
   const horiz = !!opts.horizontal;
-  // For the category axis (labels), don't set a callback — Chart.js handles it.
+  // For the category axis (labels), don't set a callback - Chart.js handles it.
   // Only apply a format callback to the value axis.
   const xTicks = { font: { size: 9 }, color: '#61677A', ...(horiz && opts.xFmt ? { callback: opts.xFmt } : {}) };
   const yTicks = { font: { size: 9 }, color: '#61677A', ...(!horiz && opts.yFmt ? { callback: opts.yFmt } : {}) };
@@ -667,13 +667,13 @@ async function loadCommandAnalytics(range) {
   const tbody = document.getElementById('cmd-table-top-body');
   if (tbody) {
     if (!topCmds.length) {
-      tbody.innerHTML = '<tr><td colspan="6" class="sub text-center py-3">No data yet — commands will appear once the bot is used.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" class="sub text-center py-3">No data yet - commands will appear once the bot is used.</td></tr>';
     } else {
       tbody.innerHTML = topCmds.map((r, i) => {
         const rate    = rateMap[r.command] || {};
-        const sucPct  = rate.success_pct != null ? rate.success_pct.toFixed(1) + '%' : '—';
-        const avgMs   = execMap[r.command] != null ? execMap[r.command].toFixed(0) + 'ms' : '—';
-        const uniq    = uniqueMap[r.command] != null ? fmt(uniqueMap[r.command]) : '—';
+        const sucPct  = rate.success_pct != null ? rate.success_pct.toFixed(1) + '%' : '-';
+        const avgMs   = execMap[r.command] != null ? execMap[r.command].toFixed(0) + 'ms' : '-';
+        const uniq    = uniqueMap[r.command] != null ? fmt(uniqueMap[r.command]) : '-';
         const rankCls = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
         return `<tr>
           <td class="rank-cell lb-rank ${rankCls}">${i + 1}</td>
@@ -698,8 +698,8 @@ async function loadCommandAnalytics(range) {
         const dt  = new Date(r.timestamp * 1000);
         const mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][dt.getMonth()];
         const t   = `${mon} ${dt.getDate()} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}:${String(dt.getSeconds()).padStart(2,'0')}`;
-        const sub   = r.subcommand || '—';
-        const ms    = r.execution_time_ms != null ? r.execution_time_ms + 'ms' : '—';
+        const sub   = r.subcommand || '-';
+        const ms    = r.execution_time_ms != null ? r.execution_time_ms + 'ms' : '-';
         const badge = r.success
           ? '<span class="cmd-badge-ok">OK</span>'
           : `<span class="cmd-badge-err">${r.error_code || 'ERR'}</span>`;

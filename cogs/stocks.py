@@ -168,6 +168,16 @@ def _render_chart(
     n  = len(closes)
     xs = list(range(n))
 
+    if n > 0:
+        all_vals = closes + (highs + lows if chart_type == "candlestick" else [])
+        v_min, v_max = min(all_vals), max(all_vals)
+        v_range = v_max - v_min if v_max > v_min else v_max * 0.01
+        pad = max(v_range * 0.25, v_max * 0.005)
+        y_bottom = v_min - pad
+        ax.set_ylim(y_bottom, v_max + pad)
+    else:
+        y_bottom = 0
+
     if chart_type == "candlestick" and n > 0:
         for i in range(n):
             o, h, l, c = opens[i], highs[i], lows[i], closes[i]
@@ -177,7 +187,7 @@ def _render_chart(
             ax.bar(i, body, bottom=min(o, c), color=clr, width=0.65, zorder=4)
     elif n > 0:
         ax.plot(xs, closes, color="#26a69a", linewidth=2.2, zorder=3)
-        ax.fill_between(xs, closes, min(closes) * 0.998,
+        ax.fill_between(xs, closes, y_bottom,
                         alpha=0.28, color="#26a69a", zorder=2)
 
     if entry_price is not None and n > 0:
@@ -186,7 +196,7 @@ def _render_chart(
         ax.text(0.01, entry_price, "Entry", transform=ax.get_yaxis_transform(),
                 color="#ffffff", fontsize=7, va="bottom", alpha=0.85)
     elif baseline is not None and baseline > 0 and n > 0:
-        # Day-open reference line — same treatment as the portfolio chart's
+        # Day-open reference line - same treatment as the portfolio chart's
         # baseline line, only shown when there's no entry/KO line to clash with.
         ax.axhline(y=baseline, color="#ffffff", linewidth=0.8,
                    linestyle="--", alpha=0.25, zorder=1)
@@ -234,7 +244,7 @@ def _render_chart(
 
 
 def _render_portfolio_chart(timeline: list, cost_basis: float = 0.0) -> bytes:
-    """Equity curve: [(label_str, total_value), ...] — Trade Republic style."""
+    """Equity curve: [(label_str, total_value), ...] - Trade Republic style."""
     labels = [t[0] for t in timeline]
     values = [float(t[1]) for t in timeline]
     n      = len(values)
@@ -256,8 +266,13 @@ def _render_portfolio_chart(timeline: list, cost_basis: float = 0.0) -> bytes:
         up        = last >= baseline
         color     = "#26a69a" if up else "#ef5350"
         xs        = list(range(n))
+        v_min, v_max = min(values), max(values)
+        v_range = v_max - v_min if v_max > v_min else v_max * 0.01
+        pad = max(v_range * 0.25, v_max * 0.005)
+        y_bottom = v_min - pad
+        ax.set_ylim(y_bottom, v_max + pad)
         ax.plot(xs, values, color=color, linewidth=2.2, zorder=3)
-        ax.fill_between(xs, values, min(values) * 0.998, alpha=0.22, color=color, zorder=2)
+        ax.fill_between(xs, values, y_bottom, alpha=0.22, color=color, zorder=2)
 
         pct  = (last - baseline) / baseline * 100 if baseline > 0 else 0.0
         sign = "+" if pct >= 0 else ""
@@ -270,7 +285,7 @@ def _render_portfolio_chart(timeline: list, cost_basis: float = 0.0) -> bytes:
         ax.text(0.5, 0.5, "Insufficient history", ha="center", va="center",
                 color="#888888", fontsize=10, transform=ax.transAxes)
 
-    # x-axis time labels — always pin last tick to final data point
+    # x-axis time labels - always pin last tick to final data point
     if labels and n > 1:
         num_ticks = min(6, n)
         positions = [round(i * (n - 1) / (num_ticks - 1)) for i in range(num_ticks)] if num_ticks > 1 else [0]
@@ -327,7 +342,7 @@ class PortfolioPeriodView(discord.ui.View):
 
 
 class StockChartView(discord.ui.View):
-    """Period-switcher buttons for /stocks chart — mirrors PortfolioPeriodView."""
+    """Period-switcher buttons for /stocks chart - mirrors PortfolioPeriodView."""
 
     def __init__(self, cog, ticker: str, chart_type: str, embed: discord.Embed, bse_bytes: bytes | None):
         super().__init__(timeout=300)

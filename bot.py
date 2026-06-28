@@ -350,7 +350,7 @@ async def console_loop(bot: commands.Bot):
                 print(f"Error: {e}")
 
         elif cmd == "web":
-            print("The web dashboard is now its own process — run web_service.py separately.")
+            print("The web dashboard is now its own process - run web_service.py separately.")
 
         elif cmd == "help":
             print(HELP_TEXT)

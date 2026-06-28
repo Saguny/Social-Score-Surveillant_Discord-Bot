@@ -17,7 +17,7 @@ async def on_ready():
         status=discord.Status.dnd,
         activity=discord.CustomActivity(name="Maintenance | ccp support"),
     )
-    print(f"Logged in as {client.user} — maintenance mode active")
+    print(f"Logged in as {client.user} - maintenance mode active")
 
 @client.command(name="support")
 async def support(ctx):

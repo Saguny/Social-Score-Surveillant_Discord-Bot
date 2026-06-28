@@ -1,5 +1,6 @@
 import asyncio
 import concurrent.futures
+import io
 import json
 import os
 import random
@@ -18,6 +19,8 @@ from config.rules import (
 )
 from config.banned_topics import contains_banned_topic
 from cogs.achievements import unlock as unlock_achievement, check_milestone
+from config.shop import COSMETIC_META
+from render.rank_card import render_rank_card
 from infra.redis_cache import cache_get, cache_set, cache_delete, cache_incr
 
 TRANSLATE_URL = "https://translate.googleapis.com/translate_a/single"
@@ -205,18 +208,13 @@ class Scoring(commands.Cog):
                     break
         if channel is None:
             return
-        embed = discord.Embed(
-            color=0xCC0000,
-            title=f"🏛️ {guild.name} has grown into a {new_bracket}!",
-            description=(
-                f"Your server has reached the **{new_bracket}** bracket on the Social Credit Almanac.\n\n"
-                f"You are now ranked among {new_bracket}-tier servers on `/serverrank top`.\n"
-                f"Use `/serverrank me` to view your full almanac profile."
-            ),
-        )
-        embed.set_thumbnail(url="attachment://bureau.png")
+        embed = discord.Embed(color=0xFFD700, title="NATIONAL BRACKET ELEVATED", description="中华人民共和国社会信用局")
+        embed.add_field(name="NATION", value=guild.name, inline=True)
+        embed.add_field(name="BRACKET", value=new_bracket, inline=True)
+        embed.add_field(name="REGISTRY", value="`/serverrank top` · `/serverrank me`", inline=False)
+        embed.set_thumbnail(url="attachment://security.png")
         try:
-            await channel.send(embed=embed, file=discord.File("images/bureau.png", filename="bureau.png"))
+            await channel.send(embed=embed, file=discord.File("images/security.png", filename="security.png"))
         except discord.Forbidden:
             pass
 
@@ -266,21 +264,62 @@ class Scoring(commands.Cog):
                 if old_rank["name"] == RANKS[0]["name"]:
                     await unlock_achievement(self.bot, guild, member, "fastest_climb", channel=channel)
 
-        color = 0xFFD700 if promoted else 0xCC0000
-        status = "PROMOTED" if promoted else "DEMOTED"
+        if promoted:
+            try:
+                avatar_bytes = None
+                try:
+                    url = str(member.display_avatar.replace(size=256).url)
+                    async with self._session.get(url) as resp:
+                        if resp.status == 200:
+                            avatar_bytes = await resp.read()
+                except Exception:
+                    pass
 
-        embed = discord.Embed(color=color, title="中华人民共和国社会信用局")
-        embed.add_field(name="CITIZEN", value=await self.bot.format_user_full(member, guild.id), inline=False)
-        embed.add_field(
-            name=f"STATUS CHANGE: {status}",
-            value=f"{old_rank['name']} -> {new_rank['name']}\nScore: {new:.2f} · {yuan_label}",
-            inline=False,
-        )
-        embed.timestamp = discord.utils.utcnow()
-        try:
-            await channel.send(embed=embed)
-        except discord.Forbidden:
-            pass
+                badge_label = None
+                try:
+                    badges = await self.bot.db.get_cosmetic_badges(member.id)
+                    if badges:
+                        pref = await self.bot.db.get_badge_preference(member.id)
+                        owned = {b["badge"] for b in badges}
+                        chosen = pref["badge_id"] if pref and pref["badge_id"] in owned else None
+                        if not chosen:
+                            for bid in ["voter", "verified", "figure", "influencer", "associate", "asset"]:
+                                if bid in owned:
+                                    chosen = bid
+                                    break
+                        if chosen and chosen in COSMETIC_META:
+                            badge_label = COSMETIC_META[chosen]["label"]
+                except Exception:
+                    pass
+
+                loop = asyncio.get_event_loop()
+                png = await loop.run_in_executor(None, lambda: render_rank_card(
+                    old_rank=old_rank["name"],
+                    new_rank=new_rank["name"],
+                    username=member.display_name,
+                    score=new,
+                    yuan_label=yuan_label,
+                    avatar_bytes=avatar_bytes,
+                    badge_label=badge_label,
+                    bot_name=self.bot.user.name,
+                ))
+                file = discord.File(io.BytesIO(png), filename="rank_card.png")
+                embed = discord.Embed(color=0xCC0000, title="STANDING ELEVATED", description="中华人民共和国社会信用局")
+                embed.set_author(name=await self.bot.format_user_full(member, guild.id), icon_url=member.display_avatar.url)
+                embed.set_image(url="attachment://rank_card.png")
+                await channel.send(member.mention, embed=embed, file=file)
+            except discord.Forbidden:
+                pass
+        else:
+            embed = discord.Embed(color=0x888888, title="STANDING REDUCED", description="中华人民共和国社会信用局")
+            embed.add_field(name="CITIZEN", value=await self.bot.format_user_full(member, guild.id), inline=False)
+            embed.add_field(name="PENALTY", value=f"{yuan_label} · Standing reduced to {new_rank['name']}", inline=False)
+            embed.set_thumbnail(url="attachment://rank.png")
+            embed.timestamp = discord.utils.utcnow()
+            try:
+                await channel.send(embed=embed, file=discord.File("images/rank.png", filename="rank.png"))
+            except discord.Forbidden:
+                pass
 
     async def _handle_execution_status(self, guild: discord.Guild, member: discord.Member, channel: discord.TextChannel, old: float, new: float):
         exec_role_name = "Execution Date: Tomorrow"
@@ -308,33 +347,13 @@ class Scoring(commands.Cog):
                 confiscated = await self.db.confiscate_yuan(guild.id, member.id)
                 citizen_str = await self.bot.format_user_full(member, guild.id)
 
-                embed = discord.Embed(
-                    color=0x8B0000, 
-                    title="🚨 中华人民共和国社会信用局 · NOTICE OF TERMINATION",
-                    description=f"**Citizen:** {citizen_str}\n**Current Score:** `{new:.2f}`"
-                )
-                
-                status_text = (
-                    " **CRITICAL INFRACTION DETECTED**\n"
-                    "Your social credit score has gone below 610-. You have been placed on the **Execution List** by the Bureau.\n"
-                    f"Your Role has been assigned."
-                )
-                embed.add_field(name="SURVEILLANCE STATUS", value=status_text, inline=False)
-                
+                embed = discord.Embed(color=0x111111, title="DETENTION ORDER ISSUED", description="中华人民共和国社会信用局")
+                embed.add_field(name="CITIZEN", value=f"{citizen_str} · {new:.2f}", inline=False)
                 if confiscated > 0:
-                    embed.add_field(
-                        name="STATE CONFISCATION", 
-                        value=f"All assets totaling **¥{confiscated:,}** have been seized and redistributed evenly to compliant citizens.", 
-                        inline=False
-                    )
-                
+                    embed.add_field(name="ASSETS", value=f"¥{confiscated:,} confiscated.", inline=False)
+                embed.set_thumbnail(url="attachment://security.png")
                 embed.timestamp = discord.utils.utcnow()
-                if not exec_channel_id:
-                    embed.set_footer(text="System Notice: Use 'ccp executions #channel' to assign a dedicated firing squad channel.")
-                else:
-                    embed.set_footer(text="中华人民共和国社会信用局 · ALL ACTIONS RECORDED")
-                
-                await target.send(content=f"{member.mention} **The Eternal Chairman awaits your Execution with Joy.**", embed=embed)
+                await target.send(embed=embed, file=discord.File("images/security.png", filename="security.png"))
 
                 exec_count = await self.db.increment_execution_count(guild.id, member.id)
                 if exec_count >= 3:
@@ -351,20 +370,11 @@ class Scoring(commands.Cog):
                 
                 citizen_str = await self.bot.format_user_full(member, guild.id)
                 
-                embed = discord.Embed(
-                    color=0x008000,
-                    title="🇨🇳 中华人民共和国社会信用局 · PROBATION UPDATE",
-                    description=f"**Citizen:** {citizen_str}\n**Current Score:** `{new:.2f}` (`{correct_rank['name']}`)"
-                )
-                embed.add_field(
-                    name="REHABILITATION SUCCESSFUL",
-                    value=f"Citizen has successfully recovered above the threshold. The execution order has been rescinded and the `{exec_role_name}` role removed.",
-                    inline=False
-                )
+                embed = discord.Embed(color=0xCC0000, title="DETENTION ORDER RESCINDED", description="中华人民共和国社会信用局")
+                embed.add_field(name="CITIZEN", value=f"{citizen_str} · {new:.2f} · {correct_rank['name']}", inline=False)
+                embed.set_thumbnail(url="attachment://security.png")
                 embed.timestamp = discord.utils.utcnow()
-                embed.set_footer(text="GLORY TO THE CCP!")
-                
-                await target.send(embed=embed)
+                await target.send(embed=embed, file=discord.File("images/security.png", filename="security.png"))
                 await unlock_achievement(self.bot, guild, member, "survived_execution", channel=target)
 
         except discord.Forbidden:
@@ -467,12 +477,6 @@ class Scoring(commands.Cog):
         if delta == 0:
             return
 
-        broadcast_media = False
-        if delta > 0 and await self.db.get_effect(gid, uid, "media_coverage"):
-            await self.db.consume_effect(gid, uid, "media_coverage")
-            delta = round(delta * 2, 2)
-            broadcast_media = True
-
         old_score, new_score = await self.db.update_score(gid, uid, delta, reason)
 
         if delta < 0:
@@ -481,16 +485,6 @@ class Scoring(commands.Cog):
             clean_days = await self.db.get_clean_streak_days(uid)
             if clean_days is not None:
                 await check_milestone(self.bot, message.guild, message.author, "clean_streak_days", clean_days, channel=message.channel)
-
-        if broadcast_media:
-            embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局 · 国家媒体报道")
-            embed.add_field(
-                name="STATE MEDIA SPOTLIGHT",
-                value=f"{await self.bot.format_user_full(message.author, message.guild.id)} · +{delta:.2f} score · DOUBLED BY STATE MEDIA",
-                inline=False,
-            )
-            embed.timestamp = discord.utils.utcnow()
-            await message.channel.send(embed=embed)
 
         self.bot.dispatch("score_change", message.guild, message.author, message.channel, old_score, new_score)
         await self.db.clean_expired_effects()

@@ -15,6 +15,24 @@ from render.serverrank_card import render_card
 _BRACKET_NAMES = [b[0] for b in GUILD_RANK_BRACKETS]
 _BRACKET_ALL = "All"
 
+_BRACKET_PLURALS = {
+    "Hamlet":     "Hamlets",
+    "Village":    "Villages",
+    "Town":       "Towns",
+    "City":       "Cities",
+    "Metropolis": "Metropolises",
+}
+
+_RANK_MEDALS = {1: "🥇 ", 2: "🥈 ", 3: "🥉 "}
+
+
+def _rank_medal(rank: int) -> str:
+    return _RANK_MEDALS.get(rank, "")
+
+
+def _bracket_plural(bracket: str) -> str:
+    return _BRACKET_PLURALS.get(bracket, f"{bracket}s")
+
 _COLOR = 0xCC0000
 
 _METRIC_EMOJIS = {
@@ -28,17 +46,17 @@ _METRIC_EMOJIS = {
 
 _METRIC_DESCRIPTIONS = {
     "happiness":     "Average social credit score across all citizens",
-    "gdp":           "Total yuan held per citizen — higher means a wealthier server",
-    "civic":         "Messages sent per active citizen — measures how engaged your community is",
+    "gdp":           "Total yuan held per citizen - higher means a wealthier server",
+    "civic":         "Messages sent per active citizen - measures how engaged your community is",
     "literacy":      "Share of citizens who have unlocked at least one achievement",
-    "incarceration": "Share of citizens currently on the execution list — lower is better",
-    "politburo":     "Average score of the top 10 citizens — the strength of your server's elite",
+    "incarceration": "Share of citizens currently on the execution list - lower is better",
+    "politburo":     "Average score of the top 10 citizens - the strength of your server's elite",
 }
 
 
 def _fmt_metric(metric: str, value: float | None) -> str:
     if value is None:
-        return "—"
+        return "-"
     if metric == "happiness":
         return f"{value:.2f}"
     if metric == "gdp":
@@ -128,7 +146,7 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
 
             if this_guild:
                 this_val = this_guild.get(tab)
-                this_bracket = this_guild.get("bracket") or "—"
+                this_bracket = this_guild.get("bracket") or "-"
                 rank_val = this_guild.get(f"rank_{tab}")
                 total_guilds = this_guild.get("total_guilds") or "?"
                 rank_str = f"#{rank_val} of {total_guilds}" if rank_val else "unranked"
@@ -143,7 +161,7 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
                     standing_lines.append("*Hidden · use `/serverrank visibility on` to appear on this list*")
                 embed.add_field(name="YOUR STANDING", value="\n".join(standing_lines), inline=False)
 
-            embed.set_thumbnail(url="attachment://bureau.png")
+            embed.set_thumbnail(url="attachment://security.png")
             embed.set_footer(text=f"{_METRIC_DESCRIPTIONS[tab]} · /serverrank me for your full profile · /serverrank visibility [on|off] · GLORY TO THE CCP!")
             return embed
 
@@ -180,7 +198,7 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
                     await btn_interaction.response.edit_message(
                         embed=await build_embed(m, self_.bkt),
                         view=ServerRankTopView(m, self_.bkt),
-                        attachments=[discord.File("images/bureau.png", filename="bureau.png")],
+                        attachments=[discord.File("images/security.png", filename="security.png")],
                     )
                 return callback
 
@@ -190,7 +208,7 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
                     await select_interaction.response.edit_message(
                         embed=await build_embed(self_.tab, new_bkt),
                         view=ServerRankTopView(self_.tab, new_bkt),
-                        attachments=[discord.File("images/bureau.png", filename="bureau.png")],
+                        attachments=[discord.File("images/security.png", filename="security.png")],
                     )
                 return callback
 
@@ -201,7 +219,7 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
         await interaction.followup.send(
             embed=await build_embed(tab, bkt),
             view=ServerRankTopView(tab, bkt),
-            file=discord.File("images/bureau.png", filename="bureau.png"),
+            file=discord.File("images/security.png", filename="security.png"),
         )
 
     @serverrank.command(name="me", description="View this server's full almanac profile and rankings")
@@ -217,28 +235,35 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
             return
 
         citizens = data.get("citizens", 0)
-        bracket = data.get("bracket") or f"Below minimum ({GUILD_RANK_MIN_CITIZENS} citizens required)"
+        raw_bracket = data.get("bracket")
+        bracket = raw_bracket or f"Below minimum ({GUILD_RANK_MIN_CITIZENS} citizens required)"
         visible = data.get("leaderboard_visible", False)
-        total = data.get("total_guilds", "?")
+        total_in_bracket = data.get("total_guilds_in_bracket")
 
         embed = discord.Embed(
             color=_COLOR,
             title="中华人民共和国社会信用局 · SERVER PROFILE",
         )
         embed.set_author(name=guild.name, icon_url=guild.icon.url if guild.icon else None)
-        embed.set_thumbnail(url="attachment://bureau.png")
+        embed.set_thumbnail(url="attachment://security.png")
         embed.add_field(name="BRACKET", value=bracket, inline=True)
         embed.add_field(name="CITIZENS", value=str(citizens), inline=True)
         embed.add_field(name="VISIBILITY", value="Public" if visible else "Hidden", inline=True)
 
         for metric in METRICS:
             val = data.get("politburo") if metric == "politburo" else data.get(metric)
-            rank_val = data.get(f"rank_{metric}")
+            bracket_rank_val = data.get(f"bracket_rank_{metric}")
 
             label = METRIC_LABELS[metric]
             formatted = _fmt_metric(metric, val)
-            rank_str = f" · Rank #{rank_val} of {total}" if rank_val else ""
-            embed.add_field(name=label, value=f"{formatted}{rank_str}", inline=False)
+            if raw_bracket and bracket_rank_val and total_in_bracket:
+                rank_line = (
+                    f"\n{_rank_medal(bracket_rank_val)}#{bracket_rank_val} / "
+                    f"{total_in_bracket} {_bracket_plural(raw_bracket)}"
+                )
+            else:
+                rank_line = ""
+            embed.add_field(name=label, value=f"{formatted}{rank_line}", inline=False)
 
         rival_above = data.get("rival_above_name")
         rival_gap = data.get("rival_above_gap")
@@ -250,7 +275,7 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
             )
 
         embed.set_footer(text="/serverrank visibility [on|off] · /state_report for today's activity · GLORY TO THE CCP!")
-        await interaction.followup.send(embed=embed, file=discord.File("images/bureau.png", filename="bureau.png"))
+        await interaction.followup.send(embed=embed, file=discord.File("images/security.png", filename="security.png"))
 
     @serverrank.command(name="visibility", description="Show or hide this server on the public leaderboard (mod only)")
     @app_commands.checks.has_permissions(manage_guild=True)
@@ -304,7 +329,7 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
 
         data = await self.db.get_guild_rank(guild.id)
         if not data:
-            await interaction.followup.send("No citizens yet — members need to chat first.", ephemeral=True)
+            await interaction.followup.send("No citizens yet - members need to chat first.", ephemeral=True)
             return
 
         bracket = data.get("bracket")
@@ -347,7 +372,7 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
                 trend_arrow = "▲" if delta >= 0 else "▼"
                 trend_delta_str = _fmt_metric(tab, abs(delta))
 
-        # rank, percentile, and rival — bracket-scoped or global
+        # rank, percentile, and rival - bracket-scoped or global
         rivals_line = ""
         if use_bracket and bracket:
             bracket_rows = await self.db.get_guild_leaderboard(tab, bracket, limit=500)

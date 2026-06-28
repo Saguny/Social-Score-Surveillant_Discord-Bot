@@ -3,7 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 
 CONFIRM_TIMEOUT = 60
-_BUREAU_IMG = "images/bureau.png"
+_BUREAU_IMG = "images/security.png"
 
 
 def _bureau_file():
@@ -46,7 +46,7 @@ class OptOutConfirmView(discord.ui.View):
         else:
             embed = discord.Embed(color=0x333333, title="中华人民共和国社会信用局 · OPT-OUT CANCELLED")
             embed.add_field(name="STATUS", value="No changes were made. You remain a registered citizen.", inline=False)
-        embed.set_thumbnail(url="attachment://bureau.png")
+        embed.set_thumbnail(url="attachment://security.png")
         await interaction.edit_original_response(embed=embed, view=self, attachments=[_bureau_file()])
 
     @discord.ui.button(label="Yes, opt out", style=discord.ButtonStyle.danger)
@@ -98,7 +98,7 @@ class OptInConfirmView(discord.ui.View):
         else:
             embed = discord.Embed(color=0x333333, title="中华人民共和国社会信用局 · OPT-IN CANCELLED")
             embed.add_field(name="STATUS", value="No changes were made. You remain opted out.", inline=False)
-        embed.set_thumbnail(url="attachment://bureau.png")
+        embed.set_thumbnail(url="attachment://security.png")
         await interaction.edit_original_response(embed=embed, view=self, attachments=[_bureau_file()])
 
     @discord.ui.button(label="Yes, opt in", style=discord.ButtonStyle.success)
@@ -144,7 +144,7 @@ class Privacy(commands.Cog):
             inline=False,
         )
         embed.add_field(name="EXPIRES", value=f"<t:{expiry}:R>", inline=False)
-        embed.set_thumbnail(url="attachment://bureau.png")
+        embed.set_thumbnail(url="attachment://security.png")
         await interaction.followup.send(
             embed=embed,
             view=OptOutConfirmView(interaction.user.id, interaction),
@@ -171,7 +171,7 @@ class Privacy(commands.Cog):
             inline=False,
         )
         embed.add_field(name="EXPIRES", value=f"<t:{expiry}:R>", inline=False)
-        embed.set_thumbnail(url="attachment://bureau.png")
+        embed.set_thumbnail(url="attachment://security.png")
         await interaction.followup.send(
             embed=embed,
             view=OptInConfirmView(interaction.user.id, interaction),
