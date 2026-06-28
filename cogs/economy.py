@@ -25,7 +25,8 @@ _CATEGORY_LABELS = {
     "cosmetic": "PRESTIGE",
 }
 
-_THUMBNAIL = "attachment://treasury.png"
+_THUMBNAIL         = "attachment://market.png"
+_TREASURY_THUMBNAIL = "attachment://treasury.png"
 
 _COSMETIC_ORDER = ["verified", "figure", "influencer", "associate", "asset", "eternal_chairman"]
 _LOTTERY_ORDER  = ["lottery", "lottery_standard", "lottery_premium", "lottery_elite", "lottery_chairman"]
@@ -450,7 +451,7 @@ class Economy(commands.Cog):
         await interaction.followup.send(
             embed=embeds["core"],
             view=view,
-            file=discord.File("images/treasury.png", filename="treasury.png"),
+            file=discord.File("images/market.png", filename="market.png"),
         )
 
     @app_commands.command(name="yuan", description="View a citizen's Yuan balance")
@@ -787,20 +788,20 @@ class Economy(commands.Cog):
         if won:
             await self.db.adjust_yuan(gid, uid, balance)
             await self.db.update_lottery_stats(gid, uid, True, balance)
-            embed = discord.Embed(color=0xFFD700, title="ALL-IN REPORT", description="中华人民共和国社会信用局")
-            embed.add_field(name="CITIZEN", value=name, inline=False)
-            embed.add_field(name="OUTCOME", value="Probability cooperated. The Commission is unsettled.", inline=False)
-            embed.add_field(name="WAGERED", value=f"¥{balance:,}", inline=True)
-            embed.add_field(name="NEW BALANCE", value=f"¥{balance * 2:,}", inline=True)
+            embed = discord.Embed(
+                color=0xFFD700,
+                title="WIN  ·  ALL-IN REPORT",
+                description=f"{name}  ·  ¥{balance:,} → ¥{balance * 2:,}",
+            )
         else:
-            await self.db.set_yuan(gid, uid, 0)
+            await self.db.spend_yuan(gid, uid, balance)
             await self.db.update_lottery_stats(gid, uid, False, -balance)
             await self._check_lottery_addict(interaction.guild, interaction.user, interaction.channel)
-            embed = discord.Embed(color=0x111111, title="ALL-IN REPORT", description="中华人民共和国社会信用局")
-            embed.add_field(name="CITIZEN", value=name, inline=False)
-            embed.add_field(name="OUTCOME", value="Assets have been confiscated and returned to the Treasury.", inline=False)
-            embed.add_field(name="LOST", value=f"¥{balance:,}", inline=True)
-            embed.add_field(name="NEW BALANCE", value="¥0", inline=True)
+            embed = discord.Embed(
+                color=0x111111,
+                title="LOSS  ·  ALL-IN REPORT",
+                description=f"{name}  ·  ¥{balance:,} → ¥0",
+            )
         embed.timestamp = discord.utils.utcnow()
         await interaction.followup.send(embed=embed)
 
@@ -1008,6 +1009,7 @@ class Economy(commands.Cog):
 
         expiry = int(discord.utils.utcnow().timestamp()) + 60
         embed = discord.Embed(color=0xCC0000, title="TRANSFER REQUEST", description="中华人民共和国社会信用局")
+        embed.set_thumbnail(url=_TREASURY_THUMBNAIL)
         embed.add_field(name="FROM", value=interaction.user.mention, inline=True)
         embed.add_field(name="TO", value=recipient.mention, inline=True)
         embed.add_field(name="AMOUNT", value=f"¥{amount:,}", inline=True)
@@ -1016,7 +1018,7 @@ class Economy(commands.Cog):
         embed.timestamp = discord.utils.utcnow()
 
         view = TransferView(interaction.user, recipient, amount, user["yuan"], interaction)
-        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+        await interaction.followup.send(embed=embed, view=view, file=discord.File("images/treasury.png", filename="treasury.png"), ephemeral=True)
 
     @app_commands.command(name="requestyuan", description="Request Yuan from another citizen")
     @app_commands.describe(citizen="The citizen to request Yuan from", amount="Amount of Yuan to request", reason="Optional reason for the request")
@@ -1034,6 +1036,7 @@ class Economy(commands.Cog):
 
         expiry = int(discord.utils.utcnow().timestamp()) + 300
         embed = discord.Embed(color=0xCC0000, title="YUAN REQUEST", description="中华人民共和国社会信用局")
+        embed.set_thumbnail(url=_TREASURY_THUMBNAIL)
         embed.add_field(name="FROM", value=citizen.mention, inline=True)
         embed.add_field(name="TO", value=interaction.user.mention, inline=True)
         embed.add_field(name="AMOUNT", value=f"¥{amount:,}", inline=True)
@@ -1043,7 +1046,7 @@ class Economy(commands.Cog):
         embed.timestamp = discord.utils.utcnow()
 
         view = RequestView(interaction.user, citizen, amount)
-        msg = await interaction.followup.send(embed=embed, view=view)
+        msg = await interaction.followup.send(embed=embed, view=view, file=discord.File("images/treasury.png", filename="treasury.png"))
         view.message = msg
 
 

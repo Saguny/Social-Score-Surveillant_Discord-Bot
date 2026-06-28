@@ -203,13 +203,18 @@ class Voting(commands.Cog):
         self.bot = bot
         self.db = bot.db
 
-    @app_commands.command(name="vote", description="Vote for this bot on Top.gg for a badge, score, and yuan")
+    @app_commands.command(name="vote", description="Vote for the bot on Top.gg for yuan, score, a badge, and a 12h 2× message boost")
     async def vote(self, interaction: discord.Interaction):
         await interaction.response.defer()
         embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · CALL TO PATRIOTIC DUTY")
         embed.add_field(
             name="BASE REWARD",
             value=f"¥{VOTE_YUAN_BASE:,} Yuan · +{VOTE_SCORE_BASE:.1f} Score · Loyal Patriot badge",
+            inline=False,
+        )
+        embed.add_field(
+            name="12H BOOST",
+            value="2× Yuan and Score per message for 12 hours · Does not affect other rewards",
             inline=False,
         )
         embed.add_field(
@@ -220,7 +225,7 @@ class Voting(commands.Cog):
         if time.gmtime().tm_wday >= 5:
             embed.add_field(
                 name="WEEKEND BONUS ACTIVE",
-                value="3× all rewards right now · Today and tomorrow only",
+                value="2× all rewards right now · Today and tomorrow only",
                 inline=False,
             )
         embed.add_field(

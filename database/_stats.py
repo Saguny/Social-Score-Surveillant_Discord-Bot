@@ -110,6 +110,34 @@ class StatsMixin:
         )
         return {"rows": rows, "current_yuan": int(user["yuan"]) if user else 0}
 
+    async def get_compare_stats(self, guild_id: int, user_id: int) -> dict:
+        user, ach_count, prestige = await asyncio.gather(
+            self._pool.fetchrow(
+                "SELECT * FROM users WHERE guild_id = $1 AND user_id = $2",
+                guild_id, user_id,
+            ),
+            self._pool.fetchval(
+                "SELECT COUNT(*) FROM achievements WHERE user_id = $1",
+                user_id,
+            ),
+            self._pool.fetchval(
+                "SELECT value FROM user_counters WHERE user_id = $1 AND counter_key = 'prestige_level'",
+                user_id,
+            ),
+        )
+        if not user:
+            return None
+        return {
+            "score": float(user["score"]),
+            "yuan": int(user["yuan"]),
+            "checkin_streak": int(user["checkin_streak"] or 0),
+            "message_count": int(user["message_count"]),
+            "times_endorsed": int(user["times_endorsed"]),
+            "times_rebuked": int(user["times_rebuked"]),
+            "achievements": int(ach_count or 0),
+            "prestige": int(prestige or 0),
+        }
+
     async def get_daily_stats(self, guild_id: int, user_id: int) -> dict:
         now = int(time.time())
         today_start = now - (now % 86400)

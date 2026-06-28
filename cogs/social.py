@@ -1,8 +1,12 @@
+import asyncio
+import io
 import time
+import aiohttp
 import discord
 from discord import app_commands
 from discord.ext import commands
 from cogs.achievements import unlock as unlock_achievement, check_milestone
+from config.ranks import get_rank
 
 COOLDOWN_SECONDS = 86400
 ENDORSE_DELTA = 1.5
@@ -88,6 +92,113 @@ class Social(commands.Cog):
     @app_commands.describe(citizen="Citizen to censure", reason="Optional statement for the record")
     async def rebuke(self, interaction: discord.Interaction, citizen: discord.Member, reason: str = None):
         await self._rate(interaction, citizen, "rebuke", reason)
+
+    @app_commands.command(name="compare", description="Request a Bureau loyalty comparison between two citizens")
+    @app_commands.describe(citizen="Citizen to compare yourself against")
+    async def compare(self, interaction: discord.Interaction, citizen: discord.Member):
+        if citizen.id == interaction.user.id:
+            await interaction.response.send_message(
+                "The Bureau does not permit citizens to compare themselves against themselves.", ephemeral=True
+            )
+            return
+
+        await interaction.response.defer()
+
+        gid = interaction.guild.id
+        a_user = interaction.user
+        b_user = citizen
+
+        a_stats, b_stats = await asyncio.gather(
+            self.db.get_compare_stats(gid, a_user.id),
+            self.db.get_compare_stats(gid, b_user.id),
+        )
+
+        if not a_stats or not b_stats:
+            await interaction.followup.send("One or both citizens have no Bureau record.", ephemeral=True)
+            return
+
+        a_rank = get_rank(a_stats["score"])["name"]
+        b_rank = get_rank(b_stats["score"])["name"]
+
+        categories = [
+            ("LOYALTY SCORE",  f"{a_stats['score']:.2f}",        f"{b_stats['score']:.2f}",        a_stats["score"],        b_stats["score"]),
+            ("RANK",           a_rank,                            b_rank,                            a_stats["score"],        b_stats["score"]),
+            ("WEALTH",         f"¥{a_stats['yuan']:,}",           f"¥{b_stats['yuan']:,}",           a_stats["yuan"],         b_stats["yuan"]),
+            ("CHECK-IN STREAK",f"{a_stats['checkin_streak']}d",   f"{b_stats['checkin_streak']}d",   a_stats["checkin_streak"],b_stats["checkin_streak"]),
+            ("MESSAGES",       f"{a_stats['message_count']:,}",   f"{b_stats['message_count']:,}",   a_stats["message_count"],b_stats["message_count"]),
+            ("COMMENDATIONS",  str(a_stats["times_endorsed"]),    str(b_stats["times_endorsed"]),    a_stats["times_endorsed"],b_stats["times_endorsed"]),
+            ("ACHIEVEMENTS",   str(a_stats["achievements"]),      str(b_stats["achievements"]),      a_stats["achievements"], b_stats["achievements"]),
+            ("PRESTIGE",       str(a_stats["prestige"]),          str(b_stats["prestige"]),          a_stats["prestige"],     b_stats["prestige"]),
+        ]
+
+        COL = 18
+        LABEL_COL = 16
+
+        a_name = a_user.display_name[:COL]
+        b_name = b_user.display_name[:COL]
+
+        header_a = a_name.rjust(COL)
+        header_b = b_name.ljust(COL)
+        sep = "─" * COL + "┼" + "─" * (LABEL_COL + 4) + "┼" + "─" * COL
+
+        lines = [
+            "╔══════════ BUREAU LOYALTY EVALUATION ══════════╗",
+            f"  {header_a}  │  {'CATEGORY':^{LABEL_COL}}  │  {header_b}",
+            sep,
+        ]
+
+        a_wins = 0
+        b_wins = 0
+        for label, a_val, b_val, a_raw, b_raw in categories:
+            if a_raw > b_raw:
+                indicator_a, indicator_b = "◄", " "
+                a_wins += 1
+            elif b_raw > a_raw:
+                indicator_a, indicator_b = " ", "►"
+                b_wins += 1
+            else:
+                indicator_a, indicator_b = "·", "·"
+
+            line = f"  {a_val:>{COL-2}} {indicator_a} │  {label:^{LABEL_COL}}  │ {indicator_b} {b_val:<{COL-2}}"
+            lines.append(line)
+
+        lines.append(sep)
+
+        if a_wins > b_wins:
+            gap = a_wins - b_wins
+            if gap >= 5:
+                verdict = f"{a_name} is an exemplary servant of the state."
+            else:
+                verdict = f"{a_name} demonstrates superior loyalty."
+            lines.append(f"  VERDICT  ►  {verdict}")
+        elif b_wins > a_wins:
+            gap = b_wins - a_wins
+            if gap >= 5:
+                verdict = f"{b_name} is an exemplary servant of the state."
+            else:
+                verdict = f"{b_name} demonstrates superior loyalty."
+            lines.append(f"  VERDICT  ►  {verdict}")
+        else:
+            lines.append(f"  VERDICT  ►  Both citizens are equally loyal to the state.")
+
+        lines.append("╚════════════════════════════════════════════════╝")
+
+        code_block = "```\n" + "\n".join(lines) + "\n```"
+
+        async def _fetch_avatar(user: discord.Member) -> bytes:
+            url = user.display_avatar.replace(size=128, format="png").url
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as resp:
+                    return await resp.read()
+
+        a_av, b_av = await asyncio.gather(_fetch_avatar(a_user), _fetch_avatar(b_user))
+
+        loop = asyncio.get_event_loop()
+        from render.compare_card import render_compare_banner
+        img_bytes = await loop.run_in_executor(None, render_compare_banner, a_av, b_av)
+
+        file = discord.File(io.BytesIO(img_bytes), filename="compare.png")
+        await interaction.followup.send(content=code_block, file=file)
 
 
 async def setup(bot: commands.Bot):

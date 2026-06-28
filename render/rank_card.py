@@ -217,6 +217,10 @@ def render_rank_card(
     return buf.getvalue()
 
 
+PW, PH = 420, 580
+PAD = 22
+
+
 def render_profile_card(
     *,
     username: str,
@@ -231,78 +235,79 @@ def render_profile_card(
     badge_label: str | None,
     bot_name: str = "Social Credit Surveillant",
 ) -> bytes:
-    card = Image.new("RGB", (W, H), BG)
-    tex = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    CX = PW // 2
+
+    card = Image.new("RGB", (PW, PH), BG)
+    tex = Image.new("RGBA", (PW, PH), (0, 0, 0, 0))
     tex_draw = ImageDraw.Draw(tex)
-    f_star = _font("mono", 18)
+    f_star = _font("mono", 14)
     star_c = (*GOLD, 20)
-    for row in range(0, H, 45):
-        for col in range(0, W, 45):
-            tex_draw.text((col + 6,  row + 6),  "★", fill=star_c, font=f_star)
-            tex_draw.text((col + 26, row + 26), "★", fill=star_c, font=f_star)
+    for row in range(0, PH, 40):
+        for col in range(0, PW, 40):
+            tex_draw.text((col + 4,  row + 4),  "★", fill=star_c, font=f_star)
+            tex_draw.text((col + 22, row + 22), "★", fill=star_c, font=f_star)
     card = Image.alpha_composite(card.convert("RGBA"), tex).convert("RGB")
     draw = ImageDraw.Draw(card)
 
-    draw.rectangle([8, 8, 228, 272], fill=LEFT_BG)
-    draw.rectangle([14, 14, 222, 266], fill=LEFT_BG)
-    draw.rectangle([8, 8, 892, 272], outline=GOLD, width=3)
-    draw.rectangle([14, 14, 886, 266], outline=(*GOLD, 128), width=1)
-    draw.line([(228, 30), (228, 250)], fill=(*GOLD, 153), width=1)
+    draw.rectangle([6, 6, PW - 6, PH - 6], outline=GOLD, width=3)
+    draw.rectangle([12, 12, PW - 12, PH - 12], outline=(*GOLD, 100), width=1)
 
-    f_cjk13  = _font("cjk",  13)
-    f_cjk11  = _font("cjk",  11)
-    f_mono8  = _font("mono",  8)
-    f_mono85 = _font("mono",  9)
+    f_cjk18 = _font("cjk", 18)
+    f_cjk14 = _font("cjk", 14)
+    f_cjk13 = _font("cjk", 13)
+    f_mono9  = _font("mono",  9)
     f_mono10 = _font("mono", 10)
     f_mono11 = _font("mono", 11)
-    f_mono18 = _font("mono", 18)
-    f_bold22 = _font("mono-bold", 22)
+    f_mono13 = _font("mono", 13)
+    f_bold26 = _font("mono-bold", 26)
+    f_bold32 = _font("mono-bold", 32)
+    f_bold14 = _font("mono-bold", 14)
 
-    _centered_baseline(draw, 117, 52, "中华人民共和国", f_cjk13, GOLD)
-    _centered_baseline(draw, 117, 70, "社会信用局",     f_cjk11, GOLD_D)
-    draw.line([(50, 78), (184, 78)], fill=(*GOLD, 100), width=1)
+    # CJK header
+    _centered_baseline(draw, CX, 46, "中华人民共和国", f_cjk18, GOLD)
+    _centered_baseline(draw, CX, 66, "社会信用局",     f_cjk14, GOLD_D)
+    draw.line([(PAD, 74), (PW - PAD, 74)], fill=(*GOLD, 100), width=1)
 
-    AV_CX, AV_CY, AV_R = 117, 139, 42
-    _dashed_ring(draw, AV_CX, AV_CY, AV_R + 6, GOLD)
+    # avatar
+    AV_CX, AV_CY, AV_R = CX, 148, 54
+    _dashed_ring(draw, AV_CX, AV_CY, AV_R + 7, GOLD)
     draw.ellipse([AV_CX - AV_R, AV_CY - AV_R, AV_CX + AV_R, AV_CY + AV_R], fill=AV_BG)
     if avatar_bytes:
         _paste_avatar(card, avatar_bytes, AV_CX, AV_CY, AV_R)
         draw = ImageDraw.Draw(card)
 
-    draw.line([(50, 196), (184, 196)], fill=(*GOLD, 100), width=1)
-    _centered_baseline(draw, 117, 214, "DEPT. OF CITIZEN AFFAIRS", f_mono85, BADGE_C)
-    _centered_baseline(draw, 117, 228, "SOCIAL CREDIT BUREAU",     f_mono8,  GOLD_DK)
+    draw.line([(PAD, 218), (PW - PAD, 218)], fill=(*GOLD, 100), width=1)
 
-    # right panel
-    _at_baseline(draw, 256, 50, "CITIZEN DOSSIER", f_mono11, GOLD_D)
-    draw.line([(256, 58), (875, 58)], fill=(*GOLD, 76), width=1)
+    # username (big)
+    _centered_baseline(draw, CX, 258, username, f_bold32, CREAM)
 
-    _at_baseline(draw, 256, 82, "CITIZEN", f_mono10, GOLD_D)
-    citizen_value = f"@{username}"
+    # badge below name
     if badge_label:
-        citizen_value += f"  ·  {_ascii_badge(badge_label)}"
-    _at_baseline(draw, 340, 82, citizen_value, f_mono10, CREAM)
+        _centered_baseline(draw, CX, 278, _ascii_badge(badge_label), f_bold14, GOLD_D)
 
-    _at_baseline(draw, 256, 107, "RANK", f_mono10, GOLD_D)
-    _at_baseline(draw, 256, 134, rank_name, f_bold22, GOLD_RK)
+    draw.line([(PAD, 290), (PW - PAD, 290)], fill=(*GOLD, 60), width=1)
 
-    draw.line([(256, 152), (875, 152)], fill=(*GOLD, 64), width=1)
+    # rank
+    _centered_baseline(draw, CX, 310, "RANK", f_mono10, GOLD_D)
+    _centered_baseline(draw, CX, 340, rank_name, f_bold26, GOLD_RK)
 
-    _at_baseline(draw, 256, 175, "SOCIAL CREDIT", f_mono10, GOLD_D)
-    _at_baseline(draw, 560, 175, "BALANCE",        f_mono10, GOLD_D)
-    draw.line([(546, 152), (546, 210)], fill=(*GOLD, 76), width=1)
-    draw.text((256, 178), f"{score:.2f}", fill=CREAM, font=f_mono18)
-    draw.text((560, 178), f"\xa5{yuan:,}", fill=CREAM, font=f_mono18)
+    draw.line([(PAD, 352), (PW - PAD, 352)], fill=(*GOLD, 60), width=1)
 
-    draw.line([(256, 210), (875, 210)], fill=(*GOLD, 51), width=1)
+    # score + yuan
+    _centered_baseline(draw, CX // 2, 372, "SOCIAL CREDIT", f_mono10, GOLD_D)
+    _centered_baseline(draw, CX + CX // 2, 372, "BALANCE",       f_mono10, GOLD_D)
+    draw.line([(CX, 354), (CX, 412)], fill=(*GOLD, 60), width=1)
+    _centered_baseline(draw, CX // 2,       408, f"{score:.2f}",  f_bold26, CREAM)
+    _centered_baseline(draw, CX + CX // 2,  408, f"\xa5{yuan:,}", f_bold26, CREAM)
 
-    # progress bar toward next rank
-    BAR_X0, BAR_X1, BAR_Y0, BAR_Y1 = 256, 875, 216, 226
+    draw.line([(PAD, 414), (PW - PAD, 414)], fill=(*GOLD, 40), width=1)
+
+    # progress bar
+    BAR_X0, BAR_X1, BAR_Y0, BAR_Y1 = PAD, PW - PAD, 422, 432
     bar_w = BAR_X1 - BAR_X0
     band = max(rank_max - rank_min, 1)
     progress = min(max((score - rank_min) / band, 0.0), 1.0)
     fill_w = int(bar_w * progress)
-
     draw.rectangle([BAR_X0, BAR_Y0, BAR_X1, BAR_Y1], fill=(30, 20, 20))
     if fill_w > 0:
         draw.rectangle([BAR_X0, BAR_Y0, BAR_X0 + fill_w, BAR_Y1], fill=GREEN)
@@ -312,22 +317,23 @@ def render_profile_card(
         progress_label = f"{pts_to_next:.2f} TO {next_rank_name.upper()}"
     else:
         progress_label = "PEAK LOYALTY ACHIEVED"
-    b = _bb(draw, progress_label, f_mono85)
-    draw.text((875 - (b[2] - b[0]), 233), progress_label, fill=GOLD_D, font=f_mono85)
+    b = _bb(draw, progress_label, f_mono9)
+    draw.text((PW - PAD - (b[2] - b[0]), 436), progress_label, fill=GOLD_D, font=f_mono9)
 
-    draw.line([(256, 244), (875, 244)], fill=(*GOLD, 51), width=1)
+    # footer panel — inset so the outer gold border shows on all sides
+    FOOT_Y = 462
+    draw.rectangle([9, FOOT_Y, PW - 9, PH - 9], fill=LEFT_BG)
+    draw.line([(9, FOOT_Y), (PW - 9, FOOT_Y)], fill=GOLD, width=2)
+    # redraw inner border over the footer fill
+    inner_color = (*GOLD, 100)
+    draw.line([(12, FOOT_Y), (12, PH - 12)],        fill=inner_color, width=1)
+    draw.line([(PW - 12, FOOT_Y), (PW - 12, PH - 12)], fill=inner_color, width=1)
+    draw.line([(12, PH - 12), (PW - 12, PH - 12)],  fill=inner_color, width=1)
 
-    # footer: latin part in mono, CJK part in cjk font to avoid box characters
-    f_cjk9 = _font("cjk", 9)
-    latin_prefix = "GLORY TO THE CCP!  \xb7  "
-    b_mono = _bb(draw, latin_prefix, f_mono85)
-    b_cjk  = _bb(draw, "中华人民共和国社会信用局", f_cjk9)
-    footer_y = 262 - b_mono[3]
-    cjk_y   = footer_y + b_mono[1] - b_cjk[1] - 2
-    draw.text((256, footer_y), latin_prefix, fill=GOLD_D, font=f_mono85)
-    draw.text((256 + b_mono[2], cjk_y), "中华人民共和国社会信用局", fill=GOLD_D, font=f_cjk9)
-    b = _bb(draw, bot_name, f_mono85)
-    draw.text((875 - (b[2] - b[0]), footer_y), bot_name, fill=GOLD_D, font=f_mono85)
+    _centered_baseline(draw, CX, FOOT_Y + 36, "GLORY TO THE CCP!", f_mono13, GOLD)
+    _centered_baseline(draw, CX, FOOT_Y + 56, "中华人民共和国社会信用局", f_cjk13, GOLD_D)
+    draw.line([(80, FOOT_Y + 62), (PW - 80, FOOT_Y + 62)], fill=(*GOLD, 60), width=1)
+    _centered_baseline(draw, CX, FOOT_Y + 82, bot_name, f_mono13, GOLD_D)
 
     buf = io.BytesIO()
     card.save(buf, format="PNG", optimize=True)
