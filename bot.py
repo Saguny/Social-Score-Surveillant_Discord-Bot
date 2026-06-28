@@ -194,7 +194,7 @@ async def _decay_task(bot: commands.Bot):
 
 _PRESENCE_CYCLE = [
     discord.Activity(type=discord.ActivityType.watching, name="/guide | /shop"),
-    discord.Activity(type=discord.ActivityType.watching, name="/vote | /checkin"),
+    discord.Activity(type=discord.ActivityType.watching, name="/vote for 2x boost | /checkin"),
     discord.Activity(type=discord.ActivityType.watching, name="/botinfo | /invite"),
     None,
 ]
@@ -203,7 +203,7 @@ _PRESENCE_CYCLE = [
 async def _rotate_presence_task(bot: commands.Bot):
     await bot.wait_until_ready()
     while True:
-        await asyncio.sleep(600)
+        await asyncio.sleep(300)
         bot._presence_index = (bot._presence_index + 1) % len(_PRESENCE_CYCLE)
         activity = _PRESENCE_CYCLE[bot._presence_index]
         if activity is None:
