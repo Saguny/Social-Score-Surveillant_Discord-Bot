@@ -117,31 +117,43 @@ class Social(commands.Cog):
             await interaction.followup.send("One or both citizens have no Bureau record.", ephemeral=True)
             return
 
-        a_rank = get_rank(a_stats["score"])["name"]
-        b_rank = get_rank(b_stats["score"])["name"]
+        _RANK_SHORT = {
+            "Enemy of the State":   "Enemy",
+            "Person of Interest":   "Person",
+            "Unremarkable Citizen": "Unremarkable",
+            "Compliant Citizen":    "Compliant",
+            "Model Citizen":        "Model",
+            "Party Loyalist":       "Loyalist",
+            "Cadre Member":         "Cadre",
+            "General Secretary":    "Secretary",
+        }
+        a_rank_full = get_rank(a_stats["score"])["name"]
+        b_rank_full = get_rank(b_stats["score"])["name"]
+        a_rank = _RANK_SHORT.get(a_rank_full, a_rank_full)
+        b_rank = _RANK_SHORT.get(b_rank_full, b_rank_full)
 
-        W = 20
-        L = 20
-        TOTAL = 2 * W + L + 6  # 66
+        W = 12
+        L = 14
+        TOTAL = 2 * W + L + 6  # 44
 
         def _trunc(s: str, w: int) -> str:
             return s if len(s) <= w else s[:w - 1] + "…"
 
         categories = [
-            ("LOYALTY SCORE",   f"{a_stats['score']:.2f}",        f"{b_stats['score']:.2f}",        a_stats["score"],          b_stats["score"]),
-            ("RANK",            a_rank,                            b_rank,                            a_stats["score"],          b_stats["score"]),
-            ("WEALTH",          f"¥{a_stats['yuan']:,}",           f"¥{b_stats['yuan']:,}",           a_stats["yuan"],           b_stats["yuan"]),
-            ("CHECK-IN STREAK", f"{a_stats['checkin_streak']}d",   f"{b_stats['checkin_streak']}d",   a_stats["checkin_streak"], b_stats["checkin_streak"]),
-            ("MESSAGES",        f"{a_stats['message_count']:,}",   f"{b_stats['message_count']:,}",   a_stats["message_count"],  b_stats["message_count"]),
-            ("COMMENDATIONS",   str(a_stats["times_endorsed"]),    str(b_stats["times_endorsed"]),    a_stats["times_endorsed"], b_stats["times_endorsed"]),
-            ("ACHIEVEMENTS",    str(a_stats["achievements"]),      str(b_stats["achievements"]),      a_stats["achievements"],   b_stats["achievements"]),
-            ("PRESTIGE",        str(a_stats["prestige"]),          str(b_stats["prestige"]),          a_stats["prestige"],       b_stats["prestige"]),
+            ("LOYALTY SCORE", f"{a_stats['score']:.2f}",       f"{b_stats['score']:.2f}",       a_stats["score"],          b_stats["score"]),
+            ("RANK",          a_rank,                           b_rank,                           a_stats["score"],          b_stats["score"]),
+            ("WEALTH",        f"¥{a_stats['yuan']:,}",          f"¥{b_stats['yuan']:,}",          a_stats["yuan"],           b_stats["yuan"]),
+            ("CHECK-IN",      f"{a_stats['checkin_streak']}d",  f"{b_stats['checkin_streak']}d",  a_stats["checkin_streak"], b_stats["checkin_streak"]),
+            ("MESSAGES",      f"{a_stats['message_count']:,}",  f"{b_stats['message_count']:,}",  a_stats["message_count"],  b_stats["message_count"]),
+            ("COMMENDATIONS", str(a_stats["times_endorsed"]),   str(b_stats["times_endorsed"]),   a_stats["times_endorsed"], b_stats["times_endorsed"]),
+            ("ACHIEVEMENTS",  str(a_stats["achievements"]),     str(b_stats["achievements"]),     a_stats["achievements"],   b_stats["achievements"]),
+            ("PRESTIGE",      str(a_stats["prestige"]),         str(b_stats["prestige"]),         a_stats["prestige"],       b_stats["prestige"]),
         ]
 
         a_name = _trunc(a_user.display_name, W)
         b_name = _trunc(b_user.display_name, W)
 
-        title_inner = " BUREAU LOYALTY EVALUATION "
+        title_inner = " LOYALTY EVAL "
         side = (TOTAL - 2 - len(title_inner)) // 2
         top = "╔" + "═" * side + title_inner + "═" * (TOTAL - 2 - len(title_inner) - side) + "╗"
         sep = "─" * (W + 2) + "┼" + "─" * L + "┼" + "─" * (W + 2)
@@ -170,14 +182,14 @@ class Social(commands.Cog):
 
         if a_wins > b_wins:
             gap = a_wins - b_wins
-            verdict = f"{a_name} is an exemplary servant of the state." if gap >= 5 else f"{a_name} demonstrates superior loyalty."
+            verdict = f"{a_name} wins ({a_wins}-{b_wins})." if gap < 5 else f"{a_name} is an exemplary servant of the state."
         elif b_wins > a_wins:
             gap = b_wins - a_wins
-            verdict = f"{b_name} is an exemplary servant of the state." if gap >= 5 else f"{b_name} demonstrates superior loyalty."
+            verdict = f"{b_name} wins ({b_wins}-{a_wins})." if gap < 5 else f"{b_name} is an exemplary servant of the state."
         else:
-            verdict = "Both citizens are equally loyal to the state."
+            verdict = "Equal loyalty to the state."
 
-        prefix = "  VERDICT  ►  "
+        prefix = "  VERDICT ► "
         lines.append(prefix + _trunc(verdict, TOTAL - len(prefix)))
         lines.append("╚" + "═" * (TOTAL - 2) + "╝")
 
