@@ -306,6 +306,7 @@ class GuideView(discord.ui.View):
             name="SERVER SETTINGS",
             value=(
                 "`ccp threshold <n>` · Fundraiser vote threshold (default 3)\n"
+                "`ccp rankchannel [#channel]` · Dedicated rank-up announcement channel\n"
                 "`ccp executions [#channel]` · Dedicated execution notice channel\n"
                 "`ccp roles [on|off]` · Toggle rank role assignment"
             ),

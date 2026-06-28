@@ -264,6 +264,10 @@ class Scoring(commands.Cog):
                 if old_rank["name"] == RANKS[0]["name"]:
                     await unlock_achievement(self.bot, guild, member, "fastest_climb", channel=channel)
 
+        rank_channel_id = await self.db.get_rank_announcement_channel(guild.id)
+        rank_channel = guild.get_channel(rank_channel_id) if rank_channel_id else None
+        announce_channel = rank_channel or channel
+
         if promoted:
             try:
                 avatar_bytes = None
@@ -307,7 +311,8 @@ class Scoring(commands.Cog):
                 embed = discord.Embed(color=0xCC0000, title="STANDING ELEVATED", description="中华人民共和国社会信用局")
                 embed.set_author(name=await self.bot.format_user_full(member, guild.id), icon_url=member.display_avatar.url)
                 embed.set_image(url="attachment://rank_card.png")
-                await channel.send(member.mention, embed=embed, file=file)
+                embed.set_footer(text="ccp rankchannel [#channel] · GLORY TO THE CCP!")
+                await announce_channel.send(member.mention, embed=embed, file=file)
             except discord.Forbidden:
                 pass
         else:
@@ -315,9 +320,10 @@ class Scoring(commands.Cog):
             embed.add_field(name="CITIZEN", value=await self.bot.format_user_full(member, guild.id), inline=False)
             embed.add_field(name="PENALTY", value=f"{yuan_label} · Standing reduced to {new_rank['name']}", inline=False)
             embed.set_thumbnail(url="attachment://rank.png")
+            embed.set_footer(text="ccp rankchannel [#channel] · GLORY TO THE CCP!")
             embed.timestamp = discord.utils.utcnow()
             try:
-                await channel.send(embed=embed, file=discord.File("images/rank.png", filename="rank.png"))
+                await announce_channel.send(embed=embed, file=discord.File("images/rank.png", filename="rank.png"))
             except discord.Forbidden:
                 pass
 

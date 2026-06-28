@@ -102,6 +102,21 @@ class RanksMixin:
         )
         return row["execution_channel_id"] if row else None
 
+    async def get_rank_announcement_channel(self, guild_id):
+        row = await self._pool.fetchrow(
+            "SELECT rank_announcement_channel_id FROM guild_config WHERE guild_id = $1",
+            guild_id,
+        )
+        return row["rank_announcement_channel_id"] if row else None
+
+    async def set_rank_announcement_channel(self, guild_id, channel_id):
+        async with self._pool.acquire() as conn:
+            await self._ensure_guild(conn, guild_id)
+            await conn.execute(
+                "UPDATE guild_config SET rank_announcement_channel_id = $2 WHERE guild_id = $1",
+                guild_id, channel_id,
+            )
+
     async def set_execution_channel(self, guild_id, channel_id):
         async with self._pool.acquire() as conn:
             await self._ensure_guild(conn, guild_id)

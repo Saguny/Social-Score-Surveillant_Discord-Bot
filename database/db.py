@@ -274,6 +274,7 @@ class Database(
             """)
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_portfolio_history_user_ts ON portfolio_history (guild_id, user_id, ts)")
             await conn.execute("ALTER TABLE guild_config ADD COLUMN IF NOT EXISTS execution_channel_id BIGINT")
+            await conn.execute("ALTER TABLE guild_config ADD COLUMN IF NOT EXISTS rank_announcement_channel_id BIGINT")
             await conn.execute("ALTER TABLE guild_config ADD COLUMN IF NOT EXISTS assign_rank_roles BOOLEAN NOT NULL DEFAULT TRUE")
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS daily_yuan_snapshots (
