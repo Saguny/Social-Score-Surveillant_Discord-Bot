@@ -291,7 +291,6 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
         if visible:
             await self.db.set_guild_name(gid, interaction.guild.name)
         await self.db.set_leaderboard_visible(gid, visible)
-        await self.db._invalidate_guild_rank_caches(gid)
 
         msg = (
             f"**{interaction.guild.name}** will now appear on `/serverrank top` and the web leaderboard."

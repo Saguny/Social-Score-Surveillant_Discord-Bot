@@ -63,16 +63,18 @@ class GuildRankMixin:
         await self._invalidate_guild_rank_caches(guild_id)
 
     async def _invalidate_guild_rank_caches(self, guild_id: int):
-        await cache_delete(f"guildrank:{guild_id}")
+        from infra.redis_client import get_redis
+        r = get_redis()
         brackets = [None, "Hamlet", "Village", "Town", "City", "Metropolis"]
         limits   = [10, 25, 100, 500]
-        deletes  = [
-            cache_delete(f"guildlb:{metric}:{bracket}:{limit}")
+        keys = [f"guildrank:{guild_id}"] + [
+            f"guildlb:{metric}:{bracket}:{limit}"
             for metric in METRICS
             for bracket in brackets
             for limit in limits
         ]
-        await asyncio.gather(*deletes)
+        if keys:
+            await r.delete(*keys)
 
     async def check_and_update_bracket(self, guild_id: int) -> str | None:
         async with self._pool.acquire() as conn:
