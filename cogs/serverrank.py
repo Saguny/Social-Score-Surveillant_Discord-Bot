@@ -290,11 +290,7 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
         gid = interaction.guild.id
         if visible:
             await self.db.set_guild_name(gid, interaction.guild.name)
-        async with self.db._pool.acquire() as conn:
-            await conn.execute(
-                "UPDATE guild_config SET leaderboard_visible = $2 WHERE guild_id = $1",
-                gid, visible,
-            )
+        await self.db.set_leaderboard_visible(gid, visible)
         await self.db._invalidate_guild_rank_caches(gid)
 
         msg = (
