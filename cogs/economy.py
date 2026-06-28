@@ -750,6 +750,7 @@ class Economy(commands.Cog):
                 title="🎰  YOU WON!",
                 description=f"{interaction.user.mention}{gift_line} · **+¥{winnings:,}** · net {net:+,}",
             )
+            embed.set_footer(text="/vote on top.gg for bonus Yuan and score · GLORY TO THE CCP!")
             await self.db.update_lottery_stats(gid, recipient.id, True, net)
         else:
             winnings = random.randint(*tier["jackpot"])
@@ -760,6 +761,7 @@ class Economy(commands.Cog):
                 title="🎰  JACKPOT.",
                 description=f"{interaction.user.mention}{gift_line} · **+¥{winnings:,}** · net {net:+,}",
             )
+            embed.set_footer(text="/vote on top.gg for bonus Yuan and score · GLORY TO THE CCP!")
             await self.db.update_lottery_stats(gid, recipient.id, True, net)
             await unlock_achievement(self.bot, interaction.guild, recipient, "jackpot_winner", channel=interaction.channel)
         await interaction.followup.send(embed=embed)

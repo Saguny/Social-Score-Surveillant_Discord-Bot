@@ -311,7 +311,7 @@ class Scoring(commands.Cog):
                 embed = discord.Embed(color=0xCC0000, title="STANDING ELEVATED", description="中华人民共和国社会信用局")
                 embed.set_author(name=await self.bot.format_user_full(member, guild.id), icon_url=member.display_avatar.url)
                 embed.set_image(url="attachment://rank_card.png")
-                embed.set_footer(text="ccp rankchannel [#channel] · GLORY TO THE CCP!")
+                embed.set_footer(text="/vote on top.gg for bonus Yuan and score · GLORY TO THE CCP!")
                 await announce_channel.send(member.mention, embed=embed, file=file)
             except discord.Forbidden:
                 pass
