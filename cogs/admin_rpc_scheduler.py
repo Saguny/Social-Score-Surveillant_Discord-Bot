@@ -65,8 +65,9 @@ class AdminRpcScheduler(commands.Cog):
         db = self.db
 
         if action == "sync":
-            await bot.tree.sync()
-            return {"output": "Slash commands synced."}
+            r = get_redis()
+            await r.publish("gateway-sync", "{}")
+            return {"output": "Sync request dispatched to all gateway workers."}
 
         if action == "guilds":
             lines = [f"{g.id}  {g.name}  ({g.member_count} members)" for g in bot.guilds]

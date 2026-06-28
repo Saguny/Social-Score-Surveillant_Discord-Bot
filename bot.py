@@ -260,6 +260,26 @@ async def _guild_notify_listener(bot: commands.Bot):
             print(f"[guild-notify] error handling {payload.get('event_type')}: {e!r}")
 
 
+_GATEWAY_SYNC_CHANNEL = "gateway-sync"
+
+
+async def _gateway_sync_listener(bot: commands.Bot):
+    await bot.wait_until_ready()
+    r = get_redis()
+    pubsub = r.pubsub()
+    await pubsub.subscribe(_GATEWAY_SYNC_CHANNEL)
+    async for message in pubsub.listen():
+        if message.get("type") != "message":
+            continue
+        try:
+            for guild in bot.guilds:
+                bot.tree.copy_global_to(guild=guild)
+                await bot.tree.sync(guild=guild)
+            print(f"[gateway-sync] synced commands to {len(bot.guilds)} guild(s).")
+        except Exception as e:
+            print(f"[gateway-sync] error during sync: {e!r}")
+
+
 async def console_loop(bot: commands.Bot):
     loop = asyncio.get_event_loop()
     while True:
@@ -496,6 +516,8 @@ class SocialCreditBot(commands.AutoShardedBot):
             asyncio.create_task(_decay_task(self))
             asyncio.create_task(_rotate_presence_task(self))
         asyncio.create_task(_guild_notify_listener(self))
+        if not IS_SCHEDULER:
+            asyncio.create_task(_gateway_sync_listener(self))
         self.loop.create_task(console_loop(self))
 
     async def on_ready(self):
