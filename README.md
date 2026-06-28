@@ -1,140 +1,193 @@
-# Social Score Surveillant - A Discord Bot
-# Outdated Read me , will update soon
+# Social Credit Bot
 
-## DISCLAIMER
+A CCP-themed Discord social credit bot. Every message is silently evaluated. Rank changes trigger official bureau notifications. Made for fun.
 
-This bot is MAINLY proposed for english speaking guilds since Vader is only for english. Any non english message will be translated using googles api, I will possibly update one day to support all languages
+> **DISCLAIMER:** This is a satirical meme project. It is not affiliated with, endorsed by, or representative of the Chinese Communist Party or the Chinese government. The creator does not support, condone, or endorse the human rights abuses, authoritarian policies, or surveillance practices of the CCP, including but not limited to the treatment of Uyghurs, Tibetans, Hong Kongers, and political dissidents, the Tiananmen Square massacre, or real-world social credit systems. This is a joke. The irony is the point.
 
-This bot is a satirical meme project and is not affiliated with, endorsed by, or representative of the Chinese Communist Party or the Chinese government. The creator does not support, condone, or endorse the human rights abuses, authoritarian policies, or surveillance practices of the CCP, including but not limited to the treatment of Uyghurs, Tibetans, Hong Kongers, and political dissidents, the Tiananmen Square massacre, or real-world social credit systems. This is a joke. The irony is the point.
+**Invite:** [Add to your server](https://discord.com/oauth2/authorize?client_id=856163780265902151&permissions=2416438352&integration_type=0&scope=bot) · **Support:** [Support Server](https://discord.gg/k4W6YAPYhC) · **Prefix:** `ccp `
 
-# Version Beta 1.0.2
-
-This is a side project made for fun by me because me and a friend are flying to china this year and i was in the midst of reviving my old bot project from 2021, so i got enough motivation and a refresh of the discordpy library enough, that I just said "fuck it, im doing a ccp bot"
-here we are
-
-**Invite:** [https://discord.com/oauth2/authorize?client_id=856163780265902151&permissions=2416438352&integration_type=0&scope=bot](https://discord.com/oauth2/authorize?client_id=856163780265902151&permissions=2416036928&integration_type=0&scope=bot)
-
-Built with discord.py 2.x · PostgreSQL (asyncpg) · vaderSentiment · langdetect · aiohttp · Deployed on Railway
-
-Prefix: `ccp `
+Built with discord.py 2.x · PostgreSQL (asyncpg) · vaderSentiment · langdetect · aiohttp · Redis · Deployed on Railway
 
 ---
 
-# About
+## Social Credit Score
 
-A CCP-themed social credit bot for Discord. Every message is silently evaluated. Rank changes trigger official bureau notifications. Made for fun in small friend group servers.
+Everyone starts at **750**. Every message is silently evaluated for tone, structure, and content. Score changes are silent - rank changes are not.
 
-`/guide` will be your best friend! it contains all information needed.
-
----
-
-## Social Credit Score System
-
-- Score range: 600 (floor) to 1300 (ceiling). Everyone starts at 750.
-- Every message is evaluated for tone and structure. Score changes accumulate silently.
-- Citizens inactive for more than 7 days have their score nudged toward 750 daily.
+- **Range:** 600 (floor) to 1300 (ceiling)
+- **Execution threshold:** ≤ 610 - triggers the "Execution Date: Tomorrow" role, confiscates all Yuan and redistributes it to other guild members
+- **Prestige:** reach 1290 and `/prestige` to reset for cosmetic stars
 
 **Ranks**
 
-| Range        | Rank                 |
-| ------------ | -------------------- |
-| 600 to 699   | Enemy of the State   |
-| 700 to 774   | Person of Interest   |
-| 775 to 849   | Unremarkable Citizen |
-| 850 to 924   | Compliant Citizen    |
-| 925 to 999   | Model Citizen        |
-| 1000 to 1099 | Party Loyalist       |
-| 1100 to 1199 | Cadre Member         |
-| 1200 to 1300 | General Secretary    |
+| Range     | Rank                 |
+| --------- | -------------------- |
+| 600–699   | Enemy of the State   |
+| 700–774   | Person of Interest   |
+| 775–849   | Unremarkable Citizen |
+| 850–924   | Compliant Citizen    |
+| 925–999   | Model Citizen        |
+| 1000–1099 | Party Loyalist       |
+| 1100–1199 | Cadre Member         |
+| 1200–1300 | General Secretary    |
+
+Rank changes award or deduct Yuan automatically. Demotion requires a 1.0-point buffer below a threshold to prevent oscillation at boundaries.
 
 ---
 
 ## Scoring Rules
 
-**Sentiment Analysis** - each message is analyzed for tone. Max impact: +0.2 (positive) or -0.2 (negative). Neutral messages have no effect.
+**Sentiment analysis** - each message is scored via VADER. Non-English messages are translated via Google Translate first. Positive and negative messages move your score; neutral messages award a small civic participation bonus (+0.03). Consecutive positive messages build a streak multiplier (up to ×1.5 at streak 15+).
 
-**Counter-Revolutionary Speech** - messages referencing banned topics (Tiananmen, Taiwan independence, Tibet, Xinjiang, Falun Gong, Hong Kong independence, etc.) are penalized -0.2 regardless of tone.
+**Banned topics** - counter-revolutionary speech (Tiananmen, Taiwan independence, Tibet, Xinjiang, Falun Gong, Hong Kong independence, etc.) is penalized immediately, regardless of tone.
 
-**Structural Penalties**
+**Structural penalties**
 
-- Same message sent twice in a row: -1.0
-- Excessive caps on messages 10+ characters: -0.2
+- Repeated message: −0.7
+- Excessive caps (10+ char messages): −0.4
+
+**Daily caps** - positive score gains diminish after a net +6.0 per day and are capped at +8.0. Negative score is never capped. Yuan per message also diminishes after 50 Yuan earned in a day.
+
+**Score decay** - citizens inactive for more than 7 days are nudged toward 750 daily (−0.1).
+
+**Defense effects** - `/buy` items like `exception`, `immunity`, `appeal`, `protection`, `legal_rep`, and `criticism` stack to reduce or block negative score events.
+
+---
+
+## Yuan Economy
+
+- **10 Yuan** earned per message (diminishing after the daily threshold)
+- **Support server members** earn a 15% yuan-per-message bonus
+- **Wealth tax** - holdings above ¥100,000 are taxed 10% daily
+
+**State Shop** - purchase with `/buy <item> [target]`
+
+| Item           | Cost          | Effect                                                         |
+| -------------- | ------------- | -------------------------------------------------------------- |
+| `report`       | ¥500          | Dock a citizen 2 score points                                  |
+| `denounce`     | ¥1,000        | Public condemnation with custom text (48h cooldown per target) |
+| `inspection`   | ¥300          | DM alerts on a target's score changes for 24h                  |
+| `rehabilitate` | ¥400+         | Recover 3 score points (cost doubles each use)                 |
+| `expunge`      | ¥600          | Wipe your last 5 score changes from history                    |
+| `freeze`       | ¥800          | Freeze your score for 1 hour                                   |
+| `dispute`      | ¥450          | Contest your last penalty                                      |
+| `exception`    | ¥1,200        | Block the next negative score event entirely                   |
+| `immunity`     | ¥900          | 50% chance to fully block the next penalty                     |
+| `appeal`       | ¥600          | Halve the next negative score event                            |
+| `protection`   | ¥750          | Halve the next negative score event (stacks with appeal)       |
+| `legal_rep`    | ¥2,000        | Passive - halves all incoming penalties while active           |
+| `criticism`    | ¥500          | Passive - doubles all incoming penalties to a target           |
+| `pact`         | ¥1,500        | Mutual score-protection agreement with another citizen         |
+| `tip`          | ¥200          | Anonymous tip about a citizen                                  |
+| Lottery tiers  | ¥500–¥250,000 | 70% lose · 20% win · 10% jackpot                               |
+
+Most items can optionally target another citizen. Several items are gift-able.
 
 ---
 
 ## Features
 
-**Yuan Economy**
+**Daily check-in** - `/checkin` once per day for Yuan and score. Streak reward scales up to ¥2,000/day and +5.0 score at max streak. Applied across every server you share with the bot.
 
-- 1 Yuan earned per message automatically.
-- `/checkin` - daily check-in for bonus Yuan and +0.2 score. Streak builds up to 150 Yuan/day.
-- State Shop items purchasable with `/buy`:
-  - `report` (500) - dock a citizen 2 score points
-  - `denounce` (1000) - post a public custom condemnation (100 char max)
-  - `surveillance` (300) - DM alerts on a target's score changes for 24h
-  - `rehabilitate` (400+) - recover 3 score points; cost doubles each use
-  - `expunge` (600) - wipe your last 5 score changes from public history
-  - `freeze` (800) - freeze your score for 1 hour
-  - `propaganda` (350) - bot posts a state-approved commendation of you
+**Peer ratings** - `/endorse` or `/rebuke` a citizen ±1.5 score with an optional reason. 24h cooldown per target.
 
-**Peer-to-Peer Ratings**
+**Community fundraisers** - `/fundraise create` proposes a task for Yuan. Others donate. The organizer fulfills it, then the community votes to pay out or refund.
 
-- `/endorse` / `/rebuke` - +/-3.0 score adjustment, one use per target per 24h, optional reason.
+**Propaganda events** (mod) - `/propaganda start` opens a submission event. Citizens submit quotes; banned content earns a −5.0 penalty and event ban. After the window closes, submissions go to a reaction vote. The winner becomes a guild decree visible via `/decree`.
 
-**Community Fundraisers**
+**Daily propaganda posters** - posted at 12:00 UTC in enabled channels. React with ❤️ for +3 score +¥250; react with 😡 for −1 score (defense effects apply). Sourced from [chineseposters.net](https://chineseposters.net).
 
-- Citizens propose a task in exchange for Yuan. Others donate. Once funded, the organizer fulfills the task and opens a community vote. Confirm threshold = payout; deny threshold = full refund.
+**Top.gg voting** - `/vote` for Yuan and score rewards that scale with your vote streak, with weekend double rewards and a check-in combo bonus. Includes an optional DM reminder.
 
-**Propaganda Events** (mod only)
+**Beijing Stock Exchange** - `/stocks` · real ADR stocks (via yfinance), one BSE ETF, and synthetic penny stocks. Turbo certificates (leveraged long/short with knockout barriers). Market hours enforced per exchange. Portfolio gains passively boost your social credit score daily.
 
-- `/propaganda start` - open a submission event with a reveal channel and duration.
-- `/propaganda submit` - citizens submit quotes. Banned content = -5.0 score + event ban.
-- After the window closes, submissions are posted with reaction voting. Winner is enshrined as a guild decree via `/decree`.
+**Achievements** - unlock badges and rewards for milestones across endorsements, check-ins, voting, stocks, streaks, and more. Rarity tiers: common, uncommon (reaction), rare (announce), legendary (meta). View with `/achievements`.
 
-**Daily Propaganda Posters**
+**Badges & cosmetics** - earn cosmetic badge suffixes from achievements, the shop, and voting. Pin a preferred badge with `/badge select`.
 
-- Posted at 12:00 UTC in enabled channels. React with heart for +1 score +20 Yuan, angry for -1 score.
-- Posters sourced from [chineseposters.net](https://chineseposters.net)
+**Prestige** - reach score 1290 and `/prestige` to reset score and Yuan in the current server for cosmetic prestige stars (global counter).
 
-**Web Dashboard**
+**Server ranking** - `/serverrank` - guild-vs-guild leaderboard across 6 metrics: happiness, GDP, civic participation, literacy, incarceration rate, and politburo score. Bracket system: Hamlet → Village → Town → City → Metropolis.
 
-- Auto-starts on port 8080. Accessible at `/` for public leaderboard (if webconsent is on) and `/admin` for server management. Both Protected by `ADMIN_TOKEN`.
+**Privacy** - `/optout` atomically deletes all your data and blocks further data collection. `/optin` starts you fresh.
 
 ---
 
 ## Commands
 
-**Citizen**
+**Citizen (slash)**
 
 - `/score [citizen]` - current score and rank
-- `/stats [citizen]` - full breakdown: trends, peak/low, messages, check-in streak, propaganda wins
-- `/history [citizen]` - last 5 score changes (mod required to view others)
-- `/leaderboard` - 8 categories: top/bottom score, richest/poorest, most active, most endorsed, most rebuked, top informants
+- `/stats [citizen]` - full breakdown: trends, peak/low, streaks, lottery, economy
+- `/leaderboard` - top/bottom score, economy, activity, social
+- `/daily_report` - your score and yuan vs yesterday
 - `/state_report` - server-wide summary
-- `/yuan` - Yuan balance and lifetime stats
 - `/shop` - browse shop items
 - `/buy <item> [target] [text]` - purchase from the State Shop
-- `/confess <text>` - public confession; cost scales with score gap (200 to 750 Yuan), grants +0.5 on acceptance
+- `/confess <text>` - public confession (cost scales with score gap, 1h cooldown)
 - `/checkin` - daily check-in
 - `/endorse <citizen> [reason]` / `/rebuke <citizen> [reason]` - peer ratings
+- `/transfer <citizen> <amount>` / `/requestyuan <citizen> <amount>` - yuan transfers
 - `/fundraise create/donate/complete/vote/list/info` - community fundraisers
 - `/propaganda submit <text>` - submit to active propaganda event
+- `/stocks buy/sell/portfolio/list` · `/turbos open/close/list` - stock exchange
+- `/serverrank top/me/card/visibility` - guild leaderboard
+- `/achievements` - view unlocked and locked achievements
+- `/badge select/clear` - pin a cosmetic badge
+- `/vote` - vote for the bot on top.gg for rewards
+- `/prestige` - reset score for cosmetic prestige stars (requires 1290)
+- `/optout` / `/optin` - data privacy
 - `/decree` - receive an official proclamation
 - `/guide` - full in-bot documentation
-- `/disclaimer` - legal and ethical disclaimer
-- `/botinfo` · `/uptime` · `/ping` · `/credits`
+- `/disclaimer` · `/botinfo` · `/uptime` · `/ping` · `/credits` · `/invite`
 
 **Moderator (prefix)**
 
 - `ccp initialize` - register all current members
 - `ccp adjust <@citizen> <delta> <reason>` - manual score adjustment
 - `ccp reset <@citizen>` - reset to 750
-- `ccp threshold <n>` - set fundraiser vote threshold (default 3)
-
+- `ccp threshold <n>` - set fundraiser vote threshold
+- `ccp executions [#channel]` - set execution announcement channel
+- `ccp achievementnotification [on|off]` - toggle achievement announcements
+- `ccp achievementchannel [#channel]` - set achievement announcement channel
 - `ccp poster` - display a random propaganda poster
-- `ccp posters` - toggle daily poster broadcasts in this channel
+- `ccp posters [on|off]` - toggle daily poster broadcasts in this channel
+- `ccp posterschannel [#channel]` - set dedicated poster broadcast channel
 - `/propaganda start <submit_channel> <reveal_channel> <duration_hours>` - start a propaganda event
+- `/serverrank visibility` - opt into the public server leaderboard
 
-# Feature requests
+---
 
-Just message me on discord under `saguny` if you have any requests or changes or additions or whatever
+## Web Dashboard
+
+A standalone public dashboard at port 8080. Live score feed, activity charts, economy stats, and a timeline - all fully anonymized (real Discord IDs replaced with stable pseudonyms).
+
+The `/admin` panel (IP-allowlist + token gated) provides server management: manual score/yuan adjustments, bot sync, cog reload, user lookup, broadcast embeds, and a vote timeline chart.
+
+---
+
+## Self-Hosting
+
+Requires Python 3.10+, PostgreSQL, and Redis.
+
+```
+DISCORD_TOKEN=...
+DATABASE_URL=postgresql://...
+REDIS_URL=redis://...
+ADMIN_TOKEN=...
+PSEUDONYM_SALT=...          # random secret for anonymizing public dashboard IDs
+PORT=8080
+TOPGG_WEBHOOK_SECRET=...    # optional
+TOPGG_TOKEN=...             # optional
+ADMIN_ALLOWED_IPS=...       # optional, comma-separated IP allowlist for /admin
+```
+
+Run three processes:
+
+```bash
+python bot.py           # gateway - slash commands, message scoring
+python scheduler.py     # scheduler - decay, daily jobs, background loops
+python web_service.py   # web dashboard
+```
+
+On Railway, create three separate services pointing at the same repo. Set `RUN_MODE=scheduler` on the scheduler service. Attach the public domain to the web service only.
