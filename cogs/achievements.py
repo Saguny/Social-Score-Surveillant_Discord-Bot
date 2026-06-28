@@ -89,8 +89,10 @@ class AchievementsCog(commands.Cog, name="Achievements"):
         grouped = achievements_by_category()
         categories = list(grouped.keys())
         author_name = await self.bot.format_user_full(target, gid)
-        unlock_counts, total_citizens = await asyncio.gather(
-            self.db.get_achievement_counts(), self.db.get_total_citizen_count()
+        unlock_counts, total_citizens, (server_rank, rank_total) = await asyncio.gather(
+            self.db.get_achievement_counts(),
+            self.db.get_total_citizen_count(),
+            self.db.get_achievement_server_rank(gid, target.id),
         )
 
         def pct_line(aid: str) -> str:
@@ -98,6 +100,24 @@ class AchievementsCog(commands.Cog, name="Achievements"):
                 return ""
             pct = (unlock_counts.get(aid, 0) / total_citizens) * 100
             return f"\n{pct:.1f}% of citizens have this achievement"
+
+        def build_overview_embed() -> discord.Embed:
+            total = len(ACHIEVEMENTS)
+            total_unlocked = len(unlocked)
+            pct = (total_unlocked / total * 100) if total > 0 else 0.0
+            e = discord.Embed(
+                title="STATE DECORATIONS",
+                description="中华人民共和国社会信用局",
+                color=0xFFD700,
+            )
+            e.set_author(name=f"{author_name} · OVERVIEW", icon_url=target.display_avatar.url)
+            e.set_thumbnail(url="attachment://achievements.png")
+            e.add_field(name="TOTAL UNLOCKED", value=f"{total_unlocked} / {total}", inline=True)
+            e.add_field(name="COMPLETION", value=f"{pct:.1f}%", inline=True)
+            if server_rank > 0:
+                e.add_field(name="SERVER RANK", value=f"#{server_rank} of {rank_total}", inline=True)
+            e.set_footer(text=f"{total_unlocked}/{total} total decorations on record")
+            return e
 
         def build_embed(category: str) -> discord.Embed:
             e = discord.Embed(
@@ -136,11 +156,22 @@ class AchievementsCog(commands.Cog, name="Achievements"):
 
             def _refresh_buttons(self_v):
                 self_v.clear_items()
+                ov_style = discord.ButtonStyle.primary if self_v.active == "OVERVIEW" else discord.ButtonStyle.secondary
+                ov_btn = discord.ui.Button(label="OVERVIEW", style=ov_style)
+                ov_btn.callback = self_v._make_overview_cb()
+                self_v.add_item(ov_btn)
                 for cat in categories:
                     style = discord.ButtonStyle.primary if cat == self_v.active else discord.ButtonStyle.secondary
                     btn = discord.ui.Button(label=cat.upper(), style=style)
                     btn.callback = self_v._make_cb(cat)
                     self_v.add_item(btn)
+
+            def _make_overview_cb(self_v):
+                async def callback(itr: discord.Interaction):
+                    self_v.active = "OVERVIEW"
+                    self_v._refresh_buttons()
+                    await itr.response.edit_message(embed=build_overview_embed(), view=self_v)
+                return callback
 
             def _make_cb(self_v, cat: str):
                 async def callback(itr: discord.Interaction):
@@ -150,7 +181,7 @@ class AchievementsCog(commands.Cog, name="Achievements"):
                 return callback
 
         file = discord.File("images/achievements.png", filename="achievements.png")
-        await interaction.followup.send(file=file, embed=build_embed(categories[0]), view=CategoryView(categories[0]))
+        await interaction.followup.send(file=file, embed=build_overview_embed(), view=CategoryView("OVERVIEW"))
 
 
 def build_announce_embeds(ids: list[str], user: discord.abc.User) -> list[discord.Embed]:

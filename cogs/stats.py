@@ -250,8 +250,11 @@ class Stats(commands.Cog):
                 badge_id = next((b for b in priority if b in cosmetic_badges), None)
                 if not badge_id:
                     badge_id = cosmetic_badges[0]
-            if badge_id and badge_id in COSMETIC_META:
-                badge_label = COSMETIC_META[badge_id].get("suffix", "").strip()
+            if badge_id:
+                if badge_id in COSMETIC_META:
+                    badge_label = COSMETIC_META[badge_id].get("suffix", "").strip() or None
+                else:
+                    badge_label = badge_id.lstrip(" |").strip() or None
 
         try:
             avatar_bytes = await target.display_avatar.with_size(128).read()

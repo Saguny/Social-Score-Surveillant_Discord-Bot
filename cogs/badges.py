@@ -22,14 +22,14 @@ class BadgesCog(commands.Cog, name="Badges"):
     @badge.command(name="select", description="Choose which badge to display next to your name")
     @app_commands.describe(choice="The badge to display")
     async def select(self, interaction: discord.Interaction, choice: str):
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer()
         owned = set(await self.db.get_cosmetic_badges(interaction.user.id))
         if choice not in owned:
             await interaction.followup.send("You do not own that badge.", ephemeral=True)
             return
         await self.db.set_badge_preference(interaction.user.id, choice)
         await interaction.followup.send(
-            f"Your displayed badge is now **{_display_name(choice)}**.", ephemeral=True
+            f"{interaction.user.mention} is now displaying **{_display_name(choice)}**."
         )
 
     @select.autocomplete("choice")

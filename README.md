@@ -107,7 +107,7 @@ Most items can optionally target another citizen. Several items are gift-able.
 
 **Prestige** - reach score 1290 and `/prestige` to reset score and Yuan in the current server for cosmetic prestige stars (global counter).
 
-**Server ranking** - `/serverrank` - guild-vs-guild leaderboard across 6 metrics: happiness, GDP, civic participation, literacy, incarceration rate, and politburo score. Bracket system: Hamlet → Village → Town → City → Metropolis.
+**Server ranking** - `/serverrank` - guild-vs-guild leaderboard across 6 metrics: happiness, GDP, civic participation, literacy, incarceration rate, and politburo score. Bracket system: Hamlet -> Village -> Town -> City -> Metropolis.
 
 **Privacy** - `/optout` atomically deletes all your data and blocks further data collection. `/optin` starts you fresh.
 
