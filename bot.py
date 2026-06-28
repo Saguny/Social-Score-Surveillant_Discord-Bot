@@ -580,7 +580,10 @@ class SocialCreditBot(commands.AutoShardedBot):
                     break
         if channel is not None:
             try:
-                await channel.send("The Bureau has been added. Run `/guide` to get started.")
+                await channel.send(
+                    "The Bureau has been added. Run `/guide` to get started.\n"
+                    "Use `/serverrank visibility on` to display your server on the [global leaderboard](https://socialcredit-dashboard.up.railway.app/leaderboards)."
+                )
             except discord.Forbidden:
                 pass
 
