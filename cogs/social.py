@@ -120,68 +120,66 @@ class Social(commands.Cog):
         a_rank = get_rank(a_stats["score"])["name"]
         b_rank = get_rank(b_stats["score"])["name"]
 
+        W = 20
+        L = 20
+        TOTAL = 2 * W + L + 6  # 66
+
+        def _trunc(s: str, w: int) -> str:
+            return s if len(s) <= w else s[:w - 1] + "…"
+
         categories = [
-            ("LOYALTY SCORE",  f"{a_stats['score']:.2f}",        f"{b_stats['score']:.2f}",        a_stats["score"],        b_stats["score"]),
-            ("RANK",           a_rank,                            b_rank,                            a_stats["score"],        b_stats["score"]),
-            ("WEALTH",         f"¥{a_stats['yuan']:,}",           f"¥{b_stats['yuan']:,}",           a_stats["yuan"],         b_stats["yuan"]),
-            ("CHECK-IN STREAK",f"{a_stats['checkin_streak']}d",   f"{b_stats['checkin_streak']}d",   a_stats["checkin_streak"],b_stats["checkin_streak"]),
-            ("MESSAGES",       f"{a_stats['message_count']:,}",   f"{b_stats['message_count']:,}",   a_stats["message_count"],b_stats["message_count"]),
-            ("COMMENDATIONS",  str(a_stats["times_endorsed"]),    str(b_stats["times_endorsed"]),    a_stats["times_endorsed"],b_stats["times_endorsed"]),
-            ("ACHIEVEMENTS",   str(a_stats["achievements"]),      str(b_stats["achievements"]),      a_stats["achievements"], b_stats["achievements"]),
-            ("PRESTIGE",       str(a_stats["prestige"]),          str(b_stats["prestige"]),          a_stats["prestige"],     b_stats["prestige"]),
+            ("LOYALTY SCORE",   f"{a_stats['score']:.2f}",        f"{b_stats['score']:.2f}",        a_stats["score"],          b_stats["score"]),
+            ("RANK",            a_rank,                            b_rank,                            a_stats["score"],          b_stats["score"]),
+            ("WEALTH",          f"¥{a_stats['yuan']:,}",           f"¥{b_stats['yuan']:,}",           a_stats["yuan"],           b_stats["yuan"]),
+            ("CHECK-IN STREAK", f"{a_stats['checkin_streak']}d",   f"{b_stats['checkin_streak']}d",   a_stats["checkin_streak"], b_stats["checkin_streak"]),
+            ("MESSAGES",        f"{a_stats['message_count']:,}",   f"{b_stats['message_count']:,}",   a_stats["message_count"],  b_stats["message_count"]),
+            ("COMMENDATIONS",   str(a_stats["times_endorsed"]),    str(b_stats["times_endorsed"]),    a_stats["times_endorsed"], b_stats["times_endorsed"]),
+            ("ACHIEVEMENTS",    str(a_stats["achievements"]),      str(b_stats["achievements"]),      a_stats["achievements"],   b_stats["achievements"]),
+            ("PRESTIGE",        str(a_stats["prestige"]),          str(b_stats["prestige"]),          a_stats["prestige"],       b_stats["prestige"]),
         ]
 
-        COL = 18
-        LABEL_COL = 16
+        a_name = _trunc(a_user.display_name, W)
+        b_name = _trunc(b_user.display_name, W)
 
-        a_name = a_user.display_name[:COL]
-        b_name = b_user.display_name[:COL]
-
-        header_a = a_name.rjust(COL)
-        header_b = b_name.ljust(COL)
-        sep = "─" * COL + "┼" + "─" * (LABEL_COL + 4) + "┼" + "─" * COL
+        title_inner = " BUREAU LOYALTY EVALUATION "
+        side = (TOTAL - 2 - len(title_inner)) // 2
+        top = "╔" + "═" * side + title_inner + "═" * (TOTAL - 2 - len(title_inner) - side) + "╗"
+        sep = "─" * (W + 2) + "┼" + "─" * L + "┼" + "─" * (W + 2)
 
         lines = [
-            "╔══════════ BUREAU LOYALTY EVALUATION ══════════╗",
-            f"  {header_a}  │  {'CATEGORY':^{LABEL_COL}}  │  {header_b}",
+            top,
+            f"{a_name:>{W}}  │{'CATEGORY':^{L}}│  {b_name:<{W}}",
             sep,
         ]
 
-        a_wins = 0
-        b_wins = 0
+        a_wins = b_wins = 0
         for label, a_val, b_val, a_raw, b_raw in categories:
+            a_disp = _trunc(str(a_val), W)
+            b_disp = _trunc(str(b_val), W)
             if a_raw > b_raw:
-                indicator_a, indicator_b = "◄", " "
+                ind_a, ind_b = "◄", " "
                 a_wins += 1
             elif b_raw > a_raw:
-                indicator_a, indicator_b = " ", "►"
+                ind_a, ind_b = " ", "►"
                 b_wins += 1
             else:
-                indicator_a, indicator_b = "·", "·"
-
-            line = f"  {a_val:>{COL-2}} {indicator_a} │  {label:^{LABEL_COL}}  │ {indicator_b} {b_val:<{COL-2}}"
-            lines.append(line)
+                ind_a, ind_b = "·", "·"
+            lines.append(f"{a_disp:>{W}} {ind_a}│{label:^{L}}│{ind_b} {b_disp:<{W}}")
 
         lines.append(sep)
 
         if a_wins > b_wins:
             gap = a_wins - b_wins
-            if gap >= 5:
-                verdict = f"{a_name} is an exemplary servant of the state."
-            else:
-                verdict = f"{a_name} demonstrates superior loyalty."
-            lines.append(f"  VERDICT  ►  {verdict}")
+            verdict = f"{a_name} is an exemplary servant of the state." if gap >= 5 else f"{a_name} demonstrates superior loyalty."
         elif b_wins > a_wins:
             gap = b_wins - a_wins
-            if gap >= 5:
-                verdict = f"{b_name} is an exemplary servant of the state."
-            else:
-                verdict = f"{b_name} demonstrates superior loyalty."
-            lines.append(f"  VERDICT  ►  {verdict}")
+            verdict = f"{b_name} is an exemplary servant of the state." if gap >= 5 else f"{b_name} demonstrates superior loyalty."
         else:
-            lines.append(f"  VERDICT  ►  Both citizens are equally loyal to the state.")
+            verdict = "Both citizens are equally loyal to the state."
 
-        lines.append("╚════════════════════════════════════════════════╝")
+        prefix = "  VERDICT  ►  "
+        lines.append(prefix + _trunc(verdict, TOTAL - len(prefix)))
+        lines.append("╚" + "═" * (TOTAL - 2) + "╝")
 
         code_block = "```\n" + "\n".join(lines) + "\n```"
 
@@ -198,7 +196,9 @@ class Social(commands.Cog):
         img_bytes = await loop.run_in_executor(None, render_compare_banner, a_av, b_av)
 
         file = discord.File(io.BytesIO(img_bytes), filename="compare.png")
-        await interaction.followup.send(content=code_block, file=file)
+        embed = discord.Embed(description=code_block, color=0xCC0000)
+        embed.set_image(url="attachment://compare.png")
+        await interaction.followup.send(embed=embed, file=file)
 
 
 async def setup(bot: commands.Bot):
