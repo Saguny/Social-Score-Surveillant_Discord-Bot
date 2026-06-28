@@ -80,7 +80,7 @@ class CheckIn(commands.Cog):
         elif streak > 1:
             embed.add_field(name="NEXT", value=f"¥{next_yuan:,} · +{next_score:.2f}", inline=False)
         embed.set_thumbnail(url="attachment://checkin.png")
-        embed.set_footer(text="/vote on top.gg for bonus Yuan and score · GLORY TO THE CCP!")
+        embed.set_footer(text="/vote for a 2x yuan and score boost · GLORY TO THE CCP!")
         embed.timestamp = discord.utils.utcnow()
         await interaction.followup.send(embed=embed, file=discord.File("images/checkin.png", filename="checkin.png"))
 
