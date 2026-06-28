@@ -36,7 +36,7 @@ def _embed_init(self, **kwargs):
     _orig_embed_init(self, **kwargs)
     roll = random.random()
     if roll < FOOTER_VOTE_NUDGE_CHANCE:
-        self.set_footer(text="Use /vote for rewards!")
+        self.set_footer(text="/vote for 2x yuan and social credit acquisition")
     elif roll < FOOTER_VOTE_NUDGE_CHANCE + FOOTER_CHECKIN_NUDGE_CHANCE:
         self.set_footer(text="Don't forget to /checkin!")
     else:

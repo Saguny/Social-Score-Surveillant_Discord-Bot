@@ -404,10 +404,13 @@ class Scoring(commands.Cog):
         is_flagged = bool(reasons)
         is_support = self._is_support_member(uid)
 
+        vote_boost = bool(await cache_get(f"voteboost:{uid}"))
         yuan_gain = 0 if is_flagged else YUAN_PER_MESSAGE
         if yuan_gain > 0:
             if is_support:
                 yuan_gain = round(yuan_gain * SUPPORT_YUAN_MULTIPLIER)
+            if vote_boost:
+                yuan_gain *= 2
             yuan_gain = await self._apply_yuan_diminishing(gid, uid, yuan_gain, exempt=is_support)
         user_row = await self.db.tick_user(gid, uid, yuan_gain)
 
@@ -456,9 +459,12 @@ class Scoring(commands.Cog):
                 daily_net, msg_count = tracking["net"], tracking["count"]
 
         if delta > 0:
+            if vote_boost:
+                delta = round(delta * 2, 2)
             if daily_net >= DAILY_NET_DIMINISHING_THRESHOLD:
                 delta = round(delta * DAILY_MSG_DIMINISHING_FACTOR, 2)
-            headroom = DAILY_MSG_SCORE_CAP - daily_net
+            effective_cap = DAILY_MSG_SCORE_CAP * (2 if vote_boost else 1)
+            headroom = effective_cap - daily_net
             if headroom <= 0.0:
                 await cache_set(
                     track_key,

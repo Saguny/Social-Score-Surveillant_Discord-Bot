@@ -6,6 +6,7 @@ from discord import app_commands
 from discord.ext import commands
 from cogs.achievements import unlock as unlock_achievement, check_milestone
 from infra.guild_notify import publish_guild_notify
+from infra.redis_cache import cache_set
 
 VOTE_URL = "https://top.gg/bot/856163780265902151/vote"
 VOTE_SCORE_BASE = 2.0
@@ -14,7 +15,7 @@ VOTE_STREAK_YUAN_STEP = 150
 VOTE_STREAK_YUAN_CAP = 4500
 VOTE_STREAK_SCORE_STEP = 0.05
 VOTE_STREAK_SCORE_CAP = 4.0
-VOTE_WEEKEND_MULTIPLIER = 2
+VOTE_WEEKEND_MULTIPLIER = 3
 VOTE_CHECKIN_COMBO_YUAN = 500
 VOTE_CHECKIN_COMBO_SCORE = 0.5
 VOTE_BADGE = "voter"
@@ -161,6 +162,7 @@ async def process_vote(bot: commands.Bot, user_id: int):
         return
 
     await db.add_temporary_cosmetic_badge(user_id, VOTE_BADGE, expires_at)
+    await cache_set(f"voteboost:{user_id}", "1", ex=VOTE_COOLDOWN)
 
     lines = [
         f"Your vote has been logged with the bureau. You have received +¥{yuan_reward:,}, "
@@ -178,6 +180,7 @@ async def process_vote(bot: commands.Bot, user_id: int):
             f"✅ Checked in today too, an extra +¥{VOTE_CHECKIN_COMBO_YUAN:,} / +{VOTE_CHECKIN_COMBO_SCORE:.2f} "
             f"combo bonus was applied in the server(s) where you checked in."
         )
+    lines.append("⚡ Vote boost active for 12h: 2× score and yuan earned from chat messages.")
 
     embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")
     embed.add_field(
@@ -217,7 +220,7 @@ class Voting(commands.Cog):
         if time.gmtime().tm_wday >= 5:
             embed.add_field(
                 name="WEEKEND BONUS ACTIVE",
-                value="2× all rewards right now · Today and tomorrow only",
+                value="3× all rewards right now · Today and tomorrow only",
                 inline=False,
             )
         embed.add_field(
