@@ -41,10 +41,12 @@ def _roll_weighted() -> tuple[str, dict]:
     cid     = random.choices(keys, weights=weights)[0]
     return cid, _CHARS[cid]
 
-CLAIM_WINDOW   = 60
-ROLL_WINDOW    = 3600
-BASE_ROLLS     = 10
+CLAIM_WINDOW     = 60
+ROLL_WINDOW      = 3600
+BASE_ROLLS       = 10
+MAX_CLAIMS_PER_HOUR = 1
 MAX_STREAK_BONUS = 4
+HAREM_PAGE_SIZE  = 15
 BROWSE_PAGE_SIZE = 10
 WISHLIST_MAX   = 20
 
@@ -289,6 +291,93 @@ class BrowseView(discord.ui.View):
         await interaction.response.edit_message(embed=self.build_embed(), view=self)
 
 
+# ── Harem ──────────────────────────────────────────────────────────────────────
+
+class HaremView(discord.ui.View):
+    def __init__(
+        self,
+        entries: list[tuple[str, dict]],
+        user_name: str,
+        thumb_url: str | None,
+        icon_url: str | None,
+        total: int,
+    ):
+        super().__init__(timeout=120)
+        self.entries       = entries
+        self.user_name     = user_name
+        self.thumb_url     = thumb_url
+        self.icon_url      = icon_url
+        self.total         = total
+        self.page          = 0
+        self.faction_filter: str | None = None
+        self.filtered      = entries
+        self._rebuild()
+
+    @property
+    def _total_pages(self) -> int:
+        return max(1, (len(self.filtered) + HAREM_PAGE_SIZE - 1) // HAREM_PAGE_SIZE)
+
+    def _rebuild(self):
+        self.clear_items()
+
+        factions = sorted({ch["faction"] for _, ch in self.entries})
+        options  = [discord.SelectOption(label="All Factions", value="all", default=self.faction_filter is None)]
+        for f in factions:
+            options.append(discord.SelectOption(
+                label=FACTION_LABEL.get(f, f.upper()),
+                value=f,
+                default=self.faction_filter == f,
+            ))
+        sel = discord.ui.Select(placeholder="Filter by faction…", options=options, row=0)
+        sel.callback = self._on_faction
+        self.add_item(sel)
+
+        prev = discord.ui.Button(label="◀", style=discord.ButtonStyle.secondary, disabled=self.page == 0, row=1)
+        prev.callback = self._on_prev
+        self.add_item(prev)
+
+        nxt = discord.ui.Button(label="▶", style=discord.ButtonStyle.secondary, disabled=self.page >= self._total_pages - 1, row=1)
+        nxt.callback = self._on_next
+        self.add_item(nxt)
+
+    async def _on_faction(self, interaction: discord.Interaction):
+        value = interaction.data["values"][0]
+        self.faction_filter = None if value == "all" else value
+        self.filtered = [(cid, ch) for cid, ch in self.entries if self.faction_filter is None or ch["faction"] == self.faction_filter]
+        self.page = 0
+        self._rebuild()
+        await interaction.response.edit_message(embed=self._build_embed(), view=self)
+
+    async def _on_prev(self, interaction: discord.Interaction):
+        self.page -= 1
+        self._rebuild()
+        await interaction.response.edit_message(embed=self._build_embed(), view=self)
+
+    async def _on_next(self, interaction: discord.Interaction):
+        self.page += 1
+        self._rebuild()
+        await interaction.response.edit_message(embed=self._build_embed(), view=self)
+
+    def _build_embed(self) -> discord.Embed:
+        start = self.page * HAREM_PAGE_SIZE
+        page_entries = self.filtered[start:start + HAREM_PAGE_SIZE]
+        lines = [f"{_stars(ch['rarity'])} **{ch['name']}**" for _, ch in page_entries]
+        embed = discord.Embed(
+            description=f"{self.total} waifu{'s' if self.total != 1 else ''} collected",
+            color=0xCC0000,
+        )
+        embed.set_author(name=f"{self.user_name}'s Harem", icon_url=self.icon_url)
+        if self.thumb_url:
+            embed.set_thumbnail(url=self.thumb_url)
+        embed.add_field(name="", value="\n".join(lines) or "No waifus match.", inline=False)
+        embed.set_footer(text=f"Page {self.page + 1}/{self._total_pages}")
+        return embed
+
+    async def on_timeout(self):
+        for item in self.children:
+            item.disabled = True
+
+
 # ── Trade ──────────────────────────────────────────────────────────────────────
 
 class TradeView(discord.ui.View):
@@ -516,6 +605,23 @@ class GachaCog(commands.Cog, name="Gacha"):
             "dupe":      dupe,
         })
         await r.set(f"gacha:pending:{msg.id}", pending, ex=CLAIM_WINDOW)
+
+        if not dupe:
+            jump_url = getattr(msg, "jump_url", None)
+            guild = self.bot.get_guild(guild_id)
+            if jump_url and guild:
+                watchers = await self.db.get_wishlist_watchers(guild_id, char_id)
+                for watcher_id in watchers:
+                    if watcher_id == user_id:
+                        continue
+                    try:
+                        watcher = guild.get_member(watcher_id) or await self.bot.fetch_user(watcher_id)
+                        await watcher.send(
+                            f"**{char['name']}** {_stars(char['rarity'])} from your wishlist just appeared in **{guild.name}**!\n"
+                            f"{jump_url}"
+                        )
+                    except (discord.Forbidden, discord.HTTPException):
+                        pass
 
 
     async def _show_top(self, send_fn):
@@ -795,9 +901,9 @@ class GachaCog(commands.Cog, name="Gacha"):
             await self._show_card(name, ctx.send)
 
     @commands.command(name="harem", aliases=["collection"])
-    async def prefix_collection(self, ctx: commands.Context):
+    async def prefix_collection(self, ctx: commands.Context, user: discord.Member = None):
         async with ctx.typing():
-            await self._show_collection(ctx.guild.id, ctx.author, ctx.send)
+            await self._show_collection(ctx.guild.id, user or ctx.author, ctx.send)
 
     @commands.command(name="choose")
     async def prefix_choose(self, ctx: commands.Context, *, name: str = ""):
@@ -927,8 +1033,28 @@ class GachaCog(commands.Cog, name="Gacha"):
         r = get_redis()
         key = f"gacha:pending:{payload.message_id}"
 
+        ttl = await r.ttl(key)
         raw = await r.getdel(key)
         if raw is None:
+            return
+
+        claim_key = f"gacha:claims:{payload.guild_id}:{payload.user_id}"
+        claims_used = await r.incr(claim_key)
+        if claims_used == 1:
+            secs_to_next_hour = 3600 - (int(time.time()) % 3600)
+            await r.expire(claim_key, secs_to_next_hour)
+        if claims_used > MAX_CLAIMS_PER_HOUR:
+            await r.decr(claim_key)
+            await r.set(key, raw, ex=max(1, ttl))
+            try:
+                channel = self.bot.get_channel(payload.channel_id) or await self.bot.fetch_channel(payload.channel_id)
+                mins = max(1, (await r.ttl(claim_key) + 59) // 60)
+                await channel.send(
+                    f"<@{payload.user_id}> You've already claimed your character for this hour. **{mins} min** left.",
+                    delete_after=10,
+                )
+            except (discord.NotFound, discord.HTTPException):
+                pass
             return
 
         try:
@@ -1050,7 +1176,7 @@ class GachaCog(commands.Cog, name="Gacha"):
         rows = await self.db.get_user_collection(guild_id, user.id)
         name = user.display_name if hasattr(user, "display_name") else str(user)
         if not rows:
-            await send_fn(f"**{name}** has no waifus yet. Use `ccp roll` to start collecting!")
+            await send_fn(f"**{name}** has no waifus yet. Use `/roll` to start collecting!")
             return
 
         chosen_id = await self.db.get_harem_thumbnail(guild_id, user.id)
@@ -1062,32 +1188,18 @@ class GachaCog(commands.Cog, name="Gacha"):
                     thumb_char = c
                     break
 
-        by_faction: dict[str, list[str]] = {}
+        thumb_url = _pick_image(thumb_char) if thumb_char else None
+        icon_url  = user.display_avatar.url if hasattr(user, "display_avatar") else None
+
+        entries = []
         for row in rows:
             char = _get_personality(row["character_id"])
-            if not char:
-                continue
-            by_faction.setdefault(char["faction"], []).append(
-                f"{_stars(char['rarity'])} {char['name']}"
-            )
+            if char:
+                entries.append((row["character_id"], char))
+        entries.sort(key=lambda x: (RARITY_ORDER.index(x[1].get("rarity", "common")), x[1]["name"]))
 
-        embed = discord.Embed(
-            description=f"{len(rows)} waifu{'s' if len(rows) != 1 else ''} collected",
-            color=0xCC0000,
-        )
-        embed.set_author(
-            name=f"{name}'s Harem",
-            icon_url=user.display_avatar.url if hasattr(user, "display_avatar") else None,
-        )
-        if thumb_char and (img := _pick_image(thumb_char)):
-            embed.set_thumbnail(url=img)
-        for faction, names in by_faction.items():
-            embed.add_field(
-                name=FACTION_LABEL.get(faction, faction.upper()),
-                value="\n".join(names),
-                inline=True,
-            )
-        await send_fn(embed=embed)
+        view = HaremView(entries, name, thumb_url, icon_url, len(rows))
+        await send_fn(embed=view._build_embed(), view=view)
 
     async def _do_choose(self, guild_id: int, user: discord.Member | discord.User, name: str, send_fn):
         char = _search_personality(name)

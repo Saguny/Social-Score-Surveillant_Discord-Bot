@@ -369,6 +369,9 @@ _WIKI_CATEGORIES = [
     "Businesspeople",
     "Billionaires",
     "Bankers",
+    "American_technology_entrepreneurs",
+    "Internet_entrepreneurs",
+    "American_chief_executives",
     # ── Explorers & adventurers ───────────────────────────────────────────────
     "Aviators",
     "Astronauts",
@@ -1199,6 +1202,60 @@ async def clear_images(dry_run: bool) -> None:
     print("Done. Now run: python scripts/populate_gacha.py --refresh-images")
 
 
+async def _add_characters(names: list[str], dry_run: bool) -> None:
+    """Force-add specific people by Wikipedia article name."""
+    if not dry_run and not R2_TOKEN:
+        print("ERROR: R2_TOKEN not set. Use --dry-run or export R2_TOKEN=...")
+        sys.exit(1)
+
+    conn = await _db_connect()
+    existing_wikis = await _db_existing_wikis(conn)
+    existing_ids   = await _db_existing_ids(conn)
+    taken_ids      = set(existing_ids)
+
+    wiki_sem = asyncio.Semaphore(4)
+    r2_sem   = asyncio.Semaphore(4)
+
+    async with aiohttp.ClientSession() as r2_session:
+        for name in names:
+            slug = name.replace(" ", "_")
+            if slug in existing_wikis:
+                print(f"  SKIP (already exists): {name}")
+                continue
+            item = {"slug": slug, "name": name, "sitelinks": 30}
+            result = await process_one(item, r2_session, wiki_sem, r2_sem, dry_run)
+            if result is None:
+                print(f"  SKIP (no data/image): {name}")
+                continue
+            char_name, char = result
+            cid = make_char_id(char_name, taken_ids)
+            taken_ids.add(cid)
+            img = "+" if char["image_urls"] else "-"
+            print(f"  [{img}img] {char_name:<36} {char['faction']:<13} {char['rarity']}")
+            if not dry_run:
+                await _db_upsert(conn, cid, char)
+
+    await conn.close()
+    print("Done. Run `reload cogs.gacha` in the bot console to apply.")
+
+
+async def _delete_character(name_or_id: str) -> None:
+    conn = await _db_connect()
+    row = await conn.fetchrow(
+        "SELECT character_id, name FROM gacha_characters "
+        "WHERE character_id = $1 OR LOWER(name) = LOWER($1) LIMIT 1",
+        name_or_id,
+    )
+    if not row:
+        print(f"Character not found: {name_or_id!r}")
+        await conn.close()
+        return
+    await conn.execute("DELETE FROM gacha_characters WHERE character_id = $1", row["character_id"])
+    await conn.close()
+    print(f"Deleted: {row['name']} ({row['character_id']})")
+    print("Run `reload gacha` in the bot console (or restart) to apply the change.")
+
+
 async def _toggle_character(name_or_id: str, enabled: bool) -> None:
     conn = await _db_connect()
     row = await conn.fetchrow(
@@ -1232,12 +1289,20 @@ if __name__ == "__main__":
                     help="Backfill existing characters with up to 5 images each (skips new character discovery)")
     ap.add_argument("--clear-images", action="store_true",
                     help="Delete all R2 gacha images and wipe image_urls in personalities.py")
+    ap.add_argument("--add", metavar="NAME", nargs="+",
+                    help="Force-add specific people by Wikipedia article name")
+    ap.add_argument("--delete",  metavar="NAME_OR_ID",
+                    help="Permanently delete a character by name or ID")
     ap.add_argument("--disable", metavar="NAME_OR_ID",
                     help="Soft-disable a character by name or ID (no reload needed after next cog reload)")
     ap.add_argument("--enable",  metavar="NAME_OR_ID",
                     help="Re-enable a previously disabled character by name or ID")
     args = ap.parse_args()
-    if args.disable:
+    if args.add:
+        asyncio.run(_add_characters(args.add, args.dry_run))
+    elif args.delete:
+        asyncio.run(_delete_character(args.delete))
+    elif args.disable:
         asyncio.run(_toggle_character(args.disable, False))
     elif args.enable:
         asyncio.run(_toggle_character(args.enable, True))
