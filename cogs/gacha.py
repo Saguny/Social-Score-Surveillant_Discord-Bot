@@ -1198,7 +1198,11 @@ class GachaCog(commands.Cog, name="Gacha"):
                 entries.append((row["character_id"], char))
         entries.sort(key=lambda x: (RARITY_ORDER.index(x[1].get("rarity", "common")), x[1]["name"]))
 
-        view = HaremView(entries, name, thumb_url, icon_url, len(rows))
+        if not entries:
+            await send_fn(f"**{name}** has no waifus yet. Use `/roll` to start collecting!")
+            return
+
+        view = HaremView(entries, name, thumb_url, icon_url, len(entries))
         await send_fn(embed=view._build_embed(), view=view)
 
     async def _do_choose(self, guild_id: int, user: discord.Member | discord.User, name: str, send_fn):
