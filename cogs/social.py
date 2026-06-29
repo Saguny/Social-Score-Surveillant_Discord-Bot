@@ -94,9 +94,15 @@ class Social(commands.Cog):
         await self._rate(interaction, citizen, "rebuke", reason)
 
     @app_commands.command(name="compare", description="Request a Bureau loyalty comparison between two citizens")
-    @app_commands.describe(citizen="Citizen to compare yourself against")
-    async def compare(self, interaction: discord.Interaction, citizen: discord.Member):
-        if citizen.id == interaction.user.id:
+    @app_commands.describe(
+        citizen="First citizen to compare",
+        against="Second citizen to compare (defaults to yourself)",
+    )
+    async def compare(self, interaction: discord.Interaction, citizen: discord.Member, against: discord.Member = None):
+        a_user = citizen
+        b_user = against or interaction.user
+
+        if a_user.id == b_user.id:
             await interaction.response.send_message(
                 "The Bureau does not permit citizens to compare themselves against themselves.", ephemeral=True
             )
@@ -105,8 +111,6 @@ class Social(commands.Cog):
         await interaction.response.defer()
 
         gid = interaction.guild.id
-        a_user = interaction.user
-        b_user = citizen
 
         a_stats, b_stats = await asyncio.gather(
             self.db.get_compare_stats(gid, a_user.id),
@@ -120,7 +124,7 @@ class Social(commands.Cog):
         _RANK_SHORT = {
             "Enemy of the State":   "Enemy",
             "Person of Interest":   "Person",
-            "Unremarkable Citizen": "Unremarkable",
+            "Unremarkable Citizen": "Unremark.",
             "Compliant Citizen":    "Compliant",
             "Model Citizen":        "Model",
             "Party Loyalist":       "Loyalist",
@@ -132,9 +136,9 @@ class Social(commands.Cog):
         a_rank = _RANK_SHORT.get(a_rank_full, a_rank_full)
         b_rank = _RANK_SHORT.get(b_rank_full, b_rank_full)
 
-        W = 12
+        W = 10
         L = 14
-        TOTAL = 2 * W + L + 6  # 44
+        TOTAL = 2 * W + L + 6  # 40
 
         def _trunc(s: str, w: int) -> str:
             return s if len(s) <= w else s[:w - 1] + "…"
