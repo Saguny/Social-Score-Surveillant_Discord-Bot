@@ -1,6 +1,23 @@
 import time
 
 
+def _row_to_char(row) -> dict:
+    return {
+        "name":       row["name"],
+        "title":      row["title"],
+        "faction":    row["faction"],
+        "rarity":     row["rarity"],
+        "quote":      row["quote"],
+        "wiki":       row["wiki"],
+        "stats": {
+            "authority": row["stat_authority"],
+            "military":  row["stat_military"],
+            "charisma":  row["stat_charisma"],
+        },
+        "image_urls": list(row["image_urls"] or []),
+    }
+
+
 class GachaMixin:
     async def claim_character(self, guild_id: int, user_id: int, character_id: str) -> bool:
         async with self._pool.acquire() as conn:
@@ -188,6 +205,24 @@ class GachaMixin:
             )
             return row is not None
 
+    async def get_harem_thumbnail(self, guild_id: int, user_id: int) -> str | None:
+        async with self._pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT value FROM gacha_preferences WHERE guild_id=$1 AND user_id=$2 AND key='thumbnail'",
+                guild_id, user_id,
+            )
+            return row["value"] if row else None
+
+    async def set_harem_thumbnail(self, guild_id: int, user_id: int, character_id: str) -> None:
+        await self._pool.execute(
+            """
+            INSERT INTO gacha_preferences (guild_id, user_id, key, value)
+            VALUES ($1, $2, 'thumbnail', $3)
+            ON CONFLICT (guild_id, user_id, key) DO UPDATE SET value = EXCLUDED.value
+            """,
+            guild_id, user_id, character_id,
+        )
+
     async def get_wishlist_watchers(self, guild_id: int, character_id: str) -> list[int]:
         """Returns user_ids who wishlisted this character in this guild."""
         async with self._pool.acquire() as conn:
@@ -196,3 +231,92 @@ class GachaMixin:
                 guild_id, character_id,
             )
             return [r["user_id"] for r in rows]
+
+    # ── gacha_characters (character pool) ─────────────────────────────────────
+
+    async def get_all_characters(self) -> dict[str, dict]:
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT * FROM gacha_characters WHERE enabled = TRUE ORDER BY character_id"
+            )
+        return {row["character_id"]: _row_to_char(row) for row in rows}
+
+    async def get_gacha_character(self, character_id: str) -> dict | None:
+        async with self._pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT * FROM gacha_characters WHERE character_id = $1",
+                character_id,
+            )
+        return _row_to_char(row) if row else None
+
+    async def upsert_gacha_character(self, character_id: str, data: dict) -> None:
+        s = data.get("stats", {})
+        await self._pool.execute(
+            """
+            INSERT INTO gacha_characters
+                (character_id, name, title, faction, rarity, quote, wiki,
+                 stat_authority, stat_military, stat_charisma, image_urls)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+            ON CONFLICT (character_id) DO UPDATE SET
+                name           = EXCLUDED.name,
+                title          = EXCLUDED.title,
+                faction        = EXCLUDED.faction,
+                rarity         = EXCLUDED.rarity,
+                quote          = EXCLUDED.quote,
+                wiki           = EXCLUDED.wiki,
+                stat_authority = EXCLUDED.stat_authority,
+                stat_military  = EXCLUDED.stat_military,
+                stat_charisma  = EXCLUDED.stat_charisma,
+                image_urls     = EXCLUDED.image_urls
+            """,
+            character_id,
+            data["name"], data["title"], data["faction"], data["rarity"],
+            data.get("quote", ""), data.get("wiki", ""),
+            s.get("authority", 50), s.get("military", 50), s.get("charisma", 50),
+            data.get("image_urls") or [],
+        )
+
+    async def update_gacha_character_images(self, character_id: str, image_urls: list[str]) -> None:
+        await self._pool.execute(
+            "UPDATE gacha_characters SET image_urls = $2 WHERE character_id = $1",
+            character_id, image_urls,
+        )
+
+    async def get_characters_missing_images(self) -> list[tuple[str, str]]:
+        """Returns (character_id, wiki) pairs for characters with no images."""
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT character_id, wiki FROM gacha_characters
+                WHERE enabled = TRUE AND array_length(image_urls, 1) IS NULL AND wiki != ''
+                ORDER BY character_id
+                """
+            )
+        return [(row["character_id"], row["wiki"]) for row in rows]
+
+    async def get_existing_character_ids(self) -> set[str]:
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch("SELECT character_id FROM gacha_characters")
+        return {row["character_id"] for row in rows}
+
+    async def get_existing_wikis(self) -> set[str]:
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch("SELECT wiki FROM gacha_characters WHERE wiki != ''")
+        return {row["wiki"] for row in rows}
+
+    async def set_gacha_character_enabled(self, character_id: str, enabled: bool) -> bool:
+        """Soft-enable or soft-disable a character. Returns True if the row was found."""
+        result = await self._pool.execute(
+            "UPDATE gacha_characters SET enabled = $2 WHERE character_id = $1",
+            character_id, enabled,
+        )
+        return result.split()[-1] != "0"
+
+    async def find_gacha_character_id(self, name_or_id: str) -> str | None:
+        """Resolve a character name or id to its character_id."""
+        async with self._pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT character_id FROM gacha_characters WHERE character_id = $1 OR LOWER(name) = LOWER($1) LIMIT 1",
+                name_or_id,
+            )
+        return row["character_id"] if row else None

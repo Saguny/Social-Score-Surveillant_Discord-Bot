@@ -307,7 +307,7 @@ class GuideView(discord.ui.View):
             name="ROLLING",
             value=(
                 "`ccp roll` · `ccp r` · `/roll` — Roll a random waifu\n"
-                "React with any emoji to claim · **12 rolls per hour** (up to +5 from vote streak)\n"
+                "React with any emoji to claim · **10 rolls per hour** (up to +4 from vote streak)\n"
                 "Voting on Top.gg resets your hourly rolls instantly"
             ),
             inline=False,

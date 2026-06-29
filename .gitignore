@@ -18,3 +18,4 @@ Dockerfile
 docker-compose.yml
 .claude/*
 design/BUREAU_STYLE_GUIDE.md
+scripts/*

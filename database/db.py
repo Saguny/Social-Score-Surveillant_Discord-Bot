@@ -552,3 +552,28 @@ class Database(
                     claim_count  BIGINT  NOT NULL DEFAULT 0
                 )
             """)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS gacha_preferences (
+                    guild_id     BIGINT NOT NULL,
+                    user_id      BIGINT NOT NULL,
+                    key          TEXT   NOT NULL,
+                    value        TEXT   NOT NULL,
+                    PRIMARY KEY (guild_id, user_id, key)
+                )
+            """)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS gacha_characters (
+                    character_id   TEXT PRIMARY KEY,
+                    name           TEXT NOT NULL,
+                    title          TEXT NOT NULL DEFAULT '',
+                    faction        TEXT NOT NULL DEFAULT 'wildcards',
+                    rarity         TEXT NOT NULL DEFAULT 'common',
+                    quote          TEXT NOT NULL DEFAULT '',
+                    wiki           TEXT NOT NULL DEFAULT '',
+                    stat_authority INT  NOT NULL DEFAULT 50,
+                    stat_military  INT  NOT NULL DEFAULT 50,
+                    stat_charisma  INT  NOT NULL DEFAULT 50,
+                    image_urls     TEXT[] NOT NULL DEFAULT '{}',
+                    enabled        BOOLEAN NOT NULL DEFAULT TRUE
+                )
+            """)

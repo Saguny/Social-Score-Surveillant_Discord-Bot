@@ -1,17 +1,19 @@
 """
 Bulk gacha populator.
 
-Discovers historical/political figures via Wikidata SPARQL, fetches their
-Wikipedia images, uploads to Cloudflare R2, and appends new entries to
-config/personalities.py automatically.
+Discovers historical/political figures via Wikipedia categories, fetches their
+images, uploads to Cloudflare R2, and writes new entries directly to the
+gacha_characters DB table.
 
 Usage:
     python scripts/populate_gacha.py              # add up to 500 new chars
     python scripts/populate_gacha.py --limit 2000
     python scripts/populate_gacha.py --dry-run    # preview only, no writes
     python scripts/populate_gacha.py --resume     # skip already-attempted slugs
+    python scripts/populate_gacha.py --refresh-images  # backfill images for DB chars
 
-Env vars (same as upload_gacha_images.py):
+Env vars:
+    DATABASE_URL   — Postgres connection string (required)
     R2_TOKEN, R2_ACCOUNT_ID, R2_BUCKET, R2_PUBLIC_URL
 """
 import argparse
@@ -29,20 +31,17 @@ import urllib.request
 from datetime import datetime, timedelta
 
 import aiohttp
+import asyncpg
 from dotenv import load_dotenv
 
 load_dotenv()
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from config.personalities import PERSONALITIES
 
 R2_TOKEN      = os.getenv("R2_TOKEN", "")
 R2_ACCOUNT_ID = os.getenv("R2_ACCOUNT_ID", "669887f310b5863b8c09e05b37f15243")
 R2_BUCKET     = os.getenv("R2_BUCKET", "social-credit-gacha")
 R2_PUBLIC_URL = os.getenv("R2_PUBLIC_URL", "https://pub-ad86c963b8fe456fbeea7b50a4362d70.r2.dev").rstrip("/")
+DATABASE_URL  = os.getenv("DATABASE_URL", "")
 
-_PERSONALITIES_PATH = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "config", "personalities.py")
-)
 _RESUME_PATH = os.path.join(os.path.dirname(__file__), ".gacha_attempted.json")
 
 _UA = "SocialCreditBot/2.0 (shiroyeshimura@gmail.com; gacha bulk populator)"
@@ -60,6 +59,41 @@ _OCC_QIDS = (
 _SPARQL = None  # unused — replaced by Wikipedia category discovery
 
 _WIKI_CATEGORIES = [
+    # ── Celebrities & entertainers (high-priority — sampled first) ────────────
+    "American_film_actors",
+    "British_film_actors",
+    "American_television_actors",
+    "British_television_actors",
+    "American_pop_singers",
+    "British_pop_singers",
+    "American_rhythm_and_blues_singers",
+    "American_women_singers",
+    "American_men_singers",
+    "American_rappers",
+    "British_rappers",
+    "American_hip_hop_musicians",
+    "American_country_music_singers",
+    "American_rock_singers",
+    "American_talk_show_hosts",
+    "American_television_personalities",
+    "British_television_personalities",
+    "American_women_models",
+    "American_men_models",
+    # ── Athletes (high-priority) ──────────────────────────────────────────────
+    "NBA_players",
+    "American_basketball_players",
+    "American_football_players",
+    "American_professional_wrestlers",
+    "Tennis_players",
+    "Grand_Slam_singles_champions",
+    "Boxing_world_champions",
+    "Olympic_gold_medalists",
+    "Formula_One_drivers",
+    "American_track_and_field_athletes",
+    "Major_League_Baseball_players",
+    "National_Hockey_League_players",
+    "MMA_fighters",
+    "Golfers",
     # ── Heads of state ───────────────────────────────────────────────────────
     "Presidents_of_the_United_States",
     "Prime_ministers_of_the_United_Kingdom",
@@ -369,6 +403,17 @@ _FACTION_KW: dict[str, list[str]] = {
         "conqueror", "warlord", "great khan", "caesar", "war leader",
         "crusade", "invasion", "military conquest", "legionary",
     ],
+    "icons": [
+        "actor", "actress", "singer", "pop star", "rapper", "musician",
+        "entertainer", "performer", "model", "supermodel", "influencer",
+        "television personality", "tv personality", "talk show host",
+        "footballer", "basketball player", "tennis player", "boxer",
+        "athlete", "racing driver", "formula one", "nba", "nfl",
+        "olympian", "olympic", "golfer", "wrestler", "mma fighter",
+        "mixed martial arts", "youtuber", "streamer", "social media",
+        "celebrity", "film actor", "television actor", "comedian",
+        "stand-up", "reality television", "reality tv",
+    ],
     "capitalists": [
         "president", "prime minister", "chancellor", "senator", "congressman",
         "conservative", "tory", "liberal democrat", "centre-right",
@@ -398,6 +443,7 @@ _STATS: dict[str, dict[str, tuple[int, int]]] = {
     "conquerors":  {"authority": (68, 98), "military": (80, 100), "charisma": (48, 86)},
     "strongmen":   {"authority": (78, 96), "military": (48, 86), "charisma": (32, 78)},
     "philosophers":{"authority": (22, 62), "military": (4, 28),  "charisma": (58, 92)},
+    "icons":       {"authority": (18, 55), "military": (2, 18),  "charisma": (72, 99)},
     "wildcards":   {"authority": (28, 80), "military": (4, 62),  "charisma": (58, 98)},
 }
 
@@ -517,7 +563,9 @@ async def discover_figures(fetch_limit: int) -> list[dict]:
     print(f"Scraping Wikipedia categories for up to {fetch_limit} candidates...")
     seen: set[str] = set()
     out: list[dict] = []
-    per_cat = max(300, fetch_limit // len(_WIKI_CATEGORIES) + 20)
+    # Cap per-category so large categories (e.g. American_politicians) don't
+    # consume the entire budget before others are reached.
+    per_cat = min(80, max(30, fetch_limit // len(_WIKI_CATEGORIES) + 10))
     for category in _WIKI_CATEGORIES:
         if len(out) >= fetch_limit:
             break
@@ -932,121 +980,103 @@ async def process_one(
     }
 
 
-# ── Write new entries to personalities.py ─────────────────────────────────────
-def _fmt(cid: str, c: dict) -> str:
-    def q(s): return s.replace("\\", "\\\\").replace('"', '\\"')
-    s = c["stats"]
-    return (
-        f'    "{cid}": {{\n'
-        f'        "name":       "{q(c["name"])}",\n'
-        f'        "title":      "{q(c["title"])}",\n'
-        f'        "faction":    "{c["faction"]}",\n'
-        f'        "rarity":     "{c["rarity"]}",\n'
-        f'        "quote":      "",\n'
-        f'        "stats":      {{"authority": {s["authority"]}, "military": {s["military"]}, "charisma": {s["charisma"]}}},\n'
-        f'        "wiki":       "{q(c["wiki"])}",\n'
-        f'        "image_urls": {json.dumps(c["image_urls"])},\n'
-        f'    }},'
+# ── DB helpers ────────────────────────────────────────────────────────────────
+async def _db_connect() -> asyncpg.Connection:
+    if not DATABASE_URL:
+        print("ERROR: DATABASE_URL not set.")
+        sys.exit(1)
+    return await asyncpg.connect(DATABASE_URL)
+
+
+async def _db_existing_wikis(conn: asyncpg.Connection) -> set[str]:
+    rows = await conn.fetch("SELECT wiki FROM gacha_characters WHERE wiki != ''")
+    return {row["wiki"] for row in rows}
+
+
+async def _db_existing_ids(conn: asyncpg.Connection) -> set[str]:
+    rows = await conn.fetch("SELECT character_id FROM gacha_characters")
+    return {row["character_id"] for row in rows}
+
+
+async def _db_upsert(conn: asyncpg.Connection, cid: str, c: dict) -> None:
+    s = c.get("stats", {})
+    await conn.execute(
+        """
+        INSERT INTO gacha_characters
+            (character_id, name, title, faction, rarity, quote, wiki,
+             stat_authority, stat_military, stat_charisma, image_urls)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+        ON CONFLICT (character_id) DO UPDATE SET
+            name           = EXCLUDED.name,
+            title          = EXCLUDED.title,
+            faction        = EXCLUDED.faction,
+            rarity         = EXCLUDED.rarity,
+            quote          = EXCLUDED.quote,
+            wiki           = EXCLUDED.wiki,
+            stat_authority = EXCLUDED.stat_authority,
+            stat_military  = EXCLUDED.stat_military,
+            stat_charisma  = EXCLUDED.stat_charisma,
+            image_urls     = EXCLUDED.image_urls
+        """,
+        cid,
+        c["name"], c.get("title", ""), c.get("faction", "wildcards"), c.get("rarity", "common"),
+        c.get("quote", ""), c.get("wiki", ""),
+        s.get("authority", 50), s.get("military", 50), s.get("charisma", 50),
+        c.get("image_urls") or [],
     )
-
-
-def write_personalities(new_chars: dict[str, dict], dry_run: bool) -> None:
-    if not new_chars:
-        print("Nothing new to write.")
-        return
-
-    with open(_PERSONALITIES_PATH, "r", encoding="utf-8") as f:
-        content = f.read()
-
-    marker = "\n}\n\nRARITY_WEIGHT"
-    idx = content.rfind(marker)
-    if idx == -1:
-        print("ERROR: Cannot find insertion point in personalities.py — aborting.")
-        return
-
-    block = "\n\n    # ── AUTO-POPULATED ────────────────────────────────────────────────────\n"
-    for cid, c in new_chars.items():
-        block += _fmt(cid, c) + "\n"
-
-    if dry_run:
-        print(f"\n[DRY RUN] Would add {len(new_chars)} entries. Sample (first 3):\n")
-        for cid, c in list(new_chars.items())[:3]:
-            print(_fmt(cid, c))
-            print()
-        return
-
-    with open(_PERSONALITIES_PATH, "w", encoding="utf-8") as f:
-        f.write(content[:idx] + block + content[idx:])
-    print(f"Appended {len(new_chars)} entries to config/personalities.py")
 
 
 # ── Main ───────────────────────────────────────────────────────────────────────
 async def refresh_images(limit: int, dry_run: bool) -> None:
-    """Backfill existing characters with up to 5 images each."""
+    """Backfill DB characters that have no images."""
     if not dry_run and not R2_TOKEN:
         print("ERROR: R2_TOKEN not set. Use --dry-run or export R2_TOKEN=...")
         sys.exit(1)
 
-    targets = [
-        (cid, char) for cid, char in PERSONALITIES.items()
-        if len(char.get("image_urls") or []) < 1 and char.get("wiki")
-    ]
-    print(f"{len(targets)} characters with fewer than 2 images — refreshing up to {limit}")
+    conn = await _db_connect()
+    rows = await conn.fetch(
+        """
+        SELECT character_id, name, wiki FROM gacha_characters
+        WHERE enabled = TRUE AND array_length(image_urls, 1) IS NULL AND wiki != ''
+        ORDER BY character_id
+        """
+    )
+    targets = [(row["character_id"], row["name"], row["wiki"]) for row in rows]
+    await conn.close()
+
+    print(f"{len(targets)} characters with no images — refreshing up to {limit or 'all'}")
     if limit:
         targets = targets[:limit]
 
     wiki_sem = asyncio.Semaphore(2)
     r2_sem   = asyncio.Semaphore(4)
 
-    # Collect all updates in memory first, then write the file once at the end
-    updates: dict[str, list[str]] = {}  # cid -> final image_urls list
-
+    conn = await _db_connect()
     async with aiohttp.ClientSession() as r2_session:
         for i in range(0, len(targets), 20):
             batch = targets[i:i + 20]
-            tasks = [wiki_images(char["wiki"], wiki_sem, max_images=5) for _, char in batch]
+            tasks = [wiki_images(wiki, wiki_sem, max_images=5) for _, _, wiki in batch]
             results = await asyncio.gather(*tasks)
 
-            for (cid, char), img_urls in zip(batch, results):
+            for (cid, name, _), img_urls in zip(batch, results):
                 if not img_urls:
                     continue
                 if not dry_run:
                     uploaded = await upload_r2_multi(r2_session, cid, img_urls, r2_sem)
+                    if not uploaded:
+                        continue
+                    await conn.execute(
+                        "UPDATE gacha_characters SET image_urls = $2 WHERE character_id = $1",
+                        cid, uploaded,
+                    )
+                    print(f"  {name:<36} → {len(uploaded)} images")
                 else:
-                    uploaded = img_urls
-                if not uploaded:
-                    continue
-                print(f"  {char['name']:<36} → {len(uploaded)} images")
-                updates[cid] = uploaded
+                    print(f"  [DRY] {name:<36} → {len(img_urls)} images found")
 
             await asyncio.sleep(1.0)
 
-    print(f"\n{len(updates)} characters have new images.")
-
-    if dry_run or not updates:
-        return
-
-    # Read file once, patch every entry by keying on its cid string, write once
-    with open(_PERSONALITIES_PATH, "r", encoding="utf-8") as f:
-        content = f.read()
-
-    for cid, urls in updates.items():
-        new_json = json.dumps(urls)
-        # Anchor the replacement to the character's own block using its key
-        old_pattern = f'"{cid}": {{\n'
-        idx = content.find(old_pattern)
-        if idx == -1:
-            continue
-        # Find "image_urls" within this character's block (next ~500 chars)
-        block_end = content.find("\n    },", idx)
-        block = content[idx:block_end]
-        new_block = re.sub(r'"image_urls":\s*\[[^\]]*\]', f'"image_urls": {new_json}', block, count=1)
-        content = content[:idx] + new_block + content[block_end:]
-
-    with open(_PERSONALITIES_PATH, "w", encoding="utf-8") as f:
-        f.write(content)
-
-    print(f"Written to personalities.py. Done.")
+    await conn.close()
+    print("Done.")
 
 
 async def main(limit: int, dry_run: bool, resume: bool) -> None:
@@ -1054,8 +1084,9 @@ async def main(limit: int, dry_run: bool, resume: bool) -> None:
         print("ERROR: R2_TOKEN not set. Use --dry-run or export R2_TOKEN=...")
         sys.exit(1)
 
-    existing_slugs = {v["wiki"] for v in PERSONALITIES.values()}
-    existing_ids   = set(PERSONALITIES.keys())
+    conn = await _db_connect()
+    existing_wikis = await _db_existing_wikis(conn)
+    existing_ids   = await _db_existing_ids(conn)
 
     attempted: set[str] = set()
     if resume and os.path.exists(_RESUME_PATH):
@@ -1063,24 +1094,23 @@ async def main(limit: int, dry_run: bool, resume: bool) -> None:
             attempted = set(json.load(f))
         print(f"Resuming — skipping {len(attempted)} previously attempted slugs")
 
-    # Over-fetch from Wikidata to have plenty after dedup
     candidates = await discover_figures(limit * 2)
     candidates = [
         c for c in candidates
-        if c["slug"] not in existing_slugs and c["slug"] not in attempted
+        if c["slug"] not in existing_wikis and c["slug"] not in attempted
     ]
     print(f"After dedup: {len(candidates)} to process (target: {limit})")
 
     wiki_sem = asyncio.Semaphore(6)
     r2_sem   = asyncio.Semaphore(4)
 
-    new_chars: dict[str, dict] = {}
+    added    = 0
     taken_ids = set(existing_ids)
     batch_size = 25
 
     async with aiohttp.ClientSession() as r2_session:
         for batch_start in range(0, len(candidates), batch_size):
-            if len(new_chars) >= limit:
+            if added >= limit:
                 break
 
             batch = candidates[batch_start : batch_start + batch_size]
@@ -1096,13 +1126,12 @@ async def main(limit: int, dry_run: bool, resume: bool) -> None:
                 name, char = result
                 cid = make_char_id(name, taken_ids)
                 taken_ids.add(cid)
-                new_chars[cid] = char
-                n   = len(new_chars)
+                added += 1
                 img = "+" if char["image_urls"] else "-"
-                print(
-                    f"  [{n:>4}] [{img}img] {name:<36} {char['faction']:<13} {char['rarity']}"
-                )
-                if n >= limit:
+                print(f"  [{added:>4}] [{img}img] {name:<36} {char['faction']:<13} {char['rarity']}")
+                if not dry_run:
+                    await _db_upsert(conn, cid, char)
+                if added >= limit:
                     break
 
             if not dry_run:
@@ -1111,19 +1140,16 @@ async def main(limit: int, dry_run: bool, resume: bool) -> None:
 
             await asyncio.sleep(1.5)
 
-    write_personalities(new_chars, dry_run)
-    print(f"\nDone. {len(new_chars)} new characters {'previewed' if dry_run else 'added'}.")
-    if not dry_run:
-        print("Note: 'quote' fields are empty — fill them in manually or run a quotes pass later.")
+    await conn.close()
+    print(f"\nDone. {added} new characters {'previewed' if dry_run else 'written to DB'}.")
 
 
 async def clear_images(dry_run: bool) -> None:
-    """Delete every object in the R2 gacha/ prefix and wipe image_urls in personalities.py."""
+    """Delete every object in the R2 gacha/ prefix and wipe image_urls in DB."""
     if not dry_run and not R2_TOKEN:
         print("ERROR: R2_TOKEN not set.")
         sys.exit(1)
 
-    # 1. List all objects under gacha/ prefix
     list_url = (
         f"https://api.cloudflare.com/client/v4/accounts/{R2_ACCOUNT_ID}"
         f"/r2/buckets/{R2_BUCKET}/objects?prefix=gacha%2F&per_page=1000"
@@ -1137,7 +1163,7 @@ async def clear_images(dry_run: bool) -> None:
             url = list_url + (f"&cursor={cursor}" if cursor else "")
             async with session.get(url) as r:
                 data = await r.json()
-            result = data.get("result", [])
+            result  = data.get("result", [])
             objects = result if isinstance(result, list) else result.get("objects", [])
             if not objects:
                 break
@@ -1164,23 +1190,34 @@ async def clear_images(dry_run: bool) -> None:
 
     print(f"  {'Would delete' if dry_run else 'Deleted'} {deleted} R2 objects.")
 
-    # 2. Clear image_urls in personalities.py
-    with open(_PERSONALITIES_PATH, "r", encoding="utf-8") as f:
-        content = f.read()
-
-    import re as _re
-    cleared = content
-    cleared = _re.sub(r'"image_urls":\s*\[[^\]]*\]', '"image_urls": []', cleared)
-
-    if dry_run:
-        changed = content.count('"image_urls"') - cleared.count('"image_urls": []')
-        print(f"  Would clear image_urls for {content.count('image_urls')} characters.")
-    else:
-        with open(_PERSONALITIES_PATH, "w", encoding="utf-8") as f:
-            f.write(cleared)
-        print(f"  Cleared image_urls for all characters in personalities.py.")
+    if not dry_run:
+        conn = await _db_connect()
+        await conn.execute("UPDATE gacha_characters SET image_urls = '{}'")
+        await conn.close()
+        print("  Cleared image_urls in DB.")
 
     print("Done. Now run: python scripts/populate_gacha.py --refresh-images")
+
+
+async def _toggle_character(name_or_id: str, enabled: bool) -> None:
+    conn = await _db_connect()
+    row = await conn.fetchrow(
+        "SELECT character_id, name, enabled FROM gacha_characters "
+        "WHERE character_id = $1 OR LOWER(name) = LOWER($1) LIMIT 1",
+        name_or_id,
+    )
+    if not row:
+        print(f"Character not found: {name_or_id!r}")
+        await conn.close()
+        return
+    await conn.execute(
+        "UPDATE gacha_characters SET enabled = $2 WHERE character_id = $1",
+        row["character_id"], enabled,
+    )
+    await conn.close()
+    action = "enabled" if enabled else "disabled"
+    print(f"{action}: {row['name']} ({row['character_id']})")
+    print("Run `reload gacha` in the bot console (or restart) to apply the change.")
 
 
 if __name__ == "__main__":
@@ -1195,8 +1232,16 @@ if __name__ == "__main__":
                     help="Backfill existing characters with up to 5 images each (skips new character discovery)")
     ap.add_argument("--clear-images", action="store_true",
                     help="Delete all R2 gacha images and wipe image_urls in personalities.py")
+    ap.add_argument("--disable", metavar="NAME_OR_ID",
+                    help="Soft-disable a character by name or ID (no reload needed after next cog reload)")
+    ap.add_argument("--enable",  metavar="NAME_OR_ID",
+                    help="Re-enable a previously disabled character by name or ID")
     args = ap.parse_args()
-    if getattr(args, "clear_images"):
+    if args.disable:
+        asyncio.run(_toggle_character(args.disable, False))
+    elif args.enable:
+        asyncio.run(_toggle_character(args.enable, True))
+    elif getattr(args, "clear_images"):
         asyncio.run(clear_images(args.dry_run))
     elif args.refresh_images:
         asyncio.run(refresh_images(args.limit, args.dry_run))

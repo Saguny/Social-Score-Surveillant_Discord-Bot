@@ -9,16 +9,42 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from config.personalities import (
-    PERSONALITIES,
-    get_personality, roll_weighted, search_personality,
-)
+from config.personalities import RARITY_WEIGHT
+from cogs.achievements import unlock as unlock_achievement, check_milestone
 from infra.redis_client import get_redis
+
+# Character pool — loaded from DB at cog startup, stays in memory for fast rolls.
+_CHARS: dict[str, dict] = {}
+
+
+def _get_personality(char_id: str) -> dict | None:
+    return _CHARS.get(char_id)
+
+
+def _search_personality(query: str) -> dict | None:
+    """Find by name (exact first, then substring). Returns dict with 'id' injected."""
+    q = query.lower().strip()
+    if q in _CHARS:
+        return {"id": q, **_CHARS[q]}
+    for cid, ch in _CHARS.items():
+        if ch["name"].lower() == q:
+            return {"id": cid, **ch}
+    for cid, ch in _CHARS.items():
+        if q in ch["name"].lower():
+            return {"id": cid, **ch}
+    return None
+
+
+def _roll_weighted() -> tuple[str, dict]:
+    keys    = list(_CHARS.keys())
+    weights = [RARITY_WEIGHT.get(_CHARS[k]["rarity"], 60) for k in keys]
+    cid     = random.choices(keys, weights=weights)[0]
+    return cid, _CHARS[cid]
 
 CLAIM_WINDOW   = 60
 ROLL_WINDOW    = 3600
-BASE_ROLLS     = 12
-MAX_STREAK_BONUS = 5
+BASE_ROLLS     = 10
+MAX_STREAK_BONUS = 4
 BROWSE_PAGE_SIZE = 10
 WISHLIST_MAX   = 20
 
@@ -28,6 +54,7 @@ FACTION_COLOR = {
     "conquerors":  0x6E460F,
     "strongmen":   0x461450,
     "philosophers":0x0F5A50,
+    "icons":       0xC8860A,
     "wildcards":   0x505014,
 }
 
@@ -37,6 +64,7 @@ FACTION_LABEL = {
     "conquerors":  "THE CONQUERORS",
     "strongmen":   "THE STRONGMEN",
     "philosophers":"PHILOSOPHERS",
+    "icons":       "ICONS",
     "wildcards":   "WILDCARDS",
 }
 
@@ -78,7 +106,7 @@ async def _figure_ac(
 ) -> list[app_commands.Choice[str]]:
     q = current.lower()
     results = [
-        (cid, ch) for cid, ch in PERSONALITIES.items()
+        (cid, ch) for cid, ch in _CHARS.items()
         if q in ch["name"].lower() or q in cid
     ]
     results.sort(key=lambda x: (not x[1]["name"].lower().startswith(q), x[1]["name"]))
@@ -102,8 +130,8 @@ async def _owned_figure_ac(
     owned_ids = {r["character_id"] for r in rows}
     q = current.lower()
     results = [
-        (cid, PERSONALITIES[cid]) for cid in owned_ids
-        if cid in PERSONALITIES and (q in PERSONALITIES[cid]["name"].lower() or q in cid)
+        (cid, _CHARS[cid]) for cid in owned_ids
+        if cid in _CHARS and (q in _CHARS[cid]["name"].lower() or q in cid)
     ]
     results.sort(key=lambda x: (not x[1]["name"].lower().startswith(q), x[1]["name"]))
     return [
@@ -125,8 +153,8 @@ async def _wishlist_figure_ac(
     ids = await db.get_wishlist(interaction.guild.id, interaction.user.id)
     q = current.lower()
     results = [
-        (cid, PERSONALITIES[cid]) for cid in ids
-        if cid in PERSONALITIES and (q in PERSONALITIES[cid]["name"].lower() or q in cid)
+        (cid, _CHARS[cid]) for cid in ids
+        if cid in _CHARS and (q in _CHARS[cid]["name"].lower() or q in cid)
     ]
     results.sort(key=lambda x: (not x[1]["name"].lower().startswith(q), x[1]["name"]))
     return [
@@ -186,7 +214,7 @@ def _claimed_embed(char: dict, image_url: str | None, claimer_name: str, rank: i
 # ── Browse ─────────────────────────────────────────────────────────────────────
 
 def _all_chars(faction: str | None = None, rarity: str | None = None) -> list[tuple[str, dict]]:
-    items = list(PERSONALITIES.items())
+    items = list(_CHARS.items())
     if faction:
         items = [(k, v) for k, v in items if v["faction"] == faction]
     if rarity:
@@ -286,8 +314,8 @@ class TradeView(discord.ui.View):
                 self.target.id,  self.request_id,
             )
             if ok:
-                offer_char   = get_personality(self.offer_id)
-                request_char = get_personality(self.request_id)
+                offer_char   = _get_personality(self.offer_id)
+                request_char = _get_personality(self.request_id)
                 embed = discord.Embed(
                     title="Trade Complete",
                     description=(
@@ -295,6 +323,12 @@ class TradeView(discord.ui.View):
                         f"{self.target.mention} received **{offer_char['name']}**"
                     ),
                     color=0x00AA44,
+                )
+                bot = interaction.client
+                guild = interaction.guild
+                await asyncio.gather(
+                    unlock_achievement(bot, guild, self.offerer, "first_waifu_trade"),
+                    unlock_achievement(bot, guild, self.target,  "first_waifu_trade"),
                 )
             else:
                 embed = discord.Embed(
@@ -378,6 +412,16 @@ class GachaCog(commands.Cog, name="Gacha"):
         self.bot = bot
         self.db = bot.db
 
+    async def cog_load(self):
+        global _CHARS
+        _CHARS = await self.db.get_all_characters()
+        print(f"[gacha] loaded {len(_CHARS)} characters from DB")
+
+    async def reload_chars(self) -> int:
+        global _CHARS
+        _CHARS = await self.db.get_all_characters()
+        return len(_CHARS)
+
     # ── roll helpers ─────────────────────────────────────────────────────────
 
     async def _max_rolls(self, user_id: int) -> int:
@@ -399,11 +443,28 @@ class GachaCog(commands.Cog, name="Gacha"):
             await r.expire(key, secs_to_next_hour)
         return new_count
 
+    async def _get_owner_cached(self, guild_id: int, char_id: str) -> int | None:
+        r = get_redis()
+        key = f"gacha:owner:{guild_id}:{char_id}"
+        cached = await r.get(key)
+        if cached is not None:
+            return int(cached) if cached != b"0" and cached != "0" else None
+        owner_id = await self.db.get_character_owner(guild_id, char_id)
+        await r.set(key, str(owner_id) if owner_id else "0", ex=300)
+        return owner_id
+
+    async def _set_owner_cache(self, guild_id: int, char_id: str, owner_id: int | None):
+        r = get_redis()
+        key = f"gacha:owner:{guild_id}:{char_id}"
+        await r.set(key, str(owner_id) if owner_id else "0", ex=300)
+
     # ── shared logic ─────────────────────────────────────────────────────────
 
     async def _do_roll(self, guild_id: int, user_id: int, display_name: str, send_fn):
-        max_rolls = await self._max_rolls(user_id)
-        rolls_used, ttl = await self._roll_state(guild_id, user_id)
+        (max_rolls, (rolls_used, ttl)) = await asyncio.gather(
+            self._max_rolls(user_id),
+            self._roll_state(guild_id, user_id),
+        )
 
         if rolls_used >= max_rolls:
             mins = max(1, (ttl + 59) // 60)
@@ -416,12 +477,14 @@ class GachaCog(commands.Cog, name="Gacha"):
             )
             return
 
-        new_count = await self._increment_rolls(guild_id, user_id)
-        rolls_remaining = max_rolls - new_count
-
-        char_id, char = roll_weighted()
+        char_id, char = _roll_weighted()
         image_url = _pick_image(char)
-        owner_id = await self.db.get_character_owner(guild_id, char_id)
+
+        new_count, owner_id = await asyncio.gather(
+            self._increment_rolls(guild_id, user_id),
+            self._get_owner_cached(guild_id, char_id),
+        )
+        rolls_remaining = max_rolls - new_count
         dupe = owner_id is not None
 
         owner_name: str | None = None
@@ -440,6 +503,11 @@ class GachaCog(commands.Cog, name="Gacha"):
         embed = _roll_embed(char, image_url, rolls_remaining, max_rolls, dupe=dupe, owner_name=owner_name)
         msg = await send_fn(embed=embed)
 
+        guild = self.bot.get_guild(guild_id)
+        member = guild.get_member(user_id) if guild else None
+        if guild and member:
+            await unlock_achievement(self.bot, guild, member, "first_roll")
+
         r = get_redis()
         pending = json.dumps({
             "char_id":   char_id,
@@ -457,7 +525,7 @@ class GachaCog(commands.Cog, name="Gacha"):
             return
         lines = []
         for row in rows:
-            char = get_personality(row["character_id"])
+            char = _get_personality(row["character_id"])
             if not char:
                 continue
             lines.append(
@@ -482,7 +550,7 @@ class GachaCog(commands.Cog, name="Gacha"):
 
         lines = []
         for char_id in ids:
-            char = get_personality(char_id)
+            char = _get_personality(char_id)
             if not char:
                 continue
             check = "✓" if char_id in owned else "·"
@@ -514,11 +582,17 @@ class GachaCog(commands.Cog, name="Gacha"):
         await interaction.response.defer()
         await self._show_card(name, interaction.followup.send)
 
-    @app_commands.command(name="collection", description="View your claimed waifus")
-    @app_commands.describe(user="View another member's collection")
+    @app_commands.command(name="harem", description="View your harem")
+    @app_commands.describe(user="View another member's harem")
     async def slash_collection(self, interaction: discord.Interaction, user: discord.Member | None = None):
         await interaction.response.defer()
         await self._show_collection(interaction.guild.id, user or interaction.user, interaction.followup.send)
+
+    @app_commands.command(name="choose", description="Set your featured harem thumbnail")
+    @app_commands.describe(name="Name of the waifu to feature")
+    async def slash_choose(self, interaction: discord.Interaction, name: str):
+        await interaction.response.defer(ephemeral=True)
+        await self._do_choose(interaction.guild.id, interaction.user, name, interaction.followup.send)
 
     # ── slash: top ────────────────────────────────────────────────────────────
 
@@ -573,8 +647,8 @@ class GachaCog(commands.Cog, name="Gacha"):
             await interaction.followup.send("You can't trade with a bot.")
             return
 
-        offer_char   = get_personality(offer) or search_personality(offer)
-        request_char = get_personality(request) or search_personality(request)
+        offer_char   = _get_personality(offer) or _search_personality(offer)
+        request_char = _get_personality(request) or _search_personality(request)
 
         if not offer_char:
             await interaction.followup.send(f"No waifu found matching **{offer}**.")
@@ -633,7 +707,7 @@ class GachaCog(commands.Cog, name="Gacha"):
             await interaction.followup.send("You can't gift to a bot.")
             return
 
-        char = get_personality(waifu) or search_personality(waifu)
+        char = _get_personality(waifu) or _search_personality(waifu)
         if not char:
             await interaction.followup.send(f"No waifu found matching **{waifu}**.")
             return
@@ -665,7 +739,7 @@ class GachaCog(commands.Cog, name="Gacha"):
     @app_commands.autocomplete(name=_figure_ac)
     async def wishlist_add(self, interaction: discord.Interaction, name: str):
         await interaction.response.defer()
-        char = get_personality(name) or search_personality(name)
+        char = _get_personality(name) or _search_personality(name)
         if not char:
             await interaction.followup.send(f"No waifu found matching **{name}**.")
             return
@@ -687,7 +761,7 @@ class GachaCog(commands.Cog, name="Gacha"):
     @app_commands.autocomplete(name=_wishlist_figure_ac)
     async def wishlist_remove(self, interaction: discord.Interaction, name: str):
         await interaction.response.defer()
-        char = get_personality(name) or search_personality(name)
+        char = _get_personality(name) or _search_personality(name)
         if not char:
             await interaction.followup.send(f"No waifu found matching **{name}**.")
             return
@@ -713,14 +787,25 @@ class GachaCog(commands.Cog, name="Gacha"):
             await self._do_roll(ctx.guild.id, ctx.author.id, ctx.author.display_name, ctx.send)
 
     @commands.command(name="image")
-    async def prefix_image(self, ctx: commands.Context, *, name: str):
+    async def prefix_image(self, ctx: commands.Context, *, name: str = ""):
         async with ctx.typing():
+            if not name:
+                await ctx.send("Usage: `ccp image <waifu name>`")
+                return
             await self._show_card(name, ctx.send)
 
-    @commands.command(name="collection", aliases=["harem"])
+    @commands.command(name="harem", aliases=["collection"])
     async def prefix_collection(self, ctx: commands.Context):
         async with ctx.typing():
             await self._show_collection(ctx.guild.id, ctx.author, ctx.send)
+
+    @commands.command(name="choose")
+    async def prefix_choose(self, ctx: commands.Context, *, name: str = ""):
+        async with ctx.typing():
+            if not name:
+                await ctx.send("Usage: `ccp choose <waifu name>`")
+                return
+            await self._do_choose(ctx.guild.id, ctx.author, name, ctx.send)
 
     @commands.command(name="top")
     async def prefix_top(self, ctx: commands.Context):
@@ -743,7 +828,7 @@ class GachaCog(commands.Cog, name="Gacha"):
                 await ctx.send("You can't gift to a bot.")
                 return
 
-            char = search_personality(name)
+            char = _search_personality(name)
             if not char:
                 await ctx.send(f"No waifu found matching **{name}**.")
                 return
@@ -773,7 +858,7 @@ class GachaCog(commands.Cog, name="Gacha"):
             if not name:
                 await self._do_wishlist_view(ctx.guild.id, ctx.author, ctx.send)
                 return
-            char = search_personality(name)
+            char = _search_personality(name)
             if not char:
                 await ctx.send(f"No waifu found matching **{name}**.")
                 return
@@ -796,16 +881,27 @@ class GachaCog(commands.Cog, name="Gacha"):
     # ── divorce ───────────────────────────────────────────────────────────────
 
     async def _do_divorce(self, guild_id: int, user_id: int, name: str, send_fn):
-        char = get_personality(name) or search_personality(name)
+        char = _get_personality(name) or _search_personality(name)
         if not char:
             await send_fn(f"No waifu found matching **{name}**.")
             return
         char_id = char.get("id", name)
-        ok = await self.db.divorce_character(guild_id, user_id, char_id)
+        ok, _ = await asyncio.gather(
+            self.db.divorce_character(guild_id, user_id, char_id),
+            self._set_owner_cache(guild_id, char_id, None),
+        )
         if not ok:
             await send_fn(f"You don't have **{char['name']}** in your harem.")
             return
         await send_fn(f"💔 **{char['name']}** has been removed from your harem.")
+        guild = self.bot.get_guild(guild_id)
+        member = guild.get_member(user_id) if guild else None
+        if guild and member:
+            divorces = await self.db.increment_counter(user_id, "gacha_divorces")
+            await asyncio.gather(
+                unlock_achievement(self.bot, guild, member, "first_divorce"),
+                check_milestone(self.bot, guild, member, "gacha_divorces", divorces),
+            )
 
     @app_commands.command(name="divorce", description="Remove a waifu from your harem")
     @app_commands.describe(name="Waifu to divorce")
@@ -845,7 +941,7 @@ class GachaCog(commands.Cog, name="Gacha"):
         guild_id  = data["guild_id"]
         is_dupe   = data.get("dupe", False)
 
-        char = get_personality(char_id)
+        char = _get_personality(char_id)
         if not char:
             return
 
@@ -874,9 +970,14 @@ class GachaCog(commands.Cog, name="Gacha"):
                 )
             except (discord.NotFound, discord.HTTPException):
                 pass
+            if guild and isinstance(claimer, discord.Member):
+                await unlock_achievement(self.bot, guild, claimer, "first_dupe")
             return
 
-        await self.db.claim_character(guild_id, claimer_id, char_id)
+        await asyncio.gather(
+            self.db.claim_character(guild_id, claimer_id, char_id),
+            self._set_owner_cache(guild_id, char_id, claimer_id),
+        )
         rank_info = await self.db.get_character_rank(char_id)
 
         try:
@@ -888,6 +989,22 @@ class GachaCog(commands.Cog, name="Gacha"):
             await channel.send(f"**{claimer_name}** and **{char['name']}** are now married ❤️")
         except (discord.NotFound, discord.HTTPException):
             pass
+
+        if guild and isinstance(claimer, discord.Member):
+            wishlist = await self.db.get_wishlist(guild_id, claimer_id)
+            total = await self.db.increment_counter(claimer_id, "gacha_claims_total")
+            await asyncio.gather(
+                unlock_achievement(self.bot, guild, claimer, "first_claim"),
+                check_milestone(self.bot, guild, claimer, "gacha_claims_total", total),
+                *(
+                    [unlock_achievement(self.bot, guild, claimer, "claimed_legendary")]
+                    if char.get("rarity") == "legendary" else []
+                ),
+                *(
+                    [unlock_achievement(self.bot, guild, claimer, "wishlist_fulfilled")]
+                    if char_id in wishlist else []
+                ),
+            )
 
         watchers = await self.db.get_wishlist_watchers(guild_id, char_id)
         for watcher_id in watchers:
@@ -907,7 +1024,7 @@ class GachaCog(commands.Cog, name="Gacha"):
     # ── image view ────────────────────────────────────────────────────────────
 
     async def _show_card(self, name: str, send_fn):
-        char = get_personality(name) or search_personality(name)
+        char = _get_personality(name) or _search_personality(name)
         if not char:
             await send_fn(f"No waifu found matching **{name}**.")
             return
@@ -936,9 +1053,18 @@ class GachaCog(commands.Cog, name="Gacha"):
             await send_fn(f"**{name}** has no waifus yet. Use `ccp roll` to start collecting!")
             return
 
+        chosen_id = await self.db.get_harem_thumbnail(guild_id, user.id)
+        thumb_char = _get_personality(chosen_id) if chosen_id else None
+        if not thumb_char:
+            for row in rows:
+                c = _get_personality(row["character_id"])
+                if c and c.get("image_urls"):
+                    thumb_char = c
+                    break
+
         by_faction: dict[str, list[str]] = {}
         for row in rows:
-            char = get_personality(row["character_id"])
+            char = _get_personality(row["character_id"])
             if not char:
                 continue
             by_faction.setdefault(char["faction"], []).append(
@@ -946,10 +1072,15 @@ class GachaCog(commands.Cog, name="Gacha"):
             )
 
         embed = discord.Embed(
-            title=f"{name}'s Collection",
             description=f"{len(rows)} waifu{'s' if len(rows) != 1 else ''} collected",
             color=0xCC0000,
         )
+        embed.set_author(
+            name=f"{name}'s Harem",
+            icon_url=user.display_avatar.url if hasattr(user, "display_avatar") else None,
+        )
+        if thumb_char and (img := _pick_image(thumb_char)):
+            embed.set_thumbnail(url=img)
         for faction, names in by_faction.items():
             embed.add_field(
                 name=FACTION_LABEL.get(faction, faction.upper()),
@@ -957,6 +1088,17 @@ class GachaCog(commands.Cog, name="Gacha"):
                 inline=True,
             )
         await send_fn(embed=embed)
+
+    async def _do_choose(self, guild_id: int, user: discord.Member | discord.User, name: str, send_fn):
+        char = _search_personality(name)
+        if not char:
+            await send_fn(f"No waifu found matching **{name}**.", ephemeral=True)
+            return
+        if not await self.db.has_character(guild_id, user.id, char["id"]):
+            await send_fn(f"**{char['name']}** is not in your harem.", ephemeral=True)
+            return
+        await self.db.set_harem_thumbnail(guild_id, user.id, char["id"])
+        await send_fn(f"**{char['name']}** is now your featured waifu.")
 
 
 async def setup(bot: commands.Bot):
