@@ -383,6 +383,7 @@ class SocialCreditBot(commands.AutoShardedBot):
     def __init__(self):
         super().__init__(
             command_prefix="ccp ",
+            case_insensitive=True,
             intents=intents,
             tree_cls=CreditCommandTree,
             help_command=None,

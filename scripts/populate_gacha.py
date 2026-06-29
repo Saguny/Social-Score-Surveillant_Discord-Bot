@@ -946,13 +946,14 @@ async def process_one(
     wiki_sem: asyncio.Semaphore,
     r2_sem: asyncio.Semaphore,
     dry_run: bool,
+    override_image_url: str | None = None,
 ) -> tuple[str, dict] | None:
     slug = item["slug"]
     name = item["name"]
 
     summary_t = wiki_summary(slug, wiki_sem)
     views_t   = wiki_views(slug, wiki_sem)
-    images_t  = wiki_images(slug, wiki_sem, max_images=5)
+    images_t  = asyncio.sleep(0, result=[]) if override_image_url else wiki_images(slug, wiki_sem, max_images=5)
     summary, monthly_views, img_urls = await asyncio.gather(summary_t, views_t, images_t)
 
     if not summary or not _is_person_summary(summary):
@@ -963,12 +964,15 @@ async def process_one(
     stats   = derive_stats(faction, item["sitelinks"])
     title   = derive_title(summary["description"], name)
 
+    if override_image_url:
+        img_urls = [override_image_url]
+
     public_urls: list[str] = []
     if img_urls and not dry_run:
         char_id_tmp = make_char_id(name, set())
         public_urls = await upload_r2_multi(r2_session, char_id_tmp, img_urls, r2_sem)
 
-    if not public_urls and not dry_run:
+    if not public_urls and img_urls and not dry_run:
         return None
 
     return name, {
@@ -1202,10 +1206,14 @@ async def clear_images(dry_run: bool) -> None:
     print("Done. Now run: python scripts/populate_gacha.py --refresh-images")
 
 
-async def _add_characters(names: list[str], dry_run: bool) -> None:
+async def _add_characters(names: list[str], dry_run: bool, image_url: str | None = None) -> None:
     """Force-add specific people by Wikipedia article name."""
     if not dry_run and not R2_TOKEN:
         print("ERROR: R2_TOKEN not set. Use --dry-run or export R2_TOKEN=...")
+        sys.exit(1)
+
+    if image_url and len(names) != 1:
+        print("ERROR: --image-url can only be used with exactly one --add name")
         sys.exit(1)
 
     conn = await _db_connect()
@@ -1223,9 +1231,10 @@ async def _add_characters(names: list[str], dry_run: bool) -> None:
                 print(f"  SKIP (already exists): {name}")
                 continue
             item = {"slug": slug, "name": name, "sitelinks": 30}
-            result = await process_one(item, r2_session, wiki_sem, r2_sem, dry_run)
+            result = await process_one(item, r2_session, wiki_sem, r2_sem, dry_run,
+                                       override_image_url=image_url)
             if result is None:
-                print(f"  SKIP (no data/image): {name}")
+                print(f"  SKIP (no data): {name}")
                 continue
             char_name, char = result
             cid = make_char_id(char_name, taken_ids)
@@ -1291,6 +1300,8 @@ if __name__ == "__main__":
                     help="Delete all R2 gacha images and wipe image_urls in personalities.py")
     ap.add_argument("--add", metavar="NAME", nargs="+",
                     help="Force-add specific people by Wikipedia article name")
+    ap.add_argument("--image-url", metavar="URL",
+                    help="Override image URL for the single --add name (only used when --add has exactly one name)")
     ap.add_argument("--delete",  metavar="NAME_OR_ID",
                     help="Permanently delete a character by name or ID")
     ap.add_argument("--disable", metavar="NAME_OR_ID",
@@ -1299,7 +1310,7 @@ if __name__ == "__main__":
                     help="Re-enable a previously disabled character by name or ID")
     args = ap.parse_args()
     if args.add:
-        asyncio.run(_add_characters(args.add, args.dry_run))
+        asyncio.run(_add_characters(args.add, args.dry_run, image_url=getattr(args, "image_url", None)))
     elif args.delete:
         asyncio.run(_delete_character(args.delete))
     elif args.disable:

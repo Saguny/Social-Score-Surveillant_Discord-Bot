@@ -702,6 +702,55 @@ class GachaCog(commands.Cog, name="Gacha"):
 
     # ── slash: top ────────────────────────────────────────────────────────────
 
+    async def _do_whois(self, send_fn, name: str):
+        import urllib.parse
+        char = _get_personality(name) or _search_personality(name)
+        if not char:
+            await send_fn(f"No waifu found matching **{name}**.")
+            return
+
+        wiki      = char.get("wiki") or char.get("id", name)
+        faction   = FACTION_LABEL.get(char["faction"], char["faction"].upper())
+        color     = FACTION_COLOR.get(char["faction"], 0xCC0000)
+        image_url = _pick_image(char)
+
+        extract = None
+        try:
+            url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{urllib.parse.quote(wiki)}"
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, headers={"User-Agent": "SocialCreditBot/2.0"}, timeout=aiohttp.ClientTimeout(total=8)) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        extract = data.get("extract", "")
+                        if extract and len(extract) > 400:
+                            extract = extract[:400].rsplit(" ", 1)[0] + "…"
+        except Exception:
+            pass
+
+        embed = discord.Embed(
+            title=char["name"],
+            description=extract or char.get("title", "No description available."),
+            color=color,
+        )
+        embed.add_field(name="FACTION",   value=faction,                             inline=True)
+        embed.add_field(name="RARITY",    value=_stars(char["rarity"]),              inline=True)
+        embed.add_field(name="AUTHORITY", value=str(char.get("stat_authority", "?")), inline=True)
+        embed.add_field(name="MILITARY",  value=str(char.get("stat_military",  "?")), inline=True)
+        embed.add_field(name="CHARISMA",  value=str(char.get("stat_charisma",  "?")), inline=True)
+        if wiki:
+            embed.add_field(name="WIKIPEDIA", value=f"[{char['name']}](https://en.wikipedia.org/wiki/{urllib.parse.quote(wiki)})", inline=True)
+        if image_url:
+            embed.set_thumbnail(url=image_url)
+        embed.timestamp = discord.utils.utcnow()
+        await send_fn(embed=embed)
+
+    @app_commands.command(name="whois", description="Look up a waifu's Wikipedia description")
+    @app_commands.describe(name="Name of the waifu")
+    @app_commands.autocomplete(name=_figure_ac)
+    async def slash_whois(self, interaction: discord.Interaction, name: str):
+        await interaction.response.defer()
+        await self._do_whois(interaction.followup.send, name)
+
     @app_commands.command(name="top", description="Global leaderboard of most-claimed waifus")
     async def slash_top(self, interaction: discord.Interaction):
         await interaction.response.defer()
@@ -917,6 +966,14 @@ class GachaCog(commands.Cog, name="Gacha"):
     async def prefix_top(self, ctx: commands.Context):
         async with ctx.typing():
             await self._show_top(ctx.send)
+
+    @commands.command(name="whois")
+    async def prefix_whois(self, ctx: commands.Context, *, name: str = ""):
+        async with ctx.typing():
+            if not name:
+                await ctx.send("Usage: `ccp whois <name>`")
+                return
+            await self._do_whois(ctx.send, name)
 
     @commands.command(name="gift")
     async def prefix_gift(self, ctx: commands.Context, name: str, *, user_str: str = ""):
