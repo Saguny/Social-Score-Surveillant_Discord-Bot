@@ -55,6 +55,7 @@ _TOPIC_OPTIONS = [
     discord.SelectOption(label="Markets",           value="markets",      description="Stocks, turbos, circuit breakers"),
     discord.SelectOption(label="Events & Posters",  value="events",       description="Propaganda events and daily posters"),
     discord.SelectOption(label="State Decorations", value="achievements", description="Achievement system overview"),
+    discord.SelectOption(label="Waifu Bureau",      value="gacha",        description="Roll, claim, trade, and collect historical waifus"),
     discord.SelectOption(label="Mod Commands",      value="mod",          description="Mod-only commands and server settings"),
     discord.SelectOption(label="Privacy & Legal",   value="privacy",      description="/optout, /optin, and disclaimer"),
 ]
@@ -91,7 +92,7 @@ class GuideView(discord.ui.View):
             inline=False,
         )
         e.add_field(name="YUAN",             value=f"The currency of the state. Earned through productivity. Spent on influence. [Support server]({SUPPORT_URL}) members earn +15% on every contribution.", inline=False)
-        e.add_field(name="WHAT AWAITS YOU",  value="Party ranks · State Decorations · Prestige · Global Standing · Propaganda Events · The Beijing Stock Exchange", inline=False)
+        e.add_field(name="WHAT AWAITS YOU",  value="Party ranks · State Decorations · Prestige · Global Standing · Propaganda Events · The Beijing Stock Exchange · **Waifu Bureau**", inline=False)
         e.add_field(name="YOUR FIRST INSPECTION", value="Report to `/checkin` and cast your `/vote` on Top.gg on the same day - the two combine for a bonus payout on top of either reward alone. Review your `/score`. The Nation will determine your worth.", inline=False)
         e.add_field(name="BUREAU RESOURCES", value=f"[Public Dashboard]({DASHBOARD_URL}) · [Support Server]({SUPPORT_URL}) · [Invite the Bureau]({INVITE_URL})", inline=False)
         return e
@@ -288,6 +289,77 @@ class GuideView(discord.ui.View):
         e.add_field(name="WHAT YOU RECEIVE",  value="Most decorations carry a Yuan grant, a rating adjustment, or a cosmetic designation displayed in your profile header.", inline=False)
         e.add_field(name="RARITY",            value="Each decoration displays the percentage of citizens who have received it. Some are extremely rare. Some are secret.", inline=False)
         e.add_field(name="MOD CONFIGURATION", value="`ccp achievementnotification [on|off]` · `ccp achievementchannel [#channel]`", inline=False)
+        return e
+
+    def _page_gacha(self) -> discord.Embed:
+        e = self.bureau_embed("WAIFU BUREAU", "中华人民共和国恋爱局")
+        e.add_field(
+            name="THE SYSTEM",
+            value=(
+                "Roll for historical and political waifus drawn from real Wikipedia figures. "
+                "Each waifu belongs to a **faction** and a **rarity tier**. "
+                "The first citizen to react to a roll claims them — and gets married. "
+                "Your collection is per-server."
+            ),
+            inline=False,
+        )
+        e.add_field(
+            name="ROLLING",
+            value=(
+                "`ccp roll` · `ccp r` · `/roll` — Roll a random waifu\n"
+                "React with any emoji to claim · **12 rolls per hour** (up to +5 from vote streak)\n"
+                "Voting on Top.gg resets your hourly rolls instantly"
+            ),
+            inline=False,
+        )
+        e.add_field(
+            name="RARITY TIERS",
+            value=(
+                "🟡 **Legendary** — global icons (≥2M monthly views)\n"
+                "🟣 **Epic** — major historical figures (≥500k)\n"
+                "🔵 **Rare** — notable figures (≥80k)\n"
+                "🟢 **Uncommon** — regional figures (≥15k)\n"
+                "⚪ **Common** — everyone else"
+            ),
+            inline=False,
+        )
+        e.add_field(
+            name="ALREADY CLAIMED",
+            value=(
+                "If a rolled waifu is already claimed in this server, the embed turns gold. "
+                "The first reactor earns Yuan instead — scaled by rarity "
+                "(¥100 common → ¥5,000 legendary). Does not count against your roll limit."
+            ),
+            inline=False,
+        )
+        e.add_field(
+            name="COLLECTION & VIEWING",
+            value=(
+                "`ccp collection` · `ccp harem` · `/collection` — View your harem\n"
+                "`ccp image <name>` · `/image <name>` — View a waifu's image (◀▶ to browse multiple)\n"
+                "`ccp browse` · `/browse` — Full catalogue with faction/rarity filters\n"
+                "`ccp top` · `/top` — Most claimed waifus globally"
+            ),
+            inline=False,
+        )
+        e.add_field(
+            name="TRADING & GIFTING",
+            value=(
+                "`/trade <@user> <offer> <request>` — Propose a swap · target must accept\n"
+                "`ccp gift <name> <@user>` · `/gift <name> <@user>` — Give a waifu away\n"
+                "`ccp divorce <name>` · `/divorce <name>` — Remove a waifu from your harem"
+            ),
+            inline=False,
+        )
+        e.add_field(
+            name="WISHLIST",
+            value=(
+                "`ccp wish <name>` — Add to wishlist (max 20) · you'll be DM'd when they're claimed\n"
+                "`ccp wl` · `ccp wishlist` · `/wishlist view` — View your wishlist\n"
+                "`/wishlist remove <name>` — Remove from wishlist"
+            ),
+            inline=False,
+        )
         return e
 
     def _page_mod(self) -> discord.Embed:

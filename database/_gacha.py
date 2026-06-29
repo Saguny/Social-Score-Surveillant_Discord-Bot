@@ -1,0 +1,198 @@
+import time
+
+
+class GachaMixin:
+    async def claim_character(self, guild_id: int, user_id: int, character_id: str) -> bool:
+        async with self._pool.acquire() as conn:
+            async with conn.transaction():
+                row = await conn.fetchrow(
+                    """
+                    INSERT INTO gacha_claims (guild_id, user_id, character_id, claimed_at)
+                    VALUES ($1, $2, $3, $4)
+                    ON CONFLICT (guild_id, user_id, character_id) DO NOTHING
+                    RETURNING 1
+                    """,
+                    guild_id, user_id, character_id, int(time.time()),
+                )
+                await conn.execute(
+                    """
+                    INSERT INTO gacha_character_stats (character_id, claim_count)
+                    VALUES ($1, 1)
+                    ON CONFLICT (character_id) DO UPDATE SET claim_count = gacha_character_stats.claim_count + 1
+                    """,
+                    character_id,
+                )
+                return row is not None
+
+    async def get_character_rank(self, character_id: str) -> dict:
+        """Returns global rank, total ranked characters, and claim count for a character."""
+        async with self._pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT claim_count,
+                       RANK() OVER (ORDER BY claim_count DESC) AS rank,
+                       COUNT(*) OVER () AS total
+                FROM gacha_character_stats
+                WHERE character_id = $1
+                """,
+                character_id,
+            )
+            if row:
+                return {"rank": row["rank"], "total": row["total"], "claims": row["claim_count"]}
+            return {"rank": None, "total": None, "claims": 0}
+
+    async def get_top_characters(self, limit: int = 10) -> list[dict]:
+        """Global leaderboard — most claimed characters across all servers."""
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT character_id, claim_count,
+                       RANK() OVER (ORDER BY claim_count DESC) AS rank
+                FROM gacha_character_stats
+                ORDER BY claim_count DESC
+                LIMIT $1
+                """,
+                limit,
+            )
+            return [dict(r) for r in rows]
+
+    async def is_claimed_in_guild(self, guild_id: int, character_id: str) -> bool:
+        async with self._pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT 1 FROM gacha_claims WHERE guild_id=$1 AND character_id=$2 LIMIT 1",
+                guild_id, character_id,
+            )
+            return row is not None
+
+    async def get_character_owner(self, guild_id: int, character_id: str) -> int | None:
+        async with self._pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT user_id FROM gacha_claims WHERE guild_id=$1 AND character_id=$2 LIMIT 1",
+                guild_id, character_id,
+            )
+            return row["user_id"] if row else None
+
+    async def get_user_collection(self, guild_id: int, user_id: int) -> list[dict]:
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT character_id, claimed_at FROM gacha_claims "
+                "WHERE guild_id = $1 AND user_id = $2 ORDER BY claimed_at DESC",
+                guild_id, user_id,
+            )
+            return [dict(r) for r in rows]
+
+    async def has_character(self, guild_id: int, user_id: int, character_id: str) -> bool:
+        async with self._pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT 1 FROM gacha_claims WHERE guild_id = $1 AND user_id = $2 AND character_id = $3",
+                guild_id, user_id, character_id,
+            )
+            return row is not None
+
+    async def count_collection(self, guild_id: int, user_id: int) -> int:
+        async with self._pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT COUNT(*) AS n FROM gacha_claims WHERE guild_id = $1 AND user_id = $2",
+                guild_id, user_id,
+            )
+            return row["n"] if row else 0
+
+    async def trade_characters(
+        self,
+        guild_id: int,
+        user_a: int, char_a: str,
+        user_b: int, char_b: str,
+    ) -> bool:
+        """Atomically swap char_a (owned by user_a) for char_b (owned by user_b).
+        Returns False if either ownership check fails (race condition guard)."""
+        async with self._pool.acquire() as conn:
+            async with conn.transaction():
+                owns_a = await conn.fetchval(
+                    "SELECT 1 FROM gacha_claims WHERE guild_id=$1 AND user_id=$2 AND character_id=$3",
+                    guild_id, user_a, char_a,
+                )
+                owns_b = await conn.fetchval(
+                    "SELECT 1 FROM gacha_claims WHERE guild_id=$1 AND user_id=$2 AND character_id=$3",
+                    guild_id, user_b, char_b,
+                )
+                if not owns_a or not owns_b:
+                    return False
+                now = int(time.time())
+                await conn.execute(
+                    "DELETE FROM gacha_claims WHERE guild_id=$1 AND user_id=$2 AND character_id=$3",
+                    guild_id, user_a, char_a,
+                )
+                await conn.execute(
+                    "DELETE FROM gacha_claims WHERE guild_id=$1 AND user_id=$2 AND character_id=$3",
+                    guild_id, user_b, char_b,
+                )
+                await conn.execute(
+                    "INSERT INTO gacha_claims (guild_id, user_id, character_id, claimed_at) "
+                    "VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING",
+                    guild_id, user_b, char_a, now,
+                )
+                await conn.execute(
+                    "INSERT INTO gacha_claims (guild_id, user_id, character_id, claimed_at) "
+                    "VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING",
+                    guild_id, user_a, char_b, now,
+                )
+                return True
+
+    async def add_wishlist(self, guild_id: int, user_id: int, character_id: str) -> bool:
+        async with self._pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "INSERT INTO gacha_wishlists (guild_id, user_id, character_id) "
+                "VALUES ($1,$2,$3) ON CONFLICT DO NOTHING RETURNING 1",
+                guild_id, user_id, character_id,
+            )
+            return row is not None
+
+    async def remove_wishlist(self, guild_id: int, user_id: int, character_id: str) -> bool:
+        async with self._pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "DELETE FROM gacha_wishlists WHERE guild_id=$1 AND user_id=$2 AND character_id=$3 RETURNING 1",
+                guild_id, user_id, character_id,
+            )
+            return row is not None
+
+    async def get_wishlist(self, guild_id: int, user_id: int) -> list[str]:
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT character_id FROM gacha_wishlists WHERE guild_id=$1 AND user_id=$2",
+                guild_id, user_id,
+            )
+            return [r["character_id"] for r in rows]
+
+    async def gift_character(self, guild_id: int, from_user: int, to_user: int, character_id: str) -> bool:
+        """Transfer character from from_user to to_user. Returns False if from_user doesn't own it."""
+        async with self._pool.acquire() as conn:
+            async with conn.transaction():
+                deleted = await conn.fetchval(
+                    "DELETE FROM gacha_claims WHERE guild_id=$1 AND user_id=$2 AND character_id=$3 RETURNING 1",
+                    guild_id, from_user, character_id,
+                )
+                if not deleted:
+                    return False
+                await conn.execute(
+                    "INSERT INTO gacha_claims (guild_id, user_id, character_id, claimed_at) "
+                    "VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING",
+                    guild_id, to_user, character_id, int(time.time()),
+                )
+                return True
+
+    async def divorce_character(self, guild_id: int, user_id: int, character_id: str) -> bool:
+        async with self._pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "DELETE FROM gacha_claims WHERE guild_id=$1 AND user_id=$2 AND character_id=$3 RETURNING 1",
+                guild_id, user_id, character_id,
+            )
+            return row is not None
+
+    async def get_wishlist_watchers(self, guild_id: int, character_id: str) -> list[int]:
+        """Returns user_ids who wishlisted this character in this guild."""
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT user_id FROM gacha_wishlists WHERE guild_id=$1 AND character_id=$2",
+                guild_id, character_id,
+            )
+            return [r["user_id"] for r in rows]

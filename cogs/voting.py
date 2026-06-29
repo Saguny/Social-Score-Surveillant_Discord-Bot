@@ -148,7 +148,13 @@ async def process_vote(bot: commands.Bot, user_id: int):
         yuan_reward *= VOTE_WEEKEND_MULTIPLIER
         score_delta = round(score_delta * VOTE_WEEKEND_MULTIPLIER, 2)
 
+    from infra.redis_client import get_redis
+    r = get_redis()
     guild_ids = await db.get_user_guild_ids(user_id)
+    roll_keys = [f"gacha:rolls:{gid}:{user_id}" for gid in guild_ids]
+    if roll_keys:
+        await r.delete(*roll_keys)
+
     results = await asyncio.gather(
         *(_reward_guild(bot, db, gid, user_id, total_votes, vote_streak, yuan_reward, score_delta) for gid in guild_ids)
     )
@@ -181,6 +187,7 @@ async def process_vote(bot: commands.Bot, user_id: int):
             f"combo bonus was applied in the server(s) where you checked in."
         )
     lines.append("⚡ Vote boost active for 12h: 2× score and yuan earned from chat messages.")
+    lines.append("🎴 Your gacha rolls have been reset — you can roll again now.")
 
     embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")
     embed.add_field(
@@ -236,6 +243,40 @@ class Voting(commands.Cog):
         view = discord.ui.View()
         view.add_item(discord.ui.Button(label="Vote on Top.gg", style=discord.ButtonStyle.link, url=VOTE_URL))
         await interaction.followup.send(embed=embed, view=view)
+
+    @commands.command(name="vote")
+    async def vote_prefix(self, ctx: commands.Context):
+        async with ctx.typing():
+            embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · CALL TO PATRIOTIC DUTY")
+            embed.add_field(
+                name="BASE REWARD",
+                value=f"¥{VOTE_YUAN_BASE:,} Yuan · +{VOTE_SCORE_BASE:.1f} Score · Loyal Patriot badge",
+                inline=False,
+            )
+            embed.add_field(
+                name="12H BOOST",
+                value="2× Yuan and Score per message for 12 hours · Does not affect other rewards",
+                inline=False,
+            )
+            embed.add_field(
+                name="STREAK BONUS",
+                value=f"Up to ¥{VOTE_STREAK_YUAN_CAP:,} · +{VOTE_STREAK_SCORE_CAP:.1f} score at max streak",
+                inline=False,
+            )
+            if time.gmtime().tm_wday >= 5:
+                embed.add_field(
+                    name="WEEKEND BONUS ACTIVE",
+                    value="2× all rewards right now · Today and tomorrow only",
+                    inline=False,
+                )
+            embed.add_field(
+                name="STACKS WITH",
+                value="Checkin combo · Lucky roll (up to 2.5×) · Every server you share with the bureau · Every 12 hours",
+                inline=False,
+            )
+            view = discord.ui.View()
+            view.add_item(discord.ui.Button(label="Vote on Top.gg", style=discord.ButtonStyle.link, url=VOTE_URL))
+            await ctx.send(embed=embed, view=view)
 
 
 async def setup(bot: commands.Bot):

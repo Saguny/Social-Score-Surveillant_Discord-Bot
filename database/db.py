@@ -19,6 +19,7 @@ from database._privacy      import PrivacyMixin
 from database._announcement import AnnouncementMixin
 from database._guilds       import GuildRankMixin
 from database._analytics    import AnalyticsMixin
+from database._gacha        import GachaMixin
 
 
 TABLES = [
@@ -223,6 +224,7 @@ class Database(
     AnnouncementMixin,
     GuildRankMixin,
     AnalyticsMixin,
+    GachaMixin,
 ):
     def __init__(self):
         self._dsn = os.getenv("DATABASE_URL", "")
@@ -525,3 +527,28 @@ class Database(
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_cmd_analytics_ts      ON command_analytics (timestamp)")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_cmd_analytics_cmd_ts  ON command_analytics (command_name, timestamp)")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_cmd_analytics_guild   ON command_analytics (guild_id, timestamp)")
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS gacha_claims (
+                    guild_id     BIGINT NOT NULL,
+                    user_id      BIGINT NOT NULL,
+                    character_id TEXT   NOT NULL,
+                    claimed_at   BIGINT NOT NULL,
+                    PRIMARY KEY (guild_id, user_id, character_id)
+                )
+            """)
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_gacha_claims_user ON gacha_claims (guild_id, user_id, claimed_at DESC)")
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS gacha_wishlists (
+                    guild_id     BIGINT NOT NULL,
+                    user_id      BIGINT NOT NULL,
+                    character_id TEXT   NOT NULL,
+                    PRIMARY KEY (guild_id, user_id, character_id)
+                )
+            """)
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_gacha_wish_char ON gacha_wishlists (guild_id, character_id)")
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS gacha_character_stats (
+                    character_id TEXT    PRIMARY KEY,
+                    claim_count  BIGINT  NOT NULL DEFAULT 0
+                )
+            """)

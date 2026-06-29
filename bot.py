@@ -512,6 +512,7 @@ class SocialCreditBot(commands.AutoShardedBot):
         await self.load_extension("cogs.privacy")
         await self.load_extension("cogs.prestige")
         await self.load_extension("cogs.serverrank")
+        await self.load_extension("cogs.gacha")
         if IS_SCHEDULER:
             asyncio.create_task(_decay_task(self))
             asyncio.create_task(_rotate_presence_task(self))
