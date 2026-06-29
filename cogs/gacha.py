@@ -732,11 +732,12 @@ class GachaCog(commands.Cog, name="Gacha"):
             description=extract or char.get("title", "No description available."),
             color=color,
         )
-        embed.add_field(name="FACTION",   value=faction,                             inline=True)
-        embed.add_field(name="RARITY",    value=_stars(char["rarity"]),              inline=True)
-        embed.add_field(name="AUTHORITY", value=str(char.get("stat_authority", "?")), inline=True)
-        embed.add_field(name="MILITARY",  value=str(char.get("stat_military",  "?")), inline=True)
-        embed.add_field(name="CHARISMA",  value=str(char.get("stat_charisma",  "?")), inline=True)
+        stats = char.get("stats", {})
+        embed.add_field(name="FACTION",   value=faction,                              inline=True)
+        embed.add_field(name="RARITY",    value=_stars(char["rarity"]),               inline=True)
+        embed.add_field(name="AUTHORITY", value=str(stats.get("authority", "?")),     inline=False)
+        embed.add_field(name="MILITARY",  value=str(stats.get("military",  "?")),     inline=False)
+        embed.add_field(name="CHARISMA",  value=str(stats.get("charisma",  "?")),     inline=False)
         if wiki:
             embed.add_field(name="WIKIPEDIA", value=f"[{char['name']}](https://en.wikipedia.org/wiki/{urllib.parse.quote(wiki)})", inline=True)
         if image_url:
