@@ -574,6 +574,8 @@ class Database(
                     stat_military  INT  NOT NULL DEFAULT 50,
                     stat_charisma  INT  NOT NULL DEFAULT 50,
                     image_urls     TEXT[] NOT NULL DEFAULT '{}',
-                    enabled        BOOLEAN NOT NULL DEFAULT TRUE
+                    enabled        BOOLEAN NOT NULL DEFAULT TRUE,
+                    gender         TEXT DEFAULT NULL
                 )
             """)
+            await conn.execute("ALTER TABLE gacha_characters ADD COLUMN IF NOT EXISTS gender TEXT DEFAULT NULL")

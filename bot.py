@@ -379,10 +379,16 @@ async def console_loop(bot: commands.Bot):
             print(f"Unknown command: {cmd}. Type 'help' for a list.")
 
 
+def _prefix(bot, message):
+    if message.content[:4].lower() == "ccp ":
+        return message.content[:4]
+    return "ccp "
+
+
 class SocialCreditBot(commands.AutoShardedBot):
     def __init__(self):
         super().__init__(
-            command_prefix="ccp ",
+            command_prefix=_prefix,
             case_insensitive=True,
             intents=intents,
             tree_cls=CreditCommandTree,
@@ -703,6 +709,8 @@ class SocialCreditBot(commands.AutoShardedBot):
                 pass
         elif isinstance(error, commands.MissingPermissions):
             await ctx.send("You do not have permission to use this command.")
+        elif isinstance(cause, discord.DiscordServerError):
+            pass
         elif not isinstance(error, commands.CommandNotFound):
             raise error
 
