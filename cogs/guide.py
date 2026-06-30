@@ -338,7 +338,7 @@ class GuideView(discord.ui.View):
             name="COLLECTION & VIEWING",
             value=(
                 "`ccp collection` · `ccp harem` · `/collection` — View your harem\n"
-                "`ccp image <name>` · `/image <name>` — View a waifu's image (◀▶ to browse multiple)\n"
+                "`ccp image <name>` · `ccp im <name>` · `/image <name>` — View a waifu's image (◀▶ to browse multiple)\n"
                 "`ccp browse` · `/browse` — Full catalogue with faction/rarity filters\n"
                 "`ccp top` · `/top` — Most claimed waifus globally"
             ),

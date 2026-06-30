@@ -42,6 +42,17 @@ def _search_personality(query: str) -> dict | None:
     return None
 
 
+def _search_personality_all(query: str) -> list[dict]:
+    """Find every character matching by name (exact matches take priority over
+    substring matches). Returns dicts with 'id' injected. Used where multiple
+    characters can share the same name and the caller needs to disambiguate."""
+    q = query.lower().strip()
+    exact = [{"id": cid, **ch} for cid, ch in _CHARS.items() if ch["name"].lower() == q]
+    if exact:
+        return exact
+    return [{"id": cid, **ch} for cid, ch in _CHARS.items() if q in ch["name"].lower()]
+
+
 def _roll_weighted(gender: str | None = None) -> tuple[str, dict]:
     if gender:
         pool = {k: v for k, v in _CHARS.items() if v.get("gender") == gender}
@@ -505,6 +516,35 @@ class ImageView(discord.ui.View):
         self.index += 1
         self._update_buttons()
         await interaction.response.edit_message(embed=self.build_embed(), view=self)
+
+
+class ImageChoiceView(discord.ui.View):
+    """Shown when a name matches more than one character — lets the user pick."""
+
+    def __init__(self, cog: "GachaCog", matches: list[dict]):
+        super().__init__(timeout=60)
+        self.cog = cog
+        opts = [
+            discord.SelectOption(
+                label=ch["name"][:100],
+                description=f"{FACTION_LABEL.get(ch['faction'], ch['faction'].upper())} · {_stars(ch['rarity'])}"[:100],
+                value=ch["id"],
+            )
+            for ch in matches[:25]
+        ]
+        sel = discord.ui.Select(placeholder="Multiple matches — choose one…", options=opts)
+        sel.callback = self._on_select
+        self.add_item(sel)
+        self._sel = sel
+
+    async def _on_select(self, interaction: discord.Interaction):
+        cid = self._sel.values[0]
+        char = _get_personality(cid)
+        if not char:
+            await interaction.response.edit_message(content="That waifu no longer exists.", embed=None, view=None)
+            return
+        embed, view = await self.cog._build_card(cid, {"id": cid, **char})
+        await interaction.response.edit_message(content=None, embed=embed, view=view)
 
 
 # ── Cog ────────────────────────────────────────────────────────────────────────
@@ -986,7 +1026,7 @@ class GachaCog(commands.Cog, name="Gacha"):
         async with ctx.typing():
             await self._do_roll(ctx.guild.id, ctx.author.id, ctx.author.display_name, ctx.send, gender="male")
 
-    @commands.command(name="image")
+    @commands.command(name="image", aliases=["im"])
     async def prefix_image(self, ctx: commands.Context, *, name: str = ""):
         async with ctx.typing():
             if not name:
@@ -1258,26 +1298,43 @@ class GachaCog(commands.Cog, name="Gacha"):
 
     # ── image view ────────────────────────────────────────────────────────────
 
+    async def _build_card(self, char_id: str, char: dict) -> tuple[discord.Embed | None, discord.ui.View | None]:
+        """Returns (embed, view) for a resolved character, or (None, None) if it has no images."""
+        urls = char.get("image_urls") or []
+        if not urls:
+            return None, None
+        rank_info = await self.db.get_character_rank(char_id)
+        rank_text = f"Global #{rank_info['rank']}  ·  {rank_info['claims']} claims" if rank_info["rank"] else "Unclaimed globally"
+        if len(urls) == 1:
+            return _image_embed(char, urls[0], 0, len(urls), rank_text), None
+        view = ImageView(char, urls, rank_text)
+        return view.build_embed(), view
+
     async def _show_card(self, name: str, send_fn):
-        char = _get_personality(name) or _search_personality(name)
+        char = _get_personality(name)
+        if not char:
+            matches = _search_personality_all(name)
+            if len(matches) > 1:
+                view = ImageChoiceView(self, matches)
+                await send_fn(f"Multiple waifus match **{name}** — pick one:", view=view)
+                return
+            char = matches[0] if matches else None
+        else:
+            char = {"id": name, **char}
+
         if not char:
             await send_fn(f"No waifu found matching **{name}**.\nDon't see your favorite figure? Join our Support Server to request them: <https://discord.gg/k4W6YAPYhC>")
             return
+
         char_id = char.get("id", name)
-        urls = char.get("image_urls") or []
-        if not urls:
+        embed, view = await self._build_card(char_id, char)
+        if embed is None:
             await send_fn(f"No image available for **{char['name']}**.")
             return
-
-        rank_info = await self.db.get_character_rank(char_id)
-        rank_text = f"Global #{rank_info['rank']}  ·  {rank_info['claims']} claims" if rank_info["rank"] else "Unclaimed globally"
-
-        if len(urls) == 1:
-            embed = _image_embed(char, urls[0], 0, len(urls), rank_text)
-            await send_fn(embed=embed)
+        if view:
+            await send_fn(embed=embed, view=view)
         else:
-            view = ImageView(char, urls, rank_text)
-            await send_fn(embed=view.build_embed(), view=view)
+            await send_fn(embed=embed)
 
     # ── collection view ───────────────────────────────────────────────────────
 
