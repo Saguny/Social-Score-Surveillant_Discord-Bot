@@ -330,7 +330,7 @@ class GuideView(discord.ui.View):
             value=(
                 "If a rolled waifu is already claimed in this server, the embed turns gold. "
                 "The first reactor earns Yuan instead — scaled by rarity "
-                "(¥100 common → ¥5,000 legendary). Does not count against your roll limit."
+                "(¥100 common -> ¥5,000 legendary). Does not count against your roll limit."
             ),
             inline=False,
         )

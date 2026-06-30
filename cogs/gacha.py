@@ -15,6 +15,12 @@ from infra.redis_client import get_redis
 
 # Character pool — loaded from DB at cog startup, stays in memory for fast rolls.
 _CHARS: dict[str, dict] = {}
+_NAME_INDEX: dict[str, str] = {}  # lowercase name -> character_id
+
+
+def _build_name_index() -> None:
+    global _NAME_INDEX
+    _NAME_INDEX = {ch["name"].lower(): cid for cid, ch in _CHARS.items()}
 
 
 def _get_personality(char_id: str) -> dict | None:
@@ -26,9 +32,10 @@ def _search_personality(query: str) -> dict | None:
     q = query.lower().strip()
     if q in _CHARS:
         return {"id": q, **_CHARS[q]}
-    for cid, ch in _CHARS.items():
-        if ch["name"].lower() == q:
-            return {"id": cid, **ch}
+    if q in _NAME_INDEX:
+        cid = _NAME_INDEX[q]
+        return {"id": cid, **_CHARS[cid]}
+    # substring fallback — only reached when no exact match exists
     for cid, ch in _CHARS.items():
         if q in ch["name"].lower():
             return {"id": cid, **ch}
@@ -511,11 +518,13 @@ class GachaCog(commands.Cog, name="Gacha"):
         global _CHARS
         all_chars = await self.db.get_all_characters()
         _CHARS = {cid: ch for cid, ch in all_chars.items() if ch.get("image_urls")}
+        _build_name_index()
         print(f"[gacha] loaded {len(_CHARS)}/{len(all_chars)} characters from DB (imageless excluded)")
 
     async def reload_chars(self) -> int:
         global _CHARS
         _CHARS = await self.db.get_all_characters()
+        _build_name_index()
         return len(_CHARS)
 
     # ── roll helpers ─────────────────────────────────────────────────────────
