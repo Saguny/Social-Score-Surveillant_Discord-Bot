@@ -307,6 +307,8 @@ class GuideView(discord.ui.View):
             name="ROLLING",
             value=(
                 "`ccp roll` · `ccp r` · `/roll` — Roll a random waifu\n"
+                "`ccp rollwaifu` · `ccp rw` · `/rollwaifu` — Female figures only\n"
+                "`ccp rollhusbando` · `ccp rh` · `/rollhusbando` — Male figures only\n"
                 "React with any emoji to claim · **10 rolls per hour** (up to +4 from vote streak)\n"
                 "Voting on Top.gg resets your hourly rolls instantly"
             ),

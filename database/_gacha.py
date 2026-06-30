@@ -9,6 +9,7 @@ def _row_to_char(row) -> dict:
         "rarity":     row["rarity"],
         "quote":      row["quote"],
         "wiki":       row["wiki"],
+        "gender":     row["gender"],
         "stats": {
             "authority": row["stat_authority"],
             "military":  row["stat_military"],

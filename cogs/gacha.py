@@ -35,11 +35,17 @@ def _search_personality(query: str) -> dict | None:
     return None
 
 
-def _roll_weighted() -> tuple[str, dict]:
-    keys    = list(_CHARS.keys())
-    weights = [RARITY_WEIGHT.get(_CHARS[k]["rarity"], 60) for k in keys]
+def _roll_weighted(gender: str | None = None) -> tuple[str, dict]:
+    if gender:
+        pool = {k: v for k, v in _CHARS.items() if v.get("gender") == gender}
+        if not pool:
+            pool = _CHARS
+    else:
+        pool = _CHARS
+    keys    = list(pool.keys())
+    weights = [RARITY_WEIGHT.get(pool[k]["rarity"], 60) for k in keys]
     cid     = random.choices(keys, weights=weights)[0]
-    return cid, _CHARS[cid]
+    return cid, pool[cid]
 
 CLAIM_WINDOW     = 60
 ROLL_WINDOW      = 3600
@@ -503,8 +509,9 @@ class GachaCog(commands.Cog, name="Gacha"):
 
     async def cog_load(self):
         global _CHARS
-        _CHARS = await self.db.get_all_characters()
-        print(f"[gacha] loaded {len(_CHARS)} characters from DB")
+        all_chars = await self.db.get_all_characters()
+        _CHARS = {cid: ch for cid, ch in all_chars.items() if ch.get("image_urls")}
+        print(f"[gacha] loaded {len(_CHARS)}/{len(all_chars)} characters from DB (imageless excluded)")
 
     async def reload_chars(self) -> int:
         global _CHARS
@@ -549,7 +556,7 @@ class GachaCog(commands.Cog, name="Gacha"):
 
     # ── shared logic ─────────────────────────────────────────────────────────
 
-    async def _do_roll(self, guild_id: int, user_id: int, display_name: str, send_fn):
+    async def _do_roll(self, guild_id: int, user_id: int, display_name: str, send_fn, gender: str | None = None):
         (max_rolls, (rolls_used, ttl)) = await asyncio.gather(
             self._max_rolls(user_id),
             self._roll_state(guild_id, user_id),
@@ -566,7 +573,7 @@ class GachaCog(commands.Cog, name="Gacha"):
             )
             return
 
-        char_id, char = _roll_weighted()
+        char_id, char = _roll_weighted(gender)
         image_url = _pick_image(char)
 
         new_count, owner_id = await asyncio.gather(
@@ -679,6 +686,24 @@ class GachaCog(commands.Cog, name="Gacha"):
         await self._do_roll(
             interaction.guild.id, interaction.user.id,
             interaction.user.display_name, interaction.followup.send,
+        )
+
+    @app_commands.command(name="rollwaifu", description="Roll for a female historical figure only")
+    async def slash_rollwaifu(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        await self._do_roll(
+            interaction.guild.id, interaction.user.id,
+            interaction.user.display_name, interaction.followup.send,
+            gender="female",
+        )
+
+    @app_commands.command(name="rollhusbando", description="Roll for a male historical figure only")
+    async def slash_rollhusbando(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        await self._do_roll(
+            interaction.guild.id, interaction.user.id,
+            interaction.user.display_name, interaction.followup.send,
+            gender="male",
         )
 
     @app_commands.command(name="image", description="View a personality's card")
@@ -941,6 +966,16 @@ class GachaCog(commands.Cog, name="Gacha"):
     async def prefix_roll(self, ctx: commands.Context):
         async with ctx.typing():
             await self._do_roll(ctx.guild.id, ctx.author.id, ctx.author.display_name, ctx.send)
+
+    @commands.command(name="rollwaifu", aliases=["rw"])
+    async def prefix_rollwaifu(self, ctx: commands.Context):
+        async with ctx.typing():
+            await self._do_roll(ctx.guild.id, ctx.author.id, ctx.author.display_name, ctx.send, gender="female")
+
+    @commands.command(name="rollhusbando", aliases=["rh"])
+    async def prefix_rollhusbando(self, ctx: commands.Context):
+        async with ctx.typing():
+            await self._do_roll(ctx.guild.id, ctx.author.id, ctx.author.display_name, ctx.send, gender="male")
 
     @commands.command(name="image")
     async def prefix_image(self, ctx: commands.Context, *, name: str = ""):

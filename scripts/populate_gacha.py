@@ -177,6 +177,58 @@ _WIKI_CATEGORIES = [
     "South_African_politicians",
     "Nigerian_politicians",
     "Pakistani_politicians",
+    "Ukrainian_politicians",
+    "Portuguese_politicians",
+    "Belgian_politicians",
+    "Singaporean_politicians",
+    "Saudi_Arabian_politicians",
+    "Emirati_politicians",
+    "Kenyan_politicians",
+    "Ethiopian_politicians",
+    "Ghanaian_politicians",
+    "Senegalese_politicians",
+    "Rwandan_politicians",
+    "Zimbabwean_politicians",
+    "Congolese_politicians",
+    "Tanzanian_politicians",
+    "Ugandan_politicians",
+    "Sudanese_politicians",
+    "Moroccan_politicians",
+    "Tunisian_politicians",
+    "Algerian_politicians",
+    "Libyan_politicians",
+    "Syrian_politicians",
+    "Lebanese_politicians",
+    "Jordanian_politicians",
+    "Iraqi_politicians",
+    "Yemeni_politicians",
+    "Bangladeshi_politicians",
+    "Sri_Lankan_politicians",
+    "Myanmar_politicians",
+    "Thai_politicians",
+    "Vietnamese_politicians",
+    "Malaysian_politicians",
+    "Indonesian_politicians",
+    "Filipino_politicians",
+    "Peruvian_politicians",
+    "Bolivian_politicians",
+    "Ecuadorian_politicians",
+    "Paraguayan_politicians",
+    "Uruguayan_politicians",
+    "Cuban_politicians",
+    "Guatemalan_politicians",
+    "Honduran_politicians",
+    "Salvadoran_politicians",
+    "Nicaraguan_politicians",
+    "Costa_Rican_politicians",
+    "Panamanian_politicians",
+    "Dominican_Republic_politicians",
+    "Haitian_politicians",
+    "New_Zealand_politicians",
+    "Irish_politicians",
+    "Scottish_politicians",
+    "Welsh_politicians",
+    "Catalan_politicians",
     # ── Soviet / communist ────────────────────────────────────────────────────
     "General_secretaries_of_the_Communist_Party_of_the_Soviet_Union",
     "Leaders_of_the_Soviet_Union",
@@ -208,18 +260,48 @@ _WIKI_CATEGORIES = [
     "Kings_of_Scotland",
     "Kings_of_Portugal",
     "Kings_of_Poland",
+    "Kings_of_Denmark",
+    "Kings_of_Norway",
+    "Kings_of_Hungary",
+    "Kings_of_Serbia",
+    "Kings_of_Greece",
+    "Kings_of_Romania",
+    "Shahs_of_Iran",
+    "Kings_of_Saudi_Arabia",
+    "Kings_of_Jordan",
+    "Kings_of_Morocco",
+    "Pharaohs_of_Egypt",
+    "Sultans_of_the_Ottoman_Empire",
+    "Emperors_of_India",
+    "Emperors_of_Ethiopia",
+    "Rulers_of_the_Aztec_Empire",
+    "Sapa_Inca",
     # ── Military ─────────────────────────────────────────────────────────────
     "Field_marshals",
     "Military_strategists",
     "Warlords",
     "Revolutionaries",
     "Military_dictators",
-    "Fascist_leaders",
     "Admirals",
     "Generals",
     "American_military_personnel",
     "British_Army_officers",
     "Soviet_military_personnel",
+    "French_military_personnel",
+    "German_military_personnel",
+    "Japanese_military_personnel",
+    "Chinese_military_personnel",
+    "Russian_military_personnel",
+    "Roman_generals",
+    "Macedonian_military_personnel",
+    "Napoleonic_Wars_generals",
+    "World_War_I_generals",
+    "World_War_II_generals",
+    "Cold_War_military_leaders",
+    "Special_forces_personnel",
+    "Military_commanders",
+    "Pirates",
+    "Privateers",
     # ── Scientists ───────────────────────────────────────────────────────────
     "Theoretical_physicists",
     "Experimental_physicists",
@@ -386,6 +468,782 @@ _WIKI_CATEGORIES = [
     "Anti-apartheid_activists",
     "Human_rights_activists",
     "Environmentalists",
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # NEW CATEGORIES
+    # ══════════════════════════════════════════════════════════════════════════
+
+    # ── Internet / digital culture ────────────────────────────────────────────
+    "YouTubers",
+    "American_YouTubers",
+    "British_YouTubers",
+    "Gaming_YouTubers",
+    "Beauty_YouTubers",
+    "Twitch_streamers",
+    "American_Twitch_streamers",
+    "TikTokers",
+    "Podcasters",
+    "American_podcasters",
+    "Social_media_personalities",
+    "Internet_celebrities",
+    "Video_bloggers",
+    "Esports_players",
+    "Professional_gamers",
+    "Video_game_streamers",
+
+    # ── K-pop & Korean entertainment ─────────────────────────────────────────
+    "K-pop_singers",
+    "South_Korean_singers",
+    "South_Korean_actors",
+    "South_Korean_musicians",
+    "BTS_members",
+    "BLACKPINK_members",
+    "K-pop_girl_groups",
+    "K-pop_boy_bands",
+    "Korean_rappers",
+    "Korean_television_personalities",
+    "Korean_film_directors",
+
+    # ── Bollywood & Indian entertainment ──────────────────────────────────────
+    "Indian_film_actors",
+    "Bollywood_actors",
+    "Indian_actresses",
+    "Indian_singers",
+    "Indian_musicians",
+    "Indian_film_directors",
+    "Tamil_film_actors",
+    "Telugu_film_actors",
+    "Indian_television_actors",
+    "Indian_comedians",
+
+    # ── Latin American entertainment ──────────────────────────────────────────
+    "Mexican_singers",
+    "Mexican_actors",
+    "Brazilian_singers",
+    "Brazilian_actors",
+    "Colombian_singers",
+    "Argentine_singers",
+    "Argentine_actors",
+    "Latin_pop_singers",
+    "Reggaeton_musicians",
+    "Latin_Grammy_Award_winners",
+    "Spanish_actors",
+    "Spanish_singers",
+    "Puerto_Rican_singers",
+    "Cuban_musicians",
+
+    # ── Anime, manga & Japanese pop culture ──────────────────────────────────
+    "Manga_artists",
+    "Anime_directors",
+    "Japanese_animators",
+    "Japanese_voice_actors",
+    "Japanese_game_designers",
+    "Visual_novel_writers",
+    "Japanese_pop_singers",
+    "J-pop_singers",
+    "Japanese_idols",
+    "Japanese_comedians",
+    "Japanese_television_personalities",
+
+    # ── Video game industry ───────────────────────────────────────────────────
+    "Video_game_designers",
+    "Video_game_developers",
+    "Video_game_producers",
+    "Video_game_directors",
+    "American_video_game_designers",
+    "Japanese_video_game_designers",
+    "Game_programmers",
+
+    # ── Sports (extended) ─────────────────────────────────────────────────────
+    "UFC_champions",
+    "Mixed_martial_arts_champions",
+    "Professional_boxers",
+    "WBC_champions",
+    "WBA_champions",
+    "IBF_champions",
+    "WBO_champions",
+    "Kickboxers",
+    "Brazilian_jiu-jitsu_practitioners",
+    "Judokas",
+    "Wrestlers",
+    "Sumo_wrestlers",
+    "Olympic_wrestlers",
+    "Olympic_swimmers",
+    "Olympic_gymnasts",
+    "Olympic_sprinters",
+    "Olympic_cyclists",
+    "Olympic_weightlifters",
+    "Marathon_runners",
+    "Rugby_union_players",
+    "Rugby_league_players",
+    "Cricket_players",
+    "Test_cricket_players",
+    "Indian_cricketers",
+    "Australian_cricketers",
+    "English_cricketers",
+    "Pakistani_cricketers",
+    "West_Indian_cricketers",
+    "Association_football_managers",
+    "FIFA_World_Cup_winners",
+    "UEFA_Champions_League_winners",
+    "Premier_League_players",
+    "La_Liga_players",
+    "Serie_A_players",
+    "Bundesliga_players",
+    "Brazilian_footballers",
+    "Argentine_footballers",
+    "French_footballers",
+    "German_footballers",
+    "Spanish_footballers",
+    "Portuguese_footballers",
+    "Italian_footballers",
+    "English_footballers",
+    "Dutch_footballers",
+    "African_footballers",
+    "Ballon_d'Or_winners",
+    "Cyclists",
+    "Tour_de_France_winners",
+    "Swimmers",
+    "Gymnasts",
+    "Figure_skaters",
+    "Alpine_skiers",
+    "Snowboarders",
+    "Decathletes",
+    "Sprinters",
+    "High_jumpers",
+    "Long_jumpers",
+    "Shot_putters",
+    "Javelin_throwers",
+    "Race_car_drivers",
+    "NASCAR_drivers",
+    "IndyCar_drivers",
+    "Motorcycle_racers",
+    "Surfers",
+    "Skateboarders",
+    "Rock_climbers",
+    "Triathletes",
+    "Table_tennis_players",
+    "Badminton_players",
+    "Volleyball_players",
+    "Water_polo_players",
+    "Handball_players",
+    "Field_hockey_players",
+    "American_soccer_players",
+    "Women's_soccer_players",
+    "WNBA_players",
+    "Darts_players",
+    "Snooker_players",
+    "Pool_players",
+    "Poker_players",
+    "Speed_skaters",
+    "Bobsledders",
+    "Luge_athletes",
+    "Biathletes",
+    "Cross-country_skiers",
+    "Ski_jumpers",
+
+    # ── Music (extended & global) ─────────────────────────────────────────────
+    "Electronic_music_producers",
+    "DJs",
+    "EDM_musicians",
+    "House_music_DJs",
+    "Techno_musicians",
+    "Trance_musicians",
+    "Drum_and_bass_musicians",
+    "Dubstep_musicians",
+    "Dance_music_producers",
+    "Pop_musicians",
+    "Indie_pop_musicians",
+    "Alternative_rock_musicians",
+    "Heavy_metal_musicians",
+    "Death_metal_musicians",
+    "Black_metal_musicians",
+    "Punk_rock_musicians",
+    "Hardcore_punk_musicians",
+    "Grunge_musicians",
+    "New_wave_musicians",
+    "Disco_musicians",
+    "Funk_musicians",
+    "Reggae_musicians",
+    "Jamaican_musicians",
+    "Dancehall_musicians",
+    "Afrobeats_musicians",
+    "Nigerian_musicians",
+    "African_musicians",
+    "Gospel_musicians",
+    "Christian_music_artists",
+    "Latin_music_musicians",
+    "Salsa_musicians",
+    "Bossa_nova_musicians",
+    "Samba_musicians",
+    "Flamenco_musicians",
+    "Tango_musicians",
+    "Cumbia_musicians",
+    "French_musicians",
+    "German_musicians",
+    "Italian_musicians",
+    "Spanish_musicians",
+    "Australian_musicians",
+    "Canadian_musicians",
+    "Irish_musicians",
+    "Swedish_musicians",
+    "Norwegian_musicians",
+    "Icelandic_musicians",
+    "Danish_musicians",
+    "Dutch_musicians",
+    "Belgian_musicians",
+    "Russian_musicians",
+    "Ukrainian_musicians",
+    "Polish_musicians",
+    "Greek_musicians",
+    "Turkish_musicians",
+    "Arabic_pop_singers",
+    "Egyptian_musicians",
+    "Lebanese_musicians",
+    "Indian_classical_musicians",
+    "Qawwali_musicians",
+    "Bhangra_musicians",
+    "Chinese_musicians",
+    "K-pop_producers",
+    "Music_video_directors",
+    "Record_producers",
+    "Music_executives",
+    "Bassists",
+    "Drummers",
+    "Saxophonists",
+    "Trumpeters",
+    "Cellists",
+    "Flutists",
+    "Harpists",
+    "Accordionists",
+    "Banjo_players",
+    "Mandolin_players",
+    "Sitar_players",
+    "Tabla_players",
+    "Didgeridoo_players",
+    "Boy_bands",
+    "Girl_groups",
+
+    # ── Film & television (extended) ──────────────────────────────────────────
+    "Hollywood_actors",
+    "American_actresses",
+    "American_actors",
+    "French_actors",
+    "German_actors",
+    "Italian_actors",
+    "Australian_actors",
+    "Canadian_actors",
+    "Irish_actors",
+    "Hong_Kong_actors",
+    "Chinese_actors",
+    "Japanese_actors",
+    "Thai_actors",
+    "Nigerian_actors",
+    "Ghanaian_actors",
+    "South_African_actors",
+    "Action_film_actors",
+    "Horror_film_actors",
+    "Documentary_film_directors",
+    "American_film_directors",
+    "British_film_directors",
+    "French_film_directors",
+    "Italian_film_directors",
+    "German_film_directors",
+    "Japanese_film_directors",
+    "Indian_film_directors",
+    "Hong_Kong_film_directors",
+    "Chinese_film_directors",
+    "Iranian_film_directors",
+    "South_Korean_film_directors",
+    "Mexican_film_directors",
+    "Argentine_film_directors",
+    "Film_producers",
+    "Film_critics",
+    "Screenwriters",
+    "American_screenwriters",
+    "Reality_television_participants",
+    "Reality_television_personalities",
+    "American_late-night_television_hosts",
+    "American_news_anchors",
+    "Television_news_presenters",
+    "Broadcast_journalists",
+    "Radio_personalities",
+    "Stand-up_comedians",
+    "American_stand-up_comedians",
+    "British_comedians",
+    "Australian_comedians",
+    "Canadian_comedians",
+    "Satirists",
+    "Impressionists_(entertainers)",
+    "Ventriloquists",
+    "Magicians",
+    "Illusionists",
+    "Circus_performers",
+    "Stunt_performers",
+
+    # ── Fashion & beauty ──────────────────────────────────────────────────────
+    "Fashion_designers",
+    "French_fashion_designers",
+    "Italian_fashion_designers",
+    "American_fashion_designers",
+    "British_fashion_designers",
+    "Belgian_fashion_designers",
+    "Japanese_fashion_designers",
+    "Supermodels",
+    "Fashion_models",
+    "Plus-size_models",
+    "Make-up_artists",
+    "Hairstylists",
+    "Perfumers",
+    "Jewellery_designers",
+    "Shoe_designers",
+
+    # ── Food & culinary ───────────────────────────────────────────────────────
+    "Celebrity_chefs",
+    "French_chefs",
+    "Italian_chefs",
+    "American_chefs",
+    "British_chefs",
+    "Japanese_chefs",
+    "Restaurateurs",
+    "Food_critics",
+    "Cookbook_authors",
+    "Pastry_chefs",
+    "Winemakers",
+    "Sommeliers",
+    "Bartenders",
+
+    # ── Business & tech (extended) ────────────────────────────────────────────
+    "Technology_company_founders",
+    "Silicon_Valley_entrepreneurs",
+    "Venture_capitalists",
+    "Hedge_fund_managers",
+    "Investment_bankers",
+    "Corporate_executives",
+    "Chief_executive_officers",
+    "Chief_technology_officers",
+    "British_businesspeople",
+    "German_businesspeople",
+    "French_businesspeople",
+    "Chinese_businesspeople",
+    "Indian_businesspeople",
+    "Japanese_businesspeople",
+    "Russian_oligarchs",
+    "Media_moguls",
+    "Publishing_executives",
+    "Real_estate_developers",
+    "Fashion_industry_executives",
+    "Cryptocurrency_entrepreneurs",
+    "Space_industry_entrepreneurs",
+    "Electric_vehicle_entrepreneurs",
+    "Social_media_company_founders",
+    "E-commerce_entrepreneurs",
+
+    # ── Science & technology (extended) ───────────────────────────────────────
+    "Geneticists",
+    "Neuroscientists",
+    "Cognitive_scientists",
+    "Evolutionary_biologists",
+    "Ecologists",
+    "Marine_biologists",
+    "Virologists",
+    "Epidemiologists",
+    "Immunologists",
+    "Oncologists",
+    "Surgeons",
+    "Psychiatrists",
+    "Psychologists",
+    "Anthropologists",
+    "Archaeologists",
+    "Palaeontologists",
+    "Geologists",
+    "Climatologists",
+    "Meteorologists",
+    "Materials_scientists",
+    "Robotics_researchers",
+    "Artificial_intelligence_researchers",
+    "Cryptographers",
+    "Electrical_engineers",
+    "Mechanical_engineers",
+    "Civil_engineers",
+    "Chemical_engineers",
+    "Biomedical_engineers",
+    "Nanotechnologists",
+    "Quantum_physicists",
+    "Cosmologists",
+    "Astrobiologists",
+    "Science_communicators",
+    "Popular_science_writers",
+    "Indian_scientists",
+    "Chinese_scientists",
+    "Japanese_scientists",
+    "Russian_scientists",
+    "French_scientists",
+    "Italian_scientists",
+    "Israeli_scientists",
+
+    # ── Arts & architecture (extended) ────────────────────────────────────────
+    "Abstract_expressionist_artists",
+    "Pop_art_artists",
+    "Minimalist_artists",
+    "Street_artists",
+    "Graffiti_artists",
+    "Installation_artists",
+    "Performance_artists",
+    "Video_artists",
+    "Conceptual_artists",
+    "Digital_artists",
+    "Illustrators",
+    "Cartoonists",
+    "Comic_book_artists",
+    "Caricaturists",
+    "Portrait_photographers",
+    "War_photographers",
+    "Fashion_photographers",
+    "Wildlife_photographers",
+    "Documentary_photographers",
+    "Indian_painters",
+    "African_painters",
+    "Latin_American_painters",
+    "Australian_painters",
+    "Canadian_painters",
+    "Korean_painters",
+    "Modernist_architects",
+    "Contemporary_architects",
+    "American_architects",
+    "British_architects",
+    "French_architects",
+    "Japanese_architects",
+    "Landscape_architects",
+    "Interior_designers",
+    "Graphic_designers",
+    "Industrial_designers",
+    "Typographers",
+    "Textile_designers",
+    "Ceramicists",
+    "Glass_artists",
+    "Printmakers",
+    "Engravers",
+    "Calligraphers",
+    "Muralists",
+    "Mosaic_artists",
+    "Tattoo_artists",
+    "Ballet_dancers",
+    "Contemporary_dancers",
+    "Choreographers",
+    "Ballroom_dancers",
+    "Hip-hop_dancers",
+    "Flamenco_dancers",
+
+    # ── Writers & media (extended) ────────────────────────────────────────────
+    "Indian_writers",
+    "Arabic_writers",
+    "Persian_writers",
+    "Turkish_writers",
+    "Korean_writers",
+    "African-American_writers",
+    "Irish_writers",
+    "Australian_writers",
+    "Canadian_writers",
+    "New_Zealand_writers",
+    "Scandinavian_writers",
+    "Polish_writers",
+    "Hungarian_writers",
+    "Czech_writers",
+    "Yugoslav_writers",
+    "Greek_writers",
+    "Romanian_writers",
+    "Dutch_writers",
+    "Belgian_writers",
+    "Swiss_writers",
+    "Israeli_writers",
+    "Yiddish_writers",
+    "Nobel_Prize_in_Literature_laureates",
+    "Booker_Prize_winners",
+    "Pulitzer_Prize_winners",
+    "Fantasy_writers",
+    "Horror_writers",
+    "Mystery_writers",
+    "Thriller_writers",
+    "Children's_literature_authors",
+    "Young_adult_literature_authors",
+    "Graphic_novel_writers",
+    "Comic_book_writers",
+    "Biographers",
+    "Autobiographers",
+    "Memoirists",
+    "Travel_writers",
+    "Nature_writers",
+    "Sports_journalists",
+    "War_correspondents",
+    "Investigative_journalists",
+    "Bloggers",
+    "Columnists",
+    "Editors",
+    "Literary_critics",
+    "Television_critics",
+    "Film_critics",
+    "Music_critics",
+
+    # ── Philosophy & academia (extended) ─────────────────────────────────────
+    "Continental_philosophers",
+    "Analytic_philosophers",
+    "Pragmatist_philosophers",
+    "Existentialist_philosophers",
+    "Phenomenologists",
+    "Postmodern_philosophers",
+    "Feminist_philosophers",
+    "Ethicists",
+    "Logicians",
+    "Philosophers_of_science",
+    "Philosophers_of_language",
+    "Philosophers_of_mind",
+    "Metaphysicians",
+    "Epistemologists",
+    "Eastern_philosophers",
+    "Buddhist_philosophers",
+    "Confucian_philosophers",
+    "Taoist_philosophers",
+    "Islamic_philosophers",
+    "Jewish_philosophers",
+    "Christian_philosophers",
+    "Utilitarians",
+    "Kantian_philosophers",
+    "Hegelians",
+    "Marxist_philosophers",
+    "Linguists",
+    "Psycholinguists",
+    "Computational_linguists",
+    "Semioticians",
+    "Rhetoricians",
+    "Historians",
+    "Military_historians",
+    "Economic_historians",
+    "Cultural_historians",
+    "Intellectual_historians",
+    "American_historians",
+    "British_historians",
+    "French_historians",
+    "German_historians",
+    "Indian_historians",
+    "Ancient_historians",
+    "Byzantine_historians",
+    "Islamic_historians",
+    "Classicists",
+    "Orientalists",
+
+    # ── Religion (extended) ───────────────────────────────────────────────────
+    "Archbishops",
+    "Cardinals",
+    "Bishops",
+    "Rabbis",
+    "Ayatollahs",
+    "Muftis",
+    "Dalai_Lamas",
+    "Buddhist_monks",
+    "Sufi_mystics",
+    "Hindu_religious_leaders",
+    "Sikh_religious_leaders",
+    "New_religious_movement_leaders",
+    "Cult_leaders",
+    "Evangelists",
+    "Televangelists",
+    "Protestant_reformers",
+    "Puritan_ministers",
+    "Jesuit_missionaries",
+    "Saints",
+    "Martyrs",
+    "Mystics",
+    "Theologians",
+
+    # ── Law & justice ─────────────────────────────────────────────────────────
+    "Chief_justices_of_the_United_States",
+    "Judges",
+    "Lawyers",
+    "Prosecutors",
+    "Defense_attorneys",
+    "International_law_scholars",
+    "Legal_reformers",
+    "Law_professors",
+    "Attorneys_General_of_the_United_States",
+    "Solicitors_General",
+    "International_Criminal_Court_prosecutors",
+
+    # ── Criminology & true crime ──────────────────────────────────────────────
+    "Serial_killers",
+    "Criminals",
+    "Gangsters",
+    "Mobsters",
+    "Drug_lords",
+    "Hackers",
+    "Con_artists",
+    "Terrorists",
+    "Bombers",
+    "Bank_robbers",
+    "Kidnappers",
+    "Fraudsters",
+    "White-collar_criminals",
+
+    # ── Health & medicine ─────────────────────────────────────────────────────
+    "Physicians",
+    "Medical_pioneers",
+    "Vaccinologists",
+    "Pharmacologists",
+    "Anaesthesiologists",
+    "Cardiologists",
+    "Neurologists",
+    "Paediatricians",
+    "Gynaecologists",
+    "Ophthalmologists",
+    "Dentists",
+    "Nurses",
+    "Public_health_advocates",
+    "Alternative_medicine_practitioners",
+    "Nutritionists",
+    "Fitness_trainers",
+
+    # ── Education ─────────────────────────────────────────────────────────────
+    "University_presidents",
+    "Educational_reformers",
+    "University_professors",
+    "School_principals",
+
+    # ── Environment & nature ──────────────────────────────────────────────────
+    "Conservationists",
+    "Wildlife_biologists",
+    "Environmental_activists",
+    "Climate_scientists",
+    "Zoologists",
+    "Ornithologists",
+    "Botanists",
+    "Entomologists",
+    "Primatologists",
+    "Animal_rights_activists",
+    "National_park_advocates",
+
+    # ── Space exploration ─────────────────────────────────────────────────────
+    "Cosmonauts",
+    "American_astronauts",
+    "Soviet_cosmonauts",
+    "Chinese_astronauts",
+    "Space_shuttle_astronauts",
+    "International_Space_Station_crew",
+    "Lunar_astronauts",
+    "Private_spaceflight_participants",
+    "Aerospace_entrepreneurs",
+
+    # ── LGBTQ+ figures ────────────────────────────────────────────────────────
+    "LGBT_activists",
+    "LGBT_politicians",
+    "LGBT_entertainers",
+    "LGBT_writers",
+    "Gay_men",
+    "Lesbian_women",
+    "Bisexual_people",
+    "Transgender_women",
+    "Transgender_men",
+    "Non-binary_people",
+
+    # ── Disability & accessibility ────────────────────────────────────────────
+    "Disabled_activists",
+    "Blind_people",
+    "Deaf_people",
+    "Disability_rights_activists",
+
+    # ── Diaspora & international figures ─────────────────────────────────────
+    "African-American_politicians",
+    "African-American_athletes",
+    "African-American_entertainers",
+    "Hispanic_and_Latino_Americans",
+    "Asian_Americans",
+    "Arab_Americans",
+    "Jewish_Americans",
+    "Irish_Americans",
+    "Italian_Americans",
+    "Chinese_Americans",
+    "Indian_Americans",
+    "Korean_Americans",
+    "Vietnamese_Americans",
+    "Cuban_Americans",
+    "Mexican_Americans",
+    "British_Indians",
+    "British_Pakistanis",
+    "British_West_Indians",
+    "Black_British_people",
+    "Overseas_Chinese",
+    "French_people_of_Algerian_descent",
+
+    # ── Historical eras ───────────────────────────────────────────────────────
+    "Ancient_Mesopotamians",
+    "Ancient_Persians",
+    "Ancient_Israelites",
+    "Ancient_Chinese",
+    "Ancient_Indians",
+    "Ancient_Japanese",
+    "Ancient_Mesoamericans",
+    "Ancient_South_Americans",
+    "Celts",
+    "Vikings",
+    "Anglo-Saxons",
+    "Normans",
+    "Crusaders",
+    "Knights_Templar",
+    "Renaissance_people",
+    "Reformation_era_people",
+    "Age_of_Enlightenment_people",
+    "Age_of_Exploration_people",
+    "Industrial_Revolution_people",
+    "World_War_I_people",
+    "World_War_II_people",
+    "Cold_War_people",
+    "Decolonisation_era_people",
+
+    # ── Miscellaneous notable ─────────────────────────────────────────────────
+    "Philanthropists",
+    "Social_entrepreneurs",
+    "Community_organizers",
+    "Labor_leaders",
+    "Trade_union_leaders",
+    "Economists_(policy)",
+    "Central_bank_governors",
+    "Intelligence_officers",
+    "Whistleblowers",
+    "WikiLeaks_associates",
+    "Defectors",
+    "Refugees",
+    "Prisoners_of_conscience",
+    "Death_row_inmates",
+    "Exiles",
+    "Revolutionaries",
+    "Guerrillas",
+    "Resistance_fighters",
+    "Partisans",
+    "Mercenaries",
+    "Bounty_hunters",
+    "Detectives",
+    "Forensic_scientists",
+    "Coroners",
+    "Medical_examiners",
+    "Paramedics",
+    "Firefighters",
+    "Search_and_rescue_personnel",
+    "Test_pilots",
+    "Mountaineers",
+    "Free_solo_climbers",
+    "Base_jumpers",
+    "Skydivers",
+    "Wingsuit_pilots",
+    "Deep_sea_divers",
+    "Cave_divers",
+    "Solo_circumnavigators",
+    "Speed_record_holders",
+    "Daredevils",
+    "Survivalists",
+    "Preppers",
+    "Futurists",
+    "Transhumanists",
+    "Singularitarians",
+    "Effective_altruists",
 ]
 
 # ── Faction keyword rules (matched against Wikipedia description + extract) ────
@@ -416,17 +1274,49 @@ _FACTION_KW: dict[str, list[str]] = {
         "mixed martial arts", "youtuber", "streamer", "social media",
         "celebrity", "film actor", "television actor", "comedian",
         "stand-up", "reality television", "reality tv",
+        "content creator", "podcaster", "tiktoker", "vlogger",
+        "esports", "professional gamer", "twitch", "youtuber",
+        "k-pop", "idol", "boy band", "girl group",
+        "chef", "restaurateur", "food critic", "culinary",
+        "fashion designer", "fashion model", "runway model",
+        "dancer", "choreographer", "ballet", "gymnast",
+        "dj", "disc jockey", "electronic music", "producer",
+        "film director", "screenwriter", "cinematographer",
+        "drag queen", "drag performer", "cabaret",
+        "magician", "illusionist", "circus",
+        "voice actor", "narrator", "host",
+        "cricket player", "cricketer", "rugby player",
+        "swimmer", "cyclist", "sprinter", "marathon runner",
+        "figure skater", "skier", "snowboarder",
+        "surfer", "skateboarder", "extreme sports",
+        "mountaineer", "climber", "adventurer", "daredevil",
+        "professional poker player",
     ],
     "capitalists": [
         "president", "prime minister", "chancellor", "senator", "congressman",
         "conservative", "tory", "liberal democrat", "centre-right",
         "businessman", "entrepreneur", "industrialist", "banker",
         "chief executive", "founder", "magnate", "tycoon", "billionaire",
+        "venture capitalist", "hedge fund", "private equity",
+        "tech entrepreneur", "startup founder", "ceo", "cto", "cfo",
+        "real estate developer", "media mogul", "publishing executive",
+        "investment banker", "stockbroker", "financier",
+        "crypto", "cryptocurrency", "blockchain entrepreneur",
     ],
     "philosophers": [
         "philosopher", "economist", "political theorist", "intellectual",
         "theologian", "scholar", "jurist", "political scientist",
         "political philosopher", "social theorist",
+        "linguist", "anthropologist", "sociologist", "psychologist",
+        "historian", "classicist", "archaeologist", "literary critic",
+        "ethicist", "logician", "metaphysician", "epistemologist",
+        "futurist", "transhumanist", "effective altruist",
+        "science communicator", "science writer", "public intellectual",
+        "professor", "academic", "researcher", "author",
+        "journalist", "columnist", "essayist", "critic",
+        "lawyer", "attorney", "judge", "legal scholar",
+        "doctor", "physician", "scientist", "inventor",
+        "architect", "urban planner", "designer",
     ],
 }
 
@@ -464,22 +1354,51 @@ def _sync_get(url: str, headers: dict | None = None) -> bytes | None:
 async def _aget(url: str, sem: asyncio.Semaphore, headers: dict | None = None) -> bytes | None:
     async with sem:
         data = await asyncio.to_thread(_sync_get, url, headers)
-        await asyncio.sleep(0.08)
         return data
 
 
 # ── Wikidata SPARQL discovery ──────────────────────────────────────────────────
-def _wiki_cat_pages(category: str, limit: int) -> list[str]:
-    """Direct page members of a single category (no recursion)."""
-    out = []
+def _wiki_langlinks_counts(titles: list[str]) -> dict[str, int]:
+    """Batch-fetch number of language editions for each title (50 at a time).
+    Returns {title: langlink_count}. Used as a popularity proxy."""
+    counts: dict[str, int] = {}
+    for i in range(0, len(titles), 50):
+        batch = titles[i:i + 50]
+        params = {
+            "action": "query",
+            "titles": "|".join(batch),
+            "prop": "langlinks",
+            "lllimit": "max",
+            "format": "json",
+        }
+        url = "https://en.wikipedia.org/w/api.php?" + urllib.parse.urlencode(params)
+        req = urllib.request.Request(url, headers={"User-Agent": _UA})
+        try:
+            with urllib.request.urlopen(req, timeout=15) as r:
+                data = json.loads(r.read())
+            for page in data.get("query", {}).get("pages", {}).values():
+                t = page.get("title", "")
+                counts[t] = len(page.get("langlinks", []))
+        except Exception:
+            pass
+        time.sleep(0.05)
+    return counts
+
+
+_CAT_FETCH_MAX = 150
+
+def _wiki_cat_pages(category: str, limit: int) -> tuple[list[str], dict[str, int]]:
+    """Fetch up to _CAT_FETCH_MAX members of a category, rank by language-edition count
+    (popularity proxy), and return (top `limit` sorted most-popular first, counts dict)."""
+    titles: list[str] = []
     cmcontinue = None
-    while len(out) < limit:
+    while len(titles) < _CAT_FETCH_MAX:
         params = {
             "action": "query",
             "list": "categorymembers",
             "cmtitle": f"Category:{category}",
             "cmtype": "page",
-            "cmlimit": min(500, limit - len(out)),
+            "cmlimit": min(500, _CAT_FETCH_MAX - len(titles)),
             "format": "json",
         }
         if cmcontinue:
@@ -494,11 +1413,15 @@ def _wiki_cat_pages(category: str, limit: int) -> list[str]:
         for m in data.get("query", {}).get("categorymembers", []):
             title = m.get("title", "")
             if title and ":" not in title:
-                out.append(title)
+                titles.append(title)
         cmcontinue = data.get("continue", {}).get("cmcontinue")
         if not cmcontinue:
             break
-    return out
+    if not titles:
+        return [], {}
+    counts = _wiki_langlinks_counts(titles)
+    titles.sort(key=lambda t: counts.get(t, 0), reverse=True)
+    return titles[:limit], counts
 
 
 def _wiki_cat_subcats(category: str) -> list[str]:
@@ -533,55 +1456,56 @@ _SKIP_SUBCAT_KW = (
 )
 
 
-def _sync_wiki_category(category: str, limit: int) -> list[str]:
-    """Return Wikipedia article titles from a category + one level of subcategories.
-
-    Always recurses into subcategories even if direct members fill the limit,
-    so prominent figures in sub-subcategories (e.g. Mozart in
-    Austrian_classical_composers) are not silently skipped.
-    """
+def _sync_wiki_category(category: str, limit: int) -> tuple[list[str], dict[str, int]]:
+    """Return (titles, langlinks_counts) from a category + one level of subcategories."""
     seen: set[str] = set()
     out: list[str] = []
+    all_counts: dict[str, int] = {}
 
-    def _add(titles: list[str]):
+    def _add(titles: list[str], counts: dict[str, int]):
+        all_counts.update(counts)
         for t in titles:
             slug = t.replace(" ", "_")
             if slug not in seen:
                 seen.add(slug)
                 out.append(t)
 
-    # direct members
-    _add(_wiki_cat_pages(category, limit))
+    titles, counts = _wiki_cat_pages(category, limit)
+    _add(titles, counts)
 
-    # always recurse into subcategories — cap each sub at 100 entries
     for sub in _wiki_cat_subcats(category):
         if any(kw in sub.lower() for kw in _SKIP_SUBCAT_KW):
             continue
-        _add(_wiki_cat_pages(sub, 100))
+        titles, counts = _wiki_cat_pages(sub, 100)
+        _add(titles, counts)
 
-    return out[:limit]
+    return out[:limit], all_counts
 
 
-async def discover_figures(fetch_limit: int) -> list[dict]:
+async def discover_figures(fetch_limit: int, existing_wikis: set[str] | None = None) -> list[dict]:
     print(f"Scraping Wikipedia categories for up to {fetch_limit} candidates...")
+    existing_wikis = existing_wikis or set()
     seen: set[str] = set()
     out: list[dict] = []
-    # Cap per-category so large categories (e.g. American_politicians) don't
-    # consume the entire budget before others are reached.
-    per_cat = min(80, max(30, fetch_limit // len(_WIKI_CATEGORIES) + 10))
+    # Fetch more per category than we need so existing entries don't exhaust the budget.
+    # Goal is per_cat NEW entries per category; fetch up to 3x to find them.
+    per_cat_new = min(50, max(20, fetch_limit // len(_WIKI_CATEGORIES) + 5))
+    per_cat_fetch = min(500, per_cat_new * 3)
     for category in _WIKI_CATEGORIES:
         if len(out) >= fetch_limit:
             break
-        titles = await asyncio.to_thread(_sync_wiki_category, category, per_cat)
+        titles, counts = await asyncio.to_thread(_sync_wiki_category, category, per_cat_fetch)
         added = 0
         for title in titles:
             slug = title.replace(" ", "_")
-            if slug not in seen:
+            if slug not in seen and slug not in existing_wikis:
                 seen.add(slug)
-                out.append({"slug": slug, "name": title, "sitelinks": 30})
+                out.append({"slug": slug, "name": title, "sitelinks": 30, "langlinks": counts.get(title, 30)})
                 added += 1
+                if added >= per_cat_new:
+                    break
         print(f"  {category}: {added} new ({len(out)} total)")
-        await asyncio.sleep(0.2)
+        await asyncio.sleep(0.05)
 
     print(f"  {len(out)} distinct candidates")
     return out
@@ -667,6 +1591,82 @@ async def wiki_summary(slug: str, sem: asyncio.Semaphore) -> dict | None:
         return None
 
 
+# ── Wikidata P21 gender lookup ────────────────────────────────────────────────
+# Maps Wikidata gender QIDs to our three values
+_GENDER_QID: dict[str, str] = {
+    "Q6581097": "male",    # male
+    "Q6581072": "female",  # female
+    "Q2449503": "female",  # transgender female
+    "Q2449532": "male",    # transgender male
+    "Q1097630": "other",   # intersex
+    "Q48270":   "other",   # non-binary
+    "Q505371":  "other",   # agender
+}
+
+# Fallback: pronoun-based detection from Wikipedia extract
+_HE_RE  = re.compile(r"\b(he|his|him)\b", re.IGNORECASE)
+_SHE_RE = re.compile(r"\b(she|her|hers)\b", re.IGNORECASE)
+
+
+def _gender_from_pronouns(extract: str) -> str | None:
+    he  = len(_HE_RE.findall(extract[:500]))
+    she = len(_SHE_RE.findall(extract[:500]))
+    if he == 0 and she == 0:
+        return None
+    if she > he:
+        return "female"
+    if he > she:
+        return "male"
+    return None
+
+
+def _sync_wiki_gender(slug: str) -> str | None:
+    """Try Wikidata P21 first, then fall back to pronoun detection."""
+    # Step 1: get QID from Wikipedia
+    combo = {}
+    req = urllib.request.Request(
+        "https://en.wikipedia.org/w/api.php"
+        f"?action=query&titles={urllib.parse.quote(slug, safe='')}"
+        "&prop=pageprops&ppprop=wikibase_item&format=json",
+        headers={"User-Agent": _UA},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            combo = json.loads(r.read())
+    except Exception:
+        return None
+    qid = None
+    for page in combo.get("query", {}).get("pages", {}).values():
+        qid = page.get("pageprops", {}).get("wikibase_item")
+    if not qid:
+        return None
+    # Step 2: fetch P21 from Wikidata
+    time.sleep(0.15)
+    req2 = urllib.request.Request(
+        f"https://www.wikidata.org/w/api.php?action=wbgetclaims"
+        f"&entity={qid}&property=P21&format=json",
+        headers={"User-Agent": _UA},
+    )
+    try:
+        with urllib.request.urlopen(req2, timeout=10) as r:
+            wd = json.loads(r.read())
+    except Exception:
+        return None
+    for claim in wd.get("claims", {}).get("P21", []):
+        gid = claim.get("mainsnak", {}).get("datavalue", {}).get("value", {}).get("id", "")
+        if gid in _GENDER_QID:
+            return _GENDER_QID[gid]
+    return None
+
+
+async def wiki_gender(slug: str, sem: asyncio.Semaphore, extract: str = "") -> str | None:
+    async with sem:
+        result = await asyncio.to_thread(_sync_wiki_gender, slug)
+    if result:
+        return result
+    return _gender_from_pronouns(extract)
+
+
 # ── Wikipedia monthly pageviews (avg over last 6 months) ──────────────────────
 async def wiki_views(slug: str, sem: asyncio.Semaphore) -> int:
     now   = datetime.utcnow()
@@ -715,6 +1715,26 @@ def _resolve_file_url(fname: str) -> str | None:
             else:
                 return None
     return None
+
+
+def _sync_wiki_infobox_img(slug: str) -> list[str]:
+    """Fast path: only fetch the infobox thumbnail (1 API call, no Wikidata/Commons)."""
+    req = urllib.request.Request(
+        "https://en.wikipedia.org/w/api.php"
+        f"?action=query&titles={urllib.parse.quote(slug, safe='')}"
+        "&prop=pageimages&piprop=thumbnail&pithumbsize=800&format=json",
+        headers={"User-Agent": _UA},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            data = json.loads(r.read())
+        for page in data.get("query", {}).get("pages", {}).values():
+            src = page.get("thumbnail", {}).get("source", "")
+            if src and _IMG_EXT.search(src) and not _IMG_SKIP.search(src):
+                return [src]
+    except Exception:
+        pass
+    return []
 
 
 def _sync_wiki_imgs(slug: str, max_images: int = 5) -> list[str]:
@@ -839,9 +1859,7 @@ def _sync_wiki_img(slug: str) -> str | None:
 
 async def wiki_images(slug: str, sem: asyncio.Semaphore, max_images: int = 5) -> list[str]:
     async with sem:
-        result = await asyncio.to_thread(_sync_wiki_imgs, slug, max_images)
-        await asyncio.sleep(0.08)
-        return result
+        return await asyncio.to_thread(_sync_wiki_imgs, slug, max_images)
 
 
 async def wiki_image(slug: str, sem: asyncio.Semaphore) -> str | None:
@@ -947,17 +1965,29 @@ async def process_one(
     r2_sem: asyncio.Semaphore,
     dry_run: bool,
     override_image_url: str | None = None,
+    fast: bool = False,
 ) -> tuple[str, dict] | None:
     slug = item["slug"]
     name = item["name"]
 
-    summary_t = wiki_summary(slug, wiki_sem)
-    views_t   = wiki_views(slug, wiki_sem)
-    images_t  = asyncio.sleep(0, result=[]) if override_image_url else wiki_images(slug, wiki_sem, max_images=5)
-    summary, monthly_views, img_urls = await asyncio.gather(summary_t, views_t, images_t)
-
-    if not summary or not _is_person_summary(summary):
-        return None
+    if fast:
+        summary_t = wiki_summary(slug, wiki_sem)
+        images_t  = asyncio.sleep(0, result=[]) if override_image_url else asyncio.to_thread(_sync_wiki_infobox_img, slug)
+        summary, img_urls = await asyncio.gather(summary_t, images_t)
+        if not summary or not _is_person_summary(summary):
+            return None
+        monthly_views = item.get("langlinks", 30) * 5000
+        gender = _gender_from_pronouns(summary.get("extract", ""))
+    else:
+        summary_t = wiki_summary(slug, wiki_sem)
+        views_t   = wiki_views(slug, wiki_sem)
+        images_t  = asyncio.sleep(0, result=[]) if override_image_url else wiki_images(slug, wiki_sem, max_images=5)
+        gender_t  = wiki_gender(slug, wiki_sem)
+        summary, monthly_views, img_urls, gender = await asyncio.gather(summary_t, views_t, images_t, gender_t)
+        if not summary or not _is_person_summary(summary):
+            return None
+        if not gender:
+            gender = _gender_from_pronouns(summary.get("extract", ""))
 
     faction = derive_faction(summary["description"], summary["extract"])
     rarity  = derive_rarity(monthly_views)
@@ -983,6 +2013,7 @@ async def process_one(
         "quote":      "",
         "stats":      stats,
         "wiki":       slug,
+        "gender":     gender,
         "image_urls": public_urls if public_urls else (img_urls[:1] if dry_run else []),
     }
 
@@ -1011,8 +2042,8 @@ async def _db_upsert(conn: asyncpg.Connection, cid: str, c: dict) -> None:
         """
         INSERT INTO gacha_characters
             (character_id, name, title, faction, rarity, quote, wiki,
-             stat_authority, stat_military, stat_charisma, image_urls)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+             stat_authority, stat_military, stat_charisma, image_urls, gender)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
         ON CONFLICT (character_id) DO UPDATE SET
             name           = EXCLUDED.name,
             title          = EXCLUDED.title,
@@ -1023,14 +2054,55 @@ async def _db_upsert(conn: asyncpg.Connection, cid: str, c: dict) -> None:
             stat_authority = EXCLUDED.stat_authority,
             stat_military  = EXCLUDED.stat_military,
             stat_charisma  = EXCLUDED.stat_charisma,
-            image_urls     = EXCLUDED.image_urls
+            image_urls     = EXCLUDED.image_urls,
+            gender         = COALESCE(EXCLUDED.gender, gacha_characters.gender)
         """,
         cid,
         c["name"], c.get("title", ""), c.get("faction", "wildcards"), c.get("rarity", "common"),
         c.get("quote", ""), c.get("wiki", ""),
         s.get("authority", 50), s.get("military", 50), s.get("charisma", 50),
-        c.get("image_urls") or [],
+        c.get("image_urls") or [], c.get("gender"),
     )
+
+
+# ── Backfill gender for existing characters ───────────────────────────────────
+async def backfill_gender(dry_run: bool) -> None:
+    conn = await _db_connect()
+    rows = await conn.fetch(
+        "SELECT character_id, name, wiki FROM gacha_characters WHERE gender IS NULL ORDER BY character_id"
+    )
+    print(f"{len(rows)} characters have no gender — backfilling...")
+
+    wiki_sem = asyncio.Semaphore(4)
+
+    async def _lookup(row) -> tuple[str, str, str | None]:
+        slug = row["wiki"] or row["character_id"].replace("_", " ")
+        summary = await wiki_summary(slug, wiki_sem)
+        extract = summary.get("extract", "") if summary else ""
+        gender = await wiki_gender(slug, wiki_sem, extract=extract)
+        return row["character_id"], row["name"], gender
+
+    done = unknown = 0
+    batch_size = 10
+    for i in range(0, len(rows), batch_size):
+        batch = rows[i:i + batch_size]
+        results = await asyncio.gather(*[_lookup(r) for r in batch])
+        for cid, name, gender in results:
+            label = gender or "unknown"
+            print(f"  {'[DRY] ' if dry_run else ''}{name:<36} → {label}")
+            if gender:
+                done += 1
+                if not dry_run:
+                    await conn.execute(
+                        "UPDATE gacha_characters SET gender = $1 WHERE character_id = $2",
+                        gender, cid,
+                    )
+            else:
+                unknown += 1
+        await asyncio.sleep(1.0)
+
+    await conn.close()
+    print(f"\nDone. {done} gendered, {unknown} still unknown{' (dry run — no writes)' if dry_run else ''}.")
 
 
 # ── Main ───────────────────────────────────────────────────────────────────────
@@ -1086,7 +2158,7 @@ async def refresh_images(limit: int, dry_run: bool) -> None:
     print("Done.")
 
 
-async def main(limit: int, dry_run: bool, resume: bool) -> None:
+async def main(limit: int, dry_run: bool, resume: bool, fast: bool = False) -> None:
     if not dry_run and not R2_TOKEN:
         print("ERROR: R2_TOKEN not set. Use --dry-run or export R2_TOKEN=...")
         sys.exit(1)
@@ -1101,19 +2173,16 @@ async def main(limit: int, dry_run: bool, resume: bool) -> None:
             attempted = set(json.load(f))
         print(f"Resuming — skipping {len(attempted)} previously attempted slugs")
 
-    candidates = await discover_figures(limit * 2)
-    candidates = [
-        c for c in candidates
-        if c["slug"] not in existing_wikis and c["slug"] not in attempted
-    ]
+    candidates = await discover_figures(limit * 2, existing_wikis=existing_wikis)
+    candidates = [c for c in candidates if c["slug"] not in attempted]
     print(f"After dedup: {len(candidates)} to process (target: {limit})")
 
-    wiki_sem = asyncio.Semaphore(6)
-    r2_sem   = asyncio.Semaphore(4)
+    wiki_sem = asyncio.Semaphore(40)
+    r2_sem   = asyncio.Semaphore(40)
 
     added    = 0
     taken_ids = set(existing_ids)
-    batch_size = 25
+    batch_size = 100
 
     async with aiohttp.ClientSession() as r2_session:
         for batch_start in range(0, len(candidates), batch_size):
@@ -1122,7 +2191,7 @@ async def main(limit: int, dry_run: bool, resume: bool) -> None:
 
             batch = candidates[batch_start : batch_start + batch_size]
             results = await asyncio.gather(
-                *[process_one(item, r2_session, wiki_sem, r2_sem, dry_run) for item in batch],
+                *[process_one(item, r2_session, wiki_sem, r2_sem, dry_run, fast=fast) for item in batch],
                 return_exceptions=True,
             )
 
@@ -1149,6 +2218,37 @@ async def main(limit: int, dry_run: bool, resume: bool) -> None:
 
     await conn.close()
     print(f"\nDone. {added} new characters {'previewed' if dry_run else 'written to DB'}.")
+
+
+async def _prune_imageless(dry_run: bool, watch: bool = False) -> None:
+    interval = 30
+    total_deleted = 0
+    while True:
+        conn = await _db_connect()
+        rows = await conn.fetch(
+            "SELECT character_id, name FROM gacha_characters "
+            "WHERE array_length(image_urls, 1) IS NULL OR array_length(image_urls, 1) = 0"
+        )
+        if rows:
+            print(f"Found {len(rows)} imageless characters:")
+            for r in rows:
+                print(f"  {r['name']}")
+            if not dry_run:
+                ids = [r["character_id"] for r in rows]
+                await conn.execute("DELETE FROM gacha_claims WHERE character_id = ANY($1)", ids)
+                await conn.execute("DELETE FROM gacha_character_stats WHERE character_id = ANY($1)", ids)
+                await conn.execute("DELETE FROM gacha_wishlists WHERE character_id = ANY($1)", ids)
+                await conn.execute("DELETE FROM gacha_characters WHERE character_id = ANY($1)", ids)
+                total_deleted += len(ids)
+                print(f"Deleted {len(ids)} imageless characters. (total: {total_deleted})")
+            else:
+                print("Dry run — nothing deleted.")
+        elif watch:
+            print(f"No imageless characters found. Checking again in {interval}s...")
+        await conn.close()
+        if not watch:
+            break
+        await asyncio.sleep(interval)
 
 
 async def clear_images(dry_run: bool) -> None:
@@ -1288,14 +2388,22 @@ async def _toggle_character(name_or_id: str, enabled: bool) -> None:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Bulk gacha character populator")
-    ap.add_argument("--limit",   type=int, default=500,
-                    help="Max new characters to add (default 500)")
+    ap.add_argument("--limit",   type=int, default=22000,
+                    help="Max new characters to add (default 22000)")
     ap.add_argument("--dry-run", action="store_true",
                     help="Preview without writing files or uploading images")
     ap.add_argument("--resume",  action="store_true",
                     help="Skip slugs already attempted in a previous run")
     ap.add_argument("--refresh-images", action="store_true",
                     help="Backfill existing characters with up to 5 images each (skips new character discovery)")
+    ap.add_argument("--backfill-gender", action="store_true",
+                    help="Detect and write gender for all existing characters that have none")
+    ap.add_argument("--prune-imageless", action="store_true",
+                    help="Delete all characters from the DB that have no images")
+    ap.add_argument("--watch", action="store_true",
+                    help="Used with --prune-imageless: loop every 30s instead of running once")
+    ap.add_argument("--fast", action="store_true",
+                    help="Skip gender detection and multi-image search; only grab infobox thumbnail (~3x faster)")
     ap.add_argument("--clear-images", action="store_true",
                     help="Delete all R2 gacha images and wipe image_urls in personalities.py")
     ap.add_argument("--add", metavar="NAME", nargs="+",
@@ -1321,5 +2429,9 @@ if __name__ == "__main__":
         asyncio.run(clear_images(args.dry_run))
     elif args.refresh_images:
         asyncio.run(refresh_images(args.limit, args.dry_run))
+    elif getattr(args, "backfill_gender", False):
+        asyncio.run(backfill_gender(args.dry_run))
+    elif getattr(args, "prune_imageless", False):
+        asyncio.run(_prune_imageless(args.dry_run, watch=getattr(args, "watch", False)))
     else:
-        asyncio.run(main(args.limit, args.dry_run, args.resume))
+        asyncio.run(main(args.limit, args.dry_run, args.resume, fast=getattr(args, "fast", False)))
