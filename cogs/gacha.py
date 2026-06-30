@@ -731,7 +731,7 @@ class GachaCog(commands.Cog, name="Gacha"):
         import urllib.parse
         char = _get_personality(name) or _search_personality(name)
         if not char:
-            await send_fn(f"No waifu found matching **{name}**.")
+            await send_fn(f"No waifu found matching **{name}**.\nDon't see your favorite figure? [Join our Support Server](https://discord.gg/k4W6YAPYhC) to request them!")
             return
 
         wiki      = char.get("wiki") or char.get("id", name)
@@ -1113,6 +1113,13 @@ class GachaCog(commands.Cog, name="Gacha"):
     async def prefix_divorce(self, ctx: commands.Context, *, name: str):
         async with ctx.typing():
             await self._do_divorce(ctx.guild.id, ctx.author.id, name, ctx.send)
+
+    @commands.command(name="reloadchars")
+    @commands.is_owner()
+    async def prefix_reload_chars(self, ctx: commands.Context):
+        async with ctx.typing():
+            n = await self.reload_chars()
+            await ctx.send(f"Reloaded {n} characters from DB.")
 
     # ── claim handler ─────────────────────────────────────────────────────────
 
