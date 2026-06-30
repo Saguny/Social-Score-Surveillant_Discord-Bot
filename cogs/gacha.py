@@ -832,10 +832,10 @@ class GachaCog(commands.Cog, name="Gacha"):
         request_char = _get_personality(request) or _search_personality(request)
 
         if not offer_char:
-            await interaction.followup.send(f"No waifu found matching **{offer}**.")
+            await interaction.followup.send(f"No waifu found matching **{offer}**.\nDon't see your favorite figure? [Join our Support Server](https://discord.gg/k4W6YAPYhC) to request them!")
             return
         if not request_char:
-            await interaction.followup.send(f"No waifu found matching **{request}**.")
+            await interaction.followup.send(f"No waifu found matching **{request}**.\nDon't see your favorite figure? [Join our Support Server](https://discord.gg/k4W6YAPYhC) to request them!")
             return
 
         offer_id   = offer_char.get("id", offer) if "id" in (offer_char or {}) else offer
@@ -890,7 +890,7 @@ class GachaCog(commands.Cog, name="Gacha"):
 
         char = _get_personality(waifu) or _search_personality(waifu)
         if not char:
-            await interaction.followup.send(f"No waifu found matching **{waifu}**.")
+            await interaction.followup.send(f"No waifu found matching **{waifu}**.\nDon't see your favorite figure? [Join our Support Server](https://discord.gg/k4W6YAPYhC) to request them!")
             return
         char_id = char.get("id", waifu)
 
@@ -922,7 +922,7 @@ class GachaCog(commands.Cog, name="Gacha"):
         await interaction.response.defer()
         char = _get_personality(name) or _search_personality(name)
         if not char:
-            await interaction.followup.send(f"No waifu found matching **{name}**.")
+            await interaction.followup.send(f"No waifu found matching **{name}**.\nDon't see your favorite figure? [Join our Support Server](https://discord.gg/k4W6YAPYhC) to request them!")
             return
         char_id = char.get("id", name)
 
@@ -944,7 +944,7 @@ class GachaCog(commands.Cog, name="Gacha"):
         await interaction.response.defer()
         char = _get_personality(name) or _search_personality(name)
         if not char:
-            await interaction.followup.send(f"No waifu found matching **{name}**.")
+            await interaction.followup.send(f"No waifu found matching **{name}**.\nDon't see your favorite figure? [Join our Support Server](https://discord.gg/k4W6YAPYhC) to request them!")
             return
         char_id = char.get("id", name)
 
@@ -1029,7 +1029,7 @@ class GachaCog(commands.Cog, name="Gacha"):
 
             char = _search_personality(name)
             if not char:
-                await ctx.send(f"No waifu found matching **{name}**.")
+                await ctx.send(f"No waifu found matching **{name}**.\nDon't see your favorite figure? [Join our Support Server](https://discord.gg/k4W6YAPYhC) to request them!")
                 return
 
             ok = await self.db.gift_character(ctx.guild.id, ctx.author.id, target.id, char["id"])
@@ -1059,7 +1059,7 @@ class GachaCog(commands.Cog, name="Gacha"):
                 return
             char = _search_personality(name)
             if not char:
-                await ctx.send(f"No waifu found matching **{name}**.")
+                await ctx.send(f"No waifu found matching **{name}**.\nDon't see your favorite figure? [Join our Support Server](https://discord.gg/k4W6YAPYhC) to request them!")
                 return
             char_id = char["id"]
             current = await self.db.get_wishlist(ctx.guild.id, ctx.author.id)
@@ -1082,7 +1082,7 @@ class GachaCog(commands.Cog, name="Gacha"):
     async def _do_divorce(self, guild_id: int, user_id: int, name: str, send_fn):
         char = _get_personality(name) or _search_personality(name)
         if not char:
-            await send_fn(f"No waifu found matching **{name}**.")
+            await send_fn(f"No waifu found matching **{name}**.\nDon't see your favorite figure? [Join our Support Server](https://discord.gg/k4W6YAPYhC) to request them!")
             return
         char_id = char.get("id", name)
         ok, _ = await asyncio.gather(
@@ -1252,7 +1252,7 @@ class GachaCog(commands.Cog, name="Gacha"):
     async def _show_card(self, name: str, send_fn):
         char = _get_personality(name) or _search_personality(name)
         if not char:
-            await send_fn(f"No waifu found matching **{name}**.")
+            await send_fn(f"No waifu found matching **{name}**.\nDon't see your favorite figure? [Join our Support Server](https://discord.gg/k4W6YAPYhC) to request them!")
             return
         char_id = char.get("id", name)
         urls = char.get("image_urls") or []
@@ -1308,7 +1308,7 @@ class GachaCog(commands.Cog, name="Gacha"):
     async def _do_choose(self, guild_id: int, user: discord.Member | discord.User, name: str, send_fn):
         char = _search_personality(name)
         if not char:
-            await send_fn(f"No waifu found matching **{name}**.", ephemeral=True)
+            await send_fn(f"No waifu found matching **{name}**.\nDon't see your favorite figure? [Join our Support Server](https://discord.gg/k4W6YAPYhC) to request them!", ephemeral=True)
             return
         if not await self.db.has_character(guild_id, user.id, char["id"]):
             await send_fn(f"**{char['name']}** is not in your harem.", ephemeral=True)
