@@ -1,4 +1,5 @@
 <div class="app">
+    <app-overlay></app-overlay>
     <div class="side-bar">
         <h1 class="app-title"><a (click)="selectMenu()" [routerLink]="['/']">Social Credit<br>Surveillant</a></h1>
         <div class="side-bar-elements">
@@ -8,10 +9,10 @@
                 <a id="link-leaderboard" [routerLink]="['/leaderboard']" (click)="selectMenu('leaderboard')">{{
                     leaderboardMenu }}</a>
                 <!-- falls logged in dann loginnamen anzeigen -->
-                <a (click)="login()">Login</a>
+                <a (click)="this.overlay.showOverlay('info', 'Login Required', 'Please log in to access this feature.');">Login</a>
             </div>
             <div class="side-bar-infos">
-                <span><a (click)="theme()">Theme</a></span>
+                <span><a (click)="this.overlay.showOverlay('theme', 'theme', 'theme');">Theme</a></span>
                 <span><a [routerLink]="['terms']" (click)="selectMenu()">Terms of Service</a> ★ <a
                         [routerLink]="['about']" (click)="selectMenu()">About</a></span>
                 <span><a (click)="selectMenu()" href="https://github.com/Saguny/Social-Score-Surveillant_Discord-Bot"
@@ -21,6 +22,5 @@
             </div>
         </div>
     </div>
-    <app-overlay></app-overlay>
     <router-outlet></router-outlet>
 </div>

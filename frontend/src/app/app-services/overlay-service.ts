@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Subject } from 'rxjs';
+import { BehaviorSubject } from 'rxjs';
 
 export type OverlayType =
     | "info"
@@ -25,14 +25,15 @@ export class OverlayService {
 
     showOverlay(type: OverlayType, title: string, message?: string, link?: string) {
         this.stateSubject.next({show: true, type, title, message, link});
+        //alert(`Overlay shown: ${type} - ${title}`);
     }
 
     hideOverlay() {
-        this.stateSubject.next({show: false, type: "info", title: "Overlay"});
+        const cur = this.stateSubject.value;
+        this.stateSubject.next({ ...cur, show: false });
     }
 
-    getCurrentOverlay(): OverlayState {
+    get current(): OverlayState {
         return this.stateSubject.value;
     }
-
 }

@@ -45,10 +45,10 @@
     padding-bottom: 30px;
 }
 
-router-outlet {
-    margin-left: 300px;
-}
-
 .app-title a {
     color: var(--highlight);
+}
+
+router-outlet {
+    margin-left: 300px;
 }

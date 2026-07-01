@@ -1,11 +1,26 @@
+@if (overlayState$ | async; as state) {
+@if (state.show) {
 <div class="overlays">
     <div class="overlay-backdrop">
-        <div class="overlay overlay-info">
-            <h1 class="overlay-title">INFO</h1>
-            <p class="overlay-text">This is some informational text. This is some informational text. This is some informational text. This is some informational text. This is some informational text. This is some informational text. This is some informational text. This is some informational text.</p>
+        @if (state.type === 'info') {
+        <div class="overlay">
+            <h1 class="overlay-title">{{ state.title.toUpperCase() }}</h1>
+            <p class="overlay-text">{{ state.message }}</p>
             <div class="button-row">
-                <a class="button-primary">Close</a>
+                <a class="button-primary" (click)="close()">Close</a>
             </div>
         </div>
+        } @else if (state.type === 'theme') {
+        <div class="overlay">
+            <h1 class="overlay-title">THEME</h1>
+            <p class="overlay-text">Choose your theme:</p>
+            <a class="button-theme">CCP</a>
+            <div class="button-row">
+                <a class="button-primary" (click)="close()">Close</a>
+            </div>
+        </div>
+        }
     </div>
 </div>
+}
+}

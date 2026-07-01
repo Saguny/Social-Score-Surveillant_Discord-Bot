@@ -24,14 +24,16 @@
     color: var(--text);
     padding: 0;
     border-radius: 10px;
-    width: 100vw;
-    max-width: 500px;
+    width: min(600px, 90vw);
     height: auto;
+    max-height: 90vh;
     padding: 0 30px 20px;
     border: 3px solid var(--border);
     background: linear-gradient(180deg, var(--background-top) 0%, var(--background-bottom) 100%);
     box-shadow: 0 0 40px 0 var(--background-top);
     border-radius: 10px;
+    box-sizing: border-box;
+    overflow: auto;
 }
 
 .overlay-title {
@@ -55,6 +57,7 @@
 }
 
 .button-row {
+    gap: 10px;
     display: flex;
     flex-direction: row-reverse;
 }

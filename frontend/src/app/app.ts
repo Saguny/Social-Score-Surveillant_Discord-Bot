@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
 import { RouterOutlet, RouterLink } from '@angular/router';
-import { OverlayService } from './app-services/overlay-service';
 import { Overlay } from './overlay/overlay';
+import { OverlayService } from './app-services/overlay-service';
 
 @Component({
   selector: 'app-root',
@@ -11,17 +11,11 @@ import { Overlay } from './overlay/overlay';
 })
 export class App {
   constructor(
-    private overlay: OverlayService
-  ) { }
+    public overlay: OverlayService
+  ) {}
 
   leaderboardMenu = "Leaderboard";
   dashboardMenu = "Dashboard";
-  login() {
-    this.overlay.showOverlay("info", "Test", "Test123");
-  }
-
-  theme() {
-  }
 
   selectMenu(menu?: String) {
     if (menu === undefined) {

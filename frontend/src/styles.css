@@ -2,7 +2,7 @@
     --background: #000;
     --background-top: #630000a6;
     --background-bottom: #e600002a;
-    --border: #5f0000a6;
+    --border: #920000a6;
     --text: #fff;
     --highlight: #ffb200;
     --primary: #8f0000;
@@ -36,7 +36,7 @@ a:hover {
     cursor: pointer;
 }
 
-.page-title{
+.page-title {
     font-size: 2em;
     color: var(--highlight);
     text-shadow: 0 0 50px var(--primary);
@@ -55,7 +55,7 @@ a:hover {
 }
 
 .button-primary {
-    font-size: 1.3em;
+    font-size: 1.2em;
     background-color: var(--highlight);
     color: var(--background);
     padding: 5px 10px;
@@ -73,6 +73,7 @@ a:hover {
 }
 
 .button-secondary {
+    font-size: 1.2em;
     background-color: var(--background-top);
     color: var(--highlight);
     padding: 5px 10px;
