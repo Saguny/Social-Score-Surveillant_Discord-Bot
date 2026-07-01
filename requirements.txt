@@ -7,3 +7,4 @@ aiohttp>=3.9.0
 matplotlib>=3.8.0
 yfinance>=0.2.40
 redis>=5.0.0
+Pillow>=10.0.0

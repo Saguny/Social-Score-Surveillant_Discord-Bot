@@ -1406,7 +1406,7 @@ async def _handle_admin_requests_approve(request):
                 "quote":      "",
                 "wiki":       wiki_slug,
                 "gender":     req["override_gender"],
-                "image_urls": list(req["override_image_urls"]),
+                "image_urls": [],
                 "stats":      derive_stats(faction_for_stats, 30),
             }
         else:
@@ -1424,9 +1424,35 @@ async def _handle_admin_requests_approve(request):
             else:
                 await emit("pipeline", "Using minimal character entry (no enrichment).")
 
+        # Stage 2b — normalize & upload any manually overridden image URLs
+        char_id = wiki_slug.lower().replace(" ", "_")
+        raw_override_urls = list(req.get("override_image_urls") or [])
+        if raw_override_urls:
+            already_hosted = [u for u in raw_override_urls if u.startswith(R2_PUBLIC_URL)]
+            external       = [u for u in raw_override_urls if not u.startswith(R2_PUBLIC_URL)]
+            if external:
+                await emit("images", f"Normalizing & uploading {len(external)} override image(s) to R2…")
+                try:
+                    from gacha.pipeline import upload_r2_multi
+                    r2_sem = asyncio.Semaphore(4)
+                    async with aiohttp.ClientSession() as r2_sess:
+                        uploaded = await upload_r2_multi(r2_sess, char_id, external, r2_sem)
+                    normalized_override_urls = already_hosted + uploaded
+                    await emit("images", f"Uploaded {len(uploaded)}/{len(external)} image(s).")
+                except Exception as exc:
+                    await emit("images", f"Image upload failed: {exc}", ok=False)
+                    normalized_override_urls = already_hosted
+            else:
+                normalized_override_urls = already_hosted
+        else:
+            normalized_override_urls = None
+
+        if normalized_override_urls is not None:
+            if char_data is not None:
+                char_data["image_urls"] = normalized_override_urls
+
         # Stage 3 — save to database
         await emit("db", "Saving character to database…")
-        char_id = wiki_slug.lower().replace(" ", "_")
         data_to_save = char_data or {
             "name":       wiki_title,
             "title":      "",
@@ -1447,8 +1473,8 @@ async def _handle_admin_requests_approve(request):
                 data_to_save["faction"] = req["override_faction"]
             if req.get("override_title"):
                 data_to_save["title"] = req["override_title"]
-            if req.get("override_image_urls"):
-                data_to_save["image_urls"] = list(req["override_image_urls"])
+            if normalized_override_urls is not None:
+                data_to_save["image_urls"] = normalized_override_urls
 
         await db.upsert_gacha_character(
             character_id            = char_id,

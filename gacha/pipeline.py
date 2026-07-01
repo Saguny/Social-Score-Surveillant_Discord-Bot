@@ -9,6 +9,7 @@ The bulk populator (scripts/populate_gacha.py) contains additional discovery
 and CLI logic that runs locally only — this module is the deployable subset.
 """
 import asyncio
+import io
 import json
 import mimetypes
 import os
@@ -22,6 +23,7 @@ from datetime import datetime, timedelta
 
 import aiohttp
 from dotenv import load_dotenv
+from PIL import Image
 
 load_dotenv()
 
@@ -432,6 +434,27 @@ async def wiki_images(slug: str, sem: asyncio.Semaphore, max_images: int = 5, la
         return await asyncio.to_thread(_sync_wiki_imgs, slug, max_images, lang)
 
 
+_GACHA_W = 225
+_GACHA_H = 350
+
+
+def _normalize_image(data: bytes) -> bytes:
+    """Center-crop to 9:14 portrait, resize to 225×350, encode as PNG."""
+    img   = Image.open(io.BytesIO(data)).convert("RGB")
+    w, h  = img.size
+    ratio = _GACHA_W / _GACHA_H
+    if w / h > ratio:
+        new_w = int(h * ratio)
+        img   = img.crop(((w - new_w) // 2, 0, (w - new_w) // 2 + new_w, h))
+    elif w / h < ratio:
+        new_h = int(w / ratio)
+        img   = img.crop((0, 0, w, new_h))
+    img = img.resize((_GACHA_W, _GACHA_H), Image.LANCZOS)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG", optimize=True)
+    return buf.getvalue()
+
+
 def _sync_dl(url: str) -> tuple[bytes | None, str]:
     req = urllib.request.Request(url, headers={"User-Agent": _UA})
     try:
@@ -448,13 +471,14 @@ async def upload_r2(
     index: int,
     sem: asyncio.Semaphore,
 ) -> str | None:
-    img_data, ct = await asyncio.to_thread(_sync_dl, img_url)
+    img_data, _ = await asyncio.to_thread(_sync_dl, img_url)
     if not img_data:
         return None
-    ext = mimetypes.guess_extension(ct)
-    if ext in (".jpe", ".jpeg", None):
-        ext = ".jpg"
-    key = f"gacha/{char_id}/{index}{ext}"
+    try:
+        img_data = await asyncio.to_thread(_normalize_image, img_data)
+    except Exception:
+        return None
+    key = f"gacha/{char_id}/{index}.png"
     api = (
         f"https://api.cloudflare.com/client/v4/accounts/{R2_ACCOUNT_ID}"
         f"/r2/buckets/{R2_BUCKET}/objects/{key}"
@@ -463,7 +487,7 @@ async def upload_r2(
         try:
             async with session.put(
                 api, data=img_data,
-                headers={"Authorization": f"Bearer {R2_TOKEN}", "Content-Type": ct},
+                headers={"Authorization": f"Bearer {R2_TOKEN}", "Content-Type": "image/png"},
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as r:
                 if r.status in (200, 201):
