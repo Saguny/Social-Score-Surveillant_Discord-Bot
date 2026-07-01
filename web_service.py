@@ -1,5 +1,8 @@
 import asyncio
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from database.db import Database
 from web.server import start_web_server
 

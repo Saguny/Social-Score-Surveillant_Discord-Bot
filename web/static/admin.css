@@ -65,3 +65,77 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',sans-seri
 .shdr { color:var(--text-muted); font-size:.65rem; text-transform:uppercase; letter-spacing:2px;
         margin:1.8rem 0 .7rem; padding-bottom:.4rem; border-bottom:1px solid var(--border); }
 ::-webkit-scrollbar{width:6px} ::-webkit-scrollbar-track{background:var(--bg)} ::-webkit-scrollbar-thumb{background:var(--accent);border-radius:3px}
+
+/* ── Admin tabs ─────────────────────────────────────────────────────────────── */
+.admin-tabs {
+  border-bottom: 1px solid var(--border);
+  gap: .15rem;
+  flex-wrap: wrap;
+}
+.admin-tabs .nav-link {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px 6px 0 0;
+  color: var(--text-muted) !important;
+  font-size: .78rem;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: .45rem .9rem;
+}
+.admin-tabs .nav-link:hover { color: var(--text) !important; border-color: var(--border); }
+.admin-tabs .nav-link.active {
+  background: var(--bg-panel);
+  border-color: var(--border-strong) var(--border-strong) var(--bg-panel);
+  color: var(--cream) !important;
+}
+.req-count-badge {
+  display: inline-block;
+  background: var(--red);
+  color: var(--cream);
+  font-size: .6rem;
+  font-weight: 700;
+  border-radius: 99px;
+  padding: .1rem .4rem;
+  vertical-align: middle;
+  margin-left: .3rem;
+  line-height: 1.4;
+}
+@media (max-width: 576px) {
+  .admin-tabs .nav-link { padding: .35rem .6rem; font-size: .72rem; }
+}
+
+/* ── Character submission review ────────────────────────────────────────────── */
+.req-row {
+  display:flex; flex-direction:column; gap:0;
+  padding:.6rem .75rem; border-radius:6px; margin-bottom:.5rem;
+  background:var(--bg-recessed); border:1px solid var(--border);
+}
+.req-top { display:flex; align-items:center; gap:.75rem; flex-wrap:wrap; }
+.req-meta { display:flex; align-items:center; gap:.65rem; flex-wrap:wrap; flex:1; min-width:0; font-size:.82rem; }
+.req-title { font-weight:700; color:var(--cream); }
+.req-votes { color:var(--sage); font-size:.75rem; }
+.req-by    { color:var(--grey); font-size:.75rem; }
+.req-wiki  { color:var(--sage); font-size:.75rem; text-decoration:none; }
+.req-wiki:hover { color:var(--cream); }
+.req-actions { display:flex; gap:.4rem; flex-shrink:0; }
+.req-btn  { padding:.28rem .65rem; border:none; border-radius:4px; font-size:.75rem; font-weight:600; cursor:pointer; }
+.req-approve { background:rgba(61,170,110,.2);  color:var(--green); }
+.req-approve:hover { background:rgba(61,170,110,.35); }
+.req-reject  { background:rgba(232,84,84,.15);  color:var(--red); }
+.req-reject:hover  { background:rgba(232,84,84,.3); }
+.req-ban     { background:rgba(97,103,122,.2);  color:var(--grey); }
+.req-ban:hover     { background:rgba(97,103,122,.35); color:var(--text-muted); }
+.req-edit    { background:rgba(125,157,156,.15); color:var(--sage); }
+.req-edit:hover    { background:rgba(125,157,156,.3); }
+.req-override-badge {
+  display:inline-block; background:rgba(125,157,156,.2); color:var(--sage);
+  font-size:.65rem; padding:.1rem .35rem; border-radius:3px; letter-spacing:.5px;
+}
+.req-edit-panel {
+  margin-top:.6rem; padding-top:.6rem;
+  border-top:1px solid var(--border);
+}
+.pipe-line { padding:.1rem 0; }
+.pipe-ok   { color:var(--green); }
+.pipe-err  { color:var(--yellow); }

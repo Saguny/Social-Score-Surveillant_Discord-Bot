@@ -5,269 +5,333 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Admin Console · Social Credit</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-<link rel="stylesheet" href="/static/admin.css?v=4">
+<link rel="stylesheet" href="/static/admin.css?v=7">
 </head>
 <body>
 
 <nav class="navbar px-4 py-3 mb-4">
-  <span class="navbar-brand">中华人民共和国 &nbsp;&middot;&nbsp; SOCIAL CREDIT DASHBOARD</span>
+  <a class="navbar-brand" href="/">社会信用 Social Credit</a>
   <div class="d-flex gap-3 align-items-center">
-    <a class="nav-link" href="/">STATS</a>
+    <a class="nav-link" href="/">HOME</a>
+    <a class="nav-link" href="/dashboard">DASHBOARD</a>
     <a class="nav-link active" href="/admin">ADMIN</a>
-    <a class="nav-link" href="/privacy">PRIVACY</a>
-    <a class="nav-link" href="/terms">TERMS</a>
   </div>
 </nav>
 
 <div class="container px-4" style="max-width:860px">
 
-  <div id="token-gate" style="display:block">
+  <!-- Tab nav -->
+  <ul class="nav nav-tabs admin-tabs mb-4" id="adminTabs">
+    <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tab-overview">Overview</a></li>
+    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-requests">Requests <span id="req-badge" class="req-count-badge" style="display:none"></span></a></li>
+    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-users">Users</a></li>
+    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-broadcast">Broadcast</a></li>
+    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-system">System</a></li>
+  </ul>
 
-    <div class="shdr">Output</div>
-    <div class="mb-3">
-      <div id="terminal"><span class="t-prompt">Ready.</span></div>
-    </div>
+  <div class="tab-content">
 
-    <div class="shdr d-flex justify-content-between align-items-center">
-      <span>Top.gg Votes</span>
-      <div class="btn-group" role="group" id="vote-period-group">
-        <button class="btn btn-run btn-sm px-3" data-period="1D" onclick="loadVoteChart('1D')">1D</button>
-        <button class="btn btn-run btn-sm px-3" data-period="7D" onclick="loadVoteChart('7D')">7D</button>
-        <button class="btn btn-run btn-sm px-3" data-period="1M" onclick="loadVoteChart('1M')">1M</button>
-        <button class="btn btn-run btn-sm px-3" data-period="TOTAL" onclick="loadVoteChart('TOTAL')">TOTAL</button>
+    <!-- ── Overview ─────────────────────────────────────────────────────────── -->
+    <div class="tab-pane fade show active" id="tab-overview">
+
+      <div class="shdr d-flex justify-content-between align-items-center">
+        <span>Output</span>
       </div>
-    </div>
-    <div class="card-panel p-4 mb-3 chart-card">
-      <div id="vote-total" class="lbl" style="margin-bottom:8px"></div>
-      <canvas id="vote-chart" height="90"></canvas>
-    </div>
+      <div class="mb-4">
+        <div id="terminal"><span class="t-prompt">Ready.</span></div>
+      </div>
 
-    <div class="shdr">User Lookup &amp; Yuan Adjustment</div>
-    <div class="card-panel p-4 mb-3">
-      <div class="row g-2 align-items-end mb-3">
-        <div class="col-auto">
-          <label class="form-label">User ID</label>
-          <input type="text" id="ul-user-id" class="form-control" placeholder="123456789012345678" style="width:240px">
-        </div>
-        <div class="col-auto">
-          <button class="btn btn-run px-4" onclick="lookupUser()">LOOKUP</button>
+      <div class="shdr d-flex justify-content-between align-items-center">
+        <span>Top.gg Votes</span>
+        <div class="btn-group" role="group">
+          <button class="btn btn-run btn-sm px-3" data-period="1D"    onclick="loadVoteChart('1D')">1D</button>
+          <button class="btn btn-run btn-sm px-3" data-period="7D"    onclick="loadVoteChart('7D')">7D</button>
+          <button class="btn btn-run btn-sm px-3" data-period="1M"    onclick="loadVoteChart('1M')">1M</button>
+          <button class="btn btn-run btn-sm px-3" data-period="TOTAL" onclick="loadVoteChart('TOTAL')">TOTAL</button>
         </div>
       </div>
-      <div id="ul-result" style="font-size:.85rem"></div>
+      <div class="card-panel p-4 mb-3 chart-card">
+        <div id="vote-total" class="lbl" style="margin-bottom:8px"></div>
+        <canvas id="vote-chart" height="90"></canvas>
+      </div>
+
     </div>
 
-    <div class="shdr">Dashboard Announcement</div>
-    <div class="card-panel p-4 mb-3">
-      <div class="row g-2 align-items-end mb-2">
-        <div class="col-auto form-check pt-4">
-          <input class="form-check-input" type="checkbox" id="an-enabled" onchange="renderAnnouncementPreview()">
-          <label class="form-check-label" for="an-enabled">Show on public dashboard</label>
-        </div>
-        <div class="col-3">
-          <label class="form-label">Severity</label>
-          <select id="an-severity" class="form-select" onchange="renderAnnouncementPreview()">
-            <option value="info">Info</option>
-            <option value="warn">Warning</option>
-            <option value="danger">Danger</option>
-          </select>
+    <!-- ── Requests ──────────────────────────────────────────────────────────── -->
+    <div class="tab-pane fade" id="tab-requests">
+
+      <div class="shdr d-flex justify-content-between align-items-center">
+        <span>Character Submissions</span>
+        <div class="d-flex gap-2 align-items-center">
+          <div class="btn-group" role="group">
+            <button class="btn btn-run btn-sm px-3 active" id="sort-votes"   onclick="setReqSort('votes')">Most Votes</button>
+            <button class="btn btn-run btn-sm px-3"        id="sort-newest"  onclick="setReqSort('newest')">Newest</button>
+          </div>
+          <button class="btn btn-run btn-sm px-3" onclick="loadPendingRequests()">↺</button>
         </div>
       </div>
-      <div class="mb-2">
-        <label class="form-label">Message</label>
-        <textarea id="an-message" class="form-control" rows="2" maxlength="500" placeholder="Scheduled maintenance tonight at 22:00 UTC." oninput="renderAnnouncementPreview()"></textarea>
+
+      <div id="req-list" class="mb-3">
+        <div style="color:var(--text-muted);font-size:.82rem;padding:.5rem 0">Loading…</div>
       </div>
-      <div id="an-preview" class="mb-2"></div>
-      <button class="btn btn-run px-4" onclick="saveAnnouncement()">SAVE</button>
-      <div id="an-result" class="mt-2" style="font-size:.8rem"></div>
+
+      <!-- SSE pipeline panel -->
+      <div id="req-pipeline" style="display:none;background:var(--bg-recessed);border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:1rem">
+        <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--text-muted);margin-bottom:.5rem">
+          Pipeline · <span id="req-pipeline-title"></span>
+        </div>
+        <div id="req-pipeline-log" style="font-size:.8rem;max-height:200px;overflow-y:auto;line-height:1.7"></div>
+      </div>
+
     </div>
 
-    <div class="shdr">Embed Broadcaster</div>
-    <div class="card-panel p-4 mb-3">
+    <!-- ── Users ─────────────────────────────────────────────────────────────── -->
+    <div class="tab-pane fade" id="tab-users">
 
-      <div class="row g-3">
-        <div class="col-md-7">
-          <div class="mb-2">
-            <label class="form-label">Title</label>
-            <input type="text" id="eb-title" class="form-control" placeholder="Official Decree" maxlength="256" oninput="renderEmbedPreview()">
+      <div class="shdr">User Lookup &amp; Yuan Adjustment</div>
+      <div class="card-panel p-4 mb-3">
+        <div class="row g-2 align-items-end mb-3">
+          <div class="col-auto">
+            <label class="form-label">User ID</label>
+            <input type="text" id="ul-user-id" class="form-control" placeholder="123456789012345678" style="width:240px">
           </div>
-          <div class="mb-2">
-            <label class="form-label">Description</label>
-            <textarea id="eb-desc" class="form-control" rows="4" maxlength="4096" placeholder="Embed body text" oninput="renderEmbedPreview()"></textarea>
+          <div class="col-auto">
+            <button class="btn btn-run px-4" onclick="lookupUser()">LOOKUP</button>
           </div>
-          <div class="row g-2 mb-2">
-            <div class="col-4">
-              <label class="form-label">Color</label>
-              <input type="color" id="eb-color" class="form-control" value="#cc0000" oninput="renderEmbedPreview()" style="height:38px">
-            </div>
-            <div class="col-4">
-              <label class="form-label">Image URL</label>
-              <input type="text" id="eb-image" class="form-control" placeholder="https://..." oninput="renderEmbedPreview()">
-            </div>
-            <div class="col-4">
-              <label class="form-label">Thumbnail URL</label>
-              <input type="text" id="eb-thumb" class="form-control" placeholder="https://..." oninput="renderEmbedPreview()">
-            </div>
-          </div>
+        </div>
+        <div id="ul-result" style="font-size:.85rem"></div>
+      </div>
 
-          <div class="mb-2">
-            <label class="form-label">Fields</label>
-            <div id="eb-fields"></div>
-            <button class="btn btn-run btn-sm px-3 mt-1" onclick="addEmbedField()">+ ADD FIELD</button>
-          </div>
+    </div>
 
-          <div class="row g-2 mb-2">
-            <div class="col-5">
-              <label class="form-label">Button Label</label>
-              <input type="text" id="eb-btn-label" class="form-control" placeholder="Join Server" maxlength="80" oninput="renderEmbedPreview()">
+    <!-- ── Broadcast ─────────────────────────────────────────────────────────── -->
+    <div class="tab-pane fade" id="tab-broadcast">
+
+      <div class="shdr">Dashboard Announcement</div>
+      <div class="card-panel p-4 mb-3">
+        <div class="row g-2 align-items-end mb-2">
+          <div class="col-auto form-check pt-4">
+            <input class="form-check-input" type="checkbox" id="an-enabled" onchange="renderAnnouncementPreview()">
+            <label class="form-check-label" for="an-enabled">Show on public dashboard</label>
+          </div>
+          <div class="col-3">
+            <label class="form-label">Severity</label>
+            <select id="an-severity" class="form-select" onchange="renderAnnouncementPreview()">
+              <option value="info">Info</option>
+              <option value="warn">Warning</option>
+              <option value="danger">Danger</option>
+            </select>
+          </div>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Message</label>
+          <textarea id="an-message" class="form-control" rows="2" maxlength="500" placeholder="Scheduled maintenance tonight at 22:00 UTC." oninput="renderAnnouncementPreview()"></textarea>
+        </div>
+        <div id="an-preview" class="mb-2"></div>
+        <button class="btn btn-run px-4" onclick="saveAnnouncement()">SAVE</button>
+        <div id="an-result" class="mt-2" style="font-size:.8rem"></div>
+      </div>
+
+      <div class="shdr">Embed Broadcaster</div>
+      <div class="card-panel p-4 mb-3">
+        <div class="row g-3">
+          <div class="col-md-7">
+            <div class="mb-2">
+              <label class="form-label">Title</label>
+              <input type="text" id="eb-title" class="form-control" placeholder="Official Decree" maxlength="256" oninput="renderEmbedPreview()">
             </div>
-            <div class="col-7">
-              <label class="form-label">Button URL</label>
-              <input type="text" id="eb-btn-url" class="form-control" placeholder="https://discord.gg/..." oninput="renderEmbedPreview()">
+            <div class="mb-2">
+              <label class="form-label">Description</label>
+              <textarea id="eb-desc" class="form-control" rows="4" maxlength="4096" placeholder="Embed body text" oninput="renderEmbedPreview()"></textarea>
+            </div>
+            <div class="row g-2 mb-2">
+              <div class="col-4">
+                <label class="form-label">Color</label>
+                <input type="color" id="eb-color" class="form-control" value="#cc0000" oninput="renderEmbedPreview()" style="height:38px">
+              </div>
+              <div class="col-4">
+                <label class="form-label">Image URL</label>
+                <input type="text" id="eb-image" class="form-control" placeholder="https://..." oninput="renderEmbedPreview()">
+              </div>
+              <div class="col-4">
+                <label class="form-label">Thumbnail URL</label>
+                <input type="text" id="eb-thumb" class="form-control" placeholder="https://..." oninput="renderEmbedPreview()">
+              </div>
+            </div>
+            <div class="mb-2">
+              <label class="form-label">Fields</label>
+              <div id="eb-fields"></div>
+              <button class="btn btn-run btn-sm px-3 mt-1" onclick="addEmbedField()">+ ADD FIELD</button>
+            </div>
+            <div class="row g-2 mb-2">
+              <div class="col-5">
+                <label class="form-label">Button Label</label>
+                <input type="text" id="eb-btn-label" class="form-control" placeholder="Join Server" maxlength="80" oninput="renderEmbedPreview()">
+              </div>
+              <div class="col-7">
+                <label class="form-label">Button URL</label>
+                <input type="text" id="eb-btn-url" class="form-control" placeholder="https://discord.gg/..." oninput="renderEmbedPreview()">
+              </div>
+            </div>
+            <div class="row g-2 align-items-end mt-3">
+              <div class="col-7">
+                <label class="form-label">Send to</label>
+                <select id="eb-target" class="form-select">
+                  <option value="all">All servers</option>
+                </select>
+              </div>
+              <div class="col-auto">
+                <button class="btn btn-danger-soft px-4" onclick="sendBroadcastEmbed()">SEND EMBED</button>
+              </div>
+            </div>
+            <div id="eb-result" class="mt-2" style="font-size:.8rem;white-space:pre-wrap"></div>
+          </div>
+          <div class="col-md-5">
+            <label class="form-label">Preview</label>
+            <div id="eb-preview" class="embed-preview"></div>
+            <div style="color:var(--text-faint);font-size:.7rem;margin-top:8px">
+              Sends once to a channel @everyone can write in. The bot's standard footer is appended automatically.
             </div>
           </div>
+        </div>
+      </div>
 
-          <div class="row g-2 align-items-end mt-3">
-            <div class="col-7">
-              <label class="form-label">Send to</label>
-              <select id="eb-target" class="form-select">
-                <option value="all">All servers</option>
-              </select>
+    </div>
+
+    <!-- ── System ─────────────────────────────────────────────────────────────── -->
+    <div class="tab-pane fade" id="tab-system">
+
+      <div class="shdr">Commands</div>
+      <div class="card-panel p-4">
+
+        <div class="cmd-section">
+          <div class="row g-2 align-items-end">
+            <div class="col-auto">
+              <button class="btn btn-run px-4" onclick="run('sync')">SYNC SLASH COMMANDS</button>
             </div>
             <div class="col-auto">
-              <button class="btn btn-danger-soft px-4" onclick="sendBroadcastEmbed()">SEND EMBED</button>
+              <button class="btn btn-run px-4" onclick="run('guilds')">LIST GUILDS</button>
             </div>
           </div>
-          <div id="eb-result" class="mt-2" style="font-size:.8rem;white-space:pre-wrap"></div>
         </div>
 
-        <div class="col-md-5">
-          <label class="form-label">Preview</label>
-          <div id="eb-preview" class="embed-preview"></div>
-          <div style="color:var(--text-faint);font-size:.7rem;margin-top:8px">
-            Sends once, either to a channel @everyone can already write in, or directly to a user's DMs. The bot's standard footer is appended automatically.
+        <div class="cmd-section">
+          <div class="row g-2 align-items-end">
+            <div class="col-auto">
+              <label class="form-label">Cog name</label>
+              <input type="text" id="arg-cog" class="form-control" placeholder="cogs.scoring" style="width:200px">
+            </div>
+            <div class="col-auto">
+              <button class="btn btn-run px-4" onclick="run('reload', [v('arg-cog')])">RELOAD COG</button>
+            </div>
           </div>
         </div>
+
+        <div class="cmd-section">
+          <div class="row g-2 align-items-end">
+            <div class="col-3">
+              <label class="form-label">Guild ID</label>
+              <input type="text" id="arg-fr-gid" class="form-control" placeholder="guild_id">
+            </div>
+            <div class="col-3">
+              <label class="form-label">User ID</label>
+              <input type="text" id="arg-fr-uid" class="form-control" placeholder="user_id">
+            </div>
+            <div class="col-auto">
+              <button class="btn btn-run px-4" onclick="run('force_reset', [v('arg-fr-gid'), v('arg-fr-uid')])">FORCE RESET SCORE</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="cmd-section">
+          <div class="row g-2 align-items-end">
+            <div class="col-3">
+              <label class="form-label">Guild ID</label>
+              <input type="text" id="arg-fy-gid" class="form-control" placeholder="guild_id">
+            </div>
+            <div class="col-3">
+              <label class="form-label">User ID</label>
+              <input type="text" id="arg-fy-uid" class="form-control" placeholder="user_id">
+            </div>
+            <div class="col-2">
+              <label class="form-label">Amount</label>
+              <input type="number" id="arg-fy-amt" class="form-control" placeholder="0" min="0">
+            </div>
+            <div class="col-auto">
+              <button class="btn btn-run px-4" onclick="run('force_yuan', [v('arg-fy-gid'), v('arg-fy-uid'), v('arg-fy-amt')])">SET YUAN</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="cmd-section">
+          <div class="row g-2 align-items-end">
+            <div class="col-3">
+              <label class="form-label">Guild ID</label>
+              <input type="text" id="arg-fs-gid" class="form-control" placeholder="guild_id">
+            </div>
+            <div class="col-3">
+              <label class="form-label">User ID</label>
+              <input type="text" id="arg-fs-uid" class="form-control" placeholder="user_id">
+            </div>
+            <div class="col-2">
+              <label class="form-label">Score</label>
+              <input type="number" id="arg-fs-score" class="form-control" placeholder="750" min="600" max="1300" step="0.01">
+            </div>
+            <div class="col-auto">
+              <button class="btn btn-run px-4" onclick="run('force_score', [v('arg-fs-gid'), v('arg-fs-uid'), v('arg-fs-score')])">SET SCORE</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="cmd-section">
+          <div class="row g-2 align-items-end">
+            <div class="col-3">
+              <label class="form-label">Guild ID</label>
+              <input type="text" id="arg-db-gid" class="form-control" placeholder="guild_id">
+            </div>
+            <div class="col-auto">
+              <button class="btn btn-run btn-danger-soft px-4" onclick="run('db_reset', [v('arg-db-gid')])">DB RESET GUILD</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="cmd-section">
+          <div class="row g-2 align-items-end">
+            <div class="col-auto">
+              <button class="btn btn-danger-soft px-4" onclick="confirmRun('restart', [], 'Restart the bot?')">RESTART</button>
+            </div>
+            <div class="col-auto">
+              <button class="btn btn-danger-soft px-4" onclick="confirmRun('shutdown', [], 'Shut down the bot?')">SHUTDOWN</button>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
 
-    <div class="shdr">Console</div>
-    <div class="card-panel p-4">
-
-      <div class="cmd-section">
-        <div class="row g-2 align-items-end">
-          <div class="col-auto">
-            <button class="btn btn-run px-4" onclick="run('sync')">SYNC SLASH COMMANDS</button>
-          </div>
-          <div class="col-auto">
-            <button class="btn btn-run px-4" onclick="run('guilds')">LIST GUILDS</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="cmd-section">
-        <div class="row g-2 align-items-end">
-          <div class="col-auto">
-            <label class="form-label">Cog name</label>
-            <input type="text" id="arg-cog" class="form-control" placeholder="cogs.scoring" style="width:200px">
-          </div>
-          <div class="col-auto">
-            <button class="btn btn-run px-4" onclick="run('reload', [v('arg-cog')])">RELOAD COG</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="cmd-section">
-        <div class="row g-2 align-items-end">
-          <div class="col-3">
-            <label class="form-label">Guild ID</label>
-            <input type="text" id="arg-fr-gid" class="form-control" placeholder="guild_id">
-          </div>
-          <div class="col-3">
-            <label class="form-label">User ID</label>
-            <input type="text" id="arg-fr-uid" class="form-control" placeholder="user_id">
-          </div>
-          <div class="col-auto">
-            <button class="btn btn-run px-4" onclick="run('force_reset', [v('arg-fr-gid'), v('arg-fr-uid')])">FORCE RESET SCORE</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="cmd-section">
-        <div class="row g-2 align-items-end">
-          <div class="col-3">
-            <label class="form-label">Guild ID</label>
-            <input type="text" id="arg-fy-gid" class="form-control" placeholder="guild_id">
-          </div>
-          <div class="col-3">
-            <label class="form-label">User ID</label>
-            <input type="text" id="arg-fy-uid" class="form-control" placeholder="user_id">
-          </div>
-          <div class="col-2">
-            <label class="form-label">Amount</label>
-            <input type="number" id="arg-fy-amt" class="form-control" placeholder="0" min="0">
-          </div>
-          <div class="col-auto">
-            <button class="btn btn-run px-4" onclick="run('force_yuan', [v('arg-fy-gid'), v('arg-fy-uid'), v('arg-fy-amt')])">SET YUAN</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="cmd-section">
-        <div class="row g-2 align-items-end">
-          <div class="col-3">
-            <label class="form-label">Guild ID</label>
-            <input type="text" id="arg-fs-gid" class="form-control" placeholder="guild_id">
-          </div>
-          <div class="col-3">
-            <label class="form-label">User ID</label>
-            <input type="text" id="arg-fs-uid" class="form-control" placeholder="user_id">
-          </div>
-          <div class="col-2">
-            <label class="form-label">Score</label>
-            <input type="number" id="arg-fs-score" class="form-control" placeholder="750" min="600" max="1300" step="0.01">
-          </div>
-          <div class="col-auto">
-            <button class="btn btn-run px-4" onclick="run('force_score', [v('arg-fs-gid'), v('arg-fs-uid'), v('arg-fs-score')])">SET SCORE</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="cmd-section">
-        <div class="row g-2 align-items-end">
-          <div class="col-3">
-            <label class="form-label">Guild ID</label>
-            <input type="text" id="arg-db-gid" class="form-control" placeholder="guild_id">
-          </div>
-          <div class="col-auto">
-            <button class="btn btn-run btn-danger-soft px-4" onclick="run('db_reset', [v('arg-db-gid')])">DB RESET GUILD</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="cmd-section">
-        <div class="row g-2 align-items-end">
-          <div class="col-auto">
-            <button class="btn btn-danger-soft px-4" onclick="confirmRun('restart', [], 'Restart the bot?')">RESTART</button>
-          </div>
-          <div class="col-auto">
-            <button class="btn btn-danger-soft px-4" onclick="confirmRun('shutdown', [], 'Shut down the bot?')">SHUTDOWN</button>
-          </div>
-        </div>
-      </div>
-
-    </div>
-  </div>
-
+  </div><!-- /tab-content -->
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="/static/admin.js?v=4"></script>
+<script src="/static/admin.js?v=7"></script>
 <script>
+  // Init on the active tab immediately, lazy-load the rest
   loadVoteChart('7D');
-  loadGuildListForBroadcast();
-  renderEmbedFields();
-  renderEmbedPreview();
-  loadAnnouncement();
+  loadPendingRequests();
+
+  // Lazy per-tab init
+  document.querySelectorAll('[data-bs-toggle="tab"]').forEach(tab => {
+    tab.addEventListener('shown.bs.tab', e => {
+      const target = e.target.getAttribute('href');
+      if (target === '#tab-broadcast') {
+        loadGuildListForBroadcast();
+        renderEmbedFields();
+        renderEmbedPreview();
+        loadAnnouncement();
+      }
+    });
+  });
 </script>
 </body>
 </html>

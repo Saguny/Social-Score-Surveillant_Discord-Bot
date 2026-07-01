@@ -152,15 +152,24 @@ class StocksMixin:
             guild_id, user_id,
         )
 
-    async def buy_stock(self, guild_id: int, user_id: int, ticker: str, shares: float, price: float, total_cost: int) -> bool:
+    async def buy_stock(self, guild_id: int, user_id: int, ticker: str, shares: float) -> dict | None:
         async with self._pool.acquire() as conn:
             async with conn.transaction():
+                price_row = await conn.fetchrow(
+                    "SELECT price FROM stocks WHERE ticker = $1", ticker,
+                )
+                if not price_row:
+                    return None
+                price      = float(price_row["price"])
+                total_cost = int(price * shares)
+                if total_cost < 1:
+                    return None
                 user = await conn.fetchrow(
                     "SELECT yuan FROM users WHERE guild_id = $1 AND user_id = $2",
                     guild_id, user_id,
                 )
                 if not user or user["yuan"] < total_cost:
-                    return False
+                    return None
                 await conn.execute(
                     "UPDATE users SET yuan = yuan - $1, total_yuan_spent = total_yuan_spent + $1, stock_trades = stock_trades + 1 WHERE guild_id = $2 AND user_id = $3",
                     total_cost, guild_id, user_id,
@@ -177,7 +186,7 @@ class StocksMixin:
                     """,
                     guild_id, user_id, ticker, shares, price, int(time.time()),
                 )
-        return True
+        return {"price": price, "total_cost": total_cost}
 
     async def sell_stock(self, guild_id: int, user_id: int, ticker: str, shares: float, price: float) -> dict | None:
         async with self._pool.acquire() as conn:
@@ -283,11 +292,12 @@ class StocksMixin:
             """
         )
 
-    async def close_turbo_position(self, position_id: int, pnl: int, status: str) -> None:
-        await self._pool.execute(
-            "UPDATE turbo_positions SET status = $1, pnl = $2, closed_at = $3 WHERE id = $4",
+    async def close_turbo_position(self, position_id: int, pnl: int, status: str) -> bool:
+        result = await self._pool.execute(
+            "UPDATE turbo_positions SET status = $1, pnl = $2, closed_at = $3 WHERE id = $4 AND status = 'open'",
             status, pnl, int(time.time()), position_id,
         )
+        return result.split()[-1] != "0"
 
     async def update_turbo_stats(self, guild_id: int, user_id: int, knocked: bool, pnl: int) -> None:
         await self._pool.execute(

@@ -119,6 +119,23 @@ class CoreMixin:
         )
         return [r["guild_id"] for r in rows]
 
+    async def get_user_all_guilds(self, user_id: int) -> list[dict]:
+        from config.ranks import get_rank
+        rows = await self._pool.fetch(
+            """
+            SELECT u.guild_id, u.score, u.yuan, g.guild_name
+            FROM users u
+            LEFT JOIN guild_config g ON g.guild_id = u.guild_id
+            WHERE u.user_id = $1
+            ORDER BY u.score DESC
+            """,
+            user_id,
+        )
+        return [
+            {**dict(r), "rank": get_rank(r["score"])["name"]}
+            for r in rows
+        ]
+
     async def confiscate_yuan(self, guild_id, user_id):
         async with self._pool.acquire() as conn:
             async with conn.transaction():
@@ -302,10 +319,12 @@ class CoreMixin:
         yuan_reward = min(250 + (new_streak - 1) * 100, 2000)
         score_delta = round(min(2.0 + (new_streak - 1) * 0.1, 5.0), 2)
 
-        await asyncio.gather(
-            self.set_counter(user_id, "checkin:last_day", today),
-            self.set_counter(user_id, "checkin:streak", new_streak),
-        )
+        async with self._pool.acquire() as conn:
+            await conn.executemany(
+                "INSERT INTO user_counters (user_id, counter_key, value) VALUES ($1, $2, $3) "
+                "ON CONFLICT (user_id, counter_key) DO UPDATE SET value = EXCLUDED.value",
+                [(user_id, "checkin:last_day", today), (user_id, "checkin:streak", new_streak)],
+            )
 
         results = await asyncio.gather(*(
             self._apply_checkin_guild(gid, user_id, now, new_streak, yuan_reward, score_delta)

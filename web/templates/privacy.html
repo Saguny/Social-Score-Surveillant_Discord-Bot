@@ -57,13 +57,14 @@
   </head>
   <body>
     <nav class="navbar px-4 py-3 mb-3">
-      <span class="navbar-brand"
-        >中华人民共和国 &nbsp;&middot;&nbsp; SOCIAL CREDIT SURVEILLANT
-        ANALYTICAL DASHBOARD</span
-      >
+      <a class="navbar-brand" href="/">社会信用 Social Credit</a>
       <div class="d-flex gap-3 align-items-center">
-        <a class="nav-link" href="/">STATS</a>
+        <a class="nav-link" href="/">HOME</a>
+        <a class="nav-link" href="/dashboard">DASHBOARD</a>
         <a class="nav-link" href="/leaderboards">LEADERBOARDS</a>
+        <a class="nav-link" href="/wishlist">WISHLIST</a>
+        <a class="nav-link" href="/submit">SUBMIT</a>
+        <a class="nav-link" href="/account">MY ACCOUNT</a>
         <a class="nav-link active" href="/privacy">PRIVACY</a>
         <a class="nav-link" href="/terms">TERMS</a>
       </div>
@@ -71,7 +72,7 @@
 
     <div class="container-fluid px-4">
       <div class="legal">
-        <div class="updated">Last updated: 2026-06-24</div>
+        <div class="updated">Last updated: 2026-07-01</div>
 
         <p>
           Social Credit Surveillant is an unofficial, satirical Discord bot and
@@ -141,6 +142,29 @@
             Discord user's real ID, username, and per-guild stats for support
             and moderation purposes.
           </li>
+          <li>
+            <strong>Discord OAuth sessions.</strong> When you log in to the
+            dashboard or the <a href="/submit">/submit</a> page using the
+            "Login with Discord" button, we receive your Discord user ID,
+            username, and avatar from Discord's OAuth2 <code>identify</code>
+            scope. We store a session token in Redis with a 7-day expiry to
+            keep you logged in. No guild memberships, message access, or any
+            other scope beyond <code>identify</code> is requested or received
+            through this flow.
+          </li>
+          <li>
+            <strong>Character submissions and votes.</strong> If you use
+            <a href="/submit">/submit</a> to suggest a gacha character, we
+            store your Discord ID, your Discord username at the time of
+            submission, the Wikipedia article title, any optional reviewer
+            notes, and the submission status and outcome. If you vote on an
+            existing submission through the wishlist, we store your Discord ID
+            linked to that vote. If your submission is approved, your Discord
+            username at the time of approval is stored on the character record
+            and displayed as a "Suggested by" credit on that character's gacha
+            card in Discord and on the dashboard, publicly and indefinitely
+            as part of the character entry.
+          </li>
         </ul>
 
         <h2>2. Where your data is stored</h2>
@@ -156,6 +180,15 @@
           evaluating a move to EEA-based hosting; if and when that happens, this
           section will be updated to reflect the new location and the "Last
           updated" date above will change accordingly.
+        </p>
+        <p>
+          Portrait images for approved gacha characters are stored on
+          Cloudflare R2 (Cloudflare, Inc.). Images are fetched from Wikipedia
+          and Wikimedia Commons at the time a submission is approved and then
+          hosted on R2 for in-bot delivery. No personal data beyond the
+          character images themselves is stored there. Cloudflare's own
+          <a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener">Privacy Policy</a>
+          applies to data processed through their infrastructure.
         </p>
 
         <h2>3. What the public dashboard shows</h2>
@@ -181,15 +214,29 @@
           out with <code>/globalrank visibility off</code>.
         </p>
 
+        <h2>3a. The account page</h2>
+        <p>
+          The <a href="/account">/account</a> page is separate from the public
+          dashboard: it requires you to log in with Discord (OAuth) and shows
+          only your own data - your real Discord username, avatar, score and
+          yuan per server, achievements, badges, portfolio, and character
+          submissions. This data is visible only to you after login, not to the
+          public. You can log out at any time by clicking logout or clearing your browser cookies;
+          your OAuth session token expires automatically after 7 days.
+        </p>
+
         <h2>4. Why we collect it</h2>
         <p>
           Data is collected solely to operate the bot's features: calculating
           and displaying your social credit score, running the yuan economy,
           shop, lottery and stock market, tracking check-in streaks and
           achievements, enforcing per-target cooldowns (e.g.
-          denounce/endorse/rebuke), running propaganda events, and showing
-          aggregate, anonymized statistics on this dashboard. We do not sell
-          data, and we do not use it for advertising.
+          denounce/endorse/rebuke), running propaganda events, accepting and
+          reviewing community character submissions for the gacha pool, managing
+          votes on pending submissions, notifying submitters of decisions via
+          Discord DM, displaying community credit on approved character cards,
+          and showing aggregate, anonymized statistics on this dashboard. We do
+          not sell data, and we do not use it for advertising.
         </p>
         <p>
           Our legal basis for this processing (relevant if you are in the EEA or
@@ -224,15 +271,22 @@
             moderation, and debugging purposes.
           </li>
           <li>
+            <strong>Anyone viewing a gacha card</strong> where you are credited
+            as the submitter will see your Discord username in the "Suggested
+            by" field. This is displayed in Discord and on the dashboard
+            wherever that character's card appears.
+          </li>
+          <li>
             <strong>Third-party services</strong> we rely on to run the bot:
             Discord (hosting the platform itself - see Discord's own
             <a href="https://discord.com/privacy" target="_blank" rel="noopener"
               >Privacy Policy</a
             >
             for how they handle your account data, separately from anything
-            covered here), top.gg (vote webhooks), and our hosting/database
-            provider. We do not share your data with anyone beyond what is
-            needed to operate the bot through these services.
+            covered here), top.gg (vote webhooks), Cloudflare R2 (gacha image
+            hosting - see Section 2), and our hosting/database provider. We do
+            not share your data with anyone beyond what is needed to operate
+            the bot through these services.
           </li>
         </ul>
 
@@ -270,6 +324,18 @@
           case: they are never written to the database at all and age out of
           in-memory rate-limit tracking automatically within minutes.
         </p>
+        <p>
+          OAuth session tokens are stored in Redis with a 7-day expiry and are
+          invalidated when you clear your cookies. Submission records
+          (wiki title, notes, status, outcome) are kept until you run
+          <code>/optout</code> or contact us to request deletion. If your
+          submission was approved, your username is stored as part of the
+          character record itself; running <code>/optout</code> deletes your
+          submission and vote records but does not automatically remove the
+          "Suggested by" credit from an already-published character card - if
+          you want that attribution removed, contact us separately and we will
+          handle it manually.
+        </p>
 
         <h2>7. Your choices</h2>
         <ul>
@@ -284,14 +350,18 @@
             <strong>Self-serve opt-out: <code>/optout</code>.</strong> Running
             this command in any server the bot is in permanently deletes every
             row of data tied to your Discord ID across every server - score,
-            yuan, history, achievements, badges, portfolios, and everything else
-            - instantly. Once opted out, the bot stops scoring your messages and
-            will not re-register you when you join a server, for as long as you
-            remain opted out. This is a standing bypass, not just a one-time
-            deletion. You can reverse it at any time with <code>/optin</code>,
-            which re-enables participation from scratch (your prior data was
+            yuan, history, achievements, badges, portfolios, character
+            submissions, wishlist votes, and everything else - instantly. Once
+            opted out, the bot stops scoring your messages and will not
+            re-register you when you join a server, for as long as you remain
+            opted out. This is a standing bypass, not just a one-time deletion.
+            You can reverse it at any time with <code>/optin</code>, which
+            re-enables participation from scratch (your prior data was
             permanently deleted on opt-out, so you start fresh at the default
-            score and zero yuan).
+            score and zero yuan). Note that <code>/optout</code> does not
+            automatically remove a "Suggested by" credit from a character card
+            that was already published before the opt-out - contact us to
+            request that separately.
           </li>
           <li>Server moderators can reset all bot data for their server.</li>
           <li>
@@ -392,6 +462,12 @@
             Raw message content is never stored - only the score effect of a
             message is kept, as described in Section 1.
           </li>
+          <li>
+            OAuth session tokens are stored in Redis with a 7-day TTL and
+            compared using secure equality checks. The OAuth flow requests only
+            the <code>identify</code> scope - we never receive access to your
+            messages, guild list, or any other Discord data through it.
+          </li>
         </ul>
         <p>
           That said, this is a hobby project run by a small team, not an
@@ -434,30 +510,11 @@
     </div>
 
     <footer class="site-footer">
-      Made with <span class="footer-heart">&hearts;</span> by OFF-BY-ONE
-      &nbsp;&middot;&nbsp;
-      <a
-        href="https://discord.gg/invite/k4W6YAPYhC"
-        target="_blank"
-        rel="noopener"
-        >Support Server</a
-      >
-      &nbsp;&middot;&nbsp;
-      <a
-        href="https://discord.com/oauth2/authorize?client_id=856163780265902151&permissions=2416438352&integration_type=0&scope=bot"
-        target="_blank"
-        rel="noopener"
-        >Invite Bot</a
-      >
-      &nbsp;&middot;&nbsp;
-      <a href="/privacy">Privacy Policy</a> &nbsp;&middot;&nbsp;
-      <a href="/terms">Terms of Service</a> &nbsp;&middot;&nbsp;
-      <a
-        href="https://github.com/Saguny/Social-Score-Surveillant_Discord-Bot"
-        target="_blank"
-        rel="noopener"
-        >Source Code</a
-      >
+      Made with ♥ by OFF-BY-ONE ·
+      <a href="https://discord.gg/invite/k4W6YAPYhC" target="_blank" rel="noopener">Support Server</a> ·
+      <a href="https://top.gg/bot/856163780265902151" target="_blank" rel="noopener">Invite Bot</a> ·
+      <a href="/privacy">Privacy</a> ·
+      <a href="/terms">Terms</a>
     </footer>
   </body>
 </html>

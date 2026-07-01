@@ -1,0 +1,213 @@
+/* ── shared submit / wishlist styles ─────────────────────────────────────── */
+
+.page-wrap { max-width: 640px; margin: 0 auto; padding: 0 1rem 3rem; }
+
+/* Discord login bar */
+.discord-bar {
+  display: flex; align-items: center; gap: .75rem;
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: 8px; padding: .65rem 1rem; margin-bottom: 1.5rem;
+  font-size: .85rem; flex-wrap: wrap;
+}
+.discord-bar .avatar {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--accent); flex-shrink: 0; object-fit: cover;
+}
+.discord-bar .avatar-placeholder {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--bg-recessed); border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.discord-bar .uname { color: var(--cream); font-weight: 600; }
+.discord-bar .login-link {
+  margin-left: auto; font-size: .8rem; color: var(--sage);
+  text-decoration: none; letter-spacing: .5px;
+}
+.discord-bar .login-link:hover { color: var(--cream); }
+.discord-bar .logout-link {
+  margin-left: auto; font-size: .75rem; color: var(--grey);
+  text-decoration: none;
+}
+.discord-bar .logout-link:hover { color: var(--text-muted); }
+
+/* Page header */
+.page-title { font-size: 1.15rem; font-weight: 700; letter-spacing: 1px;
+              text-transform: uppercase; color: var(--cream); margin-bottom: .25rem; }
+.page-sub   { font-size: .82rem; color: var(--text-muted); margin-bottom: 1.5rem; line-height: 1.5; }
+
+/* Input */
+.input-label { font-size: .65rem; text-transform: uppercase; letter-spacing: 1.5px;
+               color: var(--text-muted); margin-bottom: .4rem; }
+.wiki-input {
+  width: 100%; box-sizing: border-box;
+  background: var(--bg-recessed); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--cream); font-size: .95rem;
+  padding: .6rem .85rem; outline: none; transition: border-color .15s;
+}
+.wiki-input:focus { border-color: var(--sage); }
+.wiki-input::placeholder { color: var(--grey); }
+.input-hint { font-size: .72rem; color: var(--grey); margin-top: .35rem; }
+
+/* Feedback banners */
+.feedback {
+  display: flex; align-items: center; gap: .75rem;
+  border-radius: 6px; padding: .65rem .9rem;
+  font-size: .83rem; margin-top: .75rem; flex-wrap: wrap;
+}
+.fb-checking  { background: rgba(97,103,122,.15); border: 1px solid var(--border); color: var(--text-muted); }
+.fb-valid     { background: rgba(61,170,110,.1);  border: 1px solid rgba(61,170,110,.35); color: var(--green); }
+.fb-ingame    { background: rgba(61,170,110,.1);  border: 1px solid rgba(61,170,110,.35); color: var(--green); }
+.fb-error     { background: rgba(232,84,84,.1);   border: 1px solid rgba(232,84,84,.35);  color: var(--red); }
+.fb-link { margin-left: auto; color: inherit; font-size: .78rem; text-decoration: underline; white-space: nowrap; }
+
+/* Spinner */
+.spin { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border);
+        border-top-color: var(--sage); border-radius: 50%;
+        animation: spin .7s linear infinite; flex-shrink: 0; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Wikipedia preview card */
+.wiki-preview {
+  display: flex; gap: 1rem; margin-top: .9rem;
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: 8px; padding: 1rem;
+}
+.wiki-preview .portrait {
+  width: 70px; height: 88px; border-radius: 6px; object-fit: cover;
+  flex-shrink: 0; background: var(--bg-recessed);
+  border: 1px solid var(--border); display: flex; align-items: center;
+  justify-content: center; overflow: hidden; color: var(--grey); font-size: 1.6rem;
+}
+.wiki-preview .portrait img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.wiki-preview .meta { flex: 1; min-width: 0; }
+.wiki-preview .meta-name  { font-size: .95rem; font-weight: 700; color: var(--cream); margin-bottom: .1rem; }
+.wiki-preview .meta-desc  { font-size: .75rem; color: var(--text-muted); margin-bottom: .45rem; }
+.wiki-preview .meta-extract {
+  font-size: .78rem; color: var(--grey); line-height: 1.5;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+  overflow: hidden; margin-bottom: .45rem;
+}
+.wiki-preview .wiki-link {
+  font-size: .72rem; color: var(--sage); text-decoration: none;
+  display: inline-flex; align-items: center; gap: .3rem;
+}
+.wiki-preview .wiki-link:hover { color: var(--cream); }
+
+/* Support block (already-requested state) */
+.support-block {
+  margin-top: .9rem; background: rgba(87,111,114,.12);
+  border: 1px solid rgba(87,111,114,.4); border-radius: 8px; padding: 1rem;
+}
+.support-top { display: flex; align-items: center; justify-content: space-between;
+               gap: .75rem; margin-bottom: .75rem; }
+.vote-count .num  { font-size: 1.8rem; font-weight: 700; color: var(--cream); line-height: 1; }
+.vote-count .lbl  { font-size: .75rem; color: var(--text-muted); margin-top: .1rem; }
+.support-btn {
+  display: inline-flex; align-items: center; gap: .45rem;
+  padding: .55rem 1.1rem; background: var(--slate); border: none;
+  border-radius: 6px; color: var(--cream); font-size: .88rem; font-weight: 600;
+  cursor: pointer; transition: background .15s; white-space: nowrap; flex-shrink: 0;
+}
+.support-btn:hover   { background: var(--sage); }
+.support-btn.voted   { background: var(--sage); }
+.support-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.avatar-stack { display: flex; align-items: center; margin-bottom: .55rem; }
+.avatar-stack .av {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid var(--bg-panel); background: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-size: .6rem; font-weight: 700; color: var(--cream);
+  margin-left: -5px; flex-shrink: 0; overflow: hidden;
+}
+.avatar-stack .av:first-child { margin-left: 0; }
+.avatar-stack .av img { width: 100%; height: 100%; object-fit: cover; }
+.avatar-stack .av-more { background: var(--bg-recessed); color: var(--grey); font-size: .58rem; }
+
+.support-footer { font-size: .72rem; color: var(--grey); }
+.support-footer b { color: var(--text-muted); }
+.wrong-person-hint { font-size: .72rem; color: var(--grey); text-align: center;
+                     margin-top: .6rem; }
+.wrong-person-hint a { color: var(--sage); text-decoration: none; }
+
+/* TOS section */
+.tos-section { margin-top: 1rem; background: var(--bg-panel);
+               border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
+.tos-section .tos-title { font-size: .65rem; text-transform: uppercase;
+                           letter-spacing: 1.5px; color: var(--text-muted);
+                           margin-bottom: .75rem; }
+.tos-row { display: flex; align-items: flex-start; gap: .65rem;
+           margin-bottom: .6rem; font-size: .82rem; color: var(--text-muted);
+           line-height: 1.45; cursor: pointer; }
+.tos-row input[type=checkbox] { margin-top: 2px; flex-shrink: 0; accent-color: var(--sage); }
+.tos-row:last-child { margin-bottom: 0; }
+
+/* Submit button */
+.submit-btn {
+  width: 100%; margin-top: .9rem; padding: .75rem;
+  font-size: .9rem; font-weight: 700; letter-spacing: 1px;
+  text-transform: uppercase; border: none; border-radius: 6px;
+  cursor: pointer; transition: background .15s, opacity .15s;
+  background: var(--slate); color: var(--cream);
+}
+.submit-btn:not(:disabled):hover { background: var(--sage); }
+.submit-btn:disabled { opacity: .4; cursor: not-allowed; }
+.submit-hint { font-size: .72rem; color: var(--grey); text-align: center; margin-top: .45rem; }
+
+/* Wishlist page */
+.wl-row {
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: 8px; padding: .85rem 1rem;
+  display: flex; align-items: center; gap: 1rem; margin-bottom: .75rem;
+  flex-wrap: wrap;
+}
+.wl-rank { font-size: .65rem; color: var(--grey); width: 20px;
+           text-align: center; flex-shrink: 0; font-weight: 700; }
+.wl-portrait {
+  width: 42px; height: 52px; border-radius: 5px; object-fit: cover;
+  flex-shrink: 0; background: var(--bg-recessed);
+  border: 1px solid var(--border); display: flex; align-items: center;
+  justify-content: center; overflow: hidden; color: var(--grey);
+}
+.wl-portrait img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.wl-meta { flex: 1; min-width: 120px; }
+.wl-name  { font-size: .88rem; font-weight: 700; color: var(--cream); }
+.wl-desc  { font-size: .72rem; color: var(--grey); }
+.wl-votes { display: flex; flex-direction: column; align-items: center;
+            flex-shrink: 0; min-width: 42px; }
+.wl-votes .n  { font-size: 1.2rem; font-weight: 700; color: var(--cream); line-height: 1; }
+.wl-votes .lbl { font-size: .6rem; color: var(--grey); text-transform: uppercase;
+                 letter-spacing: .5px; }
+.wl-support-btn {
+  padding: .38rem .8rem; background: var(--slate); border: none;
+  border-radius: 5px; color: var(--cream); font-size: .78rem;
+  font-weight: 600; cursor: pointer; transition: background .15s;
+  white-space: nowrap; flex-shrink: 0;
+}
+.wl-support-btn:hover  { background: var(--sage); }
+.wl-support-btn.voted  { background: var(--sage); }
+.wl-support-btn.login-req { background: transparent; border: 1px solid var(--border);
+                             color: var(--grey); }
+.wl-empty { color: var(--grey); font-size: .85rem; text-align: center;
+            padding: 2rem 0; }
+
+/* Toast */
+.toast-wrap { position: fixed; bottom: 1.25rem; left: 50%; transform: translateX(-50%);
+              z-index: 9999; pointer-events: none; }
+.toast-msg {
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: 6px; padding: .55rem 1.1rem; font-size: .82rem;
+  color: var(--cream); opacity: 0; transition: opacity .25s;
+  white-space: nowrap;
+}
+.toast-msg.show { opacity: 1; }
+.toast-msg.success { border-color: rgba(61,170,110,.5); color: var(--green); }
+.toast-msg.error   { border-color: rgba(232,84,84,.5);  color: var(--red); }
+
+/* Mobile tweaks */
+@media (max-width: 576px) {
+  .wiki-preview { gap: .65rem; }
+  .wiki-preview .portrait { width: 56px; height: 70px; }
+  .support-top { flex-wrap: wrap; }
+  .wl-row { gap: .65rem; }
+}

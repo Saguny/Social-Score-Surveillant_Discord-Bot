@@ -3,19 +3,20 @@ import time
 
 def _row_to_char(row) -> dict:
     return {
-        "name":       row["name"],
-        "title":      row["title"],
-        "faction":    row["faction"],
-        "rarity":     row["rarity"],
-        "quote":      row["quote"],
-        "wiki":       row["wiki"],
-        "gender":     row["gender"],
+        "name":                   row["name"],
+        "title":                  row["title"],
+        "faction":                row["faction"],
+        "rarity":                 row["rarity"],
+        "quote":                  row["quote"],
+        "wiki":                   row["wiki"],
+        "gender":                 row["gender"],
         "stats": {
             "authority": row["stat_authority"],
             "military":  row["stat_military"],
             "charisma":  row["stat_charisma"],
         },
-        "image_urls": list(row["image_urls"] or []),
+        "image_urls":             list(row["image_urls"] or []),
+        "submitted_by_username":  row["submitted_by_username"] if "submitted_by_username" in row.keys() else None,
     }
 
 
@@ -156,14 +157,28 @@ class GachaMixin:
                 )
                 return True
 
-    async def add_wishlist(self, guild_id: int, user_id: int, character_id: str) -> bool:
+    async def add_wishlist(self, guild_id: int, user_id: int, character_id: str, max_size: int = 10) -> str:
+        """Insert only when current count < max_size. Returns 'added', 'duplicate', or 'full'."""
         async with self._pool.acquire() as conn:
             row = await conn.fetchrow(
-                "INSERT INTO gacha_wishlists (guild_id, user_id, character_id) "
-                "VALUES ($1,$2,$3) ON CONFLICT DO NOTHING RETURNING 1",
+                """
+                WITH cnt AS (
+                    SELECT COUNT(*) AS n FROM gacha_wishlists WHERE guild_id = $1 AND user_id = $2
+                )
+                INSERT INTO gacha_wishlists (guild_id, user_id, character_id)
+                SELECT $1, $2, $3 FROM cnt WHERE n < $4
+                ON CONFLICT DO NOTHING
+                RETURNING 1
+                """,
+                guild_id, user_id, character_id, max_size,
+            )
+            if row is not None:
+                return "added"
+            existing = await conn.fetchval(
+                "SELECT 1 FROM gacha_wishlists WHERE guild_id=$1 AND user_id=$2 AND character_id=$3",
                 guild_id, user_id, character_id,
             )
-            return row is not None
+            return "duplicate" if existing else "full"
 
     async def remove_wishlist(self, guild_id: int, user_id: int, character_id: str) -> bool:
         async with self._pool.acquire() as conn:
@@ -250,31 +265,41 @@ class GachaMixin:
             )
         return _row_to_char(row) if row else None
 
-    async def upsert_gacha_character(self, character_id: str, data: dict) -> None:
+    async def upsert_gacha_character(
+        self,
+        character_id: str,
+        data: dict,
+        submitted_by_discord_id: int | None = None,
+        submitted_by_username: str | None = None,
+    ) -> None:
         s = data.get("stats", {})
         await self._pool.execute(
             """
             INSERT INTO gacha_characters
                 (character_id, name, title, faction, rarity, quote, wiki,
-                 stat_authority, stat_military, stat_charisma, image_urls)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+                 stat_authority, stat_military, stat_charisma, image_urls,
+                 submitted_by_discord_id, submitted_by_username)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
             ON CONFLICT (character_id) DO UPDATE SET
-                name           = EXCLUDED.name,
-                title          = EXCLUDED.title,
-                faction        = EXCLUDED.faction,
-                rarity         = EXCLUDED.rarity,
-                quote          = EXCLUDED.quote,
-                wiki           = EXCLUDED.wiki,
-                stat_authority = EXCLUDED.stat_authority,
-                stat_military  = EXCLUDED.stat_military,
-                stat_charisma  = EXCLUDED.stat_charisma,
-                image_urls     = EXCLUDED.image_urls
+                name                    = EXCLUDED.name,
+                title                   = EXCLUDED.title,
+                faction                 = EXCLUDED.faction,
+                rarity                  = EXCLUDED.rarity,
+                quote                   = EXCLUDED.quote,
+                wiki                    = EXCLUDED.wiki,
+                stat_authority          = EXCLUDED.stat_authority,
+                stat_military           = EXCLUDED.stat_military,
+                stat_charisma           = EXCLUDED.stat_charisma,
+                image_urls              = EXCLUDED.image_urls,
+                submitted_by_discord_id = COALESCE(gacha_characters.submitted_by_discord_id, EXCLUDED.submitted_by_discord_id),
+                submitted_by_username   = COALESCE(gacha_characters.submitted_by_username,   EXCLUDED.submitted_by_username)
             """,
             character_id,
             data["name"], data["title"], data["faction"], data["rarity"],
             data.get("quote", ""), data.get("wiki", ""),
             s.get("authority", 50), s.get("military", 50), s.get("charisma", 50),
             data.get("image_urls") or [],
+            submitted_by_discord_id, submitted_by_username,
         )
 
     async def update_gacha_character_images(self, character_id: str, image_urls: list[str]) -> None:

@@ -20,6 +20,7 @@ from database._announcement import AnnouncementMixin
 from database._guilds       import GuildRankMixin
 from database._analytics    import AnalyticsMixin
 from database._gacha        import GachaMixin
+from database._requests     import GachaRequestsMixin
 
 
 TABLES = [
@@ -225,6 +226,7 @@ class Database(
     GuildRankMixin,
     AnalyticsMixin,
     GachaMixin,
+    GachaRequestsMixin,
 ):
     def __init__(self):
         self._dsn = os.getenv("DATABASE_URL", "")
@@ -234,7 +236,8 @@ class Database(
         self._pool_max = int(os.getenv("DB_POOL_MAX", "10"))
 
     async def init(self):
-        self._pool = await asyncpg.create_pool(self._dsn, min_size=self._pool_min, max_size=self._pool_max)
+        ssl = "require" if "sslmode" not in self._dsn and not self._dsn.startswith("postgresql://localhost") and not self._dsn.startswith("postgresql://127.") else None
+        self._pool = await asyncpg.create_pool(self._dsn, min_size=self._pool_min, max_size=self._pool_max, ssl=ssl)
         await self._create_tables()
         await self._migrate()
 
@@ -579,3 +582,36 @@ class Database(
                 )
             """)
             await conn.execute("ALTER TABLE gacha_characters ADD COLUMN IF NOT EXISTS gender TEXT DEFAULT NULL")
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS gacha_requests (
+                    id                  SERIAL PRIMARY KEY,
+                    discord_id          BIGINT NOT NULL,
+                    discord_username    TEXT NOT NULL,
+                    wiki_slug           TEXT NOT NULL UNIQUE,
+                    wiki_title          TEXT NOT NULL,
+                    submitted_at        BIGINT NOT NULL,
+                    status              TEXT NOT NULL DEFAULT 'pending',
+                    reviewed_at         BIGINT,
+                    rejection_reason    TEXT
+                )
+            """)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS gacha_request_votes (
+                    request_id      INT NOT NULL REFERENCES gacha_requests(id) ON DELETE CASCADE,
+                    discord_id      BIGINT NOT NULL,
+                    discord_username TEXT NOT NULL,
+                    voted_at        BIGINT NOT NULL,
+                    PRIMARY KEY (request_id, discord_id)
+                )
+            """)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS gacha_request_bans (
+                    discord_id  BIGINT PRIMARY KEY,
+                    banned_at   BIGINT NOT NULL
+                )
+            """)
+            await conn.execute("ALTER TABLE gacha_characters ADD COLUMN IF NOT EXISTS submitted_by_discord_id BIGINT DEFAULT NULL")
+            await conn.execute("ALTER TABLE gacha_characters ADD COLUMN IF NOT EXISTS submitted_by_username TEXT DEFAULT NULL")
+            await conn.execute("ALTER TABLE gacha_requests ADD COLUMN IF NOT EXISTS override_rarity TEXT DEFAULT NULL")
+            await conn.execute("ALTER TABLE gacha_requests ADD COLUMN IF NOT EXISTS override_gender TEXT DEFAULT NULL")
+            await conn.execute("ALTER TABLE gacha_requests ADD COLUMN IF NOT EXISTS override_image_urls TEXT[] DEFAULT ARRAY[]::TEXT[]")

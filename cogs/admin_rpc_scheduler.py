@@ -133,6 +133,33 @@ class AdminRpcScheduler(commands.Cog):
                 await process_vote(bot, int(user_id))
             return {"output": "ok"}
 
+        if action == "dm_user":
+            user_id = args.get("user_id")
+            message = str(args.get("message", ""))[:2000]
+            if user_id and message:
+                try:
+                    user = await bot.fetch_user(int(user_id))
+                    await user.send(message)
+                except Exception:
+                    pass
+            return {"output": "ok"}
+
+        if action == "check_contribution_milestone":
+            user_id       = args.get("user_id")
+            contributions = args.get("contributions", 0)
+            if user_id:
+                from cogs.achievements import check_milestone, unlock
+                uid = int(user_id)
+                for guild in bot.guilds:
+                    member = guild.get_member(uid)
+                    if member:
+                        await check_milestone(
+                            bot, guild, member,
+                            "gacha_contributions", contributions,
+                        )
+                        break
+            return {"output": "ok"}
+
         return {"error": f"Unknown action: {action}"}
 
     async def _delayed_restart(self):

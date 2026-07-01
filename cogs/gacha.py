@@ -1,6 +1,7 @@
 import asyncio
 import io
 import json
+import os
 import random
 import time
 
@@ -204,6 +205,11 @@ def _stars(rarity: str) -> str:
     return "★" * n + "☆" * (5 - n)
 
 
+def _suggested_by(char: dict) -> str:
+    username = char.get("submitted_by_username")
+    return f"  ·  Suggested by @{username}" if username else ""
+
+
 def _roll_embed(char: dict, image_url: str | None, rolls_remaining: int, max_rolls: int, dupe: bool = False, owner_name: str | None = None) -> discord.Embed:
     faction_label = FACTION_LABEL.get(char["faction"], char["faction"].upper())
     rolls_part = f"⚠️ {rolls_remaining}/{max_rolls} rolls remaining" if rolls_remaining <= 2 else f"{rolls_remaining}/{max_rolls} rolls remaining"
@@ -215,17 +221,19 @@ def _roll_embed(char: dict, image_url: str | None, rolls_remaining: int, max_rol
     )
     if image_url:
         embed.set_image(url=image_url)
+    credit = _suggested_by(char)
     if dupe:
         belongs = f"Belongs to {owner_name}  ·  " if owner_name else ""
-        embed.set_footer(text=f"{belongs}{rolls_part}")
+        embed.set_footer(text=f"{belongs}{rolls_part}{credit}")
     else:
-        embed.set_footer(text=f"React with any emoji to claim!  ·  {rolls_part}")
+        embed.set_footer(text=f"React with any emoji to claim!  ·  {rolls_part}{credit}")
     return embed
 
 
 def _claimed_embed(char: dict, image_url: str | None, claimer_name: str, rank: int | None = None) -> discord.Embed:
     faction_label = FACTION_LABEL.get(char["faction"], char["faction"].upper())
     rank_part = f"  ·  Global #{rank}" if rank else ""
+    credit = _suggested_by(char)
     embed = discord.Embed(
         title=char["name"],
         description=f"{char['title']}\n{faction_label}  ·  {_stars(char['rarity'])}",
@@ -233,7 +241,7 @@ def _claimed_embed(char: dict, image_url: str | None, claimer_name: str, rank: i
     )
     if image_url:
         embed.set_image(url=image_url)
-    embed.set_footer(text=f"Claimed by {claimer_name}{rank_part}")
+    embed.set_footer(text=f"Claimed by {claimer_name}{rank_part}{credit}")
     return embed
 
 
@@ -780,7 +788,7 @@ class GachaCog(commands.Cog, name="Gacha"):
         import urllib.parse
         char = _get_personality(name) or _search_personality(name)
         if not char:
-            await send_fn(f"No waifu found matching **{name}**.\nDon't see your favorite figure? Join our Support Server to request them: <https://discord.gg/k4W6YAPYhC>")
+            await send_fn(f"No waifu found matching **{name}**.\nDon't see your favorite figure? Submit them for review: <https://socialcredit-dashboard.up.railway.app/submit>")
             return
 
         wiki      = char.get("wiki") or char.get("id", name)
@@ -881,10 +889,10 @@ class GachaCog(commands.Cog, name="Gacha"):
         request_char = _get_personality(request) or _search_personality(request)
 
         if not offer_char:
-            await interaction.followup.send(f"No waifu found matching **{offer}**.\nDon't see your favorite figure? Join our Support Server to request them: <https://discord.gg/k4W6YAPYhC>")
+            await interaction.followup.send(f"No waifu found matching **{offer}**.\nDon't see your favorite figure? Submit them for review: <https://socialcredit-dashboard.up.railway.app/submit>")
             return
         if not request_char:
-            await interaction.followup.send(f"No waifu found matching **{request}**.\nDon't see your favorite figure? Join our Support Server to request them: <https://discord.gg/k4W6YAPYhC>")
+            await interaction.followup.send(f"No waifu found matching **{request}**.\nDon't see your favorite figure? Submit them for review: <https://socialcredit-dashboard.up.railway.app/submit>")
             return
 
         offer_id   = offer_char.get("id", offer) if "id" in (offer_char or {}) else offer
@@ -939,7 +947,7 @@ class GachaCog(commands.Cog, name="Gacha"):
 
         char = _get_personality(waifu) or _search_personality(waifu)
         if not char:
-            await interaction.followup.send(f"No waifu found matching **{waifu}**.\nDon't see your favorite figure? Join our Support Server to request them: <https://discord.gg/k4W6YAPYhC>")
+            await interaction.followup.send(f"No waifu found matching **{waifu}**.\nDon't see your favorite figure? Submit them for review: <https://socialcredit-dashboard.up.railway.app/submit>")
             return
         char_id = char.get("id", waifu)
 
@@ -971,18 +979,15 @@ class GachaCog(commands.Cog, name="Gacha"):
         await interaction.response.defer()
         char = _get_personality(name) or _search_personality(name)
         if not char:
-            await interaction.followup.send(f"No waifu found matching **{name}**.\nDon't see your favorite figure? Join our Support Server to request them: <https://discord.gg/k4W6YAPYhC>")
+            await interaction.followup.send(f"No waifu found matching **{name}**.\nDon't see your favorite figure? Submit them for review: <https://socialcredit-dashboard.up.railway.app/submit>")
             return
         char_id = char.get("id", name)
 
-        current = await self.db.get_wishlist(interaction.guild.id, interaction.user.id)
-        if len(current) >= WISHLIST_MAX:
-            await interaction.followup.send(f"Your wishlist is full ({WISHLIST_MAX} max). Remove one first.")
-            return
-
-        added = await self.db.add_wishlist(interaction.guild.id, interaction.user.id, char_id)
-        if added:
+        result = await self.db.add_wishlist(interaction.guild.id, interaction.user.id, char_id, max_size=WISHLIST_MAX)
+        if result == "added":
             await interaction.followup.send(f"Added **{char['name']}** {_stars(char['rarity'])} to your wishlist.")
+        elif result == "full":
+            await interaction.followup.send(f"Your wishlist is full ({WISHLIST_MAX} max). Remove one first.")
         else:
             await interaction.followup.send(f"**{char['name']}** is already on your wishlist.")
 
@@ -993,7 +998,7 @@ class GachaCog(commands.Cog, name="Gacha"):
         await interaction.response.defer()
         char = _get_personality(name) or _search_personality(name)
         if not char:
-            await interaction.followup.send(f"No waifu found matching **{name}**.\nDon't see your favorite figure? Join our Support Server to request them: <https://discord.gg/k4W6YAPYhC>")
+            await interaction.followup.send(f"No waifu found matching **{name}**.\nDon't see your favorite figure? Submit them for review: <https://socialcredit-dashboard.up.railway.app/submit>")
             return
         char_id = char.get("id", name)
 
@@ -1078,7 +1083,7 @@ class GachaCog(commands.Cog, name="Gacha"):
 
             char = _search_personality(name)
             if not char:
-                await ctx.send(f"No waifu found matching **{name}**.\nDon't see your favorite figure? Join our Support Server to request them: <https://discord.gg/k4W6YAPYhC>")
+                await ctx.send(f"No waifu found matching **{name}**.\nDon't see your favorite figure? Submit them for review: <https://socialcredit-dashboard.up.railway.app/submit>")
                 return
 
             ok = await self.db.gift_character(ctx.guild.id, ctx.author.id, target.id, char["id"])
@@ -1108,16 +1113,14 @@ class GachaCog(commands.Cog, name="Gacha"):
                 return
             char = _search_personality(name)
             if not char:
-                await ctx.send(f"No waifu found matching **{name}**.\nDon't see your favorite figure? Join our Support Server to request them: <https://discord.gg/k4W6YAPYhC>")
+                await ctx.send(f"No waifu found matching **{name}**.\nDon't see your favorite figure? Submit them for review: <https://socialcredit-dashboard.up.railway.app/submit>")
                 return
             char_id = char["id"]
-            current = await self.db.get_wishlist(ctx.guild.id, ctx.author.id)
-            if len(current) >= WISHLIST_MAX:
-                await ctx.send(f"Your wishlist is full ({WISHLIST_MAX} max). Remove one first.")
-                return
-            added = await self.db.add_wishlist(ctx.guild.id, ctx.author.id, char_id)
-            if added:
+            result = await self.db.add_wishlist(ctx.guild.id, ctx.author.id, char_id, max_size=WISHLIST_MAX)
+            if result == "added":
                 await ctx.send(f"Added **{char['name']}** {_stars(char['rarity'])} to your wishlist.")
+            elif result == "full":
+                await ctx.send(f"Your wishlist is full ({WISHLIST_MAX} max). Remove one first.")
             else:
                 await ctx.send(f"**{char['name']}** is already on your wishlist.")
 
@@ -1126,12 +1129,50 @@ class GachaCog(commands.Cog, name="Gacha"):
         async with ctx.typing():
             await self._do_wishlist_view(ctx.guild.id, ctx.author, ctx.send)
 
+    # ── community suggestion commands ─────────────────────────────────────────
+
+    _DASHBOARD_URL = os.getenv("DASHBOARD_URL", "https://socialcredit-dashboard.up.railway.app")
+
+    @app_commands.command(name="suggestions", description="Suggest a new character for the gacha pool")
+    async def slash_suggest(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        embed = discord.Embed(
+            title="Suggest a Character",
+            description=(
+                "Think a real historical figure or public personality deserves a spot in the Waifu Bureau? "
+                "Submit them for community review!\n\n"
+                f"→ **[Open Community Wishlist]({self._DASHBOARD_URL}/wishlist)**\n"
+                f"→ **[Submit a Suggestion]({self._DASHBOARD_URL}/submit)**\n\n"
+                "Submissions with the most votes go to the top of the admin queue. "
+                "If your suggestion is approved, your name appears as **Suggested by @you** on every card."
+            ),
+            color=0x576F72,
+        )
+        view = discord.ui.View()
+        view.add_item(discord.ui.Button(label="Suggest a Character", style=discord.ButtonStyle.link, url=f"{self._DASHBOARD_URL}/submit"))
+        view.add_item(discord.ui.Button(label="View Wishlist",       style=discord.ButtonStyle.link, url=f"{self._DASHBOARD_URL}/wishlist"))
+        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+
+    @commands.command(name="suggestions")
+    async def prefix_suggest(self, ctx: commands.Context):
+        async with ctx.typing():
+            embed = discord.Embed(
+                title="Suggest a Character",
+                description=(
+                    f"Submit a real historical figure for the gacha pool at **{self._DASHBOARD_URL}/submit**\n"
+                    f"View community requests at **{self._DASHBOARD_URL}/wishlist**\n\n"
+                    "Approved suggestions credit you as **Suggested by @you** on every card."
+                ),
+                color=0x576F72,
+            )
+            await ctx.send(embed=embed)
+
     # ── divorce ───────────────────────────────────────────────────────────────
 
     async def _do_divorce(self, guild_id: int, user_id: int, name: str, send_fn):
         char = _get_personality(name) or _search_personality(name)
         if not char:
-            await send_fn(f"No waifu found matching **{name}**.\nDon't see your favorite figure? Join our Support Server to request them: <https://discord.gg/k4W6YAPYhC>")
+            await send_fn(f"No waifu found matching **{name}**.\nDon't see your favorite figure? Submit them for review: <https://socialcredit-dashboard.up.railway.app/submit>")
             return
         char_id = char.get("id", name)
         ok, _ = await asyncio.gather(
@@ -1249,10 +1290,12 @@ class GachaCog(commands.Cog, name="Gacha"):
                 await unlock_achievement(self.bot, guild, claimer, "first_dupe")
             return
 
-        await asyncio.gather(
+        claimed, _ = await asyncio.gather(
             self.db.claim_character(guild_id, claimer_id, char_id),
             self._set_owner_cache(guild_id, char_id, claimer_id),
         )
+        if not claimed:
+            return
         rank_info = await self.db.get_character_rank(char_id)
 
         try:
@@ -1323,7 +1366,7 @@ class GachaCog(commands.Cog, name="Gacha"):
             char = {"id": name, **char}
 
         if not char:
-            await send_fn(f"No waifu found matching **{name}**.\nDon't see your favorite figure? Join our Support Server to request them: <https://discord.gg/k4W6YAPYhC>")
+            await send_fn(f"No waifu found matching **{name}**.\nDon't see your favorite figure? Submit them for review: <https://socialcredit-dashboard.up.railway.app/submit>")
             return
 
         char_id = char.get("id", name)
@@ -1374,7 +1417,7 @@ class GachaCog(commands.Cog, name="Gacha"):
     async def _do_choose(self, guild_id: int, user: discord.Member | discord.User, name: str, send_fn):
         char = _search_personality(name)
         if not char:
-            await send_fn(f"No waifu found matching **{name}**.\nDon't see your favorite figure? Join our Support Server to request them: <https://discord.gg/k4W6YAPYhC>", ephemeral=True)
+            await send_fn(f"No waifu found matching **{name}**.\nDon't see your favorite figure? Submit them for review: <https://socialcredit-dashboard.up.railway.app/submit>", ephemeral=True)
             return
         if not await self.db.has_character(guild_id, user.id, char["id"]):
             await send_fn(f"**{char['name']}** is not in your harem.", ephemeral=True)

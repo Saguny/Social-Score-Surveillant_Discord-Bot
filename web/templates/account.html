@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>My Account · Social Credit</title>
+  <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/static/dashboard.css">
+  <link rel="stylesheet" href="/static/submit.css">
+  <link rel="stylesheet" href="/static/account.css?v=3">
+</head>
+<body>
+
+<nav class="navbar px-4 py-3 mb-3">
+  <a class="navbar-brand" href="/">社会信用 Social Credit</a>
+  <div class="d-flex gap-3 align-items-center flex-wrap">
+    <a href="/"             class="nav-link">HOME</a>
+    <a href="/dashboard"    class="nav-link">DASHBOARD</a>
+    <a href="/leaderboards" class="nav-link">LEADERBOARDS</a>
+    <a href="/wishlist"     class="nav-link">WISHLIST</a>
+    <a href="/submit"       class="nav-link">SUBMIT</a>
+    <a href="/account"      class="nav-link active">MY ACCOUNT</a>
+    <a href="/privacy"      class="nav-link">PRIVACY</a>
+    <a href="/terms"        class="nav-link">TERMS</a>
+  </div>
+</nav>
+
+<div class="container-fluid">
+  <div class="page-wrap">
+
+    <!-- Identity bar -->
+    <div class="acc-identity" id="acc-identity">
+      <div class="acc-avatar" id="acc-avatar"></div>
+      <div class="acc-info">
+        <div class="acc-username" id="acc-username">Loading…</div>
+        <div class="acc-sub" id="acc-sub"></div>
+      </div>
+      <a href="/auth/discord/logout" class="acc-logout-btn">Log out</a>
+    </div>
+
+    <!-- Tab nav -->
+    <ul class="nav nav-tabs acc-tabs mb-4" id="accTabs">
+      <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tab-overview">Overview</a></li>
+      <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-portfolio" id="tab-portfolio-link">Portfolio</a></li>
+      <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-requests">Requests</a></li>
+      <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-achievements">Achievements</a></li>
+      <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-badges">Badges</a></li>
+    </ul>
+
+    <div class="tab-content" id="accTabContent">
+
+      <!-- ── Overview ─────────────────────────────── -->
+      <div class="tab-pane fade show active" id="tab-overview">
+
+        <div class="acc-shdr">Global Stats</div>
+        <div class="acc-stat-grid" id="acc-stats-global">
+          <div class="acc-stat-tile"><div class="n" id="s-checkin">–</div><div class="lbl">Check-in Streak</div></div>
+          <div class="acc-stat-tile"><div class="n" id="s-checkin-best">–</div><div class="lbl">Best Streak</div></div>
+          <div class="acc-stat-tile"><div class="n" id="s-votes">–</div><div class="lbl">Total Votes</div></div>
+          <div class="acc-stat-tile"><div class="n" id="s-vote-streak">–</div><div class="lbl">Vote Streak</div></div>
+          <div class="acc-stat-tile"><div class="n" id="s-prestige">–</div><div class="lbl">Prestige Level</div></div>
+          <div class="acc-stat-tile"><div class="n" id="s-gacha">–</div><div class="lbl">Gacha Approved</div></div>
+        </div>
+
+        <div class="acc-shdr mt-4">Server Breakdown</div>
+        <div id="acc-guilds">
+          <div class="acc-empty">Loading…</div>
+        </div>
+
+      </div>
+
+      <!-- ── Portfolio ──────────────────────────────── -->
+      <div class="tab-pane fade" id="tab-portfolio">
+
+        <!-- Server selector -->
+        <div class="port-server-row">
+          <label class="port-server-label">Server</label>
+          <select id="port-guild-select" class="port-guild-select">
+            <option value="">Select a server…</option>
+          </select>
+          <span id="port-yuan" class="port-yuan"></span>
+        </div>
+
+        <div id="port-content" style="display:none">
+
+          <!-- Portfolio value chart -->
+          <div class="acc-shdr d-flex align-items-center justify-content-between mt-3">
+            <span>Portfolio Value</span>
+            <div class="port-period-row">
+              <button class="port-period active" data-period="1D">1D</button>
+              <button class="port-period" data-period="5D">5D</button>
+              <button class="port-period" data-period="1M">1M</button>
+              <button class="port-period" data-period="6M">6M</button>
+              <button class="port-period" data-period="1Y">1Y</button>
+            </div>
+          </div>
+          <div class="port-chart-wrap">
+            <canvas id="port-chart"></canvas>
+            <div class="port-chart-empty" id="port-chart-empty" style="display:none">No history yet — history is recorded every 2 minutes while the bot is running.</div>
+          </div>
+
+          <!-- Holdings -->
+          <div class="acc-shdr mt-4">Holdings</div>
+          <div id="port-holdings">
+            <div class="acc-empty">Loading…</div>
+          </div>
+
+          <!-- Open Turbo Positions -->
+          <div class="acc-shdr mt-4">Open Turbo Positions</div>
+          <div id="port-turbos">
+            <div class="acc-empty">Loading…</div>
+          </div>
+
+          <!-- Stock Market -->
+          <div class="acc-shdr mt-4">Stock Market</div>
+          <div id="port-market">
+            <div class="acc-empty">Loading…</div>
+          </div>
+
+          <!-- Available Turbos -->
+          <div class="acc-shdr mt-4 d-flex align-items-center justify-content-between">
+            <span>Today's Turbo Certificates</span>
+            <span id="port-min-cost" style="font-size:.75rem;color:var(--text-muted)"></span>
+          </div>
+          <div id="port-turbos-avail">
+            <div class="acc-empty">Loading…</div>
+          </div>
+
+        </div>
+
+        <div id="port-no-server" class="acc-empty mt-4" style="display:none">Select a server above to view your portfolio.</div>
+
+      </div>
+
+      <!-- ── Requests ───────────────────────────────── -->
+      <div class="tab-pane fade" id="tab-requests">
+
+        <div class="acc-shdr">My Submissions</div>
+        <div id="acc-requests">
+          <div class="acc-empty">Loading…</div>
+        </div>
+
+      </div>
+
+      <!-- ── Achievements ───────────────────────────── -->
+      <div class="tab-pane fade" id="tab-achievements">
+
+        <div class="acc-shdr d-flex justify-content-between align-items-center">
+          <span>Achievements</span>
+          <span id="acc-ach-count" style="font-size:.78rem;font-weight:400;color:var(--text-muted)"></span>
+        </div>
+        <div id="acc-achievements" class="acc-ach-grid">
+          <div class="acc-empty">Loading…</div>
+        </div>
+
+      </div>
+
+      <!-- ── Badges ──────────────────────────────────── -->
+      <div class="tab-pane fade" id="tab-badges">
+
+        <div class="acc-shdr">Cosmetic Badges</div>
+        <div id="acc-badges" class="acc-badge-grid">
+          <div class="acc-empty">Loading…</div>
+        </div>
+
+      </div>
+
+    </div><!-- /tab-content -->
+
+  </div>
+</div>
+
+<!-- Trade modal -->
+<div class="modal fade" id="tradeModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content port-modal">
+      <div class="modal-header border-0 pb-0">
+        <h6 class="modal-title" id="trade-modal-title">Trade</h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body pt-2">
+        <div id="trade-modal-info" class="port-modal-info mb-3"></div>
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <input type="number" id="trade-shares" class="port-input flex-grow-1" placeholder="Shares" min="0.0001" step="any">
+          <span id="trade-cost-preview" class="port-cost-preview"></span>
+        </div>
+        <div id="trade-modal-err" class="port-err" style="display:none"></div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button class="port-btn port-btn-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button class="port-btn port-btn-action" id="trade-confirm-btn">Confirm</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Turbo chart modal -->
+<div class="modal fade" id="turboChartModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content port-modal">
+      <div class="modal-header border-0 pb-0">
+        <h6 class="modal-title" id="turbo-chart-title">Chart</h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body pt-2">
+        <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
+          <div id="turbo-chart-meta" style="font-size:.8rem;color:var(--text-muted)"></div>
+          <div class="port-period-row" id="turbo-chart-periods">
+            <button class="port-period active" data-period="1D">1D</button>
+            <button class="port-period" data-period="5D">5D</button>
+            <button class="port-period" data-period="1M">1M</button>
+            <button class="port-period" data-period="6M">6M</button>
+            <button class="port-period" data-period="1Y">1Y</button>
+          </div>
+        </div>
+        <div class="port-chart-wrap" style="height:260px">
+          <canvas id="turbo-chart-canvas"></canvas>
+          <div class="port-chart-empty" id="turbo-chart-empty" style="display:none">No price history available for this period.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Turbo open modal -->
+<div class="modal fade" id="turboModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content port-modal">
+      <div class="modal-header border-0 pb-0">
+        <h6 class="modal-title" id="turbo-modal-title">Open Turbo Position</h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body pt-2">
+        <div id="turbo-modal-info" class="port-modal-info mb-3"></div>
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <input type="number" id="turbo-cost" class="port-input flex-grow-1" placeholder="Yuan to invest" min="100" step="1">
+        </div>
+        <div id="turbo-modal-err" class="port-err" style="display:none"></div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button class="port-btn port-btn-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button class="port-btn port-btn-action" id="turbo-confirm-btn">Open Position</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer class="site-footer">
+  Made with ♥ by OFF-BY-ONE ·
+  <a href="https://discord.gg/invite/k4W6YAPYhC" target="_blank" rel="noopener">Support Server</a> ·
+  <a href="https://top.gg/bot/856163780265902151" target="_blank" rel="noopener">Invite Bot</a> ·
+  <a href="/privacy">Privacy</a> ·
+  <a href="/terms">Terms</a>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="/static/account.js?v=3"></script>
+</body>
+</html>

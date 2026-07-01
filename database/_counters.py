@@ -10,6 +10,16 @@ class CountersMixin:
         )
         return int(row["value"]) if row else 0
 
+    async def get_user_counters(self, user_id: int, keys: list[str]) -> dict[str, int]:
+        rows = await self._pool.fetch(
+            "SELECT counter_key, value FROM user_counters WHERE user_id = $1 AND counter_key = ANY($2::text[])",
+            user_id, keys,
+        )
+        result = {k: 0 for k in keys}
+        for row in rows:
+            result[row["counter_key"]] = int(row["value"])
+        return result
+
     async def set_counter(self, user_id: int, key: str, value: int) -> None:
         await self._pool.execute(
             """
@@ -33,27 +43,39 @@ class CountersMixin:
         return int(row["value"])
 
     async def bump_daily_streak(self, user_id: int, streak_key: str) -> tuple[int, int]:
-        today = int(time.time()) // 86400
+        today        = int(time.time()) // 86400
         last_day_key = f"{streak_key}:last_day"
-        current_key = f"{streak_key}:current"
-        best_key = f"{streak_key}:best"
+        current_key  = f"{streak_key}:current"
+        best_key     = f"{streak_key}:best"
+        all_keys     = [last_day_key, current_key, best_key]
 
-        last_day = await self.get_counter(user_id, last_day_key)
-        current = await self.get_counter(user_id, current_key)
-        best = await self.get_counter(user_id, best_key)
+        async with self._pool.acquire() as conn:
+            async with conn.transaction():
+                rows = await conn.fetch(
+                    "SELECT counter_key, value FROM user_counters "
+                    "WHERE user_id = $1 AND counter_key = ANY($2) FOR UPDATE",
+                    user_id, all_keys,
+                )
+                vals     = {r["counter_key"]: int(r["value"]) for r in rows}
+                last_day = vals.get(last_day_key, 0)
+                current  = vals.get(current_key, 0)
+                best     = vals.get(best_key, 0)
 
-        if last_day == today:
-            return current, best
+                if last_day == today:
+                    return current, best
 
-        current = current + 1 if last_day == today - 1 else 1
-        await self.set_counter(user_id, current_key, current)
-        await self.set_counter(user_id, last_day_key, today)
-
-        if current > best:
-            best = current
-            await self.set_counter(user_id, best_key, best)
-
-        return current, best
+                new_current = current + 1 if last_day == today - 1 else 1
+                new_best    = max(new_current, best)
+                await conn.executemany(
+                    "INSERT INTO user_counters (user_id, counter_key, value) VALUES ($1, $2, $3) "
+                    "ON CONFLICT (user_id, counter_key) DO UPDATE SET value = EXCLUDED.value",
+                    [
+                        (user_id, last_day_key, today),
+                        (user_id, current_key,  new_current),
+                        (user_id, best_key,      new_best),
+                    ],
+                )
+        return new_current, new_best
 
     async def get_top_by_counter(self, key: str, limit: int = 10):
         return await self._pool.fetch(
