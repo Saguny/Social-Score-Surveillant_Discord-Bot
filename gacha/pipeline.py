@@ -215,9 +215,9 @@ def _gender_from_pronouns(extract: str) -> str | None:
     return "female" if she > he else ("male" if he > she else None)
 
 
-def _sync_wiki_gender(slug: str) -> str | None:
+def _sync_wiki_gender(slug: str, lang: str = "en") -> str | None:
     req = urllib.request.Request(
-        "https://en.wikipedia.org/w/api.php"
+        f"https://{lang}.wikipedia.org/w/api.php"
         f"?action=query&titles={urllib.parse.quote(slug, safe='')}"
         "&prop=pageprops&ppprop=wikibase_item&format=json",
         headers={"User-Agent": _UA},
@@ -250,14 +250,14 @@ def _sync_wiki_gender(slug: str) -> str | None:
     return None
 
 
-async def wiki_gender(slug: str, sem: asyncio.Semaphore, extract: str = "") -> str | None:
+async def wiki_gender(slug: str, sem: asyncio.Semaphore, extract: str = "", lang: str = "en") -> str | None:
     async with sem:
-        result = await asyncio.to_thread(_sync_wiki_gender, slug)
+        result = await asyncio.to_thread(_sync_wiki_gender, slug, lang)
     return result or _gender_from_pronouns(extract)
 
 
-async def wiki_summary(slug: str, sem: asyncio.Semaphore) -> dict | None:
-    url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{urllib.parse.quote(slug)}"
+async def wiki_summary(slug: str, sem: asyncio.Semaphore, lang: str = "en") -> dict | None:
+    url = f"https://{lang}.wikipedia.org/api/rest_v1/page/summary/{urllib.parse.quote(slug)}"
     raw = await _aget(url, sem)
     if not raw:
         return None
@@ -268,13 +268,13 @@ async def wiki_summary(slug: str, sem: asyncio.Semaphore) -> dict | None:
         return None
 
 
-async def wiki_views(slug: str, sem: asyncio.Semaphore) -> int:
+async def wiki_views(slug: str, sem: asyncio.Semaphore, lang: str = "en") -> int:
     now   = datetime.utcnow()
     start = (now - timedelta(days=180)).strftime("%Y%m%d")
     end   = now.strftime("%Y%m%d")
     url = (
         "https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article"
-        f"/en.wikipedia/all-access/all-agents/{urllib.parse.quote(slug)}/monthly/{start}/{end}"
+        f"/{lang}.wikipedia/all-access/all-agents/{urllib.parse.quote(slug)}/monthly/{start}/{end}"
     )
     raw = await _aget(url, sem)
     if not raw:
@@ -309,9 +309,9 @@ def _resolve_file_url(fname: str) -> str | None:
     return None
 
 
-def _sync_wiki_infobox_img(slug: str) -> list[str]:
+def _sync_wiki_infobox_img(slug: str, lang: str = "en") -> list[str]:
     req = urllib.request.Request(
-        "https://en.wikipedia.org/w/api.php"
+        f"https://{lang}.wikipedia.org/w/api.php"
         f"?action=query&titles={urllib.parse.quote(slug, safe='')}"
         "&prop=pageimages&piprop=thumbnail&pithumbsize=800&format=json",
         headers={"User-Agent": _UA},
@@ -328,7 +328,7 @@ def _sync_wiki_infobox_img(slug: str) -> list[str]:
     return []
 
 
-def _sync_wiki_imgs(slug: str, max_images: int = 5) -> list[str]:
+def _sync_wiki_imgs(slug: str, max_images: int = 5, lang: str = "en") -> list[str]:
     results: list[str] = []
     seen: set[str] = set()
 
@@ -353,7 +353,7 @@ def _sync_wiki_imgs(slug: str, max_images: int = 5) -> list[str]:
         return {}
 
     combo = _get(
-        "https://en.wikipedia.org/w/api.php"
+        f"https://{lang}.wikipedia.org/w/api.php"
         f"?action=query&titles={urllib.parse.quote(slug, safe='')}"
         "&prop=pageimages|pageprops&piprop=thumbnail&pithumbsize=800"
         "&ppprop=wikibase_item&format=json"
@@ -366,7 +366,7 @@ def _sync_wiki_imgs(slug: str, max_images: int = 5) -> list[str]:
         qid = page.get("pageprops", {}).get("wikibase_item")
 
     if not results or not qid:
-        rest = _get(f"https://en.wikipedia.org/api/rest_v1/page/summary/{urllib.parse.quote(slug, safe='')}")
+        rest = _get(f"https://{lang}.wikipedia.org/api/rest_v1/page/summary/{urllib.parse.quote(slug, safe='')}")
         orig = rest.get("originalimage", {}).get("source", "") or rest.get("thumbnail", {}).get("source", "")
         if orig and _IMG_EXT.search(orig) and not _IMG_SKIP.search(orig):
             _add(orig)
@@ -427,9 +427,9 @@ def _sync_wiki_imgs(slug: str, max_images: int = 5) -> list[str]:
     return results[:max_images]
 
 
-async def wiki_images(slug: str, sem: asyncio.Semaphore, max_images: int = 5) -> list[str]:
+async def wiki_images(slug: str, sem: asyncio.Semaphore, max_images: int = 5, lang: str = "en") -> list[str]:
     async with sem:
-        return await asyncio.to_thread(_sync_wiki_imgs, slug, max_images)
+        return await asyncio.to_thread(_sync_wiki_imgs, slug, max_images, lang)
 
 
 def _sync_dl(url: str) -> tuple[bytes | None, str]:
@@ -528,23 +528,24 @@ async def process_one(
     dry_run: bool = False,
     override_image_urls: list[str] | None = None,
     fast: bool = False,
+    lang: str = "en",
 ) -> tuple[str, dict] | None:
     slug = item["slug"]
     name = item["name"]
 
     if fast:
-        summary_t = wiki_summary(slug, wiki_sem)
-        images_t  = asyncio.sleep(0, result=[]) if override_image_urls else asyncio.to_thread(_sync_wiki_infobox_img, slug)
+        summary_t = wiki_summary(slug, wiki_sem, lang)
+        images_t  = asyncio.sleep(0, result=[]) if override_image_urls else asyncio.to_thread(_sync_wiki_infobox_img, slug, lang)
         summary, img_urls = await asyncio.gather(summary_t, images_t)
         if not summary or not _is_person_summary(summary):
             return None
         monthly_views = item.get("langlinks", 30) * 5000
         gender = _gender_from_pronouns(summary.get("extract", ""))
     else:
-        summary_t = wiki_summary(slug, wiki_sem)
-        views_t   = wiki_views(slug, wiki_sem)
-        images_t  = asyncio.sleep(0, result=[]) if override_image_urls else wiki_images(slug, wiki_sem, max_images=5)
-        gender_t  = wiki_gender(slug, wiki_sem)
+        summary_t = wiki_summary(slug, wiki_sem, lang)
+        views_t   = wiki_views(slug, wiki_sem, lang)
+        images_t  = asyncio.sleep(0, result=[]) if override_image_urls else wiki_images(slug, wiki_sem, max_images=5, lang=lang)
+        gender_t  = wiki_gender(slug, wiki_sem, lang=lang)
         summary, monthly_views, img_urls, gender = await asyncio.gather(summary_t, views_t, images_t, gender_t)
         if not summary or not _is_person_summary(summary):
             return None
@@ -580,7 +581,7 @@ async def process_one(
     }
 
 
-async def process_slug(wiki_slug: str) -> dict | None:
+async def process_slug(wiki_slug: str, lang: str = "en") -> dict | None:
     """Single-slug entry point for the web approval pipeline."""
     item = {
         "slug":      wiki_slug,
@@ -591,7 +592,7 @@ async def process_slug(wiki_slug: str) -> dict | None:
     wiki_sem = asyncio.Semaphore(2)
     r2_sem   = asyncio.Semaphore(2)
     async with aiohttp.ClientSession() as r2_session:
-        result = await process_one(item, r2_session, wiki_sem, r2_sem, dry_run=False)
+        result = await process_one(item, r2_session, wiki_sem, r2_sem, dry_run=False, lang=lang)
     if result is None:
         return None
     _, char_data = result

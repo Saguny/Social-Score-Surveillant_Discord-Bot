@@ -618,3 +618,4 @@ class Database(
             await conn.execute("ALTER TABLE gacha_requests ADD COLUMN IF NOT EXISTS thumbnail_url TEXT NOT NULL DEFAULT ''")
             await conn.execute("ALTER TABLE gacha_requests ADD COLUMN IF NOT EXISTS override_faction TEXT DEFAULT NULL")
             await conn.execute("ALTER TABLE gacha_requests ADD COLUMN IF NOT EXISTS wiki_extract TEXT NOT NULL DEFAULT ''")
+            await conn.execute("ALTER TABLE gacha_requests ADD COLUMN IF NOT EXISTS wiki_lang TEXT NOT NULL DEFAULT 'en'")

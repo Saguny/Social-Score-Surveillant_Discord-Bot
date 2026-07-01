@@ -279,8 +279,8 @@ async def _handle_discord_logout(request):
     raise response
 
 
-_WIKI_API = "https://en.wikipedia.org/w/api.php"
-_WIKI_UA  = "SocialCreditBot/2.0 (https://discord.gg/invite/k4W6YAPYhC; character request portal)"
+_WIKI_UA   = "SocialCreditBot/2.0 (https://discord.gg/invite/k4W6YAPYhC; character request portal)"
+_WIKI_LANGS = ["en", "de", "fr", "es", "ja", "ko", "pt", "ru", "zh", "it", "pl", "nl"]
 
 _SUBMIT_DAILY_LIMIT = 3
 _REQUEST_BODY_LIMIT = 4096
@@ -308,7 +308,7 @@ def _check_origin(request) -> bool:
     return parsed.netloc == host
 
 
-async def _fetch_wikipedia_preview(slug: str) -> dict | None:
+async def _fetch_wikipedia_preview_lang(slug: str, lang: str, session: aiohttp.ClientSession) -> dict | None:
     params = {
         "action":      "query",
         "titles":      slug,
@@ -321,16 +321,15 @@ async def _fetch_wikipedia_preview(slug: str) -> dict | None:
         "format":      "json",
     }
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                _WIKI_API,
-                params=params,
-                headers={"User-Agent": _WIKI_UA},
-                timeout=aiohttp.ClientTimeout(total=8),
-            ) as resp:
-                if resp.status != 200:
-                    return None
-                data = await resp.json()
+        async with session.get(
+            f"https://{lang}.wikipedia.org/w/api.php",
+            params=params,
+            headers={"User-Agent": _WIKI_UA},
+            timeout=aiohttp.ClientTimeout(total=8),
+        ) as resp:
+            if resp.status != 200:
+                return None
+            data = await resp.json()
         pages = data.get("query", {}).get("pages", {})
         page = next(iter(pages.values()), {})
         if "missing" in page:
@@ -345,14 +344,32 @@ async def _fetch_wikipedia_preview(slug: str) -> dict | None:
             "extract":       (page.get("extract", "") or "")[:500],
             "thumbnail_url": (page.get("thumbnail") or {}).get("source", ""),
             "description":   description,
+            "lang":          lang,
         }
     except Exception:
         return None
 
 
+async def _fetch_wikipedia_preview(slug: str) -> dict | None:
+    async with aiohttp.ClientSession() as session:
+        for lang in _WIKI_LANGS:
+            result = await _fetch_wikipedia_preview_lang(slug, lang, session)
+            if result is not None:
+                return result
+    return None
+
+
+_BORN_RE = re.compile(
+    r"\b(born|died|geboren|gestorben|nacido|nacida|né|née|nato|nata)\b"
+    r"|\(\*\s*\d"           # German Wikipedia style: (* 23. November 1988
+    r"|\b(18|19|20)\d{2}\b" # any 4-digit year 1800-2099 in extract
+, re.IGNORECASE)
+
 def _looks_like_person(wiki_data: dict) -> bool:
     text = f"{wiki_data.get('description', '')} {wiki_data.get('extract', '')}".lower()
-    return any(kw in text for kw in _PERSON_KEYWORDS)
+    if any(kw in text for kw in _PERSON_KEYWORDS):
+        return True
+    return bool(_BORN_RE.search(text))
 
 
 async def _handle_requests_check(request):
@@ -472,6 +489,7 @@ async def _handle_requests_submit(request):
             wiki_title       = wiki["title"],
             thumbnail_url    = wiki.get("thumbnail_url", ""),
             wiki_extract     = wiki.get("extract", ""),
+            wiki_lang        = wiki.get("lang", "en"),
         )
     except ValueError:
         return web.json_response({"error": "already_requested"}, status=409)
@@ -1335,7 +1353,8 @@ async def _handle_admin_requests_approve(request):
         await emit("pipeline", "Running gacha enrichment pipeline…")
         try:
             from gacha.pipeline import process_slug
-            char_data = await process_slug(wiki_slug)
+            wiki_lang = req.get("wiki_lang") or "en"
+            char_data = await process_slug(wiki_slug, lang=wiki_lang)
         except Exception as exc:
             await emit("pipeline", f"Pipeline error: {exc}. Saving with minimal data.", ok=False)
             char_data = None
