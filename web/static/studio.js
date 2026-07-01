@@ -46,6 +46,17 @@
   var cardEl = document.querySelector('.card');
   cardEl.addEventListener('mouseenter', function () { overCard = true; });
   cardEl.addEventListener('mouseleave', function () { overCard = false; });
+  document.querySelectorAll('.avatar-wrap').forEach(function (wrap) {
+    var img = wrap.querySelector('.avatar');
+    wrap.addEventListener('mousemove', function (e) {
+      var rect = wrap.getBoundingClientRect();
+      var dx = (e.clientX - (rect.left + rect.width  / 2)) / (rect.width  / 2);
+      var dy = (e.clientY - (rect.top  + rect.height / 2)) / (rect.height / 2);
+      img.style.transform = 'translate(' + (dx * 4).toFixed(1) + 'px, ' + (dy * 4).toFixed(1) + 'px)';
+    });
+    wrap.addEventListener('mouseleave', function () { img.style.transform = ''; });
+  });
+
   var influence = 260;
   var maxScale = 1.4;
   var lerpSpeed = 0.1;
@@ -111,19 +122,30 @@
     }
   });
 
-  var hueAccum = 0;
-  var scrollTicking = false;
-  function applyHue() {
-    scrollTicking = false;
-    drift.style.filter = 'hue-rotate(' + hueAccum.toFixed(1) + 'deg)';
-  }
-  window.addEventListener('wheel', function (e) {
-    hueAccum = (hueAccum + e.deltaY * 0.06) % 360;
-    if (!scrollTicking) {
-      scrollTicking = true;
-      requestAnimationFrame(applyHue);
+  window.addEventListener('touchstart', function (e) {
+    var touch = e.touches[0];
+    var now = performance.now();
+    for (var i = 0; i < squares.length; i++) {
+      var s = squares[i];
+      var dx = touch.clientX - s.cx;
+      var dy = touch.clientY - s.cy;
+      var dist = Math.sqrt(dx * dx + dy * dy);
+      s.waves.push(now + dist / waveSpeed);
     }
   }, { passive: true });
+
+  var logoClickCount = 0, logoClickTimer;
+  document.querySelector('.logo').addEventListener('click', function () {
+    logoClickCount++;
+    clearTimeout(logoClickTimer);
+    logoClickTimer = setTimeout(function () { logoClickCount = 0; }, 2000);
+    if (logoClickCount >= 5) {
+      logoClickCount = 0;
+      var h1El = document.querySelector('h1');
+      h1El.classList.add('glitch-burst');
+      setTimeout(function () { h1El.classList.remove('glitch-burst'); }, 1000);
+    }
+  });
 
   var resizeTimer;
   window.addEventListener('resize', function () {
@@ -134,4 +156,15 @@
   build();
   lerpLoop();
   setInterval(measure, 500);
+
+  fetch('/api/stats')
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (d) {
+      if (!d) return;
+      var guilds = d.total_guilds;
+      var users = d.total_users;
+      if (typeof guilds === 'number') document.getElementById('sc-guilds').textContent = guilds.toLocaleString() + ' servers';
+      if (typeof users === 'number') document.getElementById('sc-users').textContent = users.toLocaleString() + ' citizens';
+    })
+    .catch(function () {});
 })();
