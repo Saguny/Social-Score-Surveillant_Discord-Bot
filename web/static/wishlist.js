@@ -96,6 +96,7 @@
               <div class="wl-name">${_esc(item.wiki_title)}</div>
               <div class="wl-desc">by @${_esc(by)} · ${when}${wikiLink ? ' · ' + wikiLink : ''}</div>
               ${extract}
+            </div>
             <div class="wl-votes">
               <div class="n" style="font-size:.7rem;color:var(--sage);font-weight:700;">✓</div>
               <div class="lbl">approved${approvedWhen ? ' ' + approvedWhen : ''}</div>

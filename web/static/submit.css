@@ -166,6 +166,7 @@
 .wl-sort-btn.active { background: var(--slate); border-color: var(--sage); color: var(--cream); }
 
 /* Wishlist page */
+#wl-list { display: flex; flex-direction: column; }
 .wl-row {
   background: var(--bg-panel); border: 1px solid var(--border);
   border-radius: 8px; padding: .85rem 1rem;
