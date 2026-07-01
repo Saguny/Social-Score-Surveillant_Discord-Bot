@@ -183,6 +183,24 @@
     });
   }
 
+  function showLoggedOut() {
+    const identity = document.getElementById('acc-identity');
+    if (identity) {
+      identity.innerHTML = `
+        <div class="acc-info" style="flex:1">
+          <div class="acc-username">You have been logged out.</div>
+        </div>
+        <a href="/social-credit/auth/discord?next=/social-credit/account" class="acc-logout-btn">Log in</a>
+      `;
+    }
+    ['acc-guilds','acc-requests','acc-achievements','acc-badges'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = '<div class="acc-empty">Log in to view your account.</div>';
+    });
+    const stats = document.getElementById('acc-stats-global');
+    if (stats) stats.querySelectorAll('.n').forEach(el => { el.textContent = '–'; });
+  }
+
   // ── Portfolio ─────────────────────────────────────────────────────────────
 
   let _portGuildId = null;
@@ -761,7 +779,15 @@
     const r = await fetch('/api/account', { credentials: 'same-origin' }).catch(() => null);
 
     if (!r) { showContentError('Network error — please refresh.'); return; }
-    if (r.status === 401) { window.location.href = '/social-credit/auth/discord?next=/social-credit/account'; return; }
+    if (r.status === 401) {
+      const justLoggedOut = new URLSearchParams(window.location.search).get('logged_out') === '1';
+      if (justLoggedOut) {
+        showLoggedOut();
+      } else {
+        window.location.href = '/social-credit/auth/discord?next=/social-credit/account';
+      }
+      return;
+    }
     if (!r.ok) { showContentError('Failed to load account data — please refresh.'); return; }
 
     const d = await r.json();
