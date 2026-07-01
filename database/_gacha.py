@@ -60,6 +60,26 @@ class GachaMixin:
                 return {"rank": row["rank"], "total": row["total"], "claims": row["claim_count"]}
             return {"rank": None, "total": None, "claims": 0}
 
+    async def get_characters_rank_batch(self, character_ids: list[str]) -> dict[str, dict]:
+        """Returns rank/claims for a list of character IDs in one query."""
+        if not character_ids:
+            return {}
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT character_id, claim_count,
+                       RANK() OVER (ORDER BY claim_count DESC) AS rank,
+                       COUNT(*) OVER () AS total
+                FROM gacha_character_stats
+                WHERE character_id = ANY($1)
+                """,
+                character_ids,
+            )
+            return {
+                r["character_id"]: {"rank": r["rank"], "total": r["total"], "claims": r["claim_count"]}
+                for r in rows
+            }
+
     async def get_top_characters(self, limit: int = 10) -> list[dict]:
         """Global leaderboard — most claimed characters across all servers."""
         async with self._pool.acquire() as conn:

@@ -555,6 +555,58 @@ class ImageChoiceView(discord.ui.View):
         await interaction.response.edit_message(content=None, embed=embed, view=view)
 
 
+# ── Harem image browser ────────────────────────────────────────────────────────
+
+def _harem_image_embed(
+    char: dict,
+    image_url: str,
+    rank_info: dict,
+    idx: int,
+    total: int,
+) -> discord.Embed:
+    faction_label = FACTION_LABEL.get(char["faction"], char["faction"].upper())
+    rank_text = (
+        f"Claim Rank: #{rank_info['rank']}  ·  {rank_info['claims']} claims"
+        if rank_info.get("rank") else "Unclaimed globally"
+    )
+    embed = discord.Embed(
+        title=char["name"],
+        description=f"{char['title']}\n{faction_label}  ·  {_stars(char['rarity'])}\n{rank_text}",
+        color=FACTION_COLOR.get(char["faction"], 0xCC0000),
+    )
+    embed.set_image(url=image_url)
+    embed.set_footer(text=f"{idx + 1}/{total}")
+    return embed
+
+
+class HaremImageView(discord.ui.View):
+    def __init__(self, entries: list[tuple[str, dict, str, dict]], owner_id: int):
+        super().__init__(timeout=180)
+        self.entries  = entries   # (char_id, char, image_url, rank_info)
+        self.owner_id = owner_id
+        self.index    = 0
+
+    def build_embed(self) -> discord.Embed:
+        char_id, char, image_url, rank_info = self.entries[self.index]
+        return _harem_image_embed(char, image_url, rank_info, self.index, len(self.entries))
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message("This isn't your harem.", ephemeral=True)
+            return False
+        return True
+
+    @discord.ui.button(label="◀", style=discord.ButtonStyle.secondary)
+    async def prev_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.index = (self.index - 1) % len(self.entries)
+        await interaction.response.edit_message(embed=self.build_embed(), view=self)
+
+    @discord.ui.button(label="▶", style=discord.ButtonStyle.secondary)
+    async def next_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.index = (self.index + 1) % len(self.entries)
+        await interaction.response.edit_message(embed=self.build_embed(), view=self)
+
+
 # ── Cog ────────────────────────────────────────────────────────────────────────
 
 class GachaCog(commands.Cog, name="Gacha"):
@@ -775,6 +827,12 @@ class GachaCog(commands.Cog, name="Gacha"):
     async def slash_collection(self, interaction: discord.Interaction, user: discord.Member | None = None):
         await interaction.response.defer()
         await self._show_collection(interaction.guild.id, user or interaction.user, interaction.followup.send)
+
+    @app_commands.command(name="haremimage", description="Browse your harem images one by one")
+    @app_commands.describe(user="Browse another member's harem")
+    async def slash_harem_image(self, interaction: discord.Interaction, user: discord.Member | None = None):
+        await interaction.response.defer()
+        await self._do_harem_image(interaction.guild.id, user or interaction.user, interaction.followup.send)
 
     @app_commands.command(name="choose", description="Set your featured harem thumbnail")
     @app_commands.describe(name="Name of the waifu to feature")
@@ -1043,6 +1101,11 @@ class GachaCog(commands.Cog, name="Gacha"):
     async def prefix_collection(self, ctx: commands.Context, user: discord.Member = None):
         async with ctx.typing():
             await self._show_collection(ctx.guild.id, user or ctx.author, ctx.send)
+
+    @commands.command(name="haremimage", aliases=["hi", "haremi"])
+    async def prefix_harem_image(self, ctx: commands.Context, user: discord.Member = None):
+        async with ctx.typing():
+            await self._do_harem_image(ctx.guild.id, user or ctx.author, ctx.send)
 
     @commands.command(name="choose")
     async def prefix_choose(self, ctx: commands.Context, *, name: str = ""):
@@ -1413,6 +1476,34 @@ class GachaCog(commands.Cog, name="Gacha"):
 
         view = HaremView(entries, name, thumb_url, icon_url, len(entries))
         await send_fn(embed=view._build_embed(), view=view)
+
+    async def _do_harem_image(self, guild_id: int, user: discord.Member | discord.User, send_fn):
+        rows = await self.db.get_user_collection(guild_id, user.id)
+        name = user.display_name if hasattr(user, "display_name") else str(user)
+        if not rows:
+            await send_fn(f"**{name}** has no waifus yet. Use `/roll` to start collecting!")
+            return
+
+        entries = []
+        for row in rows:
+            char = _get_personality(row["character_id"])
+            if char and char.get("image_urls"):
+                entries.append((row["character_id"], char))
+        entries.sort(key=lambda x: (RARITY_ORDER.index(x[1].get("rarity", "common")), x[1]["name"]))
+
+        if not entries:
+            await send_fn(f"**{name}** has no waifus with images.")
+            return
+
+        char_ids = [e[0] for e in entries]
+        ranks = await self.db.get_characters_rank_batch(char_ids)
+
+        view_entries = [
+            (cid, char, _pick_image(char), ranks.get(cid, {"rank": None, "claims": 0}))
+            for cid, char in entries
+        ]
+        view = HaremImageView(view_entries, user.id)
+        await send_fn(embed=view.build_embed(), view=view)
 
     async def _do_choose(self, guild_id: int, user: discord.Member | discord.User, name: str, send_fn):
         char = _search_personality(name)
