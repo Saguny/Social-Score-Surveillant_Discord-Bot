@@ -297,7 +297,7 @@ _PERSON_KEYWORDS = {
 
 
 def _normalize_slug(title: str) -> str:
-    return title.strip().replace(" ", "_").lower()
+    return "_".join(w[0].upper() + w[1:] if w else w for w in title.strip().split())
 
 
 def _check_origin(request) -> bool:
@@ -329,11 +329,15 @@ async def _fetch_wikipedia_preview_lang(slug: str, lang: str, session: aiohttp.C
             timeout=aiohttp.ClientTimeout(total=8),
         ) as resp:
             if resp.status != 200:
+                print(f"[wiki-preview] {lang}/{slug} HTTP {resp.status}")
                 return None
-            data = await resp.json()
+            data = await resp.json(content_type=None)
         pages = data.get("query", {}).get("pages", {})
         page = next(iter(pages.values()), {})
         if "missing" in page:
+            return None
+        if not page.get("title"):
+            print(f"[wiki-preview] {lang}/{slug} no title in page: {page!r:.200}")
             return None
         description = ""
         terms = page.get("terms", {})
@@ -347,7 +351,8 @@ async def _fetch_wikipedia_preview_lang(slug: str, lang: str, session: aiohttp.C
             "description":   description,
             "lang":          lang,
         }
-    except Exception:
+    except Exception as e:
+        print(f"[wiki-preview] {lang}/{slug} exception: {e!r}")
         return None
 
 
@@ -356,7 +361,9 @@ async def _fetch_wikipedia_preview(slug: str) -> dict | None:
         for lang in _WIKI_LANGS:
             result = await _fetch_wikipedia_preview_lang(slug, lang, session)
             if result is not None:
+                print(f"[wiki-preview] found {slug} on {lang}.wikipedia")
                 return result
+    print(f"[wiki-preview] not found: {slug}")
     return None
 
 
@@ -420,9 +427,11 @@ async def _handle_requests_check(request):
     if not _looks_like_person(wiki):
         return web.json_response({"state": "not_person"})
 
+    canonical_slug = wiki["title"].replace(" ", "_")
     return web.json_response({
         "state":         "valid",
-        "wiki_slug":     slug,
+        "wiki_slug":     canonical_slug,
+        "wiki_lang":     wiki.get("lang", "en"),
         "wiki_title":    wiki["title"],
         "thumbnail_url": wiki["thumbnail_url"],
         "description":   wiki["description"],
@@ -482,11 +491,12 @@ async def _handle_requests_submit(request):
     if not _looks_like_person(wiki):
         return web.json_response({"error": "Article does not appear to be about a real person."}, status=400)
 
+    canonical_slug = wiki["title"].replace(" ", "_")
     try:
         request_id = await db.create_request(
             discord_id       = discord_id,
             discord_username = user["username"],
-            wiki_slug        = slug,
+            wiki_slug        = canonical_slug,
             wiki_title       = wiki["title"],
             thumbnail_url    = wiki.get("thumbnail_url", ""),
             wiki_extract     = wiki.get("extract", ""),

@@ -88,8 +88,9 @@
     const imgHtml   = thumb ? `<img src="${_esc(thumb)}" alt="" loading="lazy">` : '👤';
     const descHtml  = desc    ? `<div class="meta-desc">${_esc(desc)}</div>`    : '';
     const extrHtml  = extract ? `<div class="meta-extract">${_esc(extract)}</div>` : '';
+    const wikiLang  = d.wiki_lang || 'en';
     const wikiLink  = slug
-      ? `<a class="wiki-link" href="https://en.wikipedia.org/wiki/${encodeURIComponent(slug)}" target="_blank" rel="noopener">↗ Read on Wikipedia</a>`
+      ? `<a class="wiki-link" href="https://${wikiLang}.wikipedia.org/wiki/${encodeURIComponent(slug)}" target="_blank" rel="noopener">↗ Read on Wikipedia</a>`
       : '';
     return `
       <div class="wiki-preview">
