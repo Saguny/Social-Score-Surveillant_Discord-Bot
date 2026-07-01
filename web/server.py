@@ -531,6 +531,7 @@ async def _handle_requests_submit(request):
         return web.json_response({"error": "already_requested"}, status=409)
 
     asyncio.create_task(_prescore_request(db, request_id, canonical_slug, wiki.get("lang", "en")))
+    await cache_delete(f"account:{discord_id}")
     return web.json_response({"ok": True, "request_id": request_id, "wiki_title": wiki["title"]})
 
 
@@ -1435,10 +1436,11 @@ async def _handle_admin_requests_approve(request):
 
         # Stage 2b — normalize & upload any manually overridden image URLs
         char_id = wiki_slug.lower().replace(" ", "_")
+        _r2_public_url = os.getenv("R2_PUBLIC_URL", "https://cdn.off-by-one.digital").rstrip("/")
         raw_override_urls = list(req.get("override_image_urls") or [])
         if raw_override_urls:
-            already_hosted = [u for u in raw_override_urls if u.startswith(R2_PUBLIC_URL)]
-            external       = [u for u in raw_override_urls if not u.startswith(R2_PUBLIC_URL)]
+            already_hosted = [u for u in raw_override_urls if u.startswith(_r2_public_url)]
+            external       = [u for u in raw_override_urls if not u.startswith(_r2_public_url)]
             if external:
                 await emit("images", f"Normalizing & uploading {len(external)} override image(s) to R2…")
                 try:
@@ -1495,9 +1497,11 @@ async def _handle_admin_requests_approve(request):
         first_approval = await db.set_request_approved_atomic(request_id)
         await emit("db", f"Saved as `{char_id}`.")
 
+        submitter_discord_id = req.get("discord_id")
+        if submitter_discord_id:
+            await cache_delete(f"account:{submitter_discord_id}")
+
         if first_approval:
-            # Increment contributor counter for milestone achievements
-            submitter_discord_id = req.get("discord_id")
             if submitter_discord_id:
                 new_count = await db.increment_counter(submitter_discord_id, "gacha_contributions")
                 asyncio.create_task(fire_admin_rpc("check_contribution_milestone", {

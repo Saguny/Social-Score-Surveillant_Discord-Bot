@@ -489,6 +489,7 @@ async function approveRequest(requestId, title) {
     const reader = res.body.getReader();
     const dec    = new TextDecoder();
     let buf = '';
+    let succeeded = false;
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -500,11 +501,14 @@ async function approveRequest(requestId, title) {
         try {
           const ev = JSON.parse(line);
           addLine((ev.ok === false ? '⚠ ' : '✓ ') + ev.msg, ev.ok !== false);
+          if (ev.stage === 'done' && ev.ok !== false) succeeded = true;
         } catch (_) {}
       }
     }
-    const row = document.getElementById('req-' + requestId);
-    if (row) row.remove();
+    if (succeeded) {
+      const row = document.getElementById('req-' + requestId);
+      if (row) row.remove();
+    }
   } else {
     const body = await res.json().catch(() => ({}));
     addLine('Error: ' + (body.error || res.status), false);
