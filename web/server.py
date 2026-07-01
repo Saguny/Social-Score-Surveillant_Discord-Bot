@@ -329,15 +329,11 @@ async def _fetch_wikipedia_preview_lang(slug: str, lang: str, session: aiohttp.C
             timeout=aiohttp.ClientTimeout(total=8),
         ) as resp:
             if resp.status != 200:
-                print(f"[wiki-preview] {lang}/{slug} HTTP {resp.status}")
                 return None
             data = await resp.json(content_type=None)
         pages = data.get("query", {}).get("pages", {})
         page = next(iter(pages.values()), {})
-        if "missing" in page:
-            return None
-        if not page.get("title"):
-            print(f"[wiki-preview] {lang}/{slug} no title in page: {page!r:.200}")
+        if "missing" in page or not page.get("title"):
             return None
         description = ""
         terms = page.get("terms", {})
@@ -351,8 +347,7 @@ async def _fetch_wikipedia_preview_lang(slug: str, lang: str, session: aiohttp.C
             "description":   description,
             "lang":          lang,
         }
-    except Exception as e:
-        print(f"[wiki-preview] {lang}/{slug} exception: {e!r}")
+    except Exception:
         return None
 
 
@@ -361,9 +356,7 @@ async def _fetch_wikipedia_preview(slug: str) -> dict | None:
         for lang in _WIKI_LANGS:
             result = await _fetch_wikipedia_preview_lang(slug, lang, session)
             if result is not None:
-                print(f"[wiki-preview] found {slug} on {lang}.wikipedia")
                 return result
-    print(f"[wiki-preview] not found: {slug}")
     return None
 
 
@@ -439,6 +432,27 @@ async def _handle_requests_check(request):
     })
 
 
+async def _prescore_request(db, request_id: int, wiki_slug: str, wiki_lang: str) -> None:
+    try:
+        from gacha.pipeline import wiki_summary, wiki_views, wiki_gender, derive_faction, derive_rarity, derive_title, _gender_from_pronouns
+        sem     = asyncio.Semaphore(2)
+        summary, monthly_views, gender = await asyncio.gather(
+            wiki_summary(wiki_slug, sem, lang=wiki_lang),
+            wiki_views(wiki_slug, sem, lang=wiki_lang),
+            wiki_gender(wiki_slug, sem, lang=wiki_lang),
+        )
+        if not summary:
+            return
+        if not gender:
+            gender = _gender_from_pronouns(summary.get("extract", ""))
+        faction = derive_faction(summary.get("description", ""), summary.get("extract", ""))
+        rarity  = derive_rarity(monthly_views or 0)
+        title   = derive_title(summary.get("description", ""), wiki_slug.replace("_", " "))
+        await db.update_request_overrides(request_id, rarity, gender or "other", [], faction, title=title)
+    except Exception as e:
+        print(f"[prescore] {wiki_slug} error: {e!r}")
+
+
 async def _handle_requests_submit(request):
     user = await _discord_session(request)
     if not user:
@@ -505,6 +519,7 @@ async def _handle_requests_submit(request):
     except ValueError:
         return web.json_response({"error": "already_requested"}, status=409)
 
+    asyncio.create_task(_prescore_request(db, request_id, canonical_slug, wiki.get("lang", "en")))
     return web.json_response({"ok": True, "request_id": request_id, "wiki_title": wiki["title"]})
 
 
@@ -1297,6 +1312,7 @@ async def _handle_admin_requests_edit(request):
     rarity     = body.get("rarity") or None
     gender     = body.get("gender") or None
     faction    = body.get("faction") or None
+    title      = (body.get("title") or "").strip()[:100] or None
     image_urls = [str(u).strip() for u in (body.get("image_urls") or []) if str(u).strip()]
 
     _VALID_RARITIES = {"legendary", "epic", "rare", "uncommon", "common"}
@@ -1314,7 +1330,7 @@ async def _handle_admin_requests_edit(request):
     if not req:
         return web.json_response({"error": "Not found"}, status=404)
 
-    await db.update_request_overrides(request_id, rarity, gender, image_urls, faction)
+    await db.update_request_overrides(request_id, rarity, gender, image_urls, faction, title=title)
     return web.json_response({"ok": True})
 
 
@@ -1395,6 +1411,8 @@ async def _handle_admin_requests_approve(request):
             data_to_save["gender"] = req["override_gender"]
         if req.get("override_faction"):
             data_to_save["faction"] = req["override_faction"]
+        if req.get("override_title"):
+            data_to_save["title"] = req["override_title"]
         if req.get("override_image_urls"):
             data_to_save["image_urls"] = list(req["override_image_urls"])
 

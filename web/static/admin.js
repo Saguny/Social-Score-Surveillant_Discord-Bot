@@ -352,11 +352,14 @@ async function loadPendingRequests() {
     const curRarity  = req.override_rarity  || '';
     const curGender  = req.override_gender  || '';
     const curFaction = req.override_faction || '';
+    const curTitle   = req.override_title   || '';
     const curUrls    = (req.override_image_urls || []).join('\n');
+    const wikiLang   = req.wiki_lang || 'en';
     const badges    = [
       curRarity  ? `<span class="req-override-badge">${_re(curRarity)}</span>`  : '',
       curGender  ? `<span class="req-override-badge">${_re(curGender)}</span>`  : '',
       curFaction ? `<span class="req-override-badge">${_re(curFaction)}</span>` : '',
+      curTitle   ? `<span class="req-override-badge" title="${_re(curTitle)}">${_re(curTitle.slice(0,20))}${curTitle.length>20?'…':''}</span>` : '',
       (req.override_image_urls || []).length ? `<span class="req-override-badge">${req.override_image_urls.length} img</span>` : '',
     ].join('');
     const rarityOpts  = RARITIES.map(v  => `<option value="${v}"${curRarity===v?' selected':''}>${v}</option>`).join('');
@@ -369,7 +372,7 @@ async function loadPendingRequests() {
             <span class="req-title">${_re(req.wiki_title)}</span>
             <span class="req-votes">${req.vote_count || 0} vote${(req.vote_count || 0) !== 1 ? 's' : ''}</span>
             <span class="req-by">@${_re(req.discord_username)}</span>
-            <a href="https://en.wikipedia.org/wiki/${encodeURIComponent(req.wiki_slug)}" target="_blank" rel="noopener" class="req-wiki">Wikipedia ↗</a>
+            <a href="https://${wikiLang}.wikipedia.org/wiki/${encodeURIComponent(req.wiki_slug)}" target="_blank" rel="noopener" class="req-wiki">Wikipedia ↗</a>
             ${badges}
           </div>
           <div class="req-actions">
@@ -408,6 +411,10 @@ async function loadPendingRequests() {
             <div class="col-auto" id="req-edit-result-${req.id}" style="font-size:.75rem"></div>
           </div>
           <div class="mt-2">
+            <label class="form-label">Description / Title <span style="color:var(--text-muted);font-weight:400">(shown on card)</span></label>
+            <input type="text" class="form-control form-control-sm" id="req-edit-title-${req.id}" maxlength="100" value="${_re(curTitle)}" placeholder="e.g. German YouTuber">
+          </div>
+          <div class="mt-2">
             <label class="form-label">Image URLs — one per line (leave blank to use pipeline)</label>
             <textarea class="form-control form-control-sm" id="req-edit-urls-${req.id}" rows="3" style="font-size:.75rem;font-family:monospace">${_re(curUrls)}</textarea>
           </div>
@@ -425,6 +432,7 @@ async function saveReqEdit(id) {
   const faction   = document.getElementById('req-edit-faction-' + id).value;
   const rarity    = document.getElementById('req-edit-rarity-' + id).value;
   const gender    = document.getElementById('req-edit-gender-' + id).value;
+  const title     = (document.getElementById('req-edit-title-' + id).value || '').trim();
   const urlsRaw   = document.getElementById('req-edit-urls-' + id).value;
   const imageUrls = urlsRaw.split('\n').map(u => u.trim()).filter(Boolean);
   const out       = document.getElementById('req-edit-result-' + id);
@@ -435,7 +443,7 @@ async function saveReqEdit(id) {
   const r = await fetch('/api/admin/requests/edit', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ request_id: id, faction: faction || null, rarity: rarity || null, gender: gender || null, image_urls: imageUrls }),
+    body: JSON.stringify({ request_id: id, faction: faction || null, rarity: rarity || null, gender: gender || null, title: title || null, image_urls: imageUrls }),
   });
   if (r.status === 401 || r.status === 403) { location.href = '/login?next=/admin'; return; }
   const body = await r.json().catch(() => ({}));
