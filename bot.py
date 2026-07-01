@@ -477,11 +477,14 @@ class SocialCreditBot(commands.AutoShardedBot):
                 )
             )
 
+    _COOLDOWN_EXEMPT_COMMANDS = {"roll", "rollwaifu", "rollhusbando"}
+
     async def process_commands(self, message: discord.Message) -> None:
         _current_user_id.set(message.author.id)
-        if not await _check_cmd_cooldown(message.author.id):
-            return
         ctx = await self.get_context(message)
+        is_exempt = ctx.command and ctx.command.qualified_name in self._COOLDOWN_EXEMPT_COMMANDS
+        if not is_exempt and not await _check_cmd_cooldown(message.author.id):
+            return
         if ctx.command and ctx.command.qualified_name not in OPTOUT_ALLOWED_PREFIX_COMMANDS:
             if await self.db.is_opted_out(message.author.id):
                 try:
