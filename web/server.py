@@ -4,12 +4,15 @@ import hmac
 import time
 import json
 import hashlib
+import logging
 import secrets
 import asyncio
 import urllib.parse
 from pathlib import Path
 from aiohttp import web
 import aiohttp
+
+log = logging.getLogger("web.auth")
 
 from web.cache import StatCache, format_event
 from web.sse import SSEHub
@@ -167,6 +170,7 @@ async def _discord_session(request) -> dict | None:
         return None
     raw = await cache_get(f"discordSession:{cookie}")
     if not raw:
+        log.info("SESSION cookie=%s... present but no Redis entry (expired or logged out)", cookie[:8])
         return None
     try:
         return json.loads(raw)
@@ -260,6 +264,7 @@ async def _handle_discord_callback(request):
         "avatar":     user.get("avatar", ""),
     })
     await cache_set(f"discordSession:{session_token}", payload, ex=_DISCORD_SESSION_TTL)
+    log.info("LOGIN  user=%s token=%s...  cookie_domain=<none,host> path=/ samesite=Lax secure=True", user.get("username"), session_token[:8])
 
     response = web.HTTPFound(next_safe)
     response.set_cookie(
@@ -274,20 +279,29 @@ async def _handle_discord_callback(request):
 
 async def _handle_discord_logout(request):
     cookie = request.cookies.get("discord_auth", "")
+    cf_ray   = request.headers.get("CF-Ray", "no-cf-ray")
+    cf_cache = request.headers.get("CF-Cache-Status", "no-cf-cache")
+    log.info("LOGOUT method=%s cookie_present=%s cf-ray=%s cf-cache=%s host=%s",
+             request.method, bool(cookie), cf_ray, cf_cache, request.host)
     if cookie:
         await cache_delete(f"discordSession:{cookie}")
+        log.info("LOGOUT redis deleted discordSession:%s...", cookie[:8])
+    else:
+        log.warning("LOGOUT no discord_auth cookie in request — cookie already gone or never sent")
     if request.method == "POST":
         resp = web.Response(
             text='{"ok":true}', content_type="application/json",
             headers={"Cache-Control": "no-store"},
         )
         resp.set_cookie("discord_auth", "", max_age=0, path="/", secure=True, httponly=True, samesite="Lax")
+        log.info("LOGOUT POST response set-cookie=discord_auth='' max-age=0 headers=%s", dict(resp.headers))
         return resp
     next_url  = request.rel_url.query.get("next", "")
     next_safe = next_url if (next_url.startswith("/social-credit/") or next_url == "/social-credit") else "/social-credit/wishlist"
     response  = web.HTTPFound(next_safe)
     response.set_cookie("discord_auth", "", max_age=0, path="/", secure=True, httponly=True, samesite="Lax")
     response.headers["Cache-Control"] = "no-store"
+    log.info("LOGOUT GET redirect->%s set-cookie=discord_auth='' max-age=0 headers=%s", next_safe, dict(response.headers))
     raise response
 
 
