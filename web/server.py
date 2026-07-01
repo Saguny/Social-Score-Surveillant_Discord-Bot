@@ -978,17 +978,23 @@ _ROUTES = [
     {"method": "GET",  "path": "/auth/discord/logout",                     "auth": "public",  "description": "Clear Discord session cookie"},
     {"method": "GET",  "path": "/login",                                   "auth": "admin-ip", "description": "Admin login page"},
     {"method": "POST", "path": "/api/auth",                                "auth": "admin-ip", "description": "Admin password auth — returns session cookie"},
-    {"method": "GET",  "path": "/api/routes",                              "auth": "public",  "description": "This endpoint — lists all API routes"},
-    {"method": "GET",  "path": "/api/discord/me",                          "auth": "discord", "description": "Current Discord user info"},
-    {"method": "GET",  "path": "/api/stats",                               "auth": "public",  "description": "Global bot stats"},
+    {"method": "GET",  "path": "/api/routes",                              "auth": "public",  "description": "Lists all API routes as JSON"},
+    {"method": "GET",  "path": "/docs",                                    "auth": "public",  "description": "Human-readable API reference page"},
+    {"method": "GET",  "path": "/api/discord/me",                          "auth": "discord", "description": "Current Discord user info",
+     "fields": "logged_in, id (string snowflake), username, avatar (hash or null)"},
+    {"method": "GET",  "path": "/api/stats",                               "auth": "public",  "description": "Global bot stats",
+     "fields": "avg_score (float), total_users, total_messages, total_guilds, total_yuan, total_earned, total_spent, dau, wau, highest_score, lowest_score, highest_yuan, avg_msgs_per_user, endorsements, rebukes, checkins_today, checkins_yday, events_24h, pos_24h, neg_24h, net_delta_7d, score_dist {t1–t8}, total_votes, yuan_in_stocks, yuan_in_turbos, treasury_total, top_reasons[], daily_7d[]"},
     {"method": "GET",  "path": "/api/stats/all",                           "auth": "public",  "description": "All stats in one response"},
-    {"method": "GET",  "path": "/api/stats/timeline",                      "auth": "public",  "description": "Activity timeline — ?range=24h|7d|30d"},
-    {"method": "GET",  "path": "/api/stats/recent-events",                 "auth": "public",  "description": "Recent score events feed"},
+    {"method": "GET",  "path": "/api/stats/timeline",                      "auth": "public",  "description": "Activity timeline — ?range=24h|7d|30d",
+     "fields": "range, buckets[] {ts, messages, score_delta, dau, checkins}"},
+    {"method": "GET",  "path": "/api/stats/recent-events",                 "auth": "public",  "description": "Recent score events feed",
+     "fields": "events[] {user (pseudonym), delta, timestamp, reason (sanitised)}"},
     {"method": "GET",  "path": "/api/stats/commands",                      "auth": "public",  "description": "Command usage analytics"},
     {"method": "GET",  "path": "/api/leaderboard",                         "auth": "public",  "description": "User leaderboard — ?guild_id="},
     {"method": "GET",  "path": "/api/leaderboards/guilds",                 "auth": "public",  "description": "Guild leaderboard — ?metric=&bracket="},
-    {"method": "GET",  "path": "/api/stream",                              "auth": "public",  "description": "Server-Sent Events live feed"},
-    {"method": "GET",  "path": "/api/announcement",                        "auth": "public",  "description": "Current dashboard announcement"},
+    {"method": "GET",  "path": "/api/stream",                              "auth": "public",  "description": "Server-Sent Events live feed — events: stats, latency, feed"},
+    {"method": "GET",  "path": "/api/announcement",                        "auth": "public",  "description": "Current dashboard announcement",
+     "fields": "enabled, message, severity (info|warn|danger), updated_at"},
     {"method": "GET",  "path": "/api/account",                             "auth": "discord", "description": "Account overview — stats, guilds, achievements, badges"},
     {"method": "GET",  "path": "/api/account/portfolio",                   "auth": "discord", "description": "Portfolio holdings, turbos, and full ticker list — ?guild_id="},
     {"method": "GET",  "path": "/api/account/portfolio/history",           "auth": "discord", "description": "Portfolio value history — ?guild_id=&period=1D|5D|1M|6M|1Y"},
@@ -998,8 +1004,10 @@ _ROUTES = [
     {"method": "POST", "path": "/api/account/portfolio/sell",              "auth": "discord", "description": "Sell shares — {guild_id, ticker, shares}"},
     {"method": "POST", "path": "/api/account/portfolio/turbo/open",        "auth": "discord", "description": "Open a turbo position — {guild_id, ticker, direction, leverage, cost}"},
     {"method": "POST", "path": "/api/account/portfolio/turbo/close",       "auth": "discord", "description": "Close a turbo position — {guild_id, ticker, turbo_id}"},
-    {"method": "GET",  "path": "/api/requests/check",                      "auth": "public",  "description": "Check if a Wikipedia title is already submitted — ?wiki="},
-    {"method": "GET",  "path": "/api/requests/wishlist",                   "auth": "public",  "description": "Pending submissions — ?page=&sort=votes|newest"},
+    {"method": "GET",  "path": "/api/requests/check",                      "auth": "public",  "description": "Check if a Wikipedia title is already submitted — ?title=",
+     "fields": "state (invalid|not_found|not_person|in_game|requested|valid) · in_game→character_id · requested→request_id, vote_count, has_voted, submitted_by · valid→wiki_slug, wiki_title, thumbnail_url, description, extract"},
+    {"method": "GET",  "path": "/api/requests/wishlist",                   "auth": "public",  "description": "Pending submissions — ?page=&sort=votes|newest",
+     "fields": "requests[] {id, wiki_slug, wiki_title, submitted_by, submitted_at, vote_count, has_voted, recent_voters[]}, logged_in"},
     {"method": "POST", "path": "/api/requests/submit",                     "auth": "discord", "description": "Submit a character — {wiki_title, reason?}"},
     {"method": "POST", "path": "/api/requests/vote",                       "auth": "discord", "description": "Vote on a submission — {request_id}"},
     {"method": "POST", "path": "/api/requests/delete",                     "auth": "discord", "description": "Delete own pending submission — {request_id}"},
@@ -1021,6 +1029,72 @@ _ROUTES = [
 
 async def _handle_routes(request):
     return web.json_response({"routes": _ROUTES})
+
+
+_AUTH_COLORS = {
+    "public":   ("#7d9d9c", "Public"),
+    "discord":  ("#5865f2", "Discord login"),
+    "admin":    ("#e85350", "Admin"),
+    "admin-ip": ("#e8a250", "Admin IP"),
+    "webhook":  ("#8b5cf6", "Webhook"),
+}
+
+_METHOD_COLORS = {"GET": "#26a69a", "POST": "#e8a250"}
+
+async def _handle_docs(request):
+    groups: dict[str, list] = {}
+    for r in _ROUTES:
+        section = r["path"].split("/")[1] or "pages"
+        groups.setdefault(section, []).append(r)
+
+    rows = ""
+    for section, routes in groups.items():
+        rows += f'<tr><td colspan="4" class="section">{section.upper()}</td></tr>\n'
+        for r in routes:
+            color, label = _AUTH_COLORS.get(r["auth"], ("#888", r["auth"]))
+            mc = _METHOD_COLORS.get(r["method"], "#aaa")
+            fields_html = ""
+            if r.get("fields"):
+                fields_html = f'<div class="fields">{r["fields"]}</div>'
+            rows += (
+                f'<tr>'
+                f'<td><span class="method" style="color:{mc}">{r["method"]}</span></td>'
+                f'<td><code>{r["path"]}</code></td>'
+                f'<td><span class="badge" style="border-color:{color};color:{color}">{label}</span></td>'
+                f'<td class="desc">{r["description"]}{fields_html}</td>'
+                f'</tr>\n'
+            )
+
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="robots" content="noindex,nofollow">
+<title>API Docs · Social Credit</title>
+<style>
+  body {{ font-family: monospace; background: #0e0e10; color: #c9c9c9; margin: 0; padding: 2rem; }}
+  h1 {{ color: #e6e6e6; font-size: 1.1rem; letter-spacing: 2px; text-transform: uppercase; margin-bottom: .25rem; }}
+  p.sub {{ color: #666; font-size: .8rem; margin-bottom: 2rem; }}
+  a {{ color: #7d9d9c; }}
+  table {{ border-collapse: collapse; width: 100%; font-size: .82rem; }}
+  td {{ padding: .45rem .75rem; border-bottom: 1px solid #1e1e22; vertical-align: middle; }}
+  td.section {{ color: #555; font-size: .65rem; letter-spacing: 2px; padding-top: 1.2rem; padding-bottom: .3rem; border-bottom: 1px solid #2a2a2e; }}
+  td.desc {{ color: #888; }}
+  code {{ background: #1a1a1e; padding: .15rem .4rem; border-radius: 3px; color: #c9c9c9; }}
+  .method {{ font-weight: 700; font-size: .78rem; letter-spacing: .5px; }}
+  .badge {{ border: 1px solid; border-radius: 3px; font-size: .65rem; padding: .1rem .4rem; letter-spacing: .5px; text-transform: uppercase; white-space: nowrap; }}
+  .fields {{ color: #555; font-size: .72rem; margin-top: .3rem; line-height: 1.5; }}
+</style>
+</head>
+<body>
+<h1>社会信用 API Reference</h1>
+<p class="sub">Machine-readable version: <a href="/api/routes">/api/routes</a></p>
+<table>
+{rows}
+</table>
+</body>
+</html>"""
+    return web.Response(text=html, content_type="text/html")
 
 
 async def _handle_guild_list(request):
@@ -1874,6 +1948,7 @@ async def start_web_server(db):
     app.router.add_get("/admin", _require_admin(_handle_admin))
     app.router.add_post("/api/admin/command", _require_admin(_handle_admin_command))
     app.router.add_get("/api/routes", _rate_limit_public(_handle_routes))
+    app.router.add_get("/docs",       _rate_limit_public(_handle_docs))
     app.router.add_get("/api/stats", _rate_limit_public(_handle_stats))
     app.router.add_get("/api/stats/commands", _rate_limit_public(_handle_stats_commands))
     app.router.add_get("/api/stats/all", _rate_limit_public(_handle_stats_all))

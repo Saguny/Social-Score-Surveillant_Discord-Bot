@@ -283,6 +283,10 @@
       });
       const body = await r.json();
       if (!r.ok) {
+        if (body.error === 'already_requested' || body.error === 'already_in_game') {
+          if (_lastTitle) doCheck(_lastTitle);
+          return;
+        }
         toast(body.error || 'Submission failed', 'error');
         if (btn) { btn.disabled = false; btn.textContent = 'SUBMIT FOR REVIEW'; }
         return;
