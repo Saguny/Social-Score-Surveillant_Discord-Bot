@@ -27,7 +27,7 @@ class GachaRequestsMixin:
     async def get_request_by_slug(self, wiki_slug: str) -> dict | None:
         async with self._pool.acquire() as conn:
             row = await conn.fetchrow(
-                "SELECT * FROM gacha_requests WHERE wiki_slug = $1",
+                "SELECT * FROM gacha_requests WHERE wiki_slug = $1 AND status != 'approved'",
                 wiki_slug,
             )
         return dict(row) if row else None
