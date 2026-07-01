@@ -278,7 +278,7 @@ async def _handle_discord_logout(request):
     next_url  = request.rel_url.query.get("next", "")
     next_safe = next_url if (next_url.startswith("/social-credit/") or next_url == "/social-credit") else "/social-credit/wishlist"
     response  = web.HTTPFound(next_safe)
-    response.del_cookie("discord_auth")
+    response.del_cookie("discord_auth", path="/")
     raise response
 
 
