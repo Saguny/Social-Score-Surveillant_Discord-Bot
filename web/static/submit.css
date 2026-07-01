@@ -192,7 +192,7 @@
             padding: 2rem 0; }
 
 /* Toast */
-.toast-wrap { position: fixed; bottom: 1.25rem; left: 50%; transform: translateX(-50%);
+.toast-wrap { position: fixed; top: 1.25rem; left: 50%; transform: translateX(-50%);
               z-index: 9999; pointer-events: none; }
 .toast-msg {
   background: var(--bg-panel); border: 1px solid var(--border);
