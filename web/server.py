@@ -369,22 +369,30 @@ async def _handle_requests_check(request):
         return web.json_response({"state": "in_game", "character_id": existing_char})
 
     existing_req = await db.get_request_by_slug(slug)
+    if existing_req and existing_req.get("status") == "approved":
+        return web.json_response({"state": "in_game"})
     if existing_req:
-        vote_count    = await db.get_vote_count(existing_req["id"])
-        recent_voters = await db.get_recent_voters(existing_req["id"], limit=4)
-        user_session  = await _discord_session(request)
-        has_voted     = False
+        vote_count, recent_voters, wiki_preview, user_session = await asyncio.gather(
+            db.get_vote_count(existing_req["id"]),
+            db.get_recent_voters(existing_req["id"], limit=4),
+            _fetch_wikipedia_preview(slug),
+            _discord_session(request),
+        )
+        has_voted = False
         if user_session:
             has_voted = await db.has_voted(existing_req["id"], user_session["discord_id"])
         return web.json_response({
-            "state":          "requested",
-            "request_id":     existing_req["id"],
-            "wiki_title":     existing_req["wiki_title"],
-            "submitted_by":   existing_req["discord_username"],
-            "submitted_at":   existing_req["submitted_at"],
-            "vote_count":     vote_count,
-            "recent_voters":  recent_voters,
-            "has_voted":      has_voted,
+            "state":         "requested",
+            "request_id":    existing_req["id"],
+            "wiki_title":    existing_req["wiki_title"],
+            "wiki_slug":     slug,
+            "thumbnail_url": (wiki_preview or {}).get("thumbnail_url", ""),
+            "description":   (wiki_preview or {}).get("description", ""),
+            "submitted_by":  existing_req["discord_username"],
+            "submitted_at":  existing_req["submitted_at"],
+            "vote_count":    vote_count,
+            "recent_voters": recent_voters,
+            "has_voted":     has_voted,
         })
 
     wiki = await _fetch_wikipedia_preview(slug)
