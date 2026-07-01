@@ -251,13 +251,23 @@ async def _guild_notify_listener(bot: commands.Bot):
             payload = json.loads(message["data"])
         except (TypeError, ValueError):
             continue
+        event_type = payload.get("event_type")
+        if event_type == "reload_gacha":
+            cog = bot.get_cog("Gacha")
+            if cog:
+                try:
+                    n = await cog.reload_chars()
+                    print(f"[guild-notify] gacha chars reloaded ({n})")
+                except Exception as e:
+                    print(f"[guild-notify] reload_gacha error: {e!r}")
+            continue
         guild = bot.get_guild(payload.get("guild_id"))
         if guild is None:
             continue
         try:
-            await _handle_guild_notify(bot, guild, payload.get("event_type"), payload.get("data") or {})
+            await _handle_guild_notify(bot, guild, event_type, payload.get("data") or {})
         except Exception as e:
-            print(f"[guild-notify] error handling {payload.get('event_type')}: {e!r}")
+            print(f"[guild-notify] error handling {event_type}: {e!r}")
 
 
 _GATEWAY_SYNC_CHANNEL = "gateway-sync"

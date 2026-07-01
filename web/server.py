@@ -15,6 +15,7 @@ from web.sse import SSEHub
 from web.anonymize import redact_global_stats, pseudonym_user, pseudonym_guild, using_fallback_salt
 from infra.redis_cache import cache_get, cache_set, cache_delete
 from infra.admin_rpc import call_admin_rpc, fire_admin_rpc
+from infra.guild_notify import publish_guild_notify
 from config.achievements import ACHIEVEMENTS
 from config.shop import COSMETIC_META
 from config.stocks import (
@@ -1373,6 +1374,7 @@ async def _handle_admin_requests_approve(request):
             submitted_by_discord_id = req.get("discord_id"),
             submitted_by_username   = req.get("discord_username"),
         )
+        await publish_guild_notify(0, "reload_gacha", {})
         first_approval = await db.set_request_approved_atomic(request_id)
         await emit("db", f"Saved as `{char_id}`.")
 
