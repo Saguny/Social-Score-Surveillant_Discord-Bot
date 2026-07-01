@@ -470,14 +470,14 @@ async def upload_r2(
     img_url: str,
     index: int,
     sem: asyncio.Semaphore,
-) -> str | None:
+) -> tuple[str | None, str | None]:
     img_data, _ = await asyncio.to_thread(_sync_dl, img_url)
     if not img_data:
-        return None
+        return None, f"download failed: {img_url}"
     try:
         img_data = await asyncio.to_thread(_normalize_image, img_data)
-    except Exception:
-        return None
+    except Exception as e:
+        return None, f"image processing failed ({e}): {img_url}"
     key = f"gacha/{char_id}/{index}.png"
     api = (
         f"https://api.cloudflare.com/client/v4/accounts/{R2_ACCOUNT_ID}"
@@ -491,10 +491,11 @@ async def upload_r2(
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as r:
                 if r.status in (200, 201):
-                    return f"{R2_PUBLIC_URL}/{key}"
-        except Exception:
-            pass
-    return None
+                    return f"{R2_PUBLIC_URL}/{key}", None
+                body = await r.text()
+                return None, f"R2 returned HTTP {r.status}: {body[:200]}"
+        except Exception as e:
+            return None, f"R2 connection error: {e}"
 
 
 async def upload_r2_multi(
@@ -502,10 +503,12 @@ async def upload_r2_multi(
     char_id: str,
     img_urls: list[str],
     sem: asyncio.Semaphore,
-) -> list[str]:
+) -> tuple[list[str], list[str]]:
     tasks = [upload_r2(session, char_id, url, i + 1, sem) for i, url in enumerate(img_urls)]
     results = await asyncio.gather(*tasks)
-    return [r for r in results if r]
+    urls   = [url for url, err in results if url]
+    errors = [err for url, err in results if err]
+    return urls, errors
 
 
 def derive_faction(description: str, extract: str) -> str:
@@ -587,7 +590,7 @@ async def process_one(
     public_urls: list[str] = []
     if img_urls and not dry_run:
         char_id_tmp = make_char_id(name, set())
-        public_urls = await upload_r2_multi(r2_session, char_id_tmp, img_urls, r2_sem)
+        public_urls, _ = await upload_r2_multi(r2_session, char_id_tmp, img_urls, r2_sem)
 
     if not public_urls and img_urls and not dry_run:
         return None

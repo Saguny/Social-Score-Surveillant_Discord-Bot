@@ -1447,9 +1447,12 @@ async def _handle_admin_requests_approve(request):
                     from gacha.pipeline import upload_r2_multi
                     r2_sem = asyncio.Semaphore(4)
                     async with aiohttp.ClientSession() as r2_sess:
-                        uploaded = await upload_r2_multi(r2_sess, char_id, external, r2_sem)
+                        uploaded, upload_errors = await upload_r2_multi(r2_sess, char_id, external, r2_sem)
                     normalized_override_urls = already_hosted + uploaded
-                    await emit("images", f"Uploaded {len(uploaded)}/{len(external)} image(s).")
+                    ok_flag = len(uploaded) == len(external)
+                    await emit("images", f"Uploaded {len(uploaded)}/{len(external)} image(s).", ok=ok_flag)
+                    for err in upload_errors:
+                        await emit("images", err, ok=False)
                 except Exception as exc:
                     await emit("images", f"Image upload failed: {exc}", ok=False)
                     normalized_override_urls = already_hosted
