@@ -345,19 +345,23 @@ async function loadPendingRequests() {
     $list.innerHTML = '<div style="color:var(--text-muted);font-size:.82rem">No pending requests.</div>';
     return;
   }
-  const RARITIES = ['legendary','epic','rare','uncommon','common'];
-  const GENDERS  = ['male','female','other'];
+  const RARITIES  = ['legendary','epic','rare','uncommon','common'];
+  const GENDERS   = ['male','female','other'];
+  const FACTIONS  = ['reds','strongmen','conquerors','icons','wildcards'];
   $list.innerHTML = rows.map(req => {
-    const curRarity = req.override_rarity || '';
-    const curGender = req.override_gender || '';
-    const curUrls   = (req.override_image_urls || []).join('\n');
+    const curRarity  = req.override_rarity  || '';
+    const curGender  = req.override_gender  || '';
+    const curFaction = req.override_faction || '';
+    const curUrls    = (req.override_image_urls || []).join('\n');
     const badges    = [
-      curRarity ? `<span class="req-override-badge">${_re(curRarity)}</span>` : '',
-      curGender ? `<span class="req-override-badge">${_re(curGender)}</span>` : '',
+      curRarity  ? `<span class="req-override-badge">${_re(curRarity)}</span>`  : '',
+      curGender  ? `<span class="req-override-badge">${_re(curGender)}</span>`  : '',
+      curFaction ? `<span class="req-override-badge">${_re(curFaction)}</span>` : '',
       (req.override_image_urls || []).length ? `<span class="req-override-badge">${req.override_image_urls.length} img</span>` : '',
     ].join('');
-    const rarityOpts = RARITIES.map(v => `<option value="${v}"${curRarity===v?' selected':''}>${v}</option>`).join('');
-    const genderOpts = GENDERS.map(v  => `<option value="${v}"${curGender===v?' selected':''}>${v}</option>`).join('');
+    const rarityOpts  = RARITIES.map(v  => `<option value="${v}"${curRarity===v?' selected':''}>${v}</option>`).join('');
+    const genderOpts  = GENDERS.map(v   => `<option value="${v}"${curGender===v?' selected':''}>${v}</option>`).join('');
+    const factionOpts = FACTIONS.map(v  => `<option value="${v}"${curFaction===v?' selected':''}>${v}</option>`).join('');
     return `
       <div class="req-row" id="req-${req.id}">
         <div class="req-top">
@@ -377,6 +381,13 @@ async function loadPendingRequests() {
         </div>
         <div class="req-edit-panel" id="req-edit-${req.id}" style="display:none">
           <div class="row g-2 align-items-end">
+            <div class="col-auto">
+              <label class="form-label">Faction</label>
+              <select class="form-select form-select-sm" id="req-edit-faction-${req.id}" style="width:135px">
+                <option value="">— auto —</option>
+                ${factionOpts}
+              </select>
+            </div>
             <div class="col-auto">
               <label class="form-label">Rarity</label>
               <select class="form-select form-select-sm" id="req-edit-rarity-${req.id}" style="width:135px">
@@ -411,6 +422,7 @@ function toggleReqEdit(id) {
 }
 
 async function saveReqEdit(id) {
+  const faction   = document.getElementById('req-edit-faction-' + id).value;
   const rarity    = document.getElementById('req-edit-rarity-' + id).value;
   const gender    = document.getElementById('req-edit-gender-' + id).value;
   const urlsRaw   = document.getElementById('req-edit-urls-' + id).value;
@@ -423,7 +435,7 @@ async function saveReqEdit(id) {
   const r = await fetch('/api/admin/requests/edit', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ request_id: id, rarity: rarity || null, gender: gender || null, image_urls: imageUrls }),
+    body: JSON.stringify({ request_id: id, faction: faction || null, rarity: rarity || null, gender: gender || null, image_urls: imageUrls }),
   });
   if (r.status === 401 || r.status === 403) { location.href = '/login?next=/admin'; return; }
   const body = await r.json().catch(() => ({}));

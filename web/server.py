@@ -1263,21 +1263,25 @@ async def _handle_admin_requests_edit(request):
 
     rarity     = body.get("rarity") or None
     gender     = body.get("gender") or None
+    faction    = body.get("faction") or None
     image_urls = [str(u).strip() for u in (body.get("image_urls") or []) if str(u).strip()]
 
     _VALID_RARITIES = {"legendary", "epic", "rare", "uncommon", "common"}
     _VALID_GENDERS  = {"male", "female", "other"}
+    _VALID_FACTIONS = {"reds", "strongmen", "conquerors", "icons", "wildcards"}
     if rarity and rarity not in _VALID_RARITIES:
         return web.json_response({"error": "Invalid rarity"}, status=400)
     if gender and gender not in _VALID_GENDERS:
         return web.json_response({"error": "Invalid gender"}, status=400)
+    if faction and faction not in _VALID_FACTIONS:
+        return web.json_response({"error": "Invalid faction"}, status=400)
 
     db  = request.app["db"]
     req = await db.get_request_by_id(request_id)
     if not req:
         return web.json_response({"error": "Not found"}, status=404)
 
-    await db.update_request_overrides(request_id, rarity, gender, image_urls)
+    await db.update_request_overrides(request_id, rarity, gender, image_urls, faction)
     return web.json_response({"ok": True})
 
 
@@ -1355,6 +1359,8 @@ async def _handle_admin_requests_approve(request):
             data_to_save["rarity"] = req["override_rarity"]
         if req.get("override_gender"):
             data_to_save["gender"] = req["override_gender"]
+        if req.get("override_faction"):
+            data_to_save["faction"] = req["override_faction"]
         if req.get("override_image_urls"):
             data_to_save["image_urls"] = list(req["override_image_urls"])
 
@@ -1383,13 +1389,13 @@ async def _handle_admin_requests_approve(request):
             for uid in voter_ids:
                 asyncio.create_task(fire_admin_rpc("dm_user", {
                     "user_id": uid,
-                    "message": f"🎉 A character you supported — **{wiki_title}** — has been approved and added to the Social Credit gacha pool!",
+                    "message": f"🎉 A character you supported — **{wiki_title}** — has been approved and added to the Social Credit gacha pool! It may take up to 10 minutes to appear in the bot.",
                 }))
             submitter_id = req.get("discord_id")
             if submitter_id and submitter_id not in voter_ids:
                 asyncio.create_task(fire_admin_rpc("dm_user", {
                     "user_id": submitter_id,
-                    "message": f"🎉 Your character suggestion **{wiki_title}** has been approved and added to the Social Credit gacha pool! It will be credited as suggested by you.",
+                    "message": f"🎉 Your character suggestion **{wiki_title}** has been approved and added to the Social Credit gacha pool! It will be credited as suggested by you. It may take up to 10 minutes to appear in the bot.",
                 }))
         else:
             await emit("notify", "Already approved — skipping notifications.")

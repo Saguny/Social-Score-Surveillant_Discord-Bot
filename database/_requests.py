@@ -260,12 +260,14 @@ class GachaRequestsMixin:
         rarity: str | None,
         gender: str | None,
         image_urls: list[str],
+        faction: str | None = None,
     ) -> None:
         await self._pool.execute(
             """
             UPDATE gacha_requests
-            SET override_rarity = $2, override_gender = $3, override_image_urls = $4
+            SET override_rarity = $2, override_gender = $3, override_image_urls = $4,
+                override_faction = $5
             WHERE id = $1
             """,
-            request_id, rarity, gender, image_urls,
+            request_id, rarity, gender, image_urls, faction,
         )
