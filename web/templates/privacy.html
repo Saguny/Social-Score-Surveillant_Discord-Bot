@@ -57,16 +57,16 @@
   </head>
   <body>
     <nav class="navbar px-4 py-3 mb-3">
-      <a class="navbar-brand" href="/">社会信用 Social Credit</a>
+      <a class="navbar-brand" href="/social-credit">社会信用 Social Credit</a>
       <div class="d-flex gap-3 align-items-center">
-        <a class="nav-link" href="/">HOME</a>
-        <a class="nav-link" href="/dashboard">DASHBOARD</a>
-        <a class="nav-link" href="/leaderboards">LEADERBOARDS</a>
-        <a class="nav-link" href="/wishlist">WISHLIST</a>
-        <a class="nav-link" href="/submit">SUBMIT</a>
-        <a class="nav-link" href="/account">MY ACCOUNT</a>
-        <a class="nav-link active" href="/privacy">PRIVACY</a>
-        <a class="nav-link" href="/terms">TERMS</a>
+        <a class="nav-link" href="/social-credit">HOME</a>
+        <a class="nav-link" href="/social-credit/dashboard">DASHBOARD</a>
+        <a class="nav-link" href="/social-credit/leaderboards">LEADERBOARDS</a>
+        <a class="nav-link" href="/social-credit/wishlist">WISHLIST</a>
+        <a class="nav-link" href="/social-credit/submit">SUBMIT</a>
+        <a class="nav-link" href="/social-credit/account">MY ACCOUNT</a>
+        <a class="nav-link active" href="/social-credit/privacy">PRIVACY</a>
+        <a class="nav-link" href="/social-credit/terms">TERMS</a>
       </div>
     </nav>
 
@@ -138,13 +138,13 @@
           </li>
           <li>
             <strong>Admin console access.</strong> The password-protected
-            <code>/admin</code> panel is used by the bot operator to look up a
+            <code>/social-credit/admin</code> panel is used by the bot operator to look up a
             Discord user's real ID, username, and per-guild stats for support
             and moderation purposes.
           </li>
           <li>
             <strong>Discord OAuth sessions.</strong> When you log in to the
-            dashboard or the <a href="/submit">/submit</a> page using the
+            dashboard or the <a href="/social-credit/submit">/social-credit/submit</a> page using the
             "Login with Discord" button, we receive your Discord user ID,
             username, and avatar from Discord's OAuth2 <code>identify</code>
             scope. We store a session token in Redis with a 7-day expiry to
@@ -154,7 +154,7 @@
           </li>
           <li>
             <strong>Character submissions and votes.</strong> If you use
-            <a href="/submit">/submit</a> to suggest a gacha character, we
+            <a href="/social-credit/submit">/social-credit/submit</a> to suggest a gacha character, we
             store your Discord ID, your Discord username at the time of
             submission, the Wikipedia article title, any optional reviewer
             notes, and the submission status and outcome. If you vote on an
@@ -193,7 +193,7 @@
 
         <h2>3. What the public dashboard shows</h2>
         <p>
-          The dashboard you are looking at (<a href="/">/</a>) is open to the
+          The dashboard you are looking at (<a href="/social-credit/dashboard">/social-credit/dashboard</a>) is open to the
           public. By default, it never displays real Discord usernames, server
           names, or message text. Every user and server shown is replaced with a
           stable, salted-hash pseudonym (e.g. "User #1842"), so the figures
@@ -205,7 +205,7 @@
           be indexed by search engines even though it is technically reachable.
         </p>
         <p>
-          The global leaderboard (<a href="/leaderboards">/leaderboards</a>)
+          The global leaderboard (<a href="/social-credit/leaderboards">/social-credit/leaderboards</a>)
           works differently: it is opt-in. By default your entry there is also
           pseudonymized, but if you run
           <code>/globalrank visibility on</code> in Discord, we store your
@@ -216,7 +216,7 @@
 
         <h2>3a. The account page</h2>
         <p>
-          The <a href="/account">/account</a> page is separate from the public
+          The <a href="/social-credit/account">/social-credit/account</a> page is separate from the public
           dashboard: it requires you to log in with Discord (OAuth) and shows
           only your own data - your real Discord username, avatar, score and
           yuan per server, achievements, badges, portfolio, and character
@@ -510,11 +510,11 @@
     </div>
 
     <footer class="site-footer">
-      Made with ♥ by OFF-BY-ONE ·
+      Made with ♥ by <a href="/">OFF-BY-ONE</a> ·
       <a href="https://discord.gg/invite/k4W6YAPYhC" target="_blank" rel="noopener">Support Server</a> ·
       <a href="https://top.gg/bot/856163780265902151" target="_blank" rel="noopener">Invite Bot</a> ·
-      <a href="/privacy">Privacy</a> ·
-      <a href="/terms">Terms</a>
+      <a href="/social-credit/privacy">Privacy</a> ·
+      <a href="/social-credit/terms">Terms</a>
     </footer>
   </body>
 </html>

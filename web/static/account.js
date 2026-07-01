@@ -88,7 +88,7 @@
   function renderRequests(requests) {
     const $el = document.getElementById('acc-requests');
     if (!requests.length) {
-      $el.innerHTML = `<div class="acc-empty">No submissions yet. <a href="/submit" style="color:var(--sage)">Suggest a character!</a></div>`;
+      $el.innerHTML = `<div class="acc-empty">No submissions yet. <a href="/social-credit/submit" style="color:var(--sage)">Suggest a character!</a></div>`;
       return;
     }
     $el.innerHTML = requests.map(r => {
@@ -134,7 +134,7 @@
 
     const $el = document.getElementById('acc-requests');
     if ($el && !$el.querySelector('.acc-req-row')) {
-      $el.innerHTML = `<div class="acc-empty">No submissions yet. <a href="/submit" style="color:var(--sage)">Suggest a character!</a></div>`;
+      $el.innerHTML = `<div class="acc-empty">No submissions yet. <a href="/social-credit/submit" style="color:var(--sage)">Suggest a character!</a></div>`;
     }
   };
 
@@ -761,7 +761,7 @@
     const r = await fetch('/api/account', { credentials: 'same-origin' }).catch(() => null);
 
     if (!r) { showContentError('Network error — please refresh.'); return; }
-    if (r.status === 401) { window.location.href = '/auth/discord?next=/account'; return; }
+    if (r.status === 401) { window.location.href = '/social-credit/auth/discord?next=/social-credit/account'; return; }
     if (!r.ok) { showContentError('Failed to load account data — please refresh.'); return; }
 
     const d = await r.json();

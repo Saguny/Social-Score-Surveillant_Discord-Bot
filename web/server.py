@@ -50,8 +50,8 @@ _public_hits: dict[str, list[float]] = {}
 _TEMPLATE_DIR = Path(__file__).parent / 'templates'
 
 
-def _load_template(name: str) -> str:
-    return (_TEMPLATE_DIR / name).read_text(encoding='utf-8')
+async def _load_template(name: str) -> str:
+    return await asyncio.to_thread((_TEMPLATE_DIR / name).read_text, encoding='utf-8')
 
 
 async def _is_authed(request) -> bool:
@@ -93,8 +93,8 @@ def _require_admin(handler):
         if not _admin_ip_allowed(request):
             raise web.HTTPForbidden(text="Access denied.")
         if not await _is_authed(request):
-            next_url = str(request.rel_url)
-            raise web.HTTPFound(f"/login?next={next_url}")
+            next_url = urllib.parse.quote(str(request.rel_url), safe='')
+            raise web.HTTPFound(f"/social-credit/login?next={next_url}")
         return await handler(request)
     return middleware
 
@@ -120,7 +120,7 @@ def _rate_limit_public(handler):
 
 
 async def _handle_login(request):
-    return web.Response(text=_load_template('login.html'), content_type='text/html')
+    return web.Response(text=await _load_template('login.html'), content_type='text/html')
 
 
 async def _handle_auth(request):
@@ -158,7 +158,7 @@ def _discord_redirect_uri(request) -> str:
         return base
     scheme = request.headers.get("X-Forwarded-Proto", "http")
     host   = request.headers.get("X-Forwarded-Host", request.host)
-    return f"{scheme}://{host}/auth/discord/callback"
+    return f"{scheme}://{host}/social-credit/auth/discord/callback"
 
 
 async def _discord_session(request) -> dict | None:
@@ -177,7 +177,7 @@ async def _discord_session(request) -> dict | None:
 def _require_discord(handler):
     async def middleware(request):
         if not await _discord_session(request):
-            raise web.HTTPFound(f"/auth/discord?next={urllib.parse.quote(str(request.rel_url))}")
+            raise web.HTTPFound(f"/social-credit/auth/discord?next={urllib.parse.quote(str(request.rel_url))}")
         return await handler(request)
     return middleware
 
@@ -185,8 +185,8 @@ def _require_discord(handler):
 async def _handle_discord_auth(request):
     client_id    = os.getenv("DISCORD_CLIENT_ID", "")
     redirect_uri = _discord_redirect_uri(request)
-    next_url     = request.rel_url.query.get("next", "/account")
-    next_safe    = next_url if next_url.startswith("/") else "/account"
+    next_url     = request.rel_url.query.get("next", "/social-credit/account")
+    next_safe    = next_url if (next_url.startswith("/social-credit/") or next_url == "/social-credit") else "/social-credit/account"
 
     nonce = secrets.token_urlsafe(16)
     await cache_set(f"oauthNonce:{nonce}", next_safe, ex=300)
@@ -206,12 +206,12 @@ async def _handle_discord_callback(request):
     code  = request.rel_url.query.get("code", "")
     state = request.rel_url.query.get("state", "")
     if not code or not state:
-        raise web.HTTPFound("/account")
+        raise web.HTTPFound("/social-credit/account")
 
     nonce, _, encoded_next = state.partition(".")
-    fallback = urllib.parse.unquote(encoded_next) if encoded_next else "/account"
+    fallback = urllib.parse.unquote(encoded_next) if encoded_next else "/social-credit/account"
     if not fallback.startswith("/"):
-        fallback = "/account"
+        fallback = "/social-credit/account"
 
     cached = await cache_get(f"oauthNonce:{nonce}")
     if not cached:
@@ -275,7 +275,9 @@ async def _handle_discord_logout(request):
     cookie = request.cookies.get("discord_auth", "")
     if cookie:
         await cache_delete(f"discordSession:{cookie}")
-    response = web.HTTPFound("/wishlist")
+    next_url  = request.rel_url.query.get("next", "")
+    next_safe = next_url if (next_url.startswith("/social-credit/") or next_url == "/social-credit") else "/social-credit/wishlist"
+    response  = web.HTTPFound(next_safe)
     response.del_cookie("discord_auth")
     raise response
 
@@ -646,11 +648,11 @@ async def _handle_requests_wishlist(request):
 
 
 async def _handle_submit_page(request):
-    return web.Response(text=_load_template('submit.html'), content_type='text/html')
+    return web.Response(text=await _load_template('submit.html'), content_type='text/html')
 
 
 async def _handle_wishlist_page(request):
-    return web.Response(text=_load_template('wishlist.html'), content_type='text/html')
+    return web.Response(text=await _load_template('wishlist.html'), content_type='text/html')
 
 
 async def _handle_discord_me(request):
@@ -665,30 +667,34 @@ async def _handle_discord_me(request):
     })
 
 
+async def _handle_studio_landing(request):
+    return web.Response(text=await _load_template('studio.html'), content_type='text/html')
+
+
 async def _handle_landing(request):
-    return web.Response(text=_load_template('landing.html'), content_type='text/html')
+    return web.Response(text=await _load_template('landing.html'), content_type='text/html')
 
 
 async def _handle_index(request):
-    return web.Response(text=_load_template('index.html'), content_type='text/html')
+    return web.Response(text=await _load_template('index.html'), content_type='text/html')
 
 
 
 
 async def _handle_admin(request):
-    return web.Response(text=_load_template('admin.html'), content_type='text/html')
+    return web.Response(text=await _load_template('admin.html'), content_type='text/html')
 
 
 async def _handle_privacy(request):
-    return web.Response(text=_load_template('privacy.html'), content_type='text/html')
+    return web.Response(text=await _load_template('privacy.html'), content_type='text/html')
 
 
 async def _handle_terms(request):
-    return web.Response(text=_load_template('terms.html'), content_type='text/html')
+    return web.Response(text=await _load_template('terms.html'), content_type='text/html')
 
 
 async def _handle_leaderboards_page(request):
-    return web.Response(text=_load_template('leaderboards.html'), content_type='text/html')
+    return web.Response(text=await _load_template('leaderboards.html'), content_type='text/html')
 
 
 _BOT_COMMANDS = {"sync", "guilds", "reload", "restart", "shutdown"}
@@ -1043,22 +1049,23 @@ async def _handle_robots(request):
 
 
 _ROUTES = [
-    {"method": "GET",  "path": "/",                                        "auth": "public",  "description": "Landing page"},
-    {"method": "GET",  "path": "/dashboard",                               "auth": "public",  "description": "Public dashboard"},
-    {"method": "GET",  "path": "/leaderboards",                            "auth": "public",  "description": "Guild leaderboard page"},
-    {"method": "GET",  "path": "/submit",                                  "auth": "public",  "description": "Character submission page"},
-    {"method": "GET",  "path": "/wishlist",                                "auth": "public",  "description": "Community wishlist / voting page"},
-    {"method": "GET",  "path": "/account",                                 "auth": "public",  "description": "User account page"},
-    {"method": "GET",  "path": "/privacy",                                 "auth": "public",  "description": "Privacy policy"},
-    {"method": "GET",  "path": "/terms",                                   "auth": "public",  "description": "Terms of service"},
+    {"method": "GET",  "path": "/",                                        "auth": "public",  "description": "OFF-BY-ONE studio landing page"},
+    {"method": "GET",  "path": "/social-credit",                           "auth": "public",  "description": "Social Credit Bot hub page"},
+    {"method": "GET",  "path": "/social-credit/dashboard",                 "auth": "public",  "description": "Public dashboard"},
+    {"method": "GET",  "path": "/social-credit/leaderboards",              "auth": "public",  "description": "Guild leaderboard page"},
+    {"method": "GET",  "path": "/social-credit/submit",                    "auth": "public",  "description": "Character submission page"},
+    {"method": "GET",  "path": "/social-credit/wishlist",                  "auth": "public",  "description": "Community wishlist / voting page"},
+    {"method": "GET",  "path": "/social-credit/account",                   "auth": "public",  "description": "User account page"},
+    {"method": "GET",  "path": "/social-credit/privacy",                   "auth": "public",  "description": "Privacy policy"},
+    {"method": "GET",  "path": "/social-credit/terms",                     "auth": "public",  "description": "Terms of service"},
     {"method": "GET",  "path": "/robots.txt",                              "auth": "public",  "description": "Robots exclusion file"},
-    {"method": "GET",  "path": "/auth/discord",                            "auth": "public",  "description": "Start Discord OAuth2 flow — ?next= sets redirect destination"},
-    {"method": "GET",  "path": "/auth/discord/callback",                   "auth": "public",  "description": "Discord OAuth2 callback"},
-    {"method": "GET",  "path": "/auth/discord/logout",                     "auth": "public",  "description": "Clear Discord session cookie"},
-    {"method": "GET",  "path": "/login",                                   "auth": "admin-ip", "description": "Admin login page"},
+    {"method": "GET",  "path": "/social-credit/auth/discord",              "auth": "public",  "description": "Start Discord OAuth2 flow — ?next= sets redirect destination"},
+    {"method": "GET",  "path": "/social-credit/auth/discord/callback",     "auth": "public",  "description": "Discord OAuth2 callback"},
+    {"method": "GET",  "path": "/social-credit/auth/discord/logout",       "auth": "public",  "description": "Clear Discord session cookie"},
+    {"method": "GET",  "path": "/social-credit/login",                     "auth": "admin-ip", "description": "Admin login page"},
     {"method": "POST", "path": "/api/auth",                                "auth": "admin-ip", "description": "Admin password auth — returns session cookie"},
     {"method": "GET",  "path": "/api/routes",                              "auth": "public",  "description": "Lists all API routes as JSON"},
-    {"method": "GET",  "path": "/docs",                                    "auth": "public",  "description": "Human-readable API reference page"},
+    {"method": "GET",  "path": "/social-credit/docs",                      "auth": "public",  "description": "Human-readable API reference page"},
     {"method": "GET",  "path": "/api/discord/me",                          "auth": "discord", "description": "Current Discord user info",
      "fields": "logged_in, id (string snowflake), username, avatar (hash or null)"},
     {"method": "GET",  "path": "/api/stats",                               "auth": "public",  "description": "Global bot stats",
@@ -1500,8 +1507,8 @@ _ACCOUNT_COUNTER_KEYS = [
 async def _handle_account_page(request):
     user = await _discord_session(request)
     if not user:
-        raise web.HTTPFound("/auth/discord?next=/account")
-    return web.Response(text=_load_template("account.html"), content_type="text/html")
+        raise web.HTTPFound("/social-credit/auth/discord?next=/social-credit/account")
+    return web.Response(text=await _load_template("account.html"), content_type="text/html")
 
 
 async def _handle_account_api(request):
@@ -2044,28 +2051,29 @@ async def start_web_server(db):
     app["db"] = db
     app["cache"] = cache
     app["sse_hub"] = hub
-    app.router.add_get("/auth/discord",          _handle_discord_auth)
-    app.router.add_get("/auth/discord/callback", _handle_discord_callback)
-    app.router.add_get("/auth/discord/logout",   _handle_discord_logout)
+    app.router.add_get("/social-credit/auth/discord",          _handle_discord_auth)
+    app.router.add_get("/social-credit/auth/discord/callback", _handle_discord_callback)
+    app.router.add_get("/social-credit/auth/discord/logout",   _handle_discord_logout)
     app.router.add_get("/api/discord/me",        _handle_discord_me)
-    app.router.add_get("/submit",                _rate_limit_public(_handle_submit_page))
-    app.router.add_get("/wishlist",              _rate_limit_public(_handle_wishlist_page))
+    app.router.add_get("/social-credit/submit",                _rate_limit_public(_handle_submit_page))
+    app.router.add_get("/social-credit/wishlist",              _rate_limit_public(_handle_wishlist_page))
     app.router.add_get("/api/requests/check",    _rate_limit_public(_handle_requests_check))
     app.router.add_post("/api/requests/submit",  _rate_limit_public(_handle_requests_submit))
     app.router.add_post("/api/requests/vote",    _rate_limit_public(_handle_requests_vote))
     app.router.add_post("/api/requests/delete",  _rate_limit_public(_handle_requests_delete))
     app.router.add_get("/api/requests/wishlist", _rate_limit_public(_handle_requests_wishlist))
-    app.router.add_get("/login", _require_admin_ip(_handle_login))
+    app.router.add_get("/social-credit/login", _require_admin_ip(_handle_login))
     app.router.add_post("/api/auth", _require_admin_ip(_handle_auth))
-    app.router.add_get("/",             _rate_limit_public(_handle_landing))
-    app.router.add_get("/dashboard",    _rate_limit_public(_handle_index))
-    app.router.add_get("/privacy", _rate_limit_public(_handle_privacy))
-    app.router.add_get("/terms",   _rate_limit_public(_handle_terms))
-    app.router.add_get("/leaderboards", _rate_limit_public(_handle_leaderboards_page))
-    app.router.add_get("/admin", _require_admin(_handle_admin))
+    app.router.add_get("/",                         _rate_limit_public(_handle_studio_landing))
+    app.router.add_get("/social-credit",            _rate_limit_public(_handle_landing))
+    app.router.add_get("/social-credit/dashboard",  _rate_limit_public(_handle_index))
+    app.router.add_get("/social-credit/privacy", _rate_limit_public(_handle_privacy))
+    app.router.add_get("/social-credit/terms",   _rate_limit_public(_handle_terms))
+    app.router.add_get("/social-credit/leaderboards", _rate_limit_public(_handle_leaderboards_page))
+    app.router.add_get("/social-credit/admin", _require_admin(_handle_admin))
     app.router.add_post("/api/admin/command", _require_admin(_handle_admin_command))
     app.router.add_get("/api/routes", _rate_limit_public(_handle_routes))
-    app.router.add_get("/docs",       _rate_limit_public(_handle_docs))
+    app.router.add_get("/social-credit/docs",       _rate_limit_public(_handle_docs))
     app.router.add_get("/api/stats", _rate_limit_public(_handle_stats))
     app.router.add_get("/api/stats/commands", _rate_limit_public(_handle_stats_commands))
     app.router.add_get("/api/stats/all", _rate_limit_public(_handle_stats_all))
@@ -2086,7 +2094,7 @@ async def start_web_server(db):
     app.router.add_post("/api/admin/requests/reject",     _require_admin(_handle_admin_requests_reject))
     app.router.add_post("/api/admin/requests/ban",        _require_admin(_handle_admin_requests_ban))
     app.router.add_post("/api/admin/requests/edit",       _require_admin(_handle_admin_requests_edit))
-    app.router.add_get("/account",      _rate_limit_public(_handle_account_page))
+    app.router.add_get("/social-credit/account",      _rate_limit_public(_handle_account_page))
     app.router.add_get("/api/account",  _rate_limit_public(_handle_account_api))
     app.router.add_get("/api/account/portfolio",                  _rate_limit_public(_handle_portfolio_data))
     app.router.add_get("/api/account/portfolio/history",          _rate_limit_public(_handle_portfolio_history))

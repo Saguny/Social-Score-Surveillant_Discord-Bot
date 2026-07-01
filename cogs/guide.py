@@ -17,7 +17,7 @@ REPO_URL      = "https://github.com/Saguny/Social-Score-Surveillant_Discord-Bot"
 INVITE_URL    = "https://discord.com/oauth2/authorize?client_id=856163780265902151&permissions=2416438352&integration_type=0&scope=bot"
 TOPGG_URL     = "https://top.gg/bot/856163780265902151/invite"
 SUPPORT_URL   = "https://discord.gg/invite/k4W6YAPYhC"
-DASHBOARD_URL = "https://socialcredit-dashboard.up.railway.app"
+DASHBOARD_URL = "https://off-by-one.digital/social-credit/dashboard"
 WIKIQUOTE_API = "https://en.wikiquote.org/w/api.php"
 
 BUREAU_IMAGE    = Path("images/security.png")

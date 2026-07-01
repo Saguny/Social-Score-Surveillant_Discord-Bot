@@ -34,12 +34,12 @@
         ${av}
         <span class="uname">@${_esc(user.username)}</span>
         <span style="font-size:.75rem;color:var(--grey)">You are logged in</span>
-        <a href="/auth/discord/logout?next=/submit" class="logout-link">Log out</a>`;
+        <a href="/social-credit/auth/discord/logout?next=/social-credit/submit" class="logout-link">Log out</a>`;
     } else {
       $bar.innerHTML = `
         <div class="avatar-placeholder"></div>
         <span style="font-size:.82rem;color:var(--text-muted)">Log in to submit or vote on characters</span>
-        <a href="/auth/discord?next=/submit" class="login-link">🔗 Login with Discord</a>`;
+        <a href="/social-credit/auth/discord?next=/social-credit/submit" class="login-link">🔗 Login with Discord</a>`;
     }
   }
 
@@ -183,7 +183,7 @@
       </div>
       <button class="submit-btn" id="submit-btn" disabled>SUBMIT FOR REVIEW</button>
       <div class="submit-hint" id="submit-hint">
-        ${_user ? 'Check all boxes to submit.' : '<a href="/auth/discord?next=/submit">Log in with Discord</a> to submit.'}
+        ${_user ? 'Check all boxes to submit.' : '<a href="/social-credit/auth/discord?next=/social-credit/submit">Log in with Discord</a> to submit.'}
       </div>
       <div class="wrong-person-hint">
         Not the right person? <a href="#" id="clear-link">Try a different title</a>

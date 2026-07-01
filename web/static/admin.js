@@ -23,7 +23,7 @@ async function run(command, args = []) {
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify({command, args})
   });
-  if (res.status === 401 || res.status === 403) { location.href = '/login?next=/admin'; return; }
+  if (res.status === 401 || res.status === 403) { location.href = '/social-credit/login?next=/social-credit/admin'; return; }
   const data = await res.json();
   log(command + (args.length ? ' ' + args.join(' ') : ''), data.output || data.error, res.ok && !data.error);
 }
@@ -39,7 +39,7 @@ async function lookupUser() {
   out.innerHTML = '<div style="color:var(--text-muted)">Looking up...</div>';
 
   const res = await fetch('/api/admin/user-lookup?user_id=' + encodeURIComponent(userId));
-  if (res.status === 401 || res.status === 403) { location.href = '/login?next=/admin'; return; }
+  if (res.status === 401 || res.status === 403) { location.href = '/social-credit/login?next=/social-credit/admin'; return; }
   const data = await res.json();
   if (data.error) { out.innerHTML = `<div style="color:var(--red)">${_esc(data.error)}</div>`; return; }
 
@@ -82,7 +82,7 @@ async function applyYuan(guildId, userId, btn) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ guild_id: guildId, user_id: userId, amount }),
   });
-  if (res.status === 401 || res.status === 403) { location.href = '/login?next=/admin'; return; }
+  if (res.status === 401 || res.status === 403) { location.href = '/social-credit/login?next=/social-credit/admin'; return; }
   const data = await res.json();
   if (data.error) { alert(data.error); return; }
 
@@ -167,7 +167,7 @@ function renderEmbedPreview() {
 
 async function loadGuildListForBroadcast() {
   const res = await fetch('/api/admin/guild-list');
-  if (res.status === 401 || res.status === 403) { location.href = '/login?next=/admin'; return; }
+  if (res.status === 401 || res.status === 403) { location.href = '/social-credit/login?next=/social-credit/admin'; return; }
   const data = await res.json();
   const sel = document.getElementById('eb-target');
   sel.innerHTML = '<option value="all">All servers</option>';
@@ -211,7 +211,7 @@ async function sendBroadcastEmbed() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  if (res.status === 401 || res.status === 403) { location.href = '/login?next=/admin'; return; }
+  if (res.status === 401 || res.status === 403) { location.href = '/social-credit/login?next=/social-credit/admin'; return; }
   const data = await res.json();
 
   if (data.error) {
@@ -261,7 +261,7 @@ async function saveAnnouncement() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  if (res.status === 401 || res.status === 403) { location.href = '/login?next=/admin'; return; }
+  if (res.status === 401 || res.status === 403) { location.href = '/social-credit/login?next=/social-credit/admin'; return; }
   const data = await res.json();
   if (data.error) {
     out.style.color = 'var(--red)';
@@ -286,7 +286,7 @@ async function loadVoteChart(period) {
   });
 
   const res = await fetch('/api/admin/topgg-votes?period=' + period);
-  if (res.status === 401 || res.status === 403) { location.href = '/login?next=/admin'; return; }
+  if (res.status === 401 || res.status === 403) { location.href = '/social-credit/login?next=/social-credit/admin'; return; }
   const data = await res.json();
 
   document.getElementById('vote-total').textContent =
@@ -445,7 +445,7 @@ async function saveReqEdit(id) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ request_id: id, faction: faction || null, rarity: rarity || null, gender: gender || null, title: title || null, image_urls: imageUrls }),
   });
-  if (r.status === 401 || r.status === 403) { location.href = '/login?next=/admin'; return; }
+  if (r.status === 401 || r.status === 403) { location.href = '/social-credit/login?next=/social-credit/admin'; return; }
   const body = await r.json().catch(() => ({}));
   if (r.ok) {
     out.style.color = 'var(--green)';

@@ -44,12 +44,12 @@
         ${av}
         <span class="uname">@${_esc(user.username)}</span>
         <span style="font-size:.75rem;color:var(--grey)">You are logged in</span>
-        <a href="/auth/discord/logout?next=/wishlist" class="logout-link">Log out</a>`;
+        <a href="/social-credit/auth/discord/logout?next=/social-credit/wishlist" class="logout-link">Log out</a>`;
     } else {
       $bar.innerHTML = `
         <div class="avatar-placeholder"></div>
         <span style="font-size:.82rem;color:var(--text-muted)">Log in to vote on character requests</span>
-        <a href="/auth/discord?next=/wishlist" class="login-link">🔗 Login with Discord</a>`;
+        <a href="/social-credit/auth/discord?next=/social-credit/wishlist" class="login-link">🔗 Login with Discord</a>`;
     }
   }
 
@@ -66,7 +66,7 @@
     if (!items || !items.length) {
       $list.innerHTML = `<div class="wl-empty">
         Nothing here yet.
-        <a href="/submit" style="color:var(--sage)">Be the first to suggest someone!</a>
+        <a href="/social-credit/submit" style="color:var(--sage)">Be the first to suggest someone!</a>
       </div>`;
       return;
     }
@@ -142,7 +142,7 @@
     const reqId  = parseInt(btn.dataset.id, 10);
 
     if (action === 'login') {
-      window.location.href = '/auth/discord?next=/wishlist';
+      window.location.href = '/social-credit/auth/discord?next=/social-credit/wishlist';
       return;
     }
 

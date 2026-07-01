@@ -616,7 +616,7 @@ class SocialCreditBot(commands.AutoShardedBot):
             try:
                 await channel.send(
                     "The Bureau has been added. Run `/guide` to get started.\n"
-                    "Use `/serverrank visibility on` to display your server on the [global leaderboard](https://socialcredit-dashboard.up.railway.app/leaderboards)."
+                    "Use `/serverrank visibility on` to display your server on the [global leaderboard](https://off-by-one.digital/social-credit/leaderboards)."
                 )
             except discord.Forbidden:
                 pass
