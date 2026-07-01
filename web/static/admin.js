@@ -347,7 +347,7 @@ async function loadPendingRequests() {
   }
   const RARITIES  = ['legendary','epic','rare','uncommon','common'];
   const GENDERS   = ['male','female','other'];
-  const FACTIONS  = ['reds','strongmen','conquerors','icons','wildcards'];
+  const FACTIONS  = ['reds','strongmen','conquerors','icons','capitalists','wildcards'];
   $list.innerHTML = rows.map(req => {
     const curRarity  = req.override_rarity  || '';
     const curGender  = req.override_gender  || '';

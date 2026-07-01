@@ -1317,7 +1317,7 @@ async def _handle_admin_requests_edit(request):
 
     _VALID_RARITIES = {"legendary", "epic", "rare", "uncommon", "common"}
     _VALID_GENDERS  = {"male", "female", "other"}
-    _VALID_FACTIONS = {"reds", "strongmen", "conquerors", "icons", "wildcards"}
+    _VALID_FACTIONS = {"reds", "strongmen", "conquerors", "icons", "capitalists", "wildcards"}
     if rarity and rarity not in _VALID_RARITIES:
         return web.json_response({"error": "Invalid rarity"}, status=400)
     if gender and gender not in _VALID_GENDERS:
@@ -1366,30 +1366,56 @@ async def _handle_admin_requests_approve(request):
     wiki_slug = req["wiki_slug"]
 
     try:
-        # Stage 1 — fetch Wikipedia data
-        await emit("wiki", "Fetching Wikipedia article…")
-        wiki = await _fetch_wikipedia_preview(wiki_slug)
-        if wiki is None:
-            await emit("wiki", "Wikipedia article not found. Approve anyway? Skipping enrichment.", ok=False)
+        has_full_overrides = (
+            req.get("override_faction") and
+            req.get("override_gender") and
+            req.get("override_image_urls")
+        )
+
+        # Stage 1 — fetch Wikipedia data (skipped if all overrides set)
+        if has_full_overrides:
+            await emit("wiki", f"All fields set manually — skipping Wikipedia fetch.")
             wiki_title = req["wiki_title"]
         else:
-            wiki_title = wiki["title"]
-            await emit("wiki", f"Found: {wiki_title}")
+            await emit("wiki", "Fetching Wikipedia article…")
+            wiki = await _fetch_wikipedia_preview(wiki_slug)
+            if wiki is None:
+                await emit("wiki", "Wikipedia article not found. Approve anyway? Skipping enrichment.", ok=False)
+                wiki_title = req["wiki_title"]
+            else:
+                wiki_title = wiki["title"]
+                await emit("wiki", f"Found: {wiki_title}")
 
-        # Stage 2 — run gacha pipeline (image scrape, stat generation)
-        await emit("pipeline", "Running gacha enrichment pipeline…")
-        try:
-            from gacha.pipeline import process_slug
-            wiki_lang = req.get("wiki_lang") or "en"
-            char_data = await process_slug(wiki_slug, lang=wiki_lang)
-        except Exception as exc:
-            await emit("pipeline", f"Pipeline error: {exc}. Saving with minimal data.", ok=False)
-            char_data = None
-
-        if char_data:
-            await emit("pipeline", f"Pipeline complete — {len(char_data.get('image_urls', []))} image(s) found.")
+        # Stage 2 — run gacha pipeline (skipped if all overrides set)
+        if has_full_overrides:
+            await emit("pipeline", "All fields set manually — skipping pipeline.")
+            from gacha.pipeline import derive_stats
+            faction_for_stats = req["override_faction"]
+            char_data = {
+                "name":       wiki_title,
+                "title":      req.get("override_title") or "",
+                "faction":    req["override_faction"],
+                "rarity":     req.get("override_rarity") or "common",
+                "quote":      "",
+                "wiki":       wiki_slug,
+                "gender":     req["override_gender"],
+                "image_urls": list(req["override_image_urls"]),
+                "stats":      derive_stats(faction_for_stats, 30),
+            }
         else:
-            await emit("pipeline", "Using minimal character entry (no enrichment).")
+            await emit("pipeline", "Running gacha enrichment pipeline…")
+            try:
+                from gacha.pipeline import process_slug
+                wiki_lang = req.get("wiki_lang") or "en"
+                char_data = await process_slug(wiki_slug, lang=wiki_lang)
+            except Exception as exc:
+                await emit("pipeline", f"Pipeline error: {exc}. Saving with minimal data.", ok=False)
+                char_data = None
+
+            if char_data:
+                await emit("pipeline", f"Pipeline complete — {len(char_data.get('image_urls', []))} image(s) found.")
+            else:
+                await emit("pipeline", "Using minimal character entry (no enrichment).")
 
         # Stage 3 — save to database
         await emit("db", "Saving character to database…")
@@ -1405,16 +1431,17 @@ async def _handle_admin_requests_approve(request):
             "image_urls": [],
             "stats":      {"authority": 50, "military": 50, "charisma": 50},
         }
-        if req.get("override_rarity"):
-            data_to_save["rarity"] = req["override_rarity"]
-        if req.get("override_gender"):
-            data_to_save["gender"] = req["override_gender"]
-        if req.get("override_faction"):
-            data_to_save["faction"] = req["override_faction"]
-        if req.get("override_title"):
-            data_to_save["title"] = req["override_title"]
-        if req.get("override_image_urls"):
-            data_to_save["image_urls"] = list(req["override_image_urls"])
+        if not has_full_overrides:
+            if req.get("override_rarity"):
+                data_to_save["rarity"] = req["override_rarity"]
+            if req.get("override_gender"):
+                data_to_save["gender"] = req["override_gender"]
+            if req.get("override_faction"):
+                data_to_save["faction"] = req["override_faction"]
+            if req.get("override_title"):
+                data_to_save["title"] = req["override_title"]
+            if req.get("override_image_urls"):
+                data_to_save["image_urls"] = list(req["override_image_urls"])
 
         await db.upsert_gacha_character(
             character_id            = char_id,

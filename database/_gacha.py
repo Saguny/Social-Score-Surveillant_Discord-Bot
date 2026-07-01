@@ -276,10 +276,10 @@ class GachaMixin:
         await self._pool.execute(
             """
             INSERT INTO gacha_characters
-                (character_id, name, title, faction, rarity, quote, wiki,
+                (character_id, name, title, faction, rarity, quote, wiki, gender,
                  stat_authority, stat_military, stat_charisma, image_urls,
                  submitted_by_discord_id, submitted_by_username)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
             ON CONFLICT (character_id) DO UPDATE SET
                 name                    = EXCLUDED.name,
                 title                   = EXCLUDED.title,
@@ -287,6 +287,7 @@ class GachaMixin:
                 rarity                  = EXCLUDED.rarity,
                 quote                   = EXCLUDED.quote,
                 wiki                    = EXCLUDED.wiki,
+                gender                  = EXCLUDED.gender,
                 stat_authority          = EXCLUDED.stat_authority,
                 stat_military           = EXCLUDED.stat_military,
                 stat_charisma           = EXCLUDED.stat_charisma,
@@ -296,7 +297,7 @@ class GachaMixin:
             """,
             character_id,
             data["name"], data["title"], data["faction"], data["rarity"],
-            data.get("quote", ""), data.get("wiki", ""),
+            data.get("quote", ""), data.get("wiki", ""), data.get("gender"),
             s.get("authority", 50), s.get("military", 50), s.get("charisma", 50),
             data.get("image_urls") or [],
             submitted_by_discord_id, submitted_by_username,
