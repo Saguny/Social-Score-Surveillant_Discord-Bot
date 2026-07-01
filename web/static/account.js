@@ -779,15 +779,7 @@
     const r = await fetch('/api/account', { credentials: 'same-origin' }).catch(() => null);
 
     if (!r) { showContentError('Network error — please refresh.'); return; }
-    if (r.status === 401) {
-      const justLoggedOut = new URLSearchParams(window.location.search).get('logged_out') === '1';
-      if (justLoggedOut) {
-        showLoggedOut();
-      } else {
-        window.location.href = '/social-credit/auth/discord?next=/social-credit/account';
-      }
-      return;
-    }
+    if (r.status === 401) { window.location.href = '/social-credit/auth/discord?next=/social-credit/account'; return; }
     if (!r.ok) { showContentError('Failed to load account data — please refresh.'); return; }
 
     const d = await r.json();
@@ -801,4 +793,12 @@
   }
 
   init();
+
+  document.addEventListener('click', async (e) => {
+    const link = e.target.closest('a.acc-logout-btn');
+    if (!link) return;
+    e.preventDefault();
+    await fetch('/social-credit/auth/discord/logout', { method: 'POST', credentials: 'same-origin' });
+    showLoggedOut();
+  });
 })();

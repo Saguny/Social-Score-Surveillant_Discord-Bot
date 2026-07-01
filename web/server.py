@@ -276,14 +276,17 @@ async def _handle_discord_logout(request):
     cookie = request.cookies.get("discord_auth", "")
     if cookie:
         await cache_delete(f"discordSession:{cookie}")
+    if request.method == "POST":
+        resp = web.Response(
+            text='{"ok":true}', content_type="application/json",
+            headers={"Cache-Control": "no-store"},
+        )
+        resp.set_cookie("discord_auth", "", max_age=0, path="/", secure=True, httponly=True, samesite="Lax")
+        return resp
     next_url  = request.rel_url.query.get("next", "")
     next_safe = next_url if (next_url.startswith("/social-credit/") or next_url == "/social-credit") else "/social-credit/wishlist"
     response  = web.HTTPFound(next_safe)
-    response.set_cookie(
-        "discord_auth", "",
-        max_age=0, path="/",
-        secure=True, httponly=True, samesite="Lax",
-    )
+    response.set_cookie("discord_auth", "", max_age=0, path="/", secure=True, httponly=True, samesite="Lax")
     response.headers["Cache-Control"] = "no-store"
     raise response
 
@@ -2086,6 +2089,7 @@ async def start_web_server(db):
     app.router.add_get("/social-credit/auth/discord",          _handle_discord_auth)
     app.router.add_get("/social-credit/auth/discord/callback", _handle_discord_callback)
     app.router.add_get("/social-credit/auth/discord/logout",   _handle_discord_logout)
+    app.router.add_post("/social-credit/auth/discord/logout",  _handle_discord_logout)
     app.router.add_get("/api/discord/me",        _handle_discord_me)
     app.router.add_get("/social-credit/submit",                _rate_limit_public(_handle_submit_page))
     app.router.add_get("/social-credit/wishlist",              _rate_limit_public(_handle_wishlist_page))

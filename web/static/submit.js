@@ -316,4 +316,12 @@
 
   // ── init ───────────────────────────────────────────────────────────────────
   loadUser();
+
+  document.addEventListener('click', async (e) => {
+    const link = e.target.closest('a.logout-link');
+    if (!link) return;
+    e.preventDefault();
+    await fetch('/social-credit/auth/discord/logout', { method: 'POST', credentials: 'same-origin' });
+    window.location.href = '/social-credit/submit';
+  });
 })();
