@@ -963,6 +963,66 @@ async def _handle_robots(request):
     return web.Response(text="User-agent: *\nDisallow: /\n", content_type="text/plain")
 
 
+_ROUTES = [
+    {"method": "GET",  "path": "/",                                        "auth": "public",  "description": "Landing page"},
+    {"method": "GET",  "path": "/dashboard",                               "auth": "public",  "description": "Public dashboard"},
+    {"method": "GET",  "path": "/leaderboards",                            "auth": "public",  "description": "Guild leaderboard page"},
+    {"method": "GET",  "path": "/submit",                                  "auth": "public",  "description": "Character submission page"},
+    {"method": "GET",  "path": "/wishlist",                                "auth": "public",  "description": "Community wishlist / voting page"},
+    {"method": "GET",  "path": "/account",                                 "auth": "public",  "description": "User account page"},
+    {"method": "GET",  "path": "/privacy",                                 "auth": "public",  "description": "Privacy policy"},
+    {"method": "GET",  "path": "/terms",                                   "auth": "public",  "description": "Terms of service"},
+    {"method": "GET",  "path": "/robots.txt",                              "auth": "public",  "description": "Robots exclusion file"},
+    {"method": "GET",  "path": "/auth/discord",                            "auth": "public",  "description": "Start Discord OAuth2 flow — ?next= sets redirect destination"},
+    {"method": "GET",  "path": "/auth/discord/callback",                   "auth": "public",  "description": "Discord OAuth2 callback"},
+    {"method": "GET",  "path": "/auth/discord/logout",                     "auth": "public",  "description": "Clear Discord session cookie"},
+    {"method": "GET",  "path": "/login",                                   "auth": "admin-ip", "description": "Admin login page"},
+    {"method": "POST", "path": "/api/auth",                                "auth": "admin-ip", "description": "Admin password auth — returns session cookie"},
+    {"method": "GET",  "path": "/api/routes",                              "auth": "public",  "description": "This endpoint — lists all API routes"},
+    {"method": "GET",  "path": "/api/discord/me",                          "auth": "discord", "description": "Current Discord user info"},
+    {"method": "GET",  "path": "/api/stats",                               "auth": "public",  "description": "Global bot stats"},
+    {"method": "GET",  "path": "/api/stats/all",                           "auth": "public",  "description": "All stats in one response"},
+    {"method": "GET",  "path": "/api/stats/timeline",                      "auth": "public",  "description": "Activity timeline — ?range=24h|7d|30d"},
+    {"method": "GET",  "path": "/api/stats/recent-events",                 "auth": "public",  "description": "Recent score events feed"},
+    {"method": "GET",  "path": "/api/stats/commands",                      "auth": "public",  "description": "Command usage analytics"},
+    {"method": "GET",  "path": "/api/leaderboard",                         "auth": "public",  "description": "User leaderboard — ?guild_id="},
+    {"method": "GET",  "path": "/api/leaderboards/guilds",                 "auth": "public",  "description": "Guild leaderboard — ?metric=&bracket="},
+    {"method": "GET",  "path": "/api/stream",                              "auth": "public",  "description": "Server-Sent Events live feed"},
+    {"method": "GET",  "path": "/api/announcement",                        "auth": "public",  "description": "Current dashboard announcement"},
+    {"method": "GET",  "path": "/api/account",                             "auth": "discord", "description": "Account overview — stats, guilds, achievements, badges"},
+    {"method": "GET",  "path": "/api/account/portfolio",                   "auth": "discord", "description": "Portfolio holdings, turbos, and full ticker list — ?guild_id="},
+    {"method": "GET",  "path": "/api/account/portfolio/history",           "auth": "discord", "description": "Portfolio value history — ?guild_id=&period=1D|5D|1M|6M|1Y"},
+    {"method": "GET",  "path": "/api/account/portfolio/turbos/available",  "auth": "discord", "description": "Today's available turbo certificates — ?guild_id="},
+    {"method": "GET",  "path": "/api/account/stock/chart",                 "auth": "discord", "description": "Price history for a ticker — ?ticker=&period=1D|5D|1M|6M|1Y"},
+    {"method": "POST", "path": "/api/account/portfolio/buy",               "auth": "discord", "description": "Buy shares — {guild_id, ticker, shares}"},
+    {"method": "POST", "path": "/api/account/portfolio/sell",              "auth": "discord", "description": "Sell shares — {guild_id, ticker, shares}"},
+    {"method": "POST", "path": "/api/account/portfolio/turbo/open",        "auth": "discord", "description": "Open a turbo position — {guild_id, ticker, direction, leverage, cost}"},
+    {"method": "POST", "path": "/api/account/portfolio/turbo/close",       "auth": "discord", "description": "Close a turbo position — {guild_id, ticker, turbo_id}"},
+    {"method": "GET",  "path": "/api/requests/check",                      "auth": "public",  "description": "Check if a Wikipedia title is already submitted — ?wiki="},
+    {"method": "GET",  "path": "/api/requests/wishlist",                   "auth": "public",  "description": "Pending submissions — ?page=&sort=votes|newest"},
+    {"method": "POST", "path": "/api/requests/submit",                     "auth": "discord", "description": "Submit a character — {wiki_title, reason?}"},
+    {"method": "POST", "path": "/api/requests/vote",                       "auth": "discord", "description": "Vote on a submission — {request_id}"},
+    {"method": "POST", "path": "/api/requests/delete",                     "auth": "discord", "description": "Delete own pending submission — {request_id}"},
+    {"method": "GET",  "path": "/api/admin/requests",                      "auth": "admin",   "description": "All pending submissions for review"},
+    {"method": "POST", "path": "/api/admin/requests/approve",              "auth": "admin",   "description": "Approve a submission — {request_id}"},
+    {"method": "POST", "path": "/api/admin/requests/reject",               "auth": "admin",   "description": "Reject a submission — {request_id, reason?}"},
+    {"method": "POST", "path": "/api/admin/requests/ban",                  "auth": "admin",   "description": "Ban a user from submitting — {user_id}"},
+    {"method": "POST", "path": "/api/admin/requests/edit",                 "auth": "admin",   "description": "Edit submission fields before approval — {request_id, ...fields}"},
+    {"method": "GET",  "path": "/api/admin/topgg-votes",                   "auth": "admin",   "description": "Top.gg vote timeline — ?period=1D|7D|1M|TOTAL"},
+    {"method": "GET",  "path": "/api/admin/guild-list",                    "auth": "admin",   "description": "All guilds the bot is in"},
+    {"method": "GET",  "path": "/api/admin/user-lookup",                   "auth": "admin",   "description": "Look up a user across guilds — ?user_id="},
+    {"method": "POST", "path": "/api/admin/user-yuan-adjust",              "auth": "admin",   "description": "Adjust a user's yuan — {guild_id, user_id, amount}"},
+    {"method": "POST", "path": "/api/admin/broadcast-embed",               "auth": "admin",   "description": "Send an embed to one or all guilds — {target, title, description, ...}"},
+    {"method": "POST", "path": "/api/admin/announcement",                  "auth": "admin",   "description": "Set dashboard announcement — {enabled, message, severity}"},
+    {"method": "POST", "path": "/api/admin/command",                       "auth": "admin",   "description": "Run a bot console command — {command}"},
+    {"method": "POST", "path": "/webhooks/topgg",                          "auth": "webhook", "description": "Top.gg vote webhook — authenticated via TOPGG_WEBHOOK_SECRET header"},
+]
+
+
+async def _handle_routes(request):
+    return web.json_response({"routes": _ROUTES})
+
+
 async def _handle_guild_list(request):
     cache = request.app.get("cache")
     if cache:
@@ -1161,8 +1221,8 @@ async def _handle_admin_requests_approve(request):
         # Stage 2 — run gacha pipeline (image scrape, stat generation)
         await emit("pipeline", "Running gacha enrichment pipeline…")
         try:
-            from scripts.populate_gacha import process_one
-            char_data = await process_one(wiki_slug)
+            from gacha.pipeline import process_slug
+            char_data = await process_slug(wiki_slug)
         except Exception as exc:
             await emit("pipeline", f"Pipeline error: {exc}. Saving with minimal data.", ok=False)
             char_data = None
@@ -1178,11 +1238,11 @@ async def _handle_admin_requests_approve(request):
         data_to_save = char_data or {
             "name":       wiki_title,
             "title":      "",
-            "faction":    "Independent",
-            "rarity":     "R",
+            "faction":    "wildcards",
+            "rarity":     "common",
             "quote":      "",
             "wiki":       wiki_slug,
-            "gender":     "Unknown",
+            "gender":     None,
             "image_urls": [],
             "stats":      {"authority": 50, "military": 50, "charisma": 50},
         }
@@ -1813,6 +1873,7 @@ async def start_web_server(db):
     app.router.add_get("/leaderboards", _rate_limit_public(_handle_leaderboards_page))
     app.router.add_get("/admin", _require_admin(_handle_admin))
     app.router.add_post("/api/admin/command", _require_admin(_handle_admin_command))
+    app.router.add_get("/api/routes", _rate_limit_public(_handle_routes))
     app.router.add_get("/api/stats", _rate_limit_public(_handle_stats))
     app.router.add_get("/api/stats/commands", _rate_limit_public(_handle_stats_commands))
     app.router.add_get("/api/stats/all", _rate_limit_public(_handle_stats_all))
