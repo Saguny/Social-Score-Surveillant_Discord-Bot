@@ -563,6 +563,7 @@ def _harem_image_embed(
     rank_info: dict,
     idx: int,
     total: int,
+    owner_name: str,
 ) -> discord.Embed:
     faction_label = FACTION_LABEL.get(char["faction"], char["faction"].upper())
     rank_text = (
@@ -572,23 +573,24 @@ def _harem_image_embed(
     embed = discord.Embed(
         title=char["name"],
         description=f"{char['title']}\n{faction_label}  ·  {_stars(char['rarity'])}\n{rank_text}",
-        color=FACTION_COLOR.get(char["faction"], 0xCC0000),
+        color=0xFF69B4,
     )
     embed.set_image(url=image_url)
-    embed.set_footer(text=f"{idx + 1}/{total}")
+    embed.set_footer(text=f"Belongs to {owner_name}  ·  {idx + 1}/{total}")
     return embed
 
 
 class HaremImageView(discord.ui.View):
-    def __init__(self, entries: list[tuple[str, dict, str, dict]], owner_id: int):
+    def __init__(self, entries: list[tuple[str, dict, str, dict]], owner_id: int, owner_name: str):
         super().__init__(timeout=180)
-        self.entries  = entries   # (char_id, char, image_url, rank_info)
-        self.owner_id = owner_id
-        self.index    = 0
+        self.entries    = entries   # (char_id, char, image_url, rank_info)
+        self.owner_id   = owner_id
+        self.owner_name = owner_name
+        self.index      = 0
 
     def build_embed(self) -> discord.Embed:
         char_id, char, image_url, rank_info = self.entries[self.index]
-        return _harem_image_embed(char, image_url, rank_info, self.index, len(self.entries))
+        return _harem_image_embed(char, image_url, rank_info, self.index, len(self.entries), self.owner_name)
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.owner_id:
@@ -1479,9 +1481,9 @@ class GachaCog(commands.Cog, name="Gacha"):
 
     async def _do_harem_image(self, guild_id: int, user: discord.Member | discord.User, send_fn):
         rows = await self.db.get_user_collection(guild_id, user.id)
-        name = user.display_name if hasattr(user, "display_name") else str(user)
+        plain_name = user.display_name if hasattr(user, "display_name") else str(user)
         if not rows:
-            await send_fn(f"**{name}** has no waifus yet. Use `/roll` to start collecting!")
+            await send_fn(f"**{plain_name}** has no waifus yet. Use `/roll` to start collecting!")
             return
 
         entries = []
@@ -1492,17 +1494,20 @@ class GachaCog(commands.Cog, name="Gacha"):
         entries.sort(key=lambda x: (RARITY_ORDER.index(x[1].get("rarity", "common")), x[1]["name"]))
 
         if not entries:
-            await send_fn(f"**{name}** has no waifus with images.")
+            await send_fn(f"**{plain_name}** has no waifus with images.")
             return
 
         char_ids = [e[0] for e in entries]
-        ranks = await self.db.get_characters_rank_batch(char_ids)
+        ranks, formatted_name = await asyncio.gather(
+            self.db.get_characters_rank_batch(char_ids),
+            self.bot.format_user_full(user, guild_id),
+        )
 
         view_entries = [
             (cid, char, _pick_image(char), ranks.get(cid, {"rank": None, "claims": 0}))
             for cid, char in entries
         ]
-        view = HaremImageView(view_entries, user.id)
+        view = HaremImageView(view_entries, user.id, formatted_name)
         await send_fn(embed=view.build_embed(), view=view)
 
     async def _do_choose(self, guild_id: int, user: discord.Member | discord.User, name: str, send_fn):
