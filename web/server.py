@@ -470,6 +470,7 @@ async def _handle_requests_submit(request):
             wiki_slug        = slug,
             wiki_title       = wiki["title"],
             thumbnail_url    = wiki.get("thumbnail_url", ""),
+            wiki_extract     = wiki.get("extract", ""),
         )
     except ValueError:
         return web.json_response({"error": "already_requested"}, status=409)
@@ -558,6 +559,7 @@ async def _handle_requests_wishlist(request):
                     "submitted_at": row["submitted_at"],
                     "approved_at":  row.get("reviewed_at"),
                     "thumbnail_url": row.get("thumbnail_url") or "",
+                    "wiki_extract": row.get("wiki_extract") or "",
                     "status":       "approved",
                 }
                 for row in rows
@@ -587,6 +589,7 @@ async def _handle_requests_wishlist(request):
             "submitted_by":  row["discord_username"],
             "submitted_at":  row["submitted_at"],
             "thumbnail_url": row.get("thumbnail_url") or "",
+            "wiki_extract":  row.get("wiki_extract") or "",
             "vote_count":    row["vote_count"],
             "recent_voters": voters_map.get(row["id"], []),
             "has_voted":     row["id"] in voted_set,

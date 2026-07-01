@@ -82,6 +82,9 @@
       const portrait = item.thumbnail_url
         ? `<img src="${_esc(item.thumbnail_url)}" alt="" loading="lazy" onerror="this.style.display='none'">`
         : '';
+      const extract  = item.wiki_extract
+        ? `<div class="wl-extract">${_esc(item.wiki_extract)}</div>`
+        : '';
 
       if (item.status === 'approved') {
         const approvedWhen = item.approved_at ? _timeAgo(item.approved_at) : '';
@@ -92,7 +95,7 @@
             <div class="wl-meta">
               <div class="wl-name">${_esc(item.wiki_title)}</div>
               <div class="wl-desc">by @${_esc(by)} · ${when}${wikiLink ? ' · ' + wikiLink : ''}</div>
-            </div>
+              ${extract}
             <div class="wl-votes">
               <div class="n" style="font-size:.7rem;color:var(--sage);font-weight:700;">✓</div>
               <div class="lbl">approved${approvedWhen ? ' ' + approvedWhen : ''}</div>
@@ -116,6 +119,7 @@
           <div class="wl-meta">
             <div class="wl-name">${_esc(item.wiki_title)}</div>
             <div class="wl-desc">by @${_esc(by)} · ${when}${wikiLink ? ' · ' + wikiLink : ''}</div>
+            ${extract}
           </div>
           <div class="wl-votes">
             <div class="n" id="vc-${item.id}">${item.vote_count}</div>

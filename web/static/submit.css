@@ -182,8 +182,9 @@
 }
 .wl-portrait img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .wl-meta { flex: 1; min-width: 120px; }
-.wl-name  { font-size: .88rem; font-weight: 700; color: var(--cream); }
-.wl-desc  { font-size: .72rem; color: var(--grey); }
+.wl-name    { font-size: .88rem; font-weight: 700; color: var(--cream); }
+.wl-desc    { font-size: .72rem; color: var(--grey); }
+.wl-extract { font-size: .72rem; color: var(--text-muted); margin-top: .25rem; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .wl-votes { display: flex; flex-direction: column; align-items: center;
             flex-shrink: 0; min-width: 42px; }
 .wl-votes .n  { font-size: 1.2rem; font-weight: 700; color: var(--cream); line-height: 1; }

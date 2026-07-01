@@ -11,15 +11,16 @@ class GachaRequestsMixin:
         wiki_slug: str,
         wiki_title: str,
         thumbnail_url: str = "",
+        wiki_extract: str = "",
     ) -> int:
         try:
             row = await self._pool.fetchrow(
                 """
-                INSERT INTO gacha_requests (discord_id, discord_username, wiki_slug, wiki_title, submitted_at, thumbnail_url)
-                VALUES ($1, $2, $3, $4, $5, $6)
+                INSERT INTO gacha_requests (discord_id, discord_username, wiki_slug, wiki_title, submitted_at, thumbnail_url, wiki_extract)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
                 RETURNING id
                 """,
-                discord_id, discord_username, wiki_slug, wiki_title, int(time.time()), thumbnail_url,
+                discord_id, discord_username, wiki_slug, wiki_title, int(time.time()), thumbnail_url, wiki_extract,
             )
         except asyncpg.UniqueViolationError:
             raise ValueError("already_requested")

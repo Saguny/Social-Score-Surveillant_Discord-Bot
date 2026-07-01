@@ -462,12 +462,13 @@ class StocksCog(commands.Cog, name="Stocks"):
                 continue
             price, yf_open = res
             if price and price > 0:
-                self._prices[ticker] = price
+                yuan_price = self._to_yuan(ticker, price)
+                self._prices[ticker] = yuan_price
                 if yf_open and yf_open > 0:
-                    self._day_opens[ticker] = yf_open
+                    self._day_opens[ticker] = self._to_yuan(ticker, yf_open)
                 elif self._day_opens.get(ticker, 0) <= 0:
-                    self._day_opens[ticker] = price
-                price_updates.append((ticker, price, self._day_opens[ticker]))
+                    self._day_opens[ticker] = yuan_price
+                price_updates.append((ticker, yuan_price, self._day_opens[ticker]))
 
         if price_updates:
             await self.bot.db.batch_upsert_stock_prices(price_updates)
@@ -538,10 +539,11 @@ class StocksCog(commands.Cog, name="Stocks"):
 
             if old <= 0:
                 if yf_price and yf_price > 0:
-                    self._day_opens.setdefault(ticker, yf_price)
-                    self._prices[ticker] = yf_price
-                    price_updates.append((ticker, yf_price, self._day_opens[ticker]))
-                    price_bars.append((ticker, now, yf_price, yf_price, yf_price, yf_price))
+                    yuan_price = self._to_yuan(ticker, yf_price)
+                    self._day_opens.setdefault(ticker, yuan_price)
+                    self._prices[ticker] = yuan_price
+                    price_updates.append((ticker, yuan_price, self._day_opens[ticker]))
+                    price_bars.append((ticker, now, yuan_price, yuan_price, yuan_price, yuan_price))
                 continue
 
             if not open_exchanges[exchange] or ticker in self._daily_locked or (
@@ -550,7 +552,7 @@ class StocksCog(commands.Cog, name="Stocks"):
                 price_bars.append((ticker, now, old, old, old, old))
                 continue
 
-            new_price = yf_price if (yf_price and yf_price > 0) else old
+            new_price = self._to_yuan(ticker, yf_price) if (yf_price and yf_price > 0) else old
 
             pct      = (new_price - old) / old
             day_open = self._day_opens.get(ticker, new_price)
