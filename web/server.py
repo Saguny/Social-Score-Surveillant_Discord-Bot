@@ -469,6 +469,7 @@ async def _handle_requests_submit(request):
             discord_username = user["username"],
             wiki_slug        = slug,
             wiki_title       = wiki["title"],
+            thumbnail_url    = wiki.get("thumbnail_url", ""),
         )
     except ValueError:
         return web.json_response({"error": "already_requested"}, status=409)
@@ -542,9 +543,29 @@ async def _handle_requests_delete(request):
 
 async def _handle_requests_wishlist(request):
     limit = min(int(request.rel_url.query.get("limit", 20)), 50)
+    sort  = request.rel_url.query.get("sort", "votes")
     db    = request.app["db"]
-    rows  = await db.get_top_requests(limit)
 
+    if sort == "approved":
+        rows = await db.get_approved_requests(limit)
+        return web.json_response({
+            "requests": [
+                {
+                    "id":           row["id"],
+                    "wiki_slug":    row["wiki_slug"],
+                    "wiki_title":   row["wiki_title"],
+                    "submitted_by": row["discord_username"],
+                    "submitted_at": row["submitted_at"],
+                    "approved_at":  row.get("reviewed_at"),
+                    "thumbnail_url": row.get("thumbnail_url") or "",
+                    "status":       "approved",
+                }
+                for row in rows
+            ],
+            "logged_in": False,
+        })
+
+    rows    = await db.get_pending_requests(limit=limit, sort=sort if sort == "newest" else "votes")
     user    = await _discord_session(request)
     user_id = user["discord_id"] if user else None
 
@@ -565,9 +586,11 @@ async def _handle_requests_wishlist(request):
             "wiki_title":    row["wiki_title"],
             "submitted_by":  row["discord_username"],
             "submitted_at":  row["submitted_at"],
+            "thumbnail_url": row.get("thumbnail_url") or "",
             "vote_count":    row["vote_count"],
             "recent_voters": voters_map.get(row["id"], []),
             "has_voted":     row["id"] in voted_set,
+            "status":        "pending",
         }
         for row in rows
     ]

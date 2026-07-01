@@ -3,6 +3,7 @@
   'use strict';
 
   let _user = null;
+  let _sort = 'votes';
 
   const $list  = document.getElementById('wl-list');
   const $bar   = document.getElementById('discord-bar');
@@ -61,22 +62,43 @@
   }
 
   // ── render list ────────────────────────────────────────────────────────────
-  // Server response fields per item: id, wiki_slug, wiki_title,
-  // submitted_by (discord_username), submitted_at, vote_count,
-  // recent_voters ([{discord_id, discord_username}]), has_voted
   function renderList(items) {
     if (!items || !items.length) {
       $list.innerHTML = `<div class="wl-empty">
-        No pending requests yet.
+        Nothing here yet.
         <a href="/submit" style="color:var(--sage)">Be the first to suggest someone!</a>
       </div>`;
       return;
     }
 
     $list.innerHTML = items.map((item, idx) => {
-      const rank  = idx + 1;
-      const when  = _timeAgo(item.submitted_at);
-      const by    = item.submitted_by || '?';
+      const rank     = idx + 1;
+      const when     = _timeAgo(item.submitted_at);
+      const by       = item.submitted_by || '?';
+      const wikiSlug = item.wiki_slug || '';
+      const wikiLink = wikiSlug
+        ? `<a class="wiki-link" href="https://en.wikipedia.org/wiki/${encodeURIComponent(wikiSlug)}" target="_blank" rel="noopener" style="font-size:.68rem;color:var(--sage);text-decoration:none;">↗ Wikipedia</a>`
+        : '';
+      const portrait = item.thumbnail_url
+        ? `<img src="${_esc(item.thumbnail_url)}" alt="" loading="lazy" onerror="this.style.display='none'">`
+        : '';
+
+      if (item.status === 'approved') {
+        const approvedWhen = item.approved_at ? _timeAgo(item.approved_at) : '';
+        return `
+          <div class="wl-row" data-id="${item.id}">
+            <div class="wl-rank">${rank}</div>
+            <div class="wl-portrait">${portrait}</div>
+            <div class="wl-meta">
+              <div class="wl-name">${_esc(item.wiki_title)}</div>
+              <div class="wl-desc">by @${_esc(by)} · ${when}${wikiLink ? ' · ' + wikiLink : ''}</div>
+            </div>
+            <div class="wl-votes">
+              <div class="n" style="font-size:.7rem;color:var(--sage);font-weight:700;">✓</div>
+              <div class="lbl">approved${approvedWhen ? ' ' + approvedWhen : ''}</div>
+            </div>
+          </div>`;
+      }
 
       let btnHtml;
       if (!_user) {
@@ -90,10 +112,10 @@
       return `
         <div class="wl-row" data-id="${item.id}">
           <div class="wl-rank">${rank}</div>
-          <div class="wl-portrait"><img id="portrait-${item.id}" src="" alt="" onerror="this.style.display='none'"></div>
+          <div class="wl-portrait">${portrait}</div>
           <div class="wl-meta">
             <div class="wl-name">${_esc(item.wiki_title)}</div>
-            <div class="wl-desc">by @${_esc(by)} · ${when}</div>
+            <div class="wl-desc">by @${_esc(by)} · ${when}${wikiLink ? ' · ' + wikiLink : ''}</div>
           </div>
           <div class="wl-votes">
             <div class="n" id="vc-${item.id}">${item.vote_count}</div>
@@ -109,7 +131,6 @@
   }
 
   // ── vote handler ───────────────────────────────────────────────────────────
-  // Server toggles automatically — no need to send action field.
   async function onVoteClick(e) {
     const btn    = e.currentTarget;
     const action = btn.dataset.action;
@@ -145,38 +166,32 @@
     }
   }
 
-  // ── wikipedia thumbnails ───────────────────────────────────────────────────
-  async function loadPortraits(items) {
-    await Promise.all(items.map(async item => {
-      const $img = document.getElementById('portrait-' + item.id);
-      if (!$img) return;
-      try {
-        const r = await fetch(
-          'https://en.wikipedia.org/api/rest_v1/page/summary/' + encodeURIComponent(item.wiki_slug),
-          { headers: { Accept: 'application/json' } }
-        );
-        if (!r.ok) return;
-        const data = await r.json();
-        const src = data.thumbnail && data.thumbnail.source;
-        if (src) $img.src = src;
-      } catch (_) {}
-    }));
+  // ── sort buttons ───────────────────────────────────────────────────────────
+  function initSortButtons() {
+    document.querySelectorAll('.wl-sort-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        _sort = btn.dataset.sort;
+        document.querySelectorAll('.wl-sort-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        loadList();
+      });
+    });
   }
 
   // ── load wishlist ──────────────────────────────────────────────────────────
   async function loadList() {
+    $list.innerHTML = '<div class="wl-empty">Loading…</div>';
     try {
-      const r = await fetch('/api/requests/wishlist', { credentials: 'same-origin' });
+      const r = await fetch(`/api/requests/wishlist?sort=${_sort}`, { credentials: 'same-origin' });
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const data = await r.json();
-      const items = data.requests || [];
-      renderList(items);
-      loadPortraits(items);
+      renderList(data.requests || []);
     } catch (_) {
       $list.innerHTML = '<div class="wl-empty">Failed to load — please refresh.</div>';
     }
   }
 
   // ── init ───────────────────────────────────────────────────────────────────
+  initSortButtons();
   loadUser().then(loadList);
 })();

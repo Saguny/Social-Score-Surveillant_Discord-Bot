@@ -10,15 +10,16 @@ class GachaRequestsMixin:
         discord_username: str,
         wiki_slug: str,
         wiki_title: str,
+        thumbnail_url: str = "",
     ) -> int:
         try:
             row = await self._pool.fetchrow(
                 """
-                INSERT INTO gacha_requests (discord_id, discord_username, wiki_slug, wiki_title, submitted_at)
-                VALUES ($1, $2, $3, $4, $5)
+                INSERT INTO gacha_requests (discord_id, discord_username, wiki_slug, wiki_title, submitted_at, thumbnail_url)
+                VALUES ($1, $2, $3, $4, $5, $6)
                 RETURNING id
                 """,
-                discord_id, discord_username, wiki_slug, wiki_title, int(time.time()),
+                discord_id, discord_username, wiki_slug, wiki_title, int(time.time()), thumbnail_url,
             )
         except asyncpg.UniqueViolationError:
             raise ValueError("already_requested")
@@ -106,6 +107,22 @@ class GachaRequestsMixin:
                 LIMIT $1
                 """,
                 limit,
+            )
+        return [dict(r) for r in rows]
+
+    async def get_approved_requests(self, limit: int = 20) -> list[dict]:
+        cutoff = int(time.time()) - 30 * 86400
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT id, wiki_slug, wiki_title, discord_username, submitted_at,
+                       reviewed_at, thumbnail_url
+                FROM gacha_requests
+                WHERE status = 'approved' AND reviewed_at >= $2
+                ORDER BY reviewed_at DESC
+                LIMIT $1
+                """,
+                limit, cutoff,
             )
         return [dict(r) for r in rows]
 

@@ -615,3 +615,4 @@ class Database(
             await conn.execute("ALTER TABLE gacha_requests ADD COLUMN IF NOT EXISTS override_rarity TEXT DEFAULT NULL")
             await conn.execute("ALTER TABLE gacha_requests ADD COLUMN IF NOT EXISTS override_gender TEXT DEFAULT NULL")
             await conn.execute("ALTER TABLE gacha_requests ADD COLUMN IF NOT EXISTS override_image_urls TEXT[] DEFAULT ARRAY[]::TEXT[]")
+            await conn.execute("ALTER TABLE gacha_requests ADD COLUMN IF NOT EXISTS thumbnail_url TEXT NOT NULL DEFAULT ''")

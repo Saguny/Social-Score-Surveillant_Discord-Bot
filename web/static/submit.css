@@ -154,6 +154,17 @@
 .submit-btn:disabled { opacity: .4; cursor: not-allowed; }
 .submit-hint { font-size: .72rem; color: var(--grey); text-align: center; margin-top: .45rem; }
 
+/* Wishlist sort bar */
+.wl-sort-bar { display: flex; gap: .4rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.wl-sort-btn {
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: 5px; color: var(--text-muted); font-size: .75rem;
+  font-weight: 600; letter-spacing: .5px; text-transform: uppercase;
+  padding: .35rem .85rem; cursor: pointer; transition: background .15s, color .15s, border-color .15s;
+}
+.wl-sort-btn:hover { background: var(--bg-recessed); color: var(--cream); }
+.wl-sort-btn.active { background: var(--slate); border-color: var(--sage); color: var(--cream); }
+
 /* Wishlist page */
 .wl-row {
   background: var(--bg-panel); border: 1px solid var(--border);
