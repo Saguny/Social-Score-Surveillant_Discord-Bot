@@ -268,6 +268,7 @@ async def _handle_discord_callback(request):
         max_age=_DISCORD_SESSION_TTL,
         path="/",
     )
+    response.headers["Cache-Control"] = "no-store"
     raise response
 
 
@@ -278,7 +279,12 @@ async def _handle_discord_logout(request):
     next_url  = request.rel_url.query.get("next", "")
     next_safe = next_url if (next_url.startswith("/social-credit/") or next_url == "/social-credit") else "/social-credit/wishlist"
     response  = web.HTTPFound(next_safe)
-    response.del_cookie("discord_auth", path="/")
+    response.set_cookie(
+        "discord_auth", "",
+        max_age=0, path="/",
+        secure=True, httponly=True, samesite="Lax",
+    )
+    response.headers["Cache-Control"] = "no-store"
     raise response
 
 
