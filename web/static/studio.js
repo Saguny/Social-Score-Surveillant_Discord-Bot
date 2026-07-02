@@ -47,14 +47,13 @@
   cardEl.addEventListener('mouseenter', function () { overCard = true; });
   cardEl.addEventListener('mouseleave', function () { overCard = false; });
   document.querySelectorAll('.avatar-wrap').forEach(function (wrap) {
-    var img = wrap.querySelector('.avatar');
     wrap.addEventListener('mousemove', function (e) {
       var rect = wrap.getBoundingClientRect();
       var dx = (e.clientX - (rect.left + rect.width  / 2)) / (rect.width  / 2);
       var dy = (e.clientY - (rect.top  + rect.height / 2)) / (rect.height / 2);
-      img.style.transform = 'translate(' + (dx * 4).toFixed(1) + 'px, ' + (dy * 4).toFixed(1) + 'px)';
+      wrap.style.transform = 'translate(' + (dx * 4).toFixed(1) + 'px, ' + (dy * 4).toFixed(1) + 'px)';
     });
-    wrap.addEventListener('mouseleave', function () { img.style.transform = ''; });
+    wrap.addEventListener('mouseleave', function () { wrap.style.transform = ''; });
   });
 
   var influence = 260;
