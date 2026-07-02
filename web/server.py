@@ -2149,7 +2149,14 @@ async def start_web_server(db):
     app.router.add_post("/api/account/portfolio/turbo/close",     _rate_limit_public(_handle_portfolio_turbo_close))
     app.router.add_post("/webhooks/topgg", _handle_topgg_webhook)
     app.router.add_get("/robots.txt", _handle_robots)
-    app.router.add_static('/static', Path(__file__).parent / 'static', name='static')
+    _STATIC_DIR = Path(__file__).parent / 'static'
+    async def _handle_static(request: web.Request) -> web.Response:
+        filename = request.match_info['filename']
+        filepath = (_STATIC_DIR / filename).resolve()
+        if not str(filepath).startswith(str(_STATIC_DIR.resolve())) or not filepath.is_file():
+            raise web.HTTPNotFound()
+        return web.FileResponse(filepath, headers={'Cache-Control': 'no-store'})
+    app.router.add_get('/static/{filename:.+}', _handle_static)
 
     if using_fallback_salt():
         print("[web] WARNING: PSEUDONYM_SALT is not set - public stats are using a default, predictable salt. Set PSEUDONYM_SALT to a random secret.")
