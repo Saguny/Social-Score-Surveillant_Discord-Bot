@@ -179,9 +179,6 @@ nav a:hover::after { transform: scaleX(1); }
   margin-bottom: 1.875rem;
   width: fit-content;
 }
-@keyframes pride-spin {
-  to { transform: rotate(360deg); }
-}
 .avatar {
   display: block;
   width: 66px;
