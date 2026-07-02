@@ -319,6 +319,35 @@ async function loadVoteChart(period) {
 
 // ── Requests (character submission review) ────────────────────────────────────
 
+async function loadSubmitSettings() {
+  const r = await fetch('/api/admin/submit-settings');
+  if (!r.ok) return;
+  const data = await r.json();
+  const el = document.getElementById('submit-limit-val');
+  if (el) el.value = data.submit_daily_limit ?? 25;
+}
+
+async function saveSubmitLimit() {
+  const el  = document.getElementById('submit-limit-val');
+  const res = document.getElementById('submit-limit-result');
+  const val = parseInt(el?.value, 10);
+  if (!el || isNaN(val) || val < 1 || val > 1000) {
+    if (res) { res.style.color = 'var(--red)'; res.textContent = 'Enter a number between 1 and 1000.'; }
+    return;
+  }
+  const r = await fetch('/api/admin/submit-settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ submit_daily_limit: val }),
+  });
+  const body = await r.json().catch(() => ({}));
+  if (r.ok) {
+    if (res) { res.style.color = 'var(--green)'; res.textContent = `Saved — limit is now ${val}/day.`; }
+  } else {
+    if (res) { res.style.color = 'var(--red)'; res.textContent = 'Error: ' + (body.error || r.status); }
+  }
+}
+
 let _reqSort = 'votes';
 
 function setReqSort(sort) {

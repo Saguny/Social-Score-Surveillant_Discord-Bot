@@ -71,6 +71,13 @@
         </div>
       </div>
 
+      <div class="card-panel px-3 py-2 mb-3 d-flex align-items-center gap-3" style="font-size:.82rem">
+        <span style="color:var(--text-muted);white-space:nowrap">Daily submit limit</span>
+        <input type="number" id="submit-limit-val" class="form-control form-control-sm" min="1" max="1000" style="width:90px" placeholder="25">
+        <button class="btn btn-run btn-sm px-3" onclick="saveSubmitLimit()">SAVE</button>
+        <span id="submit-limit-result" style="color:var(--text-muted)"></span>
+      </div>
+
       <div id="req-list" class="mb-3">
         <div style="color:var(--text-muted);font-size:.82rem;padding:.5rem 0">Loading…</div>
       </div>
@@ -319,6 +326,7 @@
   // Init on the active tab immediately, lazy-load the rest
   loadVoteChart('7D');
   loadPendingRequests();
+  loadSubmitSettings();
 
   // Lazy per-tab init
   document.querySelectorAll('[data-bs-toggle="tab"]').forEach(tab => {

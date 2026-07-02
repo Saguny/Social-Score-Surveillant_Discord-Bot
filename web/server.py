@@ -294,8 +294,16 @@ async def _handle_discord_logout(request):
 _WIKI_UA   = "SocialCreditBot/2.0 (https://discord.gg/invite/k4W6YAPYhC; character request portal)"
 _WIKI_LANGS = ["en", "de", "fr", "es", "ja", "ko", "pt", "ru", "zh", "it", "pl", "nl"]
 
-_SUBMIT_DAILY_LIMIT = 3
+_SUBMIT_DAILY_LIMIT = 25
+_SUBMIT_LIMIT_KEY   = "config:submit_daily_limit"
 _REQUEST_BODY_LIMIT = 4096
+
+async def _get_submit_limit() -> int:
+    raw = await cache_get(_SUBMIT_LIMIT_KEY)
+    try:
+        return int(raw) if raw is not None else _SUBMIT_DAILY_LIMIT
+    except (ValueError, TypeError):
+        return _SUBMIT_DAILY_LIMIT
 
 _PERSON_KEYWORDS = {
     "born", "died", "politician", "singer", "actor", "actress", "musician",
@@ -495,8 +503,9 @@ async def _handle_requests_submit(request):
         return web.json_response({"error": "Your account is not eligible to submit requests."}, status=403)
 
     count_today = await db.get_user_request_count_today(discord_id)
-    if count_today >= _SUBMIT_DAILY_LIMIT:
-        return web.json_response({"error": f"Daily limit of {_SUBMIT_DAILY_LIMIT} new requests reached."}, status=429)
+    submit_limit = await _get_submit_limit()
+    if count_today >= submit_limit:
+        return web.json_response({"error": f"Daily limit of {submit_limit} new requests reached."}, status=429)
 
     slug = _normalize_slug(title)
 
@@ -1351,6 +1360,23 @@ async def _handle_admin_requests_edit(request):
     return web.json_response({"ok": True})
 
 
+async def _handle_admin_get_submit_settings(request):
+    limit = await _get_submit_limit()
+    return web.json_response({"submit_daily_limit": limit})
+
+
+async def _handle_admin_set_submit_settings(request):
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "Invalid JSON"}, status=400)
+    value = body.get("submit_daily_limit")
+    if not isinstance(value, int) or isinstance(value, bool) or value < 1 or value > 1000:
+        return web.json_response({"error": "submit_daily_limit must be an integer between 1 and 1000"}, status=400)
+    await cache_set(_SUBMIT_LIMIT_KEY, str(value))
+    return web.json_response({"ok": True, "submit_daily_limit": value})
+
+
 async def _handle_admin_requests_approve(request):
     """SSE endpoint — streams approval pipeline stages to the admin panel."""
     try:
@@ -2137,6 +2163,8 @@ async def start_web_server(db):
     app.router.add_post("/api/admin/requests/reject",     _require_admin(_handle_admin_requests_reject))
     app.router.add_post("/api/admin/requests/ban",        _require_admin(_handle_admin_requests_ban))
     app.router.add_post("/api/admin/requests/edit",       _require_admin(_handle_admin_requests_edit))
+    app.router.add_get("/api/admin/submit-settings",      _require_admin(_handle_admin_get_submit_settings))
+    app.router.add_post("/api/admin/submit-settings",     _require_admin(_handle_admin_set_submit_settings))
     app.router.add_get("/social-credit/account",      _rate_limit_public(_handle_account_page))
     app.router.add_get("/api/account",  _rate_limit_public(_handle_account_api))
     app.router.add_get("/api/account/portfolio",                  _rate_limit_public(_handle_portfolio_data))
