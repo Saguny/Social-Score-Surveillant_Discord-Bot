@@ -14,10 +14,12 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
+    background-color: rgba(0, 0, 0, 0.6);
     justify-content: center;
     align-items: center;
     display: flex;
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
 }
 
 .overlay {
@@ -56,8 +58,31 @@
     font-size: 1.5em;
 }
 
+.overlay-link {
+    margin: 20px 0 30px;
+    font-size: 1.5em;
+    color: var(--highlight);
+}
+
 .button-row {
     gap: 10px;
     display: flex;
     flex-direction: row-reverse;
+}
+
+.button-theme {
+    width: 200px;
+    padding: 10px;
+    text-align: center;
+    border-radius: 5px;
+    background-color: var(--primary);
+    color: var(--text);
+    text-decoration: none;
+    font-size: 2em;
+}
+
+.button-theme-row {
+    margin-top: 20px;
+    display: flex;
+    gap: 10px;
 }

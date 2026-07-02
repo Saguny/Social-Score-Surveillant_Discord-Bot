@@ -14,9 +14,22 @@
         <div class="overlay">
             <h1 class="overlay-title">THEME</h1>
             <p class="overlay-text">Choose your theme:</p>
-            <a class="button-theme">CCP</a>
+            <div class="button-theme-row">
+                <a class="button-theme">CCP</a>
+            </div>
             <div class="button-row">
                 <a class="button-primary" (click)="close()">Close</a>
+            </div>
+        </div>
+        } @else if (state.type === 'link') {
+        <div class="overlay">
+            <h1 class="overlay-title">{{ state.title }}</h1>
+            <p class="overlay-text">You are being redirected to the following link:</p>
+            <p class="overlay-link">{{ state.link!.split('/')[0] + '//' + state.link!.split('/')[2] + "/" }}</p>
+            <p class="overlay-text">Are you sure you want to proceed?</p>
+            <div class="button-row">
+                <a class="button-secondary" [href]="state.link" target="_blank">Confirm</a>
+                <a class="button-primary" (click)="close()">Cancel</a>
             </div>
         </div>
         }

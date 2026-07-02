@@ -16,3 +16,6 @@ scripts/backup_db.sh
 .github/workflows/deploy.yml
 Dockerfile
 docker-compose.yml
+frontend/.angular
+frontend/node_modules
+frontend/.vscode

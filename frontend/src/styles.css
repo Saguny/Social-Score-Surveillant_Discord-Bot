@@ -83,3 +83,16 @@ a:hover {
     margin: 10px 0;
     border: 3px solid var(--border);
 }
+
+.button-secondary:hover {
+    font-size: 1.2em;
+    background-color: var(--background-top);
+    color: var(--highlight);
+    padding: 5px 10px;
+    border-radius: 10px;
+    text-decoration: none;
+    display: inline-block;
+    margin: 10px 0;
+    border: 3px solid var(--highlight);
+    text-decoration: none;
+}
