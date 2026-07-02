@@ -1,4 +1,4 @@
-const next = new URLSearchParams(location.search).get("next") || "/";
+const next = new URLSearchParams(location.search).get("next") || "/social-credit/admin";
 document.getElementById("form").addEventListener("submit", async e => {
   e.preventDefault();
   const res = await fetch("/api/auth", {

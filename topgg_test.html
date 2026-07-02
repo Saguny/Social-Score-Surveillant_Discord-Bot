@@ -1,0 +1,479 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=VT323&family=Press+Start+2P&family=Noto+Sans+SC:wght@400&display=swap');
+
+body{background:#0a0000 !important}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;background-image:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(180,0,0,0.04) 2px,rgba(180,0,0,0.04) 4px)}
+
+[class*="button-primary"]{background-color:#cc0000 !important;background-image:none !important;color:#ffff00 !important;border:2px solid #ff6666 !important;border-radius:4px !important;font-family:'Press Start 2P',monospace !important;letter-spacing:1px !important;box-shadow:0 0 14px rgba(204,0,0,0.6) !important;transition:transform .2s ease,box-shadow .2s ease !important}
+[class*="button-primary"] svg{color:#ffff00 !important}
+[class*="button-primary"]:hover{background-color:#ff0000 !important;background-image:none !important;transform:translateY(-2px) scale(1.04) !important;box-shadow:0 0 10px rgba(255,255,0,0.7),0 0 24px rgba(255,0,0,0.7) !important}
+[class*="button-primary"]:active{transform:translateY(0) scale(0.97) !important}
+[class*="button-default"]{background-color:#110000 !important;background-image:none !important;color:#ff6666 !important;border:2px solid #ff4444 !important;border-radius:4px !important;transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease,color .2s ease !important}
+[class*="button-default"]:hover{color:#ffaaaa !important;border-color:#ff8888 !important;transform:translateY(-2px) scale(1.04) !important;box-shadow:0 0 16px rgba(255,68,68,0.6) !important}
+[class*="button-default"]:active{transform:translateY(0) scale(0.97) !important}
+[class*="text-brand"]{color:#d4af37 !important}
+[class*="bg-brand"]{background-color:#cc0000 !important;background-image:none !important}
+[class*="border-brand"]{border-color:#cc0000 !important}
+[class*="ring-brand"]{--tw-ring-color:#cc0000 !important}
+::selection{background:#cc0000;color:#ffff00}
+
+/* ── base ── */
+.scb *{box-sizing:border-box;margin:0;padding:0}
+.scb{background:#0a0000;background-image:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(180,0,0,0.03) 2px,rgba(180,0,0,0.03) 4px);color:#fff;font-family:'VT323',monospace}
+.cjk{font-family:'Noto Sans SC','Microsoft YaHei','SimHei',sans-serif;letter-spacing:1px}
+
+/* ── marquee ── */
+.scb .marquee-wrap{background:#cc0000;padding:5px 0;overflow:hidden;white-space:nowrap;border-top:3px ridge #ff6666;border-bottom:3px ridge #ff6666}
+.scb .marquee-inner{display:inline-block;white-space:nowrap;animation:scrl 24s linear infinite;color:#ffff00;font-family:'VT323',monospace;font-size:17px;letter-spacing:2px}
+@keyframes scrl{from{transform:translateX(110%)}to{transform:translateX(-100%)}}
+
+/* ── animations ── */
+.scb .blink{animation:bl 0.9s step-end infinite}
+@keyframes bl{50%{visibility:hidden}}
+.scb .twinkle{animation:tw 2s ease-in-out infinite alternate}
+@keyframes tw{from{opacity:0.5}to{opacity:1}}
+
+/* ── layout ── */
+.scb .divider{height:6px;background:repeating-linear-gradient(90deg,#cc0000 0,#cc0000 10px,#ffff00 10px,#ffff00 20px)}
+.scb .section{padding:28px 20px;border-bottom:2px solid #1a0000}
+.scb .sh{font-family:'VT323',monospace;font-size:clamp(22px,5vw,34px);color:#ff4444;text-align:center;letter-spacing:4px;margin-bottom:18px;text-shadow:0 0 12px rgba(255,0,0,0.4)}
+
+/* ── buttons ── */
+.scb .btn{display:inline-block;padding:12px 24px;margin:4px;font-family:'Press Start 2P',monospace;font-size:10px;letter-spacing:1px;text-decoration:none;cursor:pointer;line-height:1.4}
+.scb .btn-red{background:#cc0000;color:#ffff00;border-top:3px solid #ff6666;border-left:3px solid #ff6666;border-bottom:3px solid #550000;border-right:3px solid #550000;text-shadow:1px 1px #550000}
+.scb .btn-dark{background:#110000;color:#ff8888;border-top:3px solid #ff4444;border-left:3px solid #ff4444;border-bottom:3px solid #330000;border-right:3px solid #330000}
+
+/* ── gameplay loop steps ── */
+.scb .loop-wrap{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:6px;margin-top:18px}
+.scb .loop-step{font-family:'Press Start 2P',monospace;font-size:clamp(7px,1.8vw,9px);color:#ffdd66;background:#1a0000;border:1px solid #550000;padding:8px 10px;letter-spacing:0.5px;line-height:1.6;text-align:center;white-space:nowrap}
+.scb .loop-arrow{color:#ff4444;font-size:16px;padding:0 1px;flex-shrink:0}
+
+/* ── score feed ── */
+.scb .feed{font-family:'VT323',monospace;font-size:clamp(15px,3.5vw,19px);max-width:520px;margin:0 auto;border:2px inset #440000;background:#060000;padding:16px 20px;line-height:1.3;display:flex;flex-direction:column;gap:6px}
+.scb .feed .pos{color:#55ff99}
+.scb .feed .neg{color:#ff5555}
+.scb .feed .sys{color:#ffbb33}
+.scb .feed .dim{color:#aa8866}
+.scb .feed .sep{border-top:1px solid #220000;margin:8px 0}
+
+/* ── moment cards ── */
+.scb .moments{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(280px,100%),1fr));gap:14px}
+.scb .moment-card{border-left:4px solid #cc0000;background:#0e0000;padding:14px 16px}
+.scb .moment-card.gold{border-left-color:#cc9900;background:#0b0900}
+.scb .moment-card.green{border-left-color:#226622;background:#050d05}
+.scb .moment-card.blue{border-left-color:#224488;background:#03050f}
+.scb .mc-tag{font-family:'Press Start 2P',monospace;font-size:clamp(7px,1.8vw,9px);color:#ff7777;letter-spacing:0.5px;margin-bottom:10px;line-height:1.6}
+.scb .moment-card.gold .mc-tag{color:#ffbb44}
+.scb .moment-card.green .mc-tag{color:#55cc55}
+.scb .moment-card.blue .mc-tag{color:#5599dd}
+.scb .mc-body{font-family:'VT323',monospace;font-size:clamp(15px,3vw,18px);color:#cc8877;line-height:1.6}
+.scb .mc-body b{color:#ffddcc;font-weight:normal}
+.scb .moment-card.gold .mc-body{color:#bbaa66}
+.scb .moment-card.gold .mc-body b{color:#ffdd88;font-weight:normal}
+.scb .moment-card.green .mc-body{color:#66aa66}
+.scb .moment-card.green .mc-body b{color:#88ee88;font-weight:normal}
+.scb .moment-card.blue .mc-body{color:#6688bb}
+.scb .moment-card.blue .mc-body b{color:#88bbee;font-weight:normal}
+
+/* ── screenshots ── */
+.scb .ss-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(280px,100%),1fr));gap:14px}
+.scb .ss-slot{border:2px ridge #330000;background:#080000;overflow:hidden;display:flex;flex-direction:column}
+.scb .ss-slot img{width:100%;height:auto;display:block;object-fit:cover}
+.scb .ss-label{font-family:'Press Start 2P',monospace;font-size:9px;color:#884444;letter-spacing:2px;text-align:center;padding:8px;background:#060000;border-top:1px solid #220000}
+
+/* ── feature checklist ── */
+.scb .check-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(200px,100%),1fr));gap:6px 24px;max-width:740px;margin:0 auto}
+.scb .check-item{font-family:'VT323',monospace;font-size:clamp(16px,3.2vw,19px);color:#ddaa88;padding:4px 0;line-height:1.4}
+.scb .check-item::before{content:'+ ';color:#ff3333;font-family:'Press Start 2P',monospace;font-size:9px}
+
+/* ── comparison table ── */
+.scb .cmp-table{width:100%;border-collapse:collapse;border:2px ridge #440000;font-family:'VT323',monospace;max-width:680px;margin:0 auto}
+.scb .cmp-table th{background:#150000;color:#ff5555;font-family:'Press Start 2P',monospace;font-size:clamp(8px,1.8vw,10px);padding:12px 16px;text-align:left;border-bottom:2px solid #440000}
+.scb .cmp-table td{padding:10px 16px;border-bottom:1px solid #1a0000;font-size:clamp(15px,3vw,18px);line-height:1.4}
+.scb .cmp-table tr:nth-child(even) td{background:#080000}
+.scb .cmp-table tr:nth-child(odd) td{background:#0d0000}
+.scb .cmp-them{color:#664444}
+.scb .cmp-us{color:#ffcc77}
+
+/* ── rank progression ── */
+.scb .rank-prog{display:flex;flex-direction:column;align-items:center;gap:0;max-width:380px;margin:0 auto;font-family:'VT323',monospace}
+.scb .rp-item{width:100%;text-align:center;padding:10px 18px;border:1px solid #220000;font-size:clamp(16px,3.2vw,20px)}
+.scb .rp-arrow{color:#440000;font-size:20px;line-height:1.2}
+.scb .rp-start{background:#0f0300;color:#cc7700}
+.scb .rp-mid{background:#0a0a00;color:#bbbb44}
+.scb .rp-high{background:#000f00;color:#55bb55}
+.scb .rp-top{background:#0c0900;color:#ffdd44;border-color:#665500;font-family:'Press Start 2P',monospace;font-size:clamp(8px,1.8vw,10px);padding:12px 18px;line-height:1.8}
+.scb .rp-exec{background:#0f0000;color:#ff4444;border-color:#440000}
+
+/* ── why keep playing ── */
+.scb .hooks-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(160px,100%),1fr));gap:10px;max-width:780px;margin:0 auto}
+.scb .hook{border:1px solid #2a0000;background:#0a0000;padding:14px;text-align:center}
+.scb .hook-title{font-family:'Press Start 2P',monospace;font-size:clamp(7px,1.6vw,9px);color:#ff7700;margin-bottom:8px;line-height:1.6}
+.scb .hook-body{font-family:'VT323',monospace;font-size:clamp(14px,2.8vw,16px);color:#bb9977;line-height:1.5}
+
+/* ── AI comparison ── */
+.scb .ai-compare{display:flex;gap:20px;justify-content:center;flex-wrap:wrap;align-items:stretch;margin-top:8px}
+.scb .ai-col{flex:1 1 240px;max-width:320px;display:flex;flex-direction:column}
+.scb .ai-col .feed{flex:1}
+.scb .ai-col-label{font-family:'Press Start 2P',monospace;font-size:clamp(7px,1.8vw,9px);color:#554444;margin-bottom:12px;letter-spacing:1px;text-align:center}
+.scb .ai-col-label.us{color:#cc5500}
+
+/* ── footer ── */
+.scb .footer{background:#060000;border-top:4px ridge #cc0000;padding:28px 18px;text-align:center}
+.scb .table-wrap{overflow-x:auto;width:100%}
+
+/* ── responsive ── */
+@media(max-width:600px){
+  .scb .loop-step{font-size:7px;padding:6px 8px}
+  .scb .loop-arrow{font-size:13px}
+  .scb .moment-card{flex:1 1 100%;max-width:100%}
+  .scb .ss-grid{grid-template-columns:1fr 1fr}
+  .scb .btn{padding:10px 14px;font-size:9px}
+  .scb .cmp-table th{font-size:8px;padding:8px 10px}
+  .scb .cmp-table td{font-size:14px;padding:8px 10px}
+}
+@media(max-width:420px){
+  .scb .loop-wrap{gap:4px}
+  .scb .loop-step{font-size:6px;padding:5px 6px}
+  .scb .ss-grid{grid-template-columns:1fr}
+}
+</style>
+
+<div class="scb">
+
+<!-- ══════════════════════════════════════ HERO -->
+<div style="background:#0f0000;text-align:center;padding:36px 16px 28px;border-bottom:4px ridge #cc0000">
+  <div style="font-size:clamp(13px,2.5vw,16px);letter-spacing:3px;margin-bottom:12px;color:#cc6600" class="cjk">&#20013;&#21326;&#20154;&#27665;&#20849;&#21644;&#22269;&#31038;&#20250;&#20449;&#29992;&#23616;</div>
+  <div style="font-family:'Press Start 2P',monospace;font-size:clamp(14px,5vw,26px);color:#ff0000;text-shadow:3px 3px #ffff00,-2px -2px #550000;letter-spacing:2px;line-height:1.6">SOCIAL<br>CREDIT SURVEILLANT</div>
+  <div style="margin-top:18px;font-family:'VT323',monospace;font-size:clamp(18px,4.5vw,24px);color:#ffeeaa;max-width:620px;margin-left:auto;margin-right:auto;line-height:1.5;padding:0 8px">
+    Every message changes your Social Credit.<br>
+    Every citizen competes. Every server climbs the rankings.
+  </div>
+  <div style="margin-top:8px;font-family:'VT323',monospace;font-size:clamp(14px,3vw,17px);color:#aa6655;max-width:500px;margin-left:auto;margin-right:auto">A sentiment-scored social credit game where your Discord becomes its own tiny dystopia.</div>
+
+  <div class="loop-wrap">
+    <div class="loop-step">CHAT</div>
+    <div class="loop-arrow">&#9658;</div>
+    <div class="loop-step">SCORED BY<br>SENTIMENT</div>
+    <div class="loop-arrow">&#9658;</div>
+    <div class="loop-step">EARN<br>YUAN</div>
+    <div class="loop-arrow">&#9658;</div>
+    <div class="loop-step">BUY<br>ITEMS</div>
+    <div class="loop-arrow">&#9658;</div>
+    <div class="loop-step">TRADE<br>STOCKS</div>
+    <div class="loop-arrow">&#9658;</div>
+    <div class="loop-step">UNLOCK<br>ACHIEVEMENTS</div>
+    <div class="loop-arrow">&#9658;</div>
+    <div class="loop-step">COMPETE<br>GLOBALLY</div>
+  </div>
+
+  <div style="margin-top:24px">
+    <a class="btn btn-red" href="https://discord.com/oauth2/authorize?client_id=856163780265902151&permissions=2416438352&integration_type=0&scope=bot">+ ADD TO DISCORD</a>
+    <a class="btn btn-dark" href="https://discord.gg/invite/k4W6YAPYhC">SUPPORT SERVER</a>
+  </div>
+  <div style="margin-top:10px;font-family:'VT323',monospace;font-size:clamp(14px,2.5vw,16px);color:#664433">Join the support server for a permanent +15% Yuan per message</div>
+</div>
+
+<!-- MARQUEE -->
+<div class="marquee-wrap">
+  <div class="marquee-inner">&#10022; GLORY TO THE CCP &#10022; THE BUREAU IS ALWAYS WATCHING &#10022; YOUR SCORE HAS BEEN UPDATED &#10022; STAY COMPLIANT &#10022; GLORY TO THE ETERNAL CHAIRMAN &#10022; &#20013;&#21326;&#20154;&#27665;&#20849;&#21644;&#22269;&#31038;&#20250;&#20449;&#29992;&#23616; &#10022;</div>
+</div>
+
+<!-- ══════════════════════════════════════ WAIFU BUREAU -->
+<div class="section" style="background:#050010;border-bottom:2px solid #1a001a">
+  <div style="font-family:'Press Start 2P',monospace;font-size:clamp(8px,2vw,11px);color:#cc00ff;text-align:center;letter-spacing:3px;margin-bottom:6px;text-shadow:0 0 12px #9900cc">&#10022; NEW FEATURE &#10022;</div>
+  <div style="font-family:'VT323',monospace;font-size:clamp(26px,7vw,46px);color:#ff44ff;text-align:center;letter-spacing:4px;text-shadow:2px 2px #440044,-1px -1px #ff00ff;margin-bottom:4px">WAIFU BUREAU</div>
+  <div style="font-family:'VT323',monospace;font-size:clamp(13px,2.8vw,17px);color:#cc66cc;text-align:center;letter-spacing:2px;margin-bottom:20px" class="cjk">&#20013;&#21326;&#20154;&#27665;&#20849;&#21644;&#22269; &middot; MINISTRY OF MATRIMONIAL AFFAIRS</div>
+
+  <div style="display:flex;gap:16px;justify-content:center;align-items:flex-start;flex-wrap:wrap;margin-bottom:20px">
+
+    <!-- Napoleon left -->
+    <div style="border:3px ridge #880088;overflow:hidden;width:clamp(130px,26vw,200px);flex-shrink:0;position:relative;background:#080000">
+      <img src="https://i.postimg.cc/mhfF2v25/image.png" style="width:100%;height:clamp(170px,36vw,290px);object-fit:cover;object-position:top;display:block">
+      <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.80);font-family:'VT323',monospace;font-size:clamp(12px,2.2vw,15px);color:#ff88ff;text-align:center;padding:5px 6px;letter-spacing:1px">Napoleon Bonaparte<br><span style="color:#ffff00;font-size:clamp(11px,1.8vw,13px)">THE CONQUERORS &middot; &#9733;&#9733;&#9733;&#9733;</span></div>
+    </div>
+
+    <!-- copy centre -->
+    <div style="flex:1;min-width:190px;max-width:400px;font-family:'VT323',monospace">
+      <div style="font-size:clamp(18px,4.5vw,28px);color:#ff88ff;letter-spacing:2px;margin-bottom:10px;line-height:1.3">Roll historical figures, world leaders &amp; dictators &mdash; and <span style="color:#ffff00">claim them as your own.</span></div>
+      <div style="font-size:clamp(14px,3vw,18px);color:#cc88cc;line-height:1.6;margin-bottom:14px">
+        Just like your favourite gacha bots &mdash; except instead of anime girls, <span style="color:#ff4444">you're marrying Mao Zedong.</span><br><br>
+        400+ rollable figures and many many more coming in the future. Legendary rarities. Per-server harems. Global rankings. Trade, gift, or divorce your political soulmate.
+      </div>
+      <div style="background:#0d000d;border:2px ridge #660066;padding:10px 14px;font-size:clamp(12px,2.3vw,16px);color:#ffaaff;margin-bottom:12px;line-height:2">
+        <span style="color:#ff44ff">ccp roll</span> &nbsp;&middot;&nbsp;
+        <span style="color:#ff44ff">ccp r</span> &nbsp;&middot;&nbsp;
+        <span style="color:#ff44ff">ccp harem</span> &nbsp;&middot;&nbsp;
+        <span style="color:#ff44ff">ccp image [name]</span> &nbsp;&middot;&nbsp;
+        <span style="color:#ff44ff">ccp wish [name]</span> &nbsp;&middot;&nbsp;
+        <span style="color:#ff44ff">ccp trade [name]</span> &nbsp;&middot;&nbsp;
+        <span style="color:#ff44ff">ccp gift [name] [@user]</span>
+      </div>
+      <div style="font-size:clamp(12px,2.3vw,15px);color:#996699">React with any emoji to claim &middot; First reactor wins &middot; Dupes give yuan</div>
+    </div>
+
+    <!-- Kim Jong-un right -->
+    <div style="border:3px ridge #880088;overflow:hidden;width:clamp(130px,26vw,200px);flex-shrink:0;position:relative;background:#080000">
+      <img src="https://i.postimg.cc/XqyCWj3d/image.png" style="width:100%;height:clamp(170px,36vw,290px);object-fit:cover;object-position:top;display:block">
+      <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.80);font-family:'VT323',monospace;font-size:clamp(12px,2.2vw,15px);color:#ff88ff;text-align:center;padding:5px 6px;letter-spacing:1px">Kim Jong-un<br><span style="color:#ffff00;font-size:clamp(11px,1.8vw,13px)">THE REDS &middot; &#9733;&#9733;&#9733;&#9733;&#9733;</span></div>
+    </div>
+
+  </div>
+
+  <div style="text-align:center;font-family:'VT323',monospace;font-size:clamp(14px,3vw,19px);color:#884488;font-style:italic;letter-spacing:1px">
+    "The bureau has approved your marriage to <span style="color:#ffff00">Genghis Khan</span>. The state wishes you a productive union."
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ══════════════════════════════════════ WHAT ACTUALLY HAPPENS -->
+<div class="section" style="text-align:center">
+  <div class="sh">:: WHAT ACTUALLY HAPPENS ::</div>
+  <div style="font-family:'VT323',monospace;font-size:clamp(15px,3vw,18px);color:#886655;margin-bottom:18px">Every message you send goes through this.</div>
+  <div class="feed">
+    <div><span class="pos">+0.27</span>&nbsp;&nbsp;<span class="dim">"productive contribution detected"</span></div>
+    <div><span class="sys">&#9650; Promotion &rarr; Model Citizen</span>&nbsp;&nbsp;<span class="dim">+&yen;1,100 reward</span></div>
+    <div><span class="pos">+&yen;10</span>&nbsp;&nbsp;<span class="dim">message yuan</span></div>
+    <div class="sep"></div>
+    <div><span class="neg">-0.30</span>&nbsp;&nbsp;<span class="dim">"counter-revolutionary sentiment"</span></div>
+    <div><span class="neg">-20.00</span>&nbsp;&nbsp;<span class="dim">denouncement filed by Citizen #4471</span></div>
+    <div><span class="sys">&#9888; Score: 614.70 &rarr; Execution scheduled</span></div>
+    <div><span class="neg">&#9660; Assets confiscated and distributed</span></div>
+  </div>
+  <div style="margin-top:12px;font-family:'VT323',monospace;font-size:clamp(14px,2.8vw,17px);color:#664433">This is running on every message. In every server. Right now.</div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ══════════════════════════════════════ AI DIFFERENTIATOR -->
+<div class="section" style="text-align:center">
+  <div class="sh">:: NOT JUST ANOTHER LEVELING BOT ::</div>
+  <div style="font-family:'VT323',monospace;font-size:clamp(14px,3vw,17px);color:#664433;margin-bottom:14px">Every message is scored by tone, not just length. Positive streaks multiply. Negative messages trigger defense items. The system reads your vibe, not your word count.</div>
+  <div class="ai-compare">
+    <div class="ai-col">
+      <div class="ai-col-label">TYPICAL LEVEL BOT</div>
+      <div class="feed" style="text-align:left">
+        <div><span class="dim">send message</span></div>
+        <div><span class="dim">+XP</span></div>
+        <div><span class="dim">repeat</span></div>
+      </div>
+    </div>
+    <div class="ai-col">
+      <div class="ai-col-label us">SOCIAL CREDIT SURVEILLANT</div>
+      <div class="feed" style="text-align:left">
+        <div><span class="dim">send message</span></div>
+        <div><span class="sys">language detected</span></div>
+        <div><span class="sys">sentiment analyzed</span></div>
+        <div><span class="sys">daily caps + streak bonuses</span></div>
+        <div><span class="pos">credit changes</span></div>
+        <div><span class="sys">rank updates &middot; yuan awarded</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ══════════════════════════════════════ MEMORABLE MOMENTS -->
+<div class="section">
+  <div class="sh">:: MEMORABLE MOMENTS ::</div>
+  <div class="moments">
+    <div class="moment-card">
+      <div class="mc-tag">DENOUNCE YOUR FRIENDS</div>
+      <div class="mc-body">Spend <b>&yen;12,000</b> to publicly dock someone <b>-20.00</b> Social Credit. Their name in a Bureau announcement. Your name redacted. Optional.</div>
+    </div>
+    <div class="moment-card gold">
+      <div class="mc-tag">BEIJING STOCK EXCHANGE</div>
+      <div class="mc-body">Trade real market-inspired securities. Turbo certificates. Circuit breakers. Market hours enforced. <b>Profits feed back into your score.</b></div>
+    </div>
+    <div class="moment-card">
+      <div class="mc-tag">THE EXECUTION LIST</div>
+      <div class="mc-body">Drop below <b>610 Social Credit</b>. Role assigned. Assets confiscated and distributed to every other citizen. <b>Recover. Or don't.</b></div>
+    </div>
+    <div class="moment-card gold">
+      <div class="mc-tag">STATE LOTTERY COMMISSION</div>
+      <div class="mc-body">Spend <b>&yen;250,000</b>. 70% chance to lose everything. 10% jackpot up to <b>&yen;2,000,000</b>. Gift tickets to other citizens. Worth it.</div>
+    </div>
+    <div class="moment-card green">
+      <div class="mc-tag">PROPAGANDA CONTESTS</div>
+      <div class="mc-body">Mods open submission events. Citizens submit quotes. Server votes. Winner becomes a <b>permanent guild decree</b> read by /decree forever.</div>
+    </div>
+    <div class="moment-card blue">
+      <div class="mc-tag">SERVER BRACKET RANKINGS</div>
+      <div class="mc-body">Your whole server earns a score across 6 metrics. Compete only against servers your size. <b>Hamlet through Metropolis.</b></div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ══════════════════════════════════════ SCREENSHOTS -->
+<div class="section">
+  <div class="sh">:: IN ACTION ::</div>
+  <div class="ss-grid">
+    <div class="ss-slot">
+      <img src="https://i.postimg.cc/HndDvKh5/image.png" alt="Citizen Card">
+      <div class="ss-label">CITIZEN CARD</div>
+    </div>
+    <div class="ss-slot">
+      <img src="https://i.postimg.cc/pdJBY6z7/image.png" alt="/guide">
+      <div class="ss-label">/GUIDE</div>
+    </div>
+    <div class="ss-slot">
+      <img src="https://i.postimg.cc/Pf3zBLfT/image.png" alt="/serverrank card">
+      <div class="ss-label">SERVER RANK CARD</div>
+    </div>
+    <div class="ss-slot">
+      <img src="https://i.postimg.cc/9QTdRJGk/image.png" alt="Stock Market">
+      <div class="ss-label">STOCK MARKET</div>
+    </div>
+    <div class="ss-slot">
+      <img src="https://i.postimg.cc/4yN29T0z/image.png" alt="/achievements">
+      <div class="ss-label">ACHIEVEMENTS</div>
+    </div>
+    <div class="ss-slot">
+      <img src="https://i.postimg.cc/76qmFkwc/image.png" alt="/globalrank top">
+      <div class="ss-label">/GLOBALRANK TOP</div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ══════════════════════════════════════ RANK PROGRESSION -->
+<div class="section" style="text-align:center">
+  <div class="sh">:: YOUR PROGRESSION ::</div>
+  <div style="font-family:'VT323',monospace;font-size:clamp(15px,3vw,18px);color:#886655;margin-bottom:18px">Start at 750. Climb. Or don't.</div>
+  <div class="rank-prog">
+    <div class="rp-item rp-exec">&#9888; Enemy of the State &nbsp;&bull;&nbsp; 600&ndash;699</div>
+    <div class="rp-arrow">&#9650;</div>
+    <div class="rp-item rp-start">Person of Interest &nbsp;&bull;&nbsp; 700&ndash;774</div>
+    <div class="rp-arrow">&#9650;</div>
+    <div class="rp-item rp-start" style="color:#ccaa44">Unremarkable Citizen &nbsp;&bull;&nbsp; 775&ndash;849</div>
+    <div class="rp-arrow">&#9650;</div>
+    <div class="rp-item rp-mid">Compliant Citizen &nbsp;&bull;&nbsp; 850&ndash;924</div>
+    <div class="rp-arrow">&#9650;</div>
+    <div class="rp-item rp-mid" style="color:#aabb55">Model Citizen &nbsp;&bull;&nbsp; 925&ndash;999</div>
+    <div class="rp-arrow">&#9650;</div>
+    <div class="rp-item rp-high">Party Loyalist &nbsp;&bull;&nbsp; 1000&ndash;1099</div>
+    <div class="rp-arrow">&#9650;</div>
+    <div class="rp-item rp-high" style="color:#77cc77">Cadre Member &nbsp;&bull;&nbsp; 1100&ndash;1199</div>
+    <div class="rp-arrow">&#9650;</div>
+    <div class="rp-item rp-top">&#9733; &#9733; &#9733; &#9733; &#9733;<br>GENERAL SECRETARY<br>1200&ndash;1300</div>
+  </div>
+  <div style="margin-top:14px;font-family:'VT323',monospace;font-size:clamp(14px,2.8vw,17px);color:#775544">Each promotion pays a Yuan reward. Each demotion deducts one. Rank roles assigned automatically.</div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ══════════════════════════════════════ WHY SERVERS KEEP PLAYING -->
+<div class="section" style="text-align:center">
+  <div class="sh">:: WHY SERVERS KEEP COMING BACK ::</div>
+  <div class="hooks-grid">
+    <div class="hook">
+      <div class="hook-title">DAILY CENSUS</div>
+      <div class="hook-body">Check in every day. Streak bonuses scale up to &yen;2,000 per check-in.</div>
+    </div>
+    <div class="hook">
+      <div class="hook-title">MARKET OPENS</div>
+      <div class="hook-body">Beijing Exchange follows real trading hours. Miss the window, miss the trade.</div>
+    </div>
+    <div class="hook">
+      <div class="hook-title">60+ ACHIEVEMENTS</div>
+      <div class="hook-body">Global. Some secret. Rarity shown as % of all citizens across every server.</div>
+    </div>
+    <div class="hook">
+      <div class="hook-title">SERVER RANKINGS</div>
+      <div class="hook-body">Server vs server competition never resets. The gap compounds over time.</div>
+    </div>
+    <div class="hook">
+      <div class="hook-title">PROPAGANDA EVENTS</div>
+      <div class="hook-body">Submission. Voting. A winner. Recurring and mod-controlled.</div>
+    </div>
+    <div class="hook">
+      <div class="hook-title">CROSS-SERVER PROFILE</div>
+      <div class="hook-body">Score, Yuan, achievements and rank follow you across every server using the Bureau.</div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ══════════════════════════════════════ COMPARISON TABLE -->
+<div class="section" style="text-align:center">
+  <div class="sh">:: VS EVERY OTHER LEVELING BOT ::</div>
+  <div class="table-wrap">
+    <table class="cmp-table">
+      <tr><th>TYPICAL LEVEL BOT</th><th>SOCIAL CREDIT SURVEILLANT</th></tr>
+      <tr><td class="cmp-them">XP per message</td><td class="cmp-us">Sentiment-scored Social Credit per message</td></tr>
+      <tr><td class="cmp-them">Coins</td><td class="cmp-us">Yuan economy with real mechanics</td></tr>
+      <tr><td class="cmp-them">Basic shop</td><td class="cmp-us">Political satire shop &middot; denouncements &middot; shields &middot; lotteries</td></tr>
+      <tr><td class="cmp-them">Roles</td><td class="cmp-us">8 CCP ranks with Yuan rewards per promotion</td></tr>
+      <tr><td class="cmp-them">Server leaderboard only</td><td class="cmp-us">Global cross-server leaderboard</td></tr>
+      <tr><td class="cmp-them">None</td><td class="cmp-us">Beijing Stock Exchange with real market hours</td></tr>
+      <tr><td class="cmp-them">None</td><td class="cmp-us">Server vs server bracket rankings</td></tr>
+      <tr><td class="cmp-them">None</td><td class="cmp-us">Execution list &middot; asset confiscation</td></tr>
+      <tr><td class="cmp-them">None</td><td class="cmp-us">Propaganda submission events</td></tr>
+      <tr><td class="cmp-them">None</td><td class="cmp-us">Visual citizen dossier cards</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ══════════════════════════════════════ FEATURE CHECKLIST -->
+<div class="section" style="text-align:center">
+  <div class="sh">:: WHAT YOU'RE INSTALLING ::</div>
+  <div class="check-grid">
+    <div class="check-item">AI message scoring</div>
+    <div class="check-item">8 party ranks</div>
+    <div class="check-item">60+ global achievements</div>
+    <div class="check-item">Yuan economy</div>
+    <div class="check-item">Server vs server rankings</div>
+    <div class="check-item">Global citizen leaderboard</div>
+    <div class="check-item">Beijing Stock Exchange</div>
+    <div class="check-item">Turbo certificates</div>
+    <div class="check-item">5-tier lottery</div>
+    <div class="check-item">Propaganda events</div>
+    <div class="check-item">Daily check-in streaks</div>
+    <div class="check-item">Visual citizen cards</div>
+    <div class="check-item">Execution list</div>
+    <div class="check-item">30+ shop items</div>
+    <div class="check-item">Fundraisers</div>
+    <div class="check-item">Cross-server profile</div>
+    <div class="check-item">Web dashboard</div>
+    <div class="check-item">Daily reports</div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ══════════════════════════════════════ CTA -->
+<div style="background:#0f0000;text-align:center;padding:40px 16px;border-bottom:4px ridge #cc0000">
+  <div style="font-family:'Press Start 2P',monospace;font-size:clamp(12px,3.5vw,20px);color:#ffdd44;line-height:1.8;text-shadow:2px 2px #550000">Think you can become<br>General Secretary?</div>
+  <div style="margin-top:18px;font-family:'VT323',monospace;font-size:clamp(18px,4vw,24px);color:#cc9944;line-height:1.8">
+    Install the Bureau.<br>
+    Start at <span style="color:#ffff00">750 Social Credit</span>.<br>
+    Don't get executed.
+  </div>
+  <div style="margin-top:24px">
+    <a class="btn btn-red" href="https://discord.com/oauth2/authorize?client_id=856163780265902151&permissions=2416438352&integration_type=0&scope=bot">+ ADD TO DISCORD</a>
+    <a class="btn btn-dark" href="https://discord.gg/invite/k4W6YAPYhC">SUPPORT SERVER</a>
+  </div>
+  <div style="margin-top:16px">
+    <span class="twinkle" style="color:#ffff00;font-size:22px;letter-spacing:8px">&#9733; &#9733; &#9733; &#9733; &#9733;</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════ FOOTER -->
+<div class="footer">
+  <div style="font-size:clamp(13px,2.5vw,16px);color:#552222;letter-spacing:2px;margin-bottom:6px" class="cjk">&#20013;&#21326;&#20154;&#27665;&#20849;&#21644;&#22269;&#31038;&#20250;&#20449;&#29992;&#23616;</div>
+  <div style="font-family:'VT323',monospace;font-size:16px;color:#331111;letter-spacing:3px">GLORY TO THE CCP!</div>
+  <br>
+  <div style="font-size:11px;color:#331111;font-style:italic">This is a satirical meme project &middot; not affiliated with the CCP &middot; /disclaimer</div>
+  <br>
+  <div style="font-size:11px;color:#2a1a1a">Made with &#9829; by saguny &middot; 2026</div>
+</div>
+
+</div>

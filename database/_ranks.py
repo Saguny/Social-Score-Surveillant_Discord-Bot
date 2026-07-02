@@ -19,9 +19,10 @@ class RanksMixin:
                 rank_entered_at = (row["rank_entered_at"] or 0) if row else 0
                 eligible = prior == 0 or (now - rank_entered_at) >= 30 * 86400
                 if eligible:
+                    net, _tax = await self._credit_yuan_taxed(conn, guild_id, user_id, yuan_amount)
                     await conn.execute(
-                        "UPDATE users SET yuan = GREATEST(0, yuan + $1), total_yuan_earned = total_yuan_earned + $1 WHERE guild_id = $2 AND user_id = $3",
-                        yuan_amount, guild_id, user_id,
+                        "UPDATE users SET yuan = GREATEST(0, yuan + $1), total_yuan_earned = total_yuan_earned + $4 WHERE guild_id = $2 AND user_id = $3",
+                        net, guild_id, user_id, yuan_amount,
                     )
                     await conn.execute(
                         "INSERT INTO transactions (guild_id, user_id, item_id, cost, timestamp) VALUES ($1, $2, $3, $4, $5)",
@@ -100,6 +101,21 @@ class RanksMixin:
             guild_id,
         )
         return row["execution_channel_id"] if row else None
+
+    async def get_rank_announcement_channel(self, guild_id):
+        row = await self._pool.fetchrow(
+            "SELECT rank_announcement_channel_id FROM guild_config WHERE guild_id = $1",
+            guild_id,
+        )
+        return row["rank_announcement_channel_id"] if row else None
+
+    async def set_rank_announcement_channel(self, guild_id, channel_id):
+        async with self._pool.acquire() as conn:
+            await self._ensure_guild(conn, guild_id)
+            await conn.execute(
+                "UPDATE guild_config SET rank_announcement_channel_id = $2 WHERE guild_id = $1",
+                guild_id, channel_id,
+            )
 
     async def set_execution_channel(self, guild_id, channel_id):
         async with self._pool.acquire() as conn:

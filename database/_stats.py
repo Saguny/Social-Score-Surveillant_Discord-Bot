@@ -1,5 +1,8 @@
 import time
 import asyncio
+import json
+
+from infra.redis_cache import cache_get, cache_set
 
 
 class StatsMixin:
@@ -40,6 +43,24 @@ class StatsMixin:
             )
         return {"user": user, "history": history}
 
+    async def get_guild_user_rank(self, guild_id: int, user_id: int) -> dict:
+        row = await self._pool.fetchrow(
+            """
+            SELECT
+                COUNT(*) FILTER (WHERE score >= (SELECT score FROM users WHERE guild_id = $1 AND user_id = $2)) AS score_rank,
+                COUNT(*) FILTER (WHERE yuan  >= (SELECT yuan  FROM users WHERE guild_id = $1 AND user_id = $2)) AS yuan_rank,
+                COUNT(*) AS total
+            FROM users
+            WHERE guild_id = $1 AND has_chatted = 1
+            """,
+            guild_id, user_id,
+        )
+        return {
+            "score_rank": int(row["score_rank"]),
+            "yuan_rank":  int(row["yuan_rank"]),
+            "total":      int(row["total"]),
+        }
+
     async def get_score_trend(self, guild_id, user_id, days):
         cutoff = int(time.time()) - (days * 86400)
         rows = await self._pool.fetch(
@@ -47,6 +68,21 @@ class StatsMixin:
             guild_id, user_id, cutoff,
         )
         return round(sum(r["delta"] for r in rows), 2)
+
+    async def get_lifetime_score_stats(self, guild_id: int, user_id: int) -> dict:
+        row = await self._pool.fetchrow(
+            """
+            SELECT
+                COALESCE(SUM(delta) FILTER (WHERE delta > 0), 0) AS total_gained,
+                COALESCE(SUM(delta) FILTER (WHERE delta < 0), 0) AS total_lost
+            FROM score_history WHERE guild_id = $1 AND user_id = $2
+            """,
+            guild_id, user_id,
+        )
+        return {
+            "total_gained": round(float(row["total_gained"]), 2),
+            "total_lost":   round(float(row["total_lost"]),   2),
+        }
 
     async def get_score_graph_data(self, guild_id: int, user_id: int, days: int = 30):
         cutoff = int(time.time()) - (days * 86400)
@@ -65,10 +101,42 @@ class StatsMixin:
 
     async def get_yuan_graph_data(self, guild_id: int, user_id: int, days: int = 30):
         cutoff = int(time.time()) - (days * 86400)
-        return await self._pool.fetch(
-            "SELECT day, yuan FROM daily_yuan_snapshots WHERE guild_id = $1 AND user_id = $2 AND day > $3 ORDER BY day",
-            guild_id, user_id, cutoff,
+        rows, user = await asyncio.gather(
+            self._pool.fetch(
+                "SELECT day, yuan FROM daily_yuan_snapshots WHERE guild_id = $1 AND user_id = $2 AND day > $3 ORDER BY day",
+                guild_id, user_id, cutoff,
+            ),
+            self._pool.fetchrow("SELECT yuan FROM users WHERE guild_id = $1 AND user_id = $2", guild_id, user_id),
         )
+        return {"rows": rows, "current_yuan": int(user["yuan"]) if user else 0}
+
+    async def get_compare_stats(self, guild_id: int, user_id: int) -> dict:
+        user, ach_count, prestige = await asyncio.gather(
+            self._pool.fetchrow(
+                "SELECT * FROM users WHERE guild_id = $1 AND user_id = $2",
+                guild_id, user_id,
+            ),
+            self._pool.fetchval(
+                "SELECT COUNT(*) FROM achievements WHERE user_id = $1",
+                user_id,
+            ),
+            self._pool.fetchval(
+                "SELECT value FROM user_counters WHERE user_id = $1 AND counter_key = 'prestige_level'",
+                user_id,
+            ),
+        )
+        if not user:
+            return None
+        return {
+            "score": float(user["score"]),
+            "yuan": int(user["yuan"]),
+            "checkin_streak": int(user["checkin_streak"] or 0),
+            "message_count": int(user["message_count"]),
+            "times_endorsed": int(user["times_endorsed"]),
+            "times_rebuked": int(user["times_rebuked"]),
+            "achievements": int(ach_count or 0),
+            "prestige": int(prestige or 0),
+        }
 
     async def get_daily_stats(self, guild_id: int, user_id: int) -> dict:
         now = int(time.time())
@@ -259,6 +327,197 @@ class StatsMixin:
             "joins":     [[int(r["bucket"]), int(r["joins"])] for r in join_rows],
         }
 
+    async def get_global_user_rank(self, user_id: int) -> dict | None:
+        cache_key = f"globalrank:user:v2:{user_id}"
+        cached = await cache_get(cache_key)
+        if cached is not None:
+            return json.loads(cached) if cached != "null" else None
+
+        row = await self._pool.fetchrow(
+            """
+            WITH agg AS (
+                SELECT u.user_id,
+                       SUM(u.yuan) AS total_yuan,
+                       AVG(u.score) AS avg_score,
+                       COUNT(*) AS guild_count,
+                       SUM(COALESCE(u.total_yuan_earned, 0)) AS total_earned
+                FROM users u GROUP BY u.user_id
+            ),
+            with_prestige AS (
+                SELECT agg.*,
+                       COALESCE(pc.value, 0) AS prestige_level
+                FROM agg
+                LEFT JOIN user_counters pc ON pc.user_id = agg.user_id AND pc.counter_key = 'prestige_level'
+            ),
+            ranked AS (
+                SELECT user_id, total_yuan, avg_score, guild_count, total_earned, prestige_level,
+                       RANK() OVER (ORDER BY total_yuan DESC) AS balance_rank,
+                       RANK() OVER (ORDER BY total_earned DESC) AS earned_rank,
+                       RANK() OVER (ORDER BY avg_score DESC, prestige_level DESC) AS score_rank,
+                       RANK() OVER (ORDER BY avg_score DESC, total_yuan DESC, prestige_level DESC) AS citizens_rank,
+                       COUNT(*) OVER () AS total_citizens
+                FROM with_prestige
+            )
+            SELECT * FROM ranked WHERE user_id = $1
+            """,
+            user_id,
+        )
+        if not row:
+            await cache_set(cache_key, "null", ex=60)
+            return None
+        result = {
+            "total_yuan":     int(row["total_yuan"]),
+            "total_earned":   int(row["total_earned"]),
+            "avg_score":      round(float(row["avg_score"]), 2),
+            "guild_count":    int(row["guild_count"]),
+            "balance_rank":   int(row["balance_rank"]),
+            "earned_rank":    int(row["earned_rank"]),
+            "score_rank":     int(row["score_rank"]),
+            "citizens_rank":  int(row["citizens_rank"]),
+            "total_citizens": int(row["total_citizens"]),
+        }
+        await cache_set(cache_key, json.dumps(result), ex=60)
+        return result
+
+    async def get_global_leaderboard(self, limit: int = 10) -> dict:
+        cache_key = f"globaltop:leaderboard:{limit}"
+        cached = await cache_get(cache_key)
+        if cached is not None:
+            data = json.loads(cached)
+            return {
+                "by_yuan":  [{"user_id": r["user_id"], "total_yuan": r["total_yuan"]} for r in data["by_yuan"]],
+                "by_score": [{"user_id": r["user_id"], "avg_score": r["avg_score"]} for r in data["by_score"]],
+            }
+
+        by_yuan, by_score = await asyncio.gather(
+            self._pool.fetch(
+                "SELECT user_id, SUM(yuan) AS total_yuan FROM users GROUP BY user_id ORDER BY total_yuan DESC LIMIT $1",
+                limit,
+            ),
+            self._pool.fetch(
+                """
+                WITH agg AS (
+                    SELECT user_id, AVG(score) AS avg_score FROM users GROUP BY user_id
+                )
+                SELECT agg.user_id, agg.avg_score
+                FROM agg
+                LEFT JOIN user_counters pc ON pc.user_id = agg.user_id AND pc.counter_key = 'prestige_level'
+                ORDER BY agg.avg_score DESC, COALESCE(pc.value, 0) DESC
+                LIMIT $1
+                """,
+                limit,
+            ),
+        )
+        result = {"by_yuan": by_yuan, "by_score": by_score}
+        serializable = {
+            "by_yuan":  [{"user_id": r["user_id"], "total_yuan": int(r["total_yuan"])} for r in by_yuan],
+            "by_score": [{"user_id": r["user_id"], "avg_score": float(r["avg_score"])} for r in by_score],
+        }
+        await cache_set(cache_key, json.dumps(serializable), ex=60)
+        return result
+
+    async def get_global_yuan_earned_window(self, user_id: int, days: int | None = None) -> int:
+        cache_key = f"globalrank:earned:{user_id}:{days}"
+        cached = await cache_get(cache_key)
+        if cached is not None:
+            return int(cached)
+
+        if days is None:
+            current_total = await self._pool.fetchval(
+                "SELECT COALESCE(SUM(total_yuan_earned), 0) FROM users WHERE user_id = $1",
+                user_id,
+            )
+            earned = int(current_total or 0)
+        else:
+            cutoff = int(time.time()) // 86400 * 86400 - (days * 86400)
+            row = await self._pool.fetchrow(
+                """
+                WITH baseline AS (
+                    SELECT total_yuan_earned FROM global_yuan_earned_snapshots
+                    WHERE user_id = $1 AND day <= $2
+                    ORDER BY day DESC LIMIT 1
+                ),
+                current AS (
+                    SELECT COALESCE(SUM(total_yuan_earned), 0) AS total FROM users WHERE user_id = $1
+                )
+                SELECT current.total AS current_total, baseline.total_yuan_earned AS baseline_total
+                FROM current LEFT JOIN baseline ON TRUE
+                """,
+                user_id, cutoff,
+            )
+            current_total = int(row["current_total"]) if row else 0
+            baseline_total = int(row["baseline_total"]) if row and row["baseline_total"] is not None else 0
+            earned = current_total - baseline_total
+
+        await cache_set(cache_key, str(earned), ex=60)
+        return earned
+
+    async def get_global_yuan_earned_leaderboard(self, days: int | None = None, limit: int = 10) -> list[dict]:
+        cache_key = f"globaltop:earned:{days}:{limit}"
+        cached = await cache_get(cache_key)
+        if cached is not None:
+            return json.loads(cached)
+
+        if days is None:
+            rows = await self._pool.fetch(
+                "SELECT user_id, SUM(total_yuan_earned) AS earned FROM users GROUP BY user_id ORDER BY earned DESC LIMIT $1",
+                limit,
+            )
+            result = [{"user_id": r["user_id"], "earned": int(r["earned"])} for r in rows]
+        else:
+            cutoff = int(time.time()) // 86400 * 86400 - (days * 86400)
+            rows = await self._pool.fetch(
+                """
+                WITH baseline AS (
+                    SELECT DISTINCT ON (user_id) user_id, total_yuan_earned AS baseline_total
+                    FROM global_yuan_earned_snapshots
+                    WHERE day <= $1
+                    ORDER BY user_id, day DESC
+                ),
+                current AS (
+                    SELECT user_id, SUM(total_yuan_earned) AS current_total
+                    FROM users GROUP BY user_id
+                )
+                SELECT c.user_id, c.current_total - COALESCE(b.baseline_total, 0) AS earned
+                FROM current c
+                LEFT JOIN baseline b ON b.user_id = c.user_id
+                ORDER BY earned DESC
+                LIMIT $2
+                """,
+                cutoff, limit,
+            )
+            result = [{"user_id": r["user_id"], "earned": int(r["earned"])} for r in rows]
+
+        await cache_set(cache_key, json.dumps(result), ex=60)
+        return result
+
+    async def get_global_citizens_leaderboard(self, limit: int = 10) -> list[dict]:
+        cache_key = f"globaltop:citizens:{limit}"
+        cached = await cache_get(cache_key)
+        if cached is not None:
+            return json.loads(cached)
+
+        rows = await self._pool.fetch(
+            """
+            WITH agg AS (
+                SELECT user_id, AVG(score) AS avg_score, SUM(yuan) AS total_yuan
+                FROM users GROUP BY user_id
+            )
+            SELECT agg.user_id, agg.avg_score, agg.total_yuan
+            FROM agg
+            LEFT JOIN user_counters pc ON pc.user_id = agg.user_id AND pc.counter_key = 'prestige_level'
+            ORDER BY agg.avg_score DESC, agg.total_yuan DESC, COALESCE(pc.value, 0) DESC
+            LIMIT $1
+            """,
+            limit,
+        )
+        result = [
+            {"user_id": r["user_id"], "avg_score": float(r["avg_score"]), "total_yuan": int(r["total_yuan"])}
+            for r in rows
+        ]
+        await cache_set(cache_key, json.dumps(result), ex=60)
+        return result
+
     async def get_recent_events(self, limit: int = 20):
         return await self._pool.fetch(
             "SELECT guild_id, user_id, delta, reason, timestamp FROM score_history ORDER BY timestamp DESC LIMIT $1",
@@ -282,6 +541,7 @@ class StatsMixin:
             top_reasons,
             top_guild,
             markets_row,
+            treasury_total,
         ) = await asyncio.gather(
             self._pool.fetchrow("""
                 SELECT
@@ -385,6 +645,7 @@ class StatsMixin:
                     COALESCE((SELECT SUM(turbo_knocked) FROM users WHERE turbo_knocked > 0), 0) AS total_knockouts,
                     COALESCE((SELECT SUM(stock_trades) FROM users WHERE stock_trades > 0), 0) AS total_stock_trades
             """),
+            self._pool.fetchval("SELECT total FROM bureau_treasury WHERE id = 1"),
         )
 
         return {
@@ -444,4 +705,5 @@ class StatsMixin:
             "yuan_in_turbos":     int(markets_row["yuan_in_turbos"])     if markets_row else 0,
             "total_knockouts":    int(markets_row["total_knockouts"])    if markets_row else 0,
             "total_stock_trades": int(markets_row["total_stock_trades"]) if markets_row else 0,
+            "treasury_total":     int(treasury_total) if treasury_total else 0,
         }

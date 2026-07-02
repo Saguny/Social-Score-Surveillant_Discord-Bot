@@ -1,4 +1,5 @@
 import os
+import time
 import asyncpg
 
 from database._core        import CoreMixin
@@ -14,6 +15,12 @@ from database._voting      import VotingMixin
 from database._stats       import StatsMixin
 from database._achievements import AchievementsMixin
 from database._counters     import CountersMixin
+from database._privacy      import PrivacyMixin
+from database._announcement import AnnouncementMixin
+from database._guilds       import GuildRankMixin
+from database._analytics    import AnalyticsMixin
+from database._gacha        import GachaMixin
+from database._requests     import GachaRequestsMixin
 
 
 TABLES = [
@@ -190,6 +197,13 @@ TABLES = [
         purchased_at BIGINT
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS bureau_treasury (
+        id    INTEGER PRIMARY KEY DEFAULT 1,
+        total BIGINT NOT NULL DEFAULT 0,
+        CONSTRAINT single_row CHECK (id = 1)
+    )
+    """,
 ]
 
 
@@ -207,15 +221,23 @@ class Database(
     StatsMixin,
     AchievementsMixin,
     CountersMixin,
+    PrivacyMixin,
+    AnnouncementMixin,
+    GuildRankMixin,
+    AnalyticsMixin,
+    GachaMixin,
+    GachaRequestsMixin,
 ):
     def __init__(self):
         self._dsn = os.getenv("DATABASE_URL", "")
         self._pool: asyncpg.Pool | None = None
-        self._effect_cache: dict[tuple, tuple] = {}
         self._last_clean_effects: float = 0.0
+        self._pool_min = int(os.getenv("DB_POOL_MIN", "2"))
+        self._pool_max = int(os.getenv("DB_POOL_MAX", "10"))
 
     async def init(self):
-        self._pool = await asyncpg.create_pool(self._dsn, min_size=2, max_size=40)
+        ssl = "require" if "sslmode" not in self._dsn and not self._dsn.startswith("postgresql://localhost") and not self._dsn.startswith("postgresql://127.") else None
+        self._pool = await asyncpg.create_pool(self._dsn, min_size=self._pool_min, max_size=self._pool_max, ssl=ssl)
         await self._create_tables()
         await self._migrate()
 
@@ -257,6 +279,7 @@ class Database(
             """)
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_portfolio_history_user_ts ON portfolio_history (guild_id, user_id, ts)")
             await conn.execute("ALTER TABLE guild_config ADD COLUMN IF NOT EXISTS execution_channel_id BIGINT")
+            await conn.execute("ALTER TABLE guild_config ADD COLUMN IF NOT EXISTS rank_announcement_channel_id BIGINT")
             await conn.execute("ALTER TABLE guild_config ADD COLUMN IF NOT EXISTS assign_rank_roles BOOLEAN NOT NULL DEFAULT TRUE")
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS daily_yuan_snapshots (
@@ -361,6 +384,18 @@ class Database(
             """)
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_guild_joins_joined_at ON guild_joins (joined_at)")
             await conn.execute("""
+                CREATE TABLE IF NOT EXISTS guild_leaves (
+                    guild_id       BIGINT NOT NULL,
+                    left_at        BIGINT NOT NULL,
+                    member_count   INTEGER,
+                    tenure_seconds BIGINT,
+                    citizens       INTEGER NOT NULL,
+                    score_events   INTEGER NOT NULL,
+                    category       TEXT NOT NULL
+                )
+            """)
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_guild_leaves_left_at ON guild_leaves (left_at)")
+            await conn.execute("""
                 DO $$
                 BEGIN
                     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'achievements')
@@ -415,3 +450,173 @@ class Database(
                     PRIMARY KEY (user_id, counter_key)
                 )
             """)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS optouts (
+                    user_id      BIGINT PRIMARY KEY,
+                    opted_out_at BIGINT NOT NULL
+                )
+            """)
+            await conn.execute(
+                "INSERT INTO bureau_treasury (id, total) VALUES (1, 0) ON CONFLICT DO NOTHING"
+            )
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS global_yuan_earned_snapshots (
+                    user_id           BIGINT NOT NULL,
+                    day               BIGINT NOT NULL,
+                    total_yuan_earned BIGINT NOT NULL,
+                    PRIMARY KEY (user_id, day)
+                )
+            """)
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_global_yuan_earned_snapshots_user ON global_yuan_earned_snapshots (user_id, day)")
+            await conn.execute(
+                """
+                INSERT INTO global_yuan_earned_snapshots (user_id, day, total_yuan_earned)
+                SELECT user_id, $1, SUM(total_yuan_earned) FROM users GROUP BY user_id
+                ON CONFLICT (user_id, day) DO NOTHING
+                """,
+                int(time.time()) // 86400 * 86400,
+            )
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS leaderboard_profiles (
+                    user_id      BIGINT PRIMARY KEY,
+                    display_name TEXT NOT NULL,
+                    updated_at   BIGINT NOT NULL
+                )
+            """)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS dashboard_announcement (
+                    id         INTEGER PRIMARY KEY DEFAULT 1,
+                    enabled    BOOLEAN NOT NULL DEFAULT FALSE,
+                    message    TEXT,
+                    severity   TEXT NOT NULL DEFAULT 'info',
+                    updated_at BIGINT NOT NULL DEFAULT 0,
+                    CONSTRAINT single_row CHECK (id = 1)
+                )
+            """)
+            await conn.execute(
+                "INSERT INTO dashboard_announcement (id, enabled, message, severity, updated_at) "
+                "VALUES (1, FALSE, '', 'info', 0) ON CONFLICT DO NOTHING"
+            )
+            await conn.execute("ALTER TABLE guild_config ADD COLUMN IF NOT EXISTS leaderboard_visible BOOLEAN NOT NULL DEFAULT FALSE")
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS guild_daily_snapshots (
+                    guild_id       BIGINT NOT NULL,
+                    day            BIGINT NOT NULL,
+                    total_yuan     BIGINT NOT NULL DEFAULT 0,
+                    avg_score      DOUBLE PRECISION NOT NULL DEFAULT 0,
+                    total_messages BIGINT NOT NULL DEFAULT 0,
+                    citizens       INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY (guild_id, day)
+                )
+            """)
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_guild_daily_snapshots_day ON guild_daily_snapshots (day)")
+            await conn.execute("ALTER TABLE guild_daily_snapshots ADD COLUMN IF NOT EXISTS literacy_rate DOUBLE PRECISION NOT NULL DEFAULT 0")
+            await conn.execute("ALTER TABLE guild_daily_snapshots ADD COLUMN IF NOT EXISTS incarceration_rate DOUBLE PRECISION NOT NULL DEFAULT 0")
+            await conn.execute("ALTER TABLE guild_daily_snapshots ADD COLUMN IF NOT EXISTS politburo_score DOUBLE PRECISION NOT NULL DEFAULT 0")
+            await conn.execute("ALTER TABLE guild_config ADD COLUMN IF NOT EXISTS guild_bracket TEXT DEFAULT NULL")
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS command_analytics (
+                    id                SERIAL  PRIMARY KEY,
+                    timestamp         BIGINT  NOT NULL,
+                    guild_id          BIGINT  NOT NULL,
+                    user_id           BIGINT  NOT NULL,
+                    command_name      TEXT    NOT NULL,
+                    subcommand        TEXT,
+                    execution_time_ms INTEGER NOT NULL DEFAULT 0,
+                    success           BOOLEAN NOT NULL DEFAULT TRUE,
+                    error_code        TEXT
+                )
+            """)
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_cmd_analytics_ts      ON command_analytics (timestamp)")
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_cmd_analytics_cmd_ts  ON command_analytics (command_name, timestamp)")
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_cmd_analytics_guild   ON command_analytics (guild_id, timestamp)")
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS gacha_claims (
+                    guild_id     BIGINT NOT NULL,
+                    user_id      BIGINT NOT NULL,
+                    character_id TEXT   NOT NULL,
+                    claimed_at   BIGINT NOT NULL,
+                    PRIMARY KEY (guild_id, user_id, character_id)
+                )
+            """)
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_gacha_claims_user ON gacha_claims (guild_id, user_id, claimed_at DESC)")
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS gacha_wishlists (
+                    guild_id     BIGINT NOT NULL,
+                    user_id      BIGINT NOT NULL,
+                    character_id TEXT   NOT NULL,
+                    PRIMARY KEY (guild_id, user_id, character_id)
+                )
+            """)
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_gacha_wish_char ON gacha_wishlists (guild_id, character_id)")
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS gacha_character_stats (
+                    character_id TEXT    PRIMARY KEY,
+                    claim_count  BIGINT  NOT NULL DEFAULT 0
+                )
+            """)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS gacha_preferences (
+                    guild_id     BIGINT NOT NULL,
+                    user_id      BIGINT NOT NULL,
+                    key          TEXT   NOT NULL,
+                    value        TEXT   NOT NULL,
+                    PRIMARY KEY (guild_id, user_id, key)
+                )
+            """)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS gacha_characters (
+                    character_id   TEXT PRIMARY KEY,
+                    name           TEXT NOT NULL,
+                    title          TEXT NOT NULL DEFAULT '',
+                    faction        TEXT NOT NULL DEFAULT 'wildcards',
+                    rarity         TEXT NOT NULL DEFAULT 'common',
+                    quote          TEXT NOT NULL DEFAULT '',
+                    wiki           TEXT NOT NULL DEFAULT '',
+                    stat_authority INT  NOT NULL DEFAULT 50,
+                    stat_military  INT  NOT NULL DEFAULT 50,
+                    stat_charisma  INT  NOT NULL DEFAULT 50,
+                    image_urls     TEXT[] NOT NULL DEFAULT '{}',
+                    enabled        BOOLEAN NOT NULL DEFAULT TRUE,
+                    gender         TEXT DEFAULT NULL
+                )
+            """)
+            await conn.execute("ALTER TABLE gacha_characters ADD COLUMN IF NOT EXISTS gender TEXT DEFAULT NULL")
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS gacha_requests (
+                    id                  SERIAL PRIMARY KEY,
+                    discord_id          BIGINT NOT NULL,
+                    discord_username    TEXT NOT NULL,
+                    wiki_slug           TEXT NOT NULL UNIQUE,
+                    wiki_title          TEXT NOT NULL,
+                    submitted_at        BIGINT NOT NULL,
+                    status              TEXT NOT NULL DEFAULT 'pending',
+                    reviewed_at         BIGINT,
+                    rejection_reason    TEXT
+                )
+            """)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS gacha_request_votes (
+                    request_id      INT NOT NULL REFERENCES gacha_requests(id) ON DELETE CASCADE,
+                    discord_id      BIGINT NOT NULL,
+                    discord_username TEXT NOT NULL,
+                    voted_at        BIGINT NOT NULL,
+                    PRIMARY KEY (request_id, discord_id)
+                )
+            """)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS gacha_request_bans (
+                    discord_id  BIGINT PRIMARY KEY,
+                    banned_at   BIGINT NOT NULL
+                )
+            """)
+            await conn.execute("ALTER TABLE gacha_characters ADD COLUMN IF NOT EXISTS submitted_by_discord_id BIGINT DEFAULT NULL")
+            await conn.execute("ALTER TABLE gacha_characters ADD COLUMN IF NOT EXISTS submitted_by_username TEXT DEFAULT NULL")
+            await conn.execute("ALTER TABLE gacha_requests ADD COLUMN IF NOT EXISTS override_rarity TEXT DEFAULT NULL")
+            await conn.execute("ALTER TABLE gacha_requests ADD COLUMN IF NOT EXISTS override_gender TEXT DEFAULT NULL")
+            await conn.execute("ALTER TABLE gacha_requests ADD COLUMN IF NOT EXISTS override_image_urls TEXT[] DEFAULT ARRAY[]::TEXT[]")
+            await conn.execute("ALTER TABLE gacha_requests ADD COLUMN IF NOT EXISTS thumbnail_url TEXT NOT NULL DEFAULT ''")
+            await conn.execute("ALTER TABLE gacha_requests ADD COLUMN IF NOT EXISTS override_faction TEXT DEFAULT NULL")
+            await conn.execute("ALTER TABLE gacha_requests ADD COLUMN IF NOT EXISTS wiki_extract TEXT NOT NULL DEFAULT ''")
+            await conn.execute("ALTER TABLE gacha_requests ADD COLUMN IF NOT EXISTS wiki_lang TEXT NOT NULL DEFAULT 'en'")
+            await conn.execute("ALTER TABLE gacha_requests ADD COLUMN IF NOT EXISTS override_title TEXT DEFAULT NULL")

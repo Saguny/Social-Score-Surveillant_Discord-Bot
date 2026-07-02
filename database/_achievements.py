@@ -38,6 +38,27 @@ class AchievementsMixin:
         row = await self._pool.fetchrow("SELECT COUNT(DISTINCT user_id) AS n FROM users")
         return int(row["n"]) if row else 0
 
+    async def get_achievement_server_rank(self, guild_id: int, user_id: int) -> tuple[int, int]:
+        row = await self._pool.fetchrow(
+            """
+            WITH ranked AS (
+                SELECT u.user_id,
+                       RANK() OVER (ORDER BY COUNT(a.achievement_id) DESC) AS rnk
+                FROM users u
+                LEFT JOIN achievements a ON a.user_id = u.user_id
+                WHERE u.guild_id = $1
+                GROUP BY u.user_id
+            )
+            SELECT rnk, (SELECT COUNT(*) FROM users WHERE guild_id = $1) AS total
+            FROM ranked
+            WHERE user_id = $2
+            """,
+            guild_id, user_id,
+        )
+        if not row:
+            return 0, 0
+        return int(row["rnk"]), int(row["total"])
+
     async def get_achievements_channel(self, guild_id: int) -> int | None:
         row = await self._pool.fetchrow(
             "SELECT achievements_channel_id, achievements_loud_enabled FROM guild_config WHERE guild_id = $1",

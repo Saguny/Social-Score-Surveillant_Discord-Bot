@@ -1,11 +1,13 @@
 import asyncio
 import concurrent.futures
+import io
+import json
 import os
 import random
 import time
 import aiohttp
 import discord
-from discord.ext import commands, tasks
+from discord.ext import commands
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from config.ranks import get_rank, get_rank_index, RANKS, EXECUTION_THRESHOLD, RANK_YUAN
 from config.rules import (
@@ -13,9 +15,13 @@ from config.rules import (
     SENTIMENT_SCALE, SENTIMENT_NEUTRAL_THRESHOLD, NEUTRAL_BONUS, BANNED_TOPIC_PENALTY, YUAN_PER_MESSAGE,
     DAILY_MSG_SCORE_CAP, DAILY_NET_DIMINISHING_THRESHOLD, DAILY_MSG_DIMINISHING_FACTOR,
     SUPPORT_GUILD_ID, SUPPORT_YUAN_MULTIPLIER,
+    YUAN_DAILY_DIMINISHING_THRESHOLD, YUAN_DAILY_DIMINISHING_FACTOR,
 )
 from config.banned_topics import contains_banned_topic
 from cogs.achievements import unlock as unlock_achievement, check_milestone
+from config.shop import COSMETIC_META
+from render.rank_card import render_rank_card
+from infra.redis_cache import cache_get, cache_set, cache_delete, cache_incr
 
 TRANSLATE_URL = "https://translate.googleapis.com/translate_a/single"
 _LANG_CACHE_TTL = 3600
@@ -53,9 +59,6 @@ class Scoring(commands.Cog):
         self._last_messages: dict[tuple, str] = {}
         self._session: aiohttp.ClientSession | None = None
         self._executor: concurrent.futures.ProcessPoolExecutor | None = None
-        self._lang_cache: dict[tuple, tuple[str, float]] = {}
-        self._pos_streaks: dict[tuple[int, int], int] = {}
-        self._daily_tracking: dict[tuple[int, int], tuple[int, float, int]] = {}
 
     async def cog_load(self):
         self._session = aiohttp.ClientSession()
@@ -63,26 +66,16 @@ class Scoring(commands.Cog):
             max_workers=min(4, max(2, os.cpu_count() or 2)),
             initializer=_init_worker,
         )
-        self._cache_cleanup.start()
+        from infra.redis_cache import cache_set
+        await cache_set("gateway:sentiment_workers", str(self._executor._max_workers))
 
     async def cog_unload(self):
-        self._cache_cleanup.cancel()
         if self._session:
             await self._session.close()
             self._session = None
         if self._executor:
             self._executor.shutdown(wait=False)
             self._executor = None
-
-    @tasks.loop(hours=1)
-    async def _cache_cleanup(self):
-        now             = time.time()
-        today_start     = int(now) // 86400 * 86400
-        lang_cutoff     = now - _LANG_CACHE_TTL
-        stale_lang      = [k for k, v in self._lang_cache.items() if v[1] < lang_cutoff]
-        stale_tracking  = [k for k, v in self._daily_tracking.items() if v[0] < today_start]
-        for k in stale_lang:     del self._lang_cache[k]
-        for k in stale_tracking: del self._daily_tracking[k]
 
     async def _translate_to_english(self, text: str) -> str:
         try:
@@ -94,6 +87,35 @@ class Scoring(commands.Cog):
                 return "".join(part[0] for part in data[0] if part[0])
         except Exception:
             return text
+
+    def _should_skip(self, message: discord.Message) -> bool:
+        content = message.content.lower().strip()
+        if content.startswith("http") and " " not in content:
+            return True
+        if not content and (message.attachments or message.stickers):
+            return True
+        return False
+
+    async def _apply_yuan_diminishing(self, guild_id: int, user_id: int, yuan_gain: int, exempt: bool) -> int:
+        key = f"yuandaily:{guild_id}:{user_id}"
+        now_ts = int(time.time())
+        today_start = now_ts // 86400 * 86400
+        seconds_to_midnight = 86400 - (now_ts % 86400)
+        raw = await cache_get(key)
+        if raw is None:
+            count = 0
+        else:
+            data = json.loads(raw)
+            count = data["count"] if data.get("day") == today_start else 0
+        count += 1
+        await cache_set(
+            key,
+            json.dumps({"day": today_start, "count": count}),
+            ex=seconds_to_midnight,
+        )
+        if not exempt and count > YUAN_DAILY_DIMINISHING_THRESHOLD:
+            yuan_gain = round(yuan_gain * YUAN_DAILY_DIMINISHING_FACTOR)
+        return yuan_gain
 
     def _structural_score(self, message: discord.Message) -> tuple[float, list[str]]:
         content = message.content.lower().strip()
@@ -120,50 +142,40 @@ class Scoring(commands.Cog):
             return 0.0, None
 
         loop = asyncio.get_event_loop()
-        now = time.time()
-        cache_key = (guild_id, user_id)
-        cached = self._lang_cache.get(cache_key)
+        lang_key = f"lang:{guild_id}:{user_id}"
+        cached_lang = await cache_get(lang_key)
 
-        if cached and now - cached[1] < _LANG_CACHE_TTL:
-            lang = cached[0]
+        if cached_lang:
+            lang = cached_lang
             english = text if lang == "en" else await self._translate_to_english(text)
             if contains_banned_topic(english):
                 return BANNED_TOPIC_PENALTY, "counter-revolutionary speech"
             compound = await loop.run_in_executor(self._executor, _vader_only, english)
         else:
             lang, compound = await loop.run_in_executor(self._executor, _run_in_worker, text)
-            self._lang_cache[cache_key] = (lang, now)
+            await cache_set(lang_key, lang, ex=_LANG_CACHE_TTL)
             english = text if lang == "en" else await self._translate_to_english(text)
             if contains_banned_topic(english):
                 return BANNED_TOPIC_PENALTY, "counter-revolutionary speech"
             if lang != "en":
                 compound = await loop.run_in_executor(self._executor, _vader_only, english)
 
-        key = (guild_id, user_id)
+        streak_key = f"posstreak:{guild_id}:{user_id}"
         if abs(compound) < SENTIMENT_NEUTRAL_THRESHOLD:
-            self._pos_streaks.pop(key, None)
+            await cache_delete(streak_key)
             return NEUTRAL_BONUS, "civic participation"
 
         delta = round(compound * SENTIMENT_SCALE, 2)
         if delta > 0:
-            streak = self._pos_streaks.get(key, 0) + 1
-            self._pos_streaks[key] = streak
+            streak = await cache_incr(streak_key)
             if streak >= 3:
                 multiplier = 1.0 + min(streak // 3, 5) * 0.1
                 delta = round(delta * multiplier, 2)
         else:
-            self._pos_streaks.pop(key, None)
+            await cache_delete(streak_key)
         return delta, "positive sentiment" if compound > 0 else "negative sentiment"
 
-    async def _evaluate(self, message: discord.Message) -> tuple[float, str]:
-        content = message.content.lower().strip()
-
-        if content.startswith("http") and " " not in content:
-            return 0.0, "skipped"
-        if not content and (message.attachments or message.stickers):
-            return 0.0, "skipped"
-
-        struct_delta, reasons = self._structural_score(message)
+    async def _evaluate(self, message: discord.Message, struct_delta: float, reasons: list[str]) -> tuple[float, str]:
         sent_delta, sent_reason = await self._sentiment_score(
             message.guild.id, message.author.id, message.content
         )
@@ -183,6 +195,28 @@ class Scoring(commands.Cog):
         if not role:
             role = await guild.create_role(name=name)
         return role
+
+    async def _announce_bracket_promotion(self, guild: discord.Guild):
+        new_bracket = await self.db.check_and_update_bracket(guild.id)
+        if not new_bracket:
+            return
+        channel = guild.system_channel
+        if channel is None:
+            for ch in guild.text_channels:
+                if ch.permissions_for(guild.me).send_messages:
+                    channel = ch
+                    break
+        if channel is None:
+            return
+        embed = discord.Embed(color=0xFFD700, title="NATIONAL BRACKET ELEVATED", description="中华人民共和国社会信用局")
+        embed.add_field(name="NATION", value=guild.name, inline=True)
+        embed.add_field(name="BRACKET", value=new_bracket, inline=True)
+        embed.add_field(name="REGISTRY", value="`/serverrank top` · `/serverrank me`", inline=False)
+        embed.set_thumbnail(url="attachment://security.png")
+        try:
+            await channel.send(embed=embed, file=discord.File("images/security.png", filename="security.png"))
+        except discord.Forbidden:
+            pass
 
     async def _handle_rank_change(self, guild: discord.Guild, member: discord.Member, channel: discord.TextChannel, old: float, new: float):
         old_rank = get_rank(old)
@@ -230,21 +264,68 @@ class Scoring(commands.Cog):
                 if old_rank["name"] == RANKS[0]["name"]:
                     await unlock_achievement(self.bot, guild, member, "fastest_climb", channel=channel)
 
-        color = 0xFFD700 if promoted else 0xCC0000
-        status = "PROMOTED" if promoted else "DEMOTED"
+        rank_channel_id = await self.db.get_rank_announcement_channel(guild.id)
+        rank_channel = guild.get_channel(rank_channel_id) if rank_channel_id else None
+        announce_channel = rank_channel or channel
 
-        embed = discord.Embed(color=color, title="中华人民共和国社会信用局")
-        embed.add_field(name="CITIZEN", value=await self.bot.format_user_full(member, guild.id), inline=False)
-        embed.add_field(
-            name=f"STATUS CHANGE: {status}",
-            value=f"{old_rank['name']} -> {new_rank['name']}\nScore: {new:.2f} · {yuan_label}",
-            inline=False,
-        )
-        embed.timestamp = discord.utils.utcnow()
-        try:
-            await channel.send(embed=embed)
-        except discord.Forbidden:
-            pass
+        if promoted:
+            try:
+                avatar_bytes = None
+                try:
+                    url = str(member.display_avatar.replace(size=256).url)
+                    async with self._session.get(url) as resp:
+                        if resp.status == 200:
+                            avatar_bytes = await resp.read()
+                except Exception:
+                    pass
+
+                badge_label = None
+                try:
+                    badges = await self.bot.db.get_cosmetic_badges(member.id)
+                    if badges:
+                        pref = await self.bot.db.get_badge_preference(member.id)
+                        owned = {b["badge"] for b in badges}
+                        chosen = pref["badge_id"] if pref and pref["badge_id"] in owned else None
+                        if not chosen:
+                            for bid in ["voter", "verified", "figure", "influencer", "associate", "asset"]:
+                                if bid in owned:
+                                    chosen = bid
+                                    break
+                        if chosen and chosen in COSMETIC_META:
+                            badge_label = COSMETIC_META[chosen]["label"]
+                except Exception:
+                    pass
+
+                loop = asyncio.get_event_loop()
+                png = await loop.run_in_executor(None, lambda: render_rank_card(
+                    old_rank=old_rank["name"],
+                    new_rank=new_rank["name"],
+                    username=member.display_name,
+                    score=new,
+                    yuan_label=yuan_label,
+                    avatar_bytes=avatar_bytes,
+                    badge_label=badge_label,
+                    bot_name=self.bot.user.name,
+                ))
+                file = discord.File(io.BytesIO(png), filename="rank_card.png")
+                embed = discord.Embed(color=0xCC0000, title="STANDING ELEVATED", description="中华人民共和国社会信用局")
+                embed.set_author(name=await self.bot.format_user_full(member, guild.id), icon_url=member.display_avatar.url)
+                embed.set_image(url="attachment://rank_card.png")
+                embed.set_footer(text="/vote on top.gg for bonus Yuan and score · GLORY TO THE CCP!")
+                await announce_channel.send(member.mention, embed=embed, file=file)
+            except discord.Forbidden:
+                pass
+        else:
+            embed = discord.Embed(color=0x888888, title="STANDING REDUCED", description="中华人民共和国社会信用局")
+            embed.add_field(name="CITIZEN", value=await self.bot.format_user_full(member, guild.id), inline=False)
+            embed.add_field(name="PENALTY", value=f"{yuan_label} · Standing reduced to {new_rank['name']}", inline=False)
+            embed.set_thumbnail(url="attachment://rank.png")
+            embed.set_footer(text="ccp rankchannel [#channel] · GLORY TO THE CCP!")
+            embed.timestamp = discord.utils.utcnow()
+            try:
+                await announce_channel.send(embed=embed, file=discord.File("images/rank.png", filename="rank.png"))
+            except discord.Forbidden:
+                pass
 
     async def _handle_execution_status(self, guild: discord.Guild, member: discord.Member, channel: discord.TextChannel, old: float, new: float):
         exec_role_name = "Execution Date: Tomorrow"
@@ -272,33 +353,13 @@ class Scoring(commands.Cog):
                 confiscated = await self.db.confiscate_yuan(guild.id, member.id)
                 citizen_str = await self.bot.format_user_full(member, guild.id)
 
-                embed = discord.Embed(
-                    color=0x8B0000, 
-                    title="🚨 中华人民共和国社会信用局 · NOTICE OF TERMINATION",
-                    description=f"**Citizen:** {citizen_str}\n**Current Score:** `{new:.2f}`"
-                )
-                
-                status_text = (
-                    " **CRITICAL INFRACTION DETECTED**\n"
-                    "Your social credit score has gone below 610-. You have been placed on the **Execution List** by the Bureau.\n"
-                    f"Your Role has been assigned."
-                )
-                embed.add_field(name="SURVEILLANCE STATUS", value=status_text, inline=False)
-                
+                embed = discord.Embed(color=0x111111, title="DETENTION ORDER ISSUED", description="中华人民共和国社会信用局")
+                embed.add_field(name="CITIZEN", value=f"{citizen_str} · {new:.2f}", inline=False)
                 if confiscated > 0:
-                    embed.add_field(
-                        name="STATE CONFISCATION", 
-                        value=f"All assets totaling **¥{confiscated:,}** have been seized and redistributed evenly to compliant citizens.", 
-                        inline=False
-                    )
-                
+                    embed.add_field(name="ASSETS", value=f"¥{confiscated:,} confiscated.", inline=False)
+                embed.set_thumbnail(url="attachment://security.png")
                 embed.timestamp = discord.utils.utcnow()
-                if not exec_channel_id:
-                    embed.set_footer(text="System Notice: Use 'ccp executions #channel' to assign a dedicated firing squad channel.")
-                else:
-                    embed.set_footer(text="中华人民共和国社会信用局 · ALL ACTIONS RECORDED")
-                
-                await target.send(content=f"{member.mention} **The Eternal Chairman awaits your Execution with Joy.**", embed=embed)
+                await target.send(embed=embed, file=discord.File("images/security.png", filename="security.png"))
 
                 exec_count = await self.db.increment_execution_count(guild.id, member.id)
                 if exec_count >= 3:
@@ -315,20 +376,11 @@ class Scoring(commands.Cog):
                 
                 citizen_str = await self.bot.format_user_full(member, guild.id)
                 
-                embed = discord.Embed(
-                    color=0x008000,
-                    title="🇨🇳 中华人民共和国社会信用局 · PROBATION UPDATE",
-                    description=f"**Citizen:** {citizen_str}\n**Current Score:** `{new:.2f}` (`{correct_rank['name']}`)"
-                )
-                embed.add_field(
-                    name="REHABILITATION SUCCESSFUL",
-                    value=f"Citizen has successfully recovered above the threshold. The execution order has been rescinded and the `{exec_role_name}` role removed.",
-                    inline=False
-                )
+                embed = discord.Embed(color=0xCC0000, title="DETENTION ORDER RESCINDED", description="中华人民共和国社会信用局")
+                embed.add_field(name="CITIZEN", value=f"{citizen_str} · {new:.2f} · {correct_rank['name']}", inline=False)
+                embed.set_thumbnail(url="attachment://security.png")
                 embed.timestamp = discord.utils.utcnow()
-                embed.set_footer(text="GLORY TO THE CCP!")
-                
-                await target.send(embed=embed)
+                await target.send(embed=embed, file=discord.File("images/security.png", filename="security.png"))
                 await unlock_achievement(self.bot, guild, member, "survived_execution", channel=target)
 
         except discord.Forbidden:
@@ -341,15 +393,37 @@ class Scoring(commands.Cog):
 
         gid, uid = message.guild.id, message.author.id
 
-        yuan_gain = YUAN_PER_MESSAGE
-        if self._is_support_member(uid):
-            yuan_gain = round(yuan_gain * SUPPORT_YUAN_MULTIPLIER)
-        await self.db.tick_user(gid, uid, yuan_gain)
+        if await self.db.is_opted_out(uid):
+            return
+
+        skip = self._should_skip(message)
+        if skip:
+            struct_delta, reasons = 0.0, []
+        else:
+            struct_delta, reasons = self._structural_score(message)
+        is_flagged = bool(reasons)
+        is_support = self._is_support_member(uid)
+
+        vote_boost = bool(await cache_get(f"voteboost:{uid}"))
+        yuan_gain = 0 if is_flagged else YUAN_PER_MESSAGE
+        if yuan_gain > 0:
+            if is_support:
+                yuan_gain = round(yuan_gain * SUPPORT_YUAN_MULTIPLIER)
+            if vote_boost:
+                yuan_gain *= 2
+            yuan_gain = await self._apply_yuan_diminishing(gid, uid, yuan_gain, exempt=is_support)
+        user_row = await self.db.tick_user(gid, uid, yuan_gain)
+
+        if user_row and user_row["message_count"] == 1:
+            asyncio.create_task(self._announce_bracket_promotion(message.guild))
 
         if await self.db.get_effect(gid, uid, "freeze"):
             return
 
-        delta, reason = await self._evaluate(message)
+        if skip:
+            delta, reason = 0.0, "skipped"
+        else:
+            delta, reason = await self._evaluate(message, struct_delta, reasons)
 
         if "positive sentiment" in reason:
             val = await self.db.increment_counter(uid, "messages_positive")
@@ -370,35 +444,50 @@ class Scoring(commands.Cog):
         if delta == 0:
             return
 
-        key = (gid, uid)
-        today_start = int(time.time()) // 86400 * 86400
-        tracking = self._daily_tracking.get(key)
-        if tracking is None or tracking[0] != today_start:
+        track_key = f"dailytrack:{gid}:{uid}"
+        now_ts = int(time.time())
+        today_start = now_ts // 86400 * 86400
+        seconds_to_midnight = 86400 - (now_ts % 86400)
+        raw_tracking = await cache_get(track_key)
+        if raw_tracking is None:
             daily_net, msg_count = 0.0, 0
         else:
-            _, daily_net, msg_count = tracking
+            tracking = json.loads(raw_tracking)
+            if tracking["day"] != today_start:
+                daily_net, msg_count = 0.0, 0
+            else:
+                daily_net, msg_count = tracking["net"], tracking["count"]
 
         if delta > 0:
+            if vote_boost:
+                delta = round(delta * 2, 2)
             if daily_net >= DAILY_NET_DIMINISHING_THRESHOLD:
                 delta = round(delta * DAILY_MSG_DIMINISHING_FACTOR, 2)
-            headroom = DAILY_MSG_SCORE_CAP - daily_net
+            effective_cap = DAILY_MSG_SCORE_CAP * (2 if vote_boost else 1)
+            headroom = effective_cap - daily_net
             if headroom <= 0.0:
-                self._daily_tracking[key] = (today_start, daily_net, msg_count)
+                await cache_set(
+                    track_key,
+                    json.dumps({"day": today_start, "net": daily_net, "count": msg_count}),
+                    ex=seconds_to_midnight,
+                )
                 return
             delta = round(min(delta, headroom), 2)
-            self._daily_tracking[key] = (today_start, daily_net + delta, msg_count + 1)
+            await cache_set(
+                track_key,
+                json.dumps({"day": today_start, "net": daily_net + delta, "count": msg_count + 1}),
+                ex=seconds_to_midnight,
+            )
         else:
             delta, _ = await self.db.apply_defense_chain(gid, uid, delta)
-            self._daily_tracking[key] = (today_start, daily_net + delta, msg_count)
+            await cache_set(
+                track_key,
+                json.dumps({"day": today_start, "net": daily_net + delta, "count": msg_count}),
+                ex=seconds_to_midnight,
+            )
 
         if delta == 0:
             return
-
-        broadcast_media = False
-        if delta > 0 and await self.db.get_effect(gid, uid, "media_coverage"):
-            await self.db.consume_effect(gid, uid, "media_coverage")
-            delta = round(delta * 2, 2)
-            broadcast_media = True
 
         old_score, new_score = await self.db.update_score(gid, uid, delta, reason)
 
@@ -408,16 +497,6 @@ class Scoring(commands.Cog):
             clean_days = await self.db.get_clean_streak_days(uid)
             if clean_days is not None:
                 await check_milestone(self.bot, message.guild, message.author, "clean_streak_days", clean_days, channel=message.channel)
-
-        if broadcast_media:
-            embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局 · 国家媒体报道")
-            embed.add_field(
-                name="STATE MEDIA SPOTLIGHT",
-                value=f"{await self.bot.format_user_full(message.author, message.guild.id)} · +{delta:.2f} score · DOUBLED BY STATE MEDIA",
-                inline=False,
-            )
-            embed.timestamp = discord.utils.utcnow()
-            await message.channel.send(embed=embed)
 
         self.bot.dispatch("score_change", message.guild, message.author, message.channel, old_score, new_score)
         await self.db.clean_expired_effects()

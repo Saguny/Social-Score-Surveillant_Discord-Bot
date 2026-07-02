@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OFF-BY-ONE</title>
+<meta name="description" content="A two-person dev studio — saguny &amp; warpstar. Building bots, tools, and small side projects.">
+<meta property="og:type"        content="website">
+<meta property="og:url"         content="https://off-by-one.digital/">
+<meta property="og:site_name"   content="OFF-BY-ONE">
+<meta property="og:title"       content="OFF-BY-ONE">
+<meta property="og:description" content="A two-person dev studio - saguny &amp; warpstar. Building bots, tools, games, and small side projects.">
+<meta property="og:image"       content="https://off-by-one.digital/static/logo.png">
+<meta name="twitter:card"        content="summary">
+<meta name="twitter:title"       content="OFF-BY-ONE">
+<meta name="twitter:description" content="A two-person dev studio — saguny &amp; warpstar. Building bots, tools, and small side projects.">
+<meta name="twitter:image"       content="https://off-by-one.digital/static/logo.png">
+<link rel="icon" type="image/png" href="/static/logo.png">
+<link rel="stylesheet" href="/static/studio.css?v=2">
+</head>
+<body>
+
+<div id="squares-drift"><div id="squares"></div></div>
+<div id="vignette"></div>
+
+<div class="card">
+  <nav>
+    <img class="logo" src="/static/logo.png" alt="OFF-BY-ONE">
+    <div class="nav-links">
+      <a href="https://github.com/Saguny">
+        <span class="icon icon-github"></span>
+        <span>Saguny</span>
+      </a>
+      <a href="https://github.com/WARPSTAR10010001">
+        <span class="icon icon-github"></span>
+        <span>Warpstar</span>
+      </a>
+      <a href="https://discord.gg/k4W6YAPYhC">
+        <span class="icon icon-discord"></span>
+        <span>Discord</span>
+      </a>
+    </div>
+  </nav>
+
+  <div class="avatars">
+    <div class="avatar-wrap">
+      <img class="avatar" src="https://github.com/Saguny.png" alt="saguny">
+      <span class="avatar-tooltip">saguny · Game Dev, Backend</span>
+    </div>
+    <div class="avatar-wrap">
+      <img class="avatar" src="https://github.com/WARPSTAR10010001.png" alt="warpstar">
+      <span class="avatar-tooltip">warpstar · Full-Stack Web Dev</span>
+    </div>
+  </div>
+
+  <h1>Hi, we're OFF-BY-ONE</h1>
+  <p>A two-person team - <strong>saguny</strong> &amp; <strong>warpstar</strong> - building small projects together!</p>
+  <p>Currently working on a <strong>Social Credit Surveillant Discord bot</strong></p>
+
+  <div class="skills-label">Projects</div>
+  <div class="projects" id="projects">
+    <div class="project" onclick="location.href='/social-credit'" role="link" tabindex="0">
+      <div class="project-header">
+        <div class="project-name-row">
+          <div class="project-name">Social Credit Surveillant</div>
+          <div class="project-pills">
+            <span class="pill">Python</span>
+            <span class="pill">discord.py</span>
+            <span class="pill">PostgreSQL</span>
+            <span class="pill">Redis</span>
+          </div>
+        </div>
+        <span class="project-arrow">→</span>
+      </div>
+      <div class="project-desc">A CCP-themed Discord bot with a full economy, live ranks, celeb gacha and a live stock market</div>
+      <div class="project-footer">
+        <div class="project-stats" id="sc-stats">
+          <span id="sc-guilds">— servers</span>
+          <span class="project-stats-sep">·</span>
+          <span id="sc-users">— citizens</span>
+        </div>
+        <a class="project-github" href="https://github.com/Saguny/Social-Score-Surveillant_Discord-Bot" target="_blank" onclick="event.stopPropagation()">
+          <span class="icon icon-github"></span>
+          GitHub
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/static/studio.js?v=2"></script>
+
+</body>
+</html>

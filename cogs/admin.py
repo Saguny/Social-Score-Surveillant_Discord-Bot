@@ -47,6 +47,16 @@ class Admin(commands.Cog):
         await ctx.send(embed=embed)
         self.bot.dispatch("score_change", ctx.guild, citizen, ctx.channel, old, new)
 
+    @commands.command(name="rankchannel")
+    @commands.has_permissions(manage_guild=True)
+    async def set_rank_announcement_channel(self, ctx, channel: discord.TextChannel = None):
+        async with ctx.typing():
+            await self.db.set_rank_announcement_channel(ctx.guild.id, channel.id if channel else None)
+            msg = f"Rank-up and demotion announcements will be posted in {channel.mention}." if channel else "Rank announcement channel cleared · notices will post in the message channel."
+            embed = discord.Embed(color=0xCC0000, title="BUREAU DIRECTIVE", description="中华人民共和国社会信用局")
+            embed.add_field(name="RANK ANNOUNCEMENT CHANNEL", value=msg, inline=False)
+        await ctx.send(embed=embed)
+
     @commands.command(name="executions")
     @commands.has_permissions(manage_guild=True)
     async def set_execution_channel(self, ctx, channel: discord.TextChannel = None):

@@ -1,21 +1,22 @@
 import asyncio
+import time
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 
 from config.achievements import ACHIEVEMENTS, get_achievement, achievements_by_category
+from infra.redis_client import get_redis
+from infra.redis_cache import cache_set_nx
 
 _ANNOUNCE_DEBOUNCE_SECS = 2.0
+_ANNOUNCE_SAFETY_TTL = 30
 
 
 class AchievementsCog(commands.Cog, name="Achievements"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.db = bot.db
-        self._pending_ids: dict[tuple[int, int], list[str]] = {}
-        self._pending_channel: dict[tuple[int, int], discord.abc.Messageable | None] = {}
-        self._pending_tasks: dict[tuple[int, int], asyncio.Task] = {}
 
     async def grant(
         self,
@@ -35,7 +36,7 @@ class AchievementsCog(commands.Cog, name="Achievements"):
         if data["badge"]:
             await self.db.add_cosmetic_badge(user.id, data["badge"])
         await self._apply_rewards_everywhere(user, data)
-        self._queue_announce(guild, user, achievement_id, channel)
+        await self._queue_announce(guild, user, achievement_id, channel)
         if achievement_id != "completionist":
             await self._check_completionist(guild, user, channel)
         return True
@@ -51,8 +52,8 @@ class AchievementsCog(commands.Cog, name="Achievements"):
             await self.grant(guild, user, "completionist", channel=channel)
 
     async def _apply_rewards_everywhere(self, user: discord.abc.User, data: dict):
-        targets = [g for g in self.bot.guilds if g.get_member(user.id) is not None]
-        await asyncio.gather(*(self._apply_rewards(g.id, user.id, data) for g in targets))
+        guild_ids = await self.db.get_user_guild_ids(user.id)
+        await asyncio.gather(*(self._apply_rewards(gid, user.id, data) for gid in guild_ids))
 
     async def _apply_rewards(self, guild_id: int, user_id: int, data: dict):
         tasks = []
@@ -63,62 +64,21 @@ class AchievementsCog(commands.Cog, name="Achievements"):
         if tasks:
             await asyncio.gather(*tasks)
 
-    def _queue_announce(self, guild: discord.Guild, user: discord.abc.User, achievement_id: str, channel):
-        key = (guild.id, user.id)
-        self._pending_ids.setdefault(key, []).append(achievement_id)
-        self._pending_channel[key] = channel
-        existing = self._pending_tasks.get(key)
-        if existing and not existing.done():
-            return
-        self._pending_tasks[key] = asyncio.create_task(self._flush_announce(guild, user, key))
-
-    async def _flush_announce(self, guild: discord.Guild, user: discord.abc.User, key: tuple[int, int]):
-        await asyncio.sleep(_ANNOUNCE_DEBOUNCE_SECS)
-        ids = self._pending_ids.pop(key, [])
-        fallback_channel = self._pending_channel.pop(key, None)
-        self._pending_tasks.pop(key, None)
-        if not ids:
-            return
-
-        loud = await self.db.get_achievements_loud_enabled(guild.id)
-        if not loud:
-            return
-
-        configured_channel_id = await self.db.get_achievements_channel(guild.id)
-        channel = guild.get_channel(configured_channel_id) if configured_channel_id else fallback_channel
-        if channel is None:
-            return
-
-        embeds = []
-        for aid in ids:
-            data = get_achievement(aid)
-            if not data:
-                continue
-            parts = []
-            if data["score_reward"]:
-                parts.append(f"{data['score_reward']:.2f} credit score")
-            if data["yuan_reward"]:
-                parts.append(f"¥{data['yuan_reward']:,} Yuan")
-            reward_text = f" rewarding them with {' and '.join(parts)}" if parts else ""
-            embed = discord.Embed(
-                title="Achievement Unlocked!",
-                description=f"{user.mention} has unlocked the **{data['name']}** achievement{reward_text}.",
-                color=0xFFD700,
-            )
-            embed.set_thumbnail(url="attachment://achievement.png")
-            embed.set_footer(text="ccp achievementnotification [on|off] · ccp achievementchannel [#channel]")
-            embeds.append(embed)
-        if not embeds:
-            return
-        file = discord.File("images/achievement.png", filename="achievement.png")
-        try:
-            await channel.send(file=file, embeds=embeds)
-        except (discord.Forbidden, discord.HTTPException):
-            pass
+    async def _queue_announce(self, guild: discord.Guild, user: discord.abc.User, achievement_id: str, channel):
+        r = get_redis()
+        key_ids = f"ach:ids:{guild.id}:{user.id}"
+        key_channel = f"ach:channel:{guild.id}:{user.id}"
+        key_ready = f"ach:ready:{guild.id}:{user.id}"
+        await r.rpush(key_ids, achievement_id)
+        await r.expire(key_ids, _ANNOUNCE_SAFETY_TTL)
+        if channel is not None:
+            await cache_set_nx(key_channel, str(channel.id), ex=_ANNOUNCE_SAFETY_TTL)
+        ready_at = int(time.time()) + int(_ANNOUNCE_DEBOUNCE_SECS)
+        await cache_set_nx(key_ready, str(ready_at), ex=_ANNOUNCE_SAFETY_TTL)
 
     # ── /achievements ────────────────────────────────────────────────────────
 
-    @app_commands.command(name="achievements", description="View unlocked and locked achievements")
+    @app_commands.command(name="achievements", description="View this citizen's Bureau decoration record")
     @app_commands.describe(citizen="Citizen to look up (defaults to yourself)")
     async def achievements(self, interaction: discord.Interaction, citizen: discord.Member = None):
         await interaction.response.defer()
@@ -129,8 +89,10 @@ class AchievementsCog(commands.Cog, name="Achievements"):
         grouped = achievements_by_category()
         categories = list(grouped.keys())
         author_name = await self.bot.format_user_full(target, gid)
-        unlock_counts, total_citizens = await asyncio.gather(
-            self.db.get_achievement_counts(), self.db.get_total_citizen_count()
+        unlock_counts, total_citizens, (server_rank, rank_total) = await asyncio.gather(
+            self.db.get_achievement_counts(),
+            self.db.get_total_citizen_count(),
+            self.db.get_achievement_server_rank(gid, target.id),
         )
 
         def pct_line(aid: str) -> str:
@@ -139,32 +101,51 @@ class AchievementsCog(commands.Cog, name="Achievements"):
             pct = (unlock_counts.get(aid, 0) / total_citizens) * 100
             return f"\n{pct:.1f}% of citizens have this achievement"
 
-        def build_embed(category: str) -> discord.Embed:
+        def build_overview_embed() -> discord.Embed:
+            total = len(ACHIEVEMENTS)
+            total_unlocked = len(unlocked)
+            pct = (total_unlocked / total * 100) if total > 0 else 0.0
             e = discord.Embed(
-                title=f"中华人民共和国社会信用局 · Achievements · {category.upper()}",
+                title="STATE DECORATIONS",
+                description="中华人民共和国社会信用局",
                 color=0xFFD700,
             )
-            e.set_author(name=author_name, icon_url=target.display_avatar.url)
-            e.set_thumbnail(url="attachment://achievement.png")
+            e.set_author(name=f"{author_name} · OVERVIEW", icon_url=target.display_avatar.url)
+            e.set_thumbnail(url="attachment://achievements.png")
+            e.add_field(name="TOTAL UNLOCKED", value=f"{total_unlocked} / {total}", inline=True)
+            e.add_field(name="COMPLETION", value=f"{pct:.1f}%", inline=True)
+            if server_rank > 0:
+                e.add_field(name="SERVER RANK", value=f"#{server_rank} of {rank_total}", inline=True)
+            e.set_footer(text=f"{total_unlocked}/{total} total decorations on record")
+            return e
+
+        def build_embed(category: str) -> discord.Embed:
+            e = discord.Embed(
+                title="STATE DECORATIONS",
+                description="中华人民共和国社会信用局",
+                color=0xFFD700,
+            )
+            e.set_author(name=f"{author_name} · {category.upper()}", icon_url=target.display_avatar.url)
+            e.set_thumbnail(url="attachment://achievements.png")
             for aid in grouped[category]:
                 data = get_achievement(aid)
                 if aid in unlocked:
                     ts = unlocked[aid]
                     e.add_field(
-                        name=f"✅ {data['name']}",
+                        name=f"🔓 {data['name']}",
                         value=f"{data['description']}\n<t:{ts}:R>{pct_line(aid)}",
                         inline=False,
                     )
                 elif data["secret"]:
-                    e.add_field(name="🔒 ?????", value="A secret the Party keeps.", inline=False)
+                    e.add_field(name="📕 CLASSIFIED", value="Bureau records on this citation are sealed.", inline=False)
                 else:
                     e.add_field(
-                        name="🔒 ?????",
-                        value=f"{data['hint'] or 'Unknown.'}{pct_line(aid)}",
+                        name=f"🔒 RESTRICTED",
+                        value=f"{data['hint'] or 'Criteria unknown.'}{pct_line(aid)}",
                         inline=False,
                     )
             unlocked_count = sum(1 for aid in grouped[category] if aid in unlocked)
-            e.set_footer(text=f"{unlocked_count}/{len(grouped[category])} unlocked in this category")
+            e.set_footer(text=f"{unlocked_count}/{len(grouped[category])} citations on record in this category")
             return e
 
         class CategoryView(discord.ui.View):
@@ -175,11 +156,22 @@ class AchievementsCog(commands.Cog, name="Achievements"):
 
             def _refresh_buttons(self_v):
                 self_v.clear_items()
+                ov_style = discord.ButtonStyle.primary if self_v.active == "OVERVIEW" else discord.ButtonStyle.secondary
+                ov_btn = discord.ui.Button(label="OVERVIEW", style=ov_style)
+                ov_btn.callback = self_v._make_overview_cb()
+                self_v.add_item(ov_btn)
                 for cat in categories:
                     style = discord.ButtonStyle.primary if cat == self_v.active else discord.ButtonStyle.secondary
                     btn = discord.ui.Button(label=cat.upper(), style=style)
                     btn.callback = self_v._make_cb(cat)
                     self_v.add_item(btn)
+
+            def _make_overview_cb(self_v):
+                async def callback(itr: discord.Interaction):
+                    self_v.active = "OVERVIEW"
+                    self_v._refresh_buttons()
+                    await itr.response.edit_message(embed=build_overview_embed(), view=self_v)
+                return callback
 
             def _make_cb(self_v, cat: str):
                 async def callback(itr: discord.Interaction):
@@ -188,8 +180,61 @@ class AchievementsCog(commands.Cog, name="Achievements"):
                     await itr.response.edit_message(embed=build_embed(cat), view=self_v)
                 return callback
 
-        file = discord.File("images/achievement.png", filename="achievement.png")
-        await interaction.followup.send(file=file, embed=build_embed(categories[0]), view=CategoryView(categories[0]))
+        file = discord.File("images/achievements.png", filename="achievements.png")
+        await interaction.followup.send(file=file, embed=build_overview_embed(), view=CategoryView("OVERVIEW"))
+
+
+def build_announce_embeds(ids: list[str], user: discord.abc.User) -> list[discord.Embed]:
+    embeds = []
+    for aid in ids:
+        data = get_achievement(aid)
+        if not data:
+            continue
+        embed = discord.Embed(
+            title="STATE DECORATION AWARDED",
+            description="中华人民共和国社会信用局",
+            color=0xFFD700,
+        )
+        embed.add_field(name="CITIZEN", value=user.mention, inline=True)
+        embed.add_field(name="DECORATION", value=data["name"], inline=True)
+        parts = []
+        if data["score_reward"]:
+            parts.append(f"{data['score_reward']:.2f} rating")
+        if data["yuan_reward"]:
+            parts.append(f"¥{data['yuan_reward']:,}")
+        if parts:
+            embed.add_field(name="REWARD", value=" · ".join(parts), inline=False)
+        embed.set_thumbnail(url="attachment://achievements.png")
+        embed.set_footer(text="ccp achievementnotification [on|off] · ccp achievementchannel [#channel]")
+        embeds.append(embed)
+    return embeds
+
+
+async def deliver_achievement_announcements(
+    db,
+    guild: discord.Guild,
+    user: discord.abc.User,
+    ids: list[str],
+    fallback_channel_id: int | None = None,
+):
+    if not ids:
+        return
+    loud = await db.get_achievements_loud_enabled(guild.id)
+    if not loud:
+        return
+    configured_channel_id = await db.get_achievements_channel(guild.id)
+    channel_id = configured_channel_id or fallback_channel_id
+    channel = guild.get_channel(channel_id) if channel_id else None
+    if channel is None:
+        return
+    embeds = build_announce_embeds(ids, user)
+    if not embeds:
+        return
+    file = discord.File("images/achievements.png", filename="achievements.png")
+    try:
+        await channel.send(file=file, embeds=embeds)
+    except (discord.Forbidden, discord.HTTPException):
+        pass
 
 
 async def unlock(

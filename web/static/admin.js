@@ -23,7 +23,7 @@ async function run(command, args = []) {
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify({command, args})
   });
-  if (res.status === 401 || res.status === 403) { location.href = '/login?next=/admin'; return; }
+  if (res.status === 401 || res.status === 403) { location.href = '/social-credit/login?next=/social-credit/admin'; return; }
   const data = await res.json();
   log(command + (args.length ? ' ' + args.join(' ') : ''), data.output || data.error, res.ok && !data.error);
 }
@@ -39,7 +39,7 @@ async function lookupUser() {
   out.innerHTML = '<div style="color:var(--text-muted)">Looking up...</div>';
 
   const res = await fetch('/api/admin/user-lookup?user_id=' + encodeURIComponent(userId));
-  if (res.status === 401 || res.status === 403) { location.href = '/login?next=/admin'; return; }
+  if (res.status === 401 || res.status === 403) { location.href = '/social-credit/login?next=/social-credit/admin'; return; }
   const data = await res.json();
   if (data.error) { out.innerHTML = `<div style="color:var(--red)">${_esc(data.error)}</div>`; return; }
 
@@ -51,12 +51,9 @@ async function lookupUser() {
     </div>
   `;
 
-  const dmBtn = `<button class="btn btn-run btn-sm px-3 mt-2" onclick="prefillDm('${data.user_id}')">SEND DM VIA EMBED BROADCASTER</button>`;
-
   if (!data.guilds.length) {
     out.innerHTML = header +
-      `<div style="color:var(--text-faint);font-size:.85rem;margin-bottom:8px">Not currently a member of any server the bot shares.</div>` +
-      dmBtn;
+      `<div style="color:var(--text-faint);font-size:.85rem;margin-bottom:8px">Not currently a member of any server the bot shares.</div>`;
     return;
   }
 
@@ -71,7 +68,7 @@ async function lookupUser() {
     </div>
   `).join('');
 
-  out.innerHTML = header + rows + dmBtn;
+  out.innerHTML = header + rows;
 }
 
 async function applyYuan(guildId, userId, btn) {
@@ -85,26 +82,13 @@ async function applyYuan(guildId, userId, btn) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ guild_id: guildId, user_id: userId, amount }),
   });
-  if (res.status === 401 || res.status === 403) { location.href = '/login?next=/admin'; return; }
+  if (res.status === 401 || res.status === 403) { location.href = '/social-credit/login?next=/social-credit/admin'; return; }
   const data = await res.json();
   if (data.error) { alert(data.error); return; }
 
   const sub = document.getElementById('ul-sub-' + guildId);
   sub.innerHTML = sub.innerHTML.replace(/&yen;[\d,]+/, '&yen;' + data.yuan.toLocaleString());
   amtInput.value = '';
-}
-
-function toggleDmTargetInput() {
-  const isDm = document.getElementById('eb-target').value === 'dm';
-  document.getElementById('eb-dm-userid-wrap').style.display = isDm ? 'block' : 'none';
-}
-
-function prefillDm(userId) {
-  const sel = document.getElementById('eb-target');
-  sel.value = 'dm';
-  document.getElementById('eb-dm-userid').value = userId;
-  toggleDmTargetInput();
-  document.getElementById('eb-title').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 let ebFields = [];
@@ -183,10 +167,10 @@ function renderEmbedPreview() {
 
 async function loadGuildListForBroadcast() {
   const res = await fetch('/api/admin/guild-list');
-  if (res.status === 401 || res.status === 403) { location.href = '/login?next=/admin'; return; }
+  if (res.status === 401 || res.status === 403) { location.href = '/social-credit/login?next=/social-credit/admin'; return; }
   const data = await res.json();
   const sel = document.getElementById('eb-target');
-  sel.innerHTML = '<option value="all">All servers</option><option value="dm">DM a specific user</option>';
+  sel.innerHTML = '<option value="all">All servers</option>';
   (data.guilds || []).forEach(g => {
     const opt = document.createElement('option');
     opt.value = g.id;
@@ -201,15 +185,8 @@ async function sendBroadcastEmbed() {
   if (!title && !desc) { alert('Add a title or description first.'); return; }
 
   const sel = document.getElementById('eb-target');
-  let target = sel.value;
-  let targetLabel = sel.selectedOptions[0].textContent;
-
-  if (target === 'dm') {
-    const dmUserId = v('eb-dm-userid');
-    if (!dmUserId) { alert('Enter a user ID to DM.'); return; }
-    target = 'dm:' + dmUserId;
-    targetLabel = `user ${dmUserId} via DM`;
-  }
+  const target = sel.value;
+  const targetLabel = sel.selectedOptions[0].textContent;
 
   if (!confirm(`Send this embed to ${targetLabel}? This sends once, immediately, and cannot be undone.`)) return;
 
@@ -234,7 +211,7 @@ async function sendBroadcastEmbed() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  if (res.status === 401 || res.status === 403) { location.href = '/login?next=/admin'; return; }
+  if (res.status === 401 || res.status === 403) { location.href = '/social-credit/login?next=/social-credit/admin'; return; }
   const data = await res.json();
 
   if (data.error) {
@@ -248,6 +225,53 @@ async function sendBroadcastEmbed() {
     data.results.map(r => `${r.guild_name} (${r.guild_id}) -- ${r.status}${r.detail ? ': ' + r.detail : ''}`).join('\n');
 }
 
+async function loadAnnouncement() {
+  const res = await fetch('/api/announcement');
+  const data = await res.json();
+  document.getElementById('an-enabled').checked = !!data.enabled;
+  document.getElementById('an-severity').value = data.severity || 'info';
+  document.getElementById('an-message').value = data.message || '';
+  renderAnnouncementPreview();
+}
+
+function renderAnnouncementPreview() {
+  const enabled = document.getElementById('an-enabled').checked;
+  const severity = document.getElementById('an-severity').value;
+  const message = v('an-message');
+  const preview = document.getElementById('an-preview');
+  if (!enabled || !message) {
+    preview.innerHTML = '<div style="color:var(--text-faint);font-size:.75rem">Banner hidden (disabled or empty message).</div>';
+    return;
+  }
+  preview.innerHTML = `<div class="announce-banner announce-${severity}">${_esc(message)}</div>`;
+}
+
+async function saveAnnouncement() {
+  const payload = {
+    enabled: document.getElementById('an-enabled').checked,
+    severity: document.getElementById('an-severity').value,
+    message: v('an-message'),
+  };
+  const out = document.getElementById('an-result');
+  out.style.color = 'var(--text-muted)';
+  out.textContent = 'Saving...';
+
+  const res = await fetch('/api/admin/announcement', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (res.status === 401 || res.status === 403) { location.href = '/social-credit/login?next=/social-credit/admin'; return; }
+  const data = await res.json();
+  if (data.error) {
+    out.style.color = 'var(--red)';
+    out.textContent = 'Error: ' + data.error;
+    return;
+  }
+  out.style.color = 'var(--green)';
+  out.textContent = 'Saved. Live on the dashboard immediately, no restart needed.';
+}
+
 let _voteChart = null;
 
 function _formatBucket(ts, period) {
@@ -257,12 +281,12 @@ function _formatBucket(ts, period) {
 }
 
 async function loadVoteChart(period) {
-  document.querySelectorAll('#vote-period-group button').forEach(b => {
+  document.querySelectorAll('[data-period]').forEach(b => {
     b.classList.toggle('active', b.dataset.period === period);
   });
 
   const res = await fetch('/api/admin/topgg-votes?period=' + period);
-  if (res.status === 401 || res.status === 403) { location.href = '/login?next=/admin'; return; }
+  if (res.status === 401 || res.status === 403) { location.href = '/social-credit/login?next=/social-credit/admin'; return; }
   const data = await res.json();
 
   document.getElementById('vote-total').textContent =
@@ -291,4 +315,236 @@ async function loadVoteChart(period) {
       },
     },
   });
+}
+
+// ── Requests (character submission review) ────────────────────────────────────
+
+let _reqSort = 'votes';
+
+function setReqSort(sort) {
+  _reqSort = sort;
+  document.getElementById('sort-votes').classList.toggle('active', sort === 'votes');
+  document.getElementById('sort-newest').classList.toggle('active', sort === 'newest');
+  loadPendingRequests();
+}
+
+async function loadPendingRequests() {
+  const $list = document.getElementById('req-list');
+  if (!$list) return;
+  $list.innerHTML = '<div style="color:var(--text-muted);font-size:.82rem">Loading…</div>';
+  const r = await fetch('/api/admin/requests?sort=' + _reqSort);
+  if (!r.ok) { $list.innerHTML = '<div style="color:var(--red)">Failed to load.</div>'; return; }
+  const data = await r.json();
+  const rows = data.requests || [];
+  const badge = document.getElementById('req-badge');
+  if (badge) {
+    if (rows.length) { badge.textContent = rows.length; badge.style.display = ''; }
+    else badge.style.display = 'none';
+  }
+  if (!rows.length) {
+    $list.innerHTML = '<div style="color:var(--text-muted);font-size:.82rem">No pending requests.</div>';
+    return;
+  }
+  const RARITIES  = ['legendary','epic','rare','uncommon','common'];
+  const GENDERS   = ['male','female','other'];
+  const FACTIONS  = ['reds','strongmen','conquerors','icons','capitalists','wildcards'];
+  $list.innerHTML = rows.map(req => {
+    const curRarity  = req.override_rarity  || '';
+    const curGender  = req.override_gender  || '';
+    const curFaction = req.override_faction || '';
+    const curTitle   = req.override_title   || '';
+    const curUrls    = (req.override_image_urls || []).join('\n');
+    const wikiLang   = req.wiki_lang || 'en';
+    const badges    = [
+      curRarity  ? `<span class="req-override-badge">${_re(curRarity)}</span>`  : '',
+      curGender  ? `<span class="req-override-badge">${_re(curGender)}</span>`  : '',
+      curFaction ? `<span class="req-override-badge">${_re(curFaction)}</span>` : '',
+      curTitle   ? `<span class="req-override-badge" title="${_re(curTitle)}">${_re(curTitle.slice(0,20))}${curTitle.length>20?'…':''}</span>` : '',
+      (req.override_image_urls || []).length ? `<span class="req-override-badge">${req.override_image_urls.length} img</span>` : '',
+    ].join('');
+    const rarityOpts  = RARITIES.map(v  => `<option value="${v}"${curRarity===v?' selected':''}>${v}</option>`).join('');
+    const genderOpts  = GENDERS.map(v   => `<option value="${v}"${curGender===v?' selected':''}>${v}</option>`).join('');
+    const factionOpts = FACTIONS.map(v  => `<option value="${v}"${curFaction===v?' selected':''}>${v}</option>`).join('');
+    return `
+      <div class="req-row" id="req-${req.id}">
+        <div class="req-top">
+          <div class="req-meta">
+            <span class="req-title">${_re(req.wiki_title)}</span>
+            <span class="req-votes">${req.vote_count || 0} vote${(req.vote_count || 0) !== 1 ? 's' : ''}</span>
+            <span class="req-by">@${_re(req.discord_username)}</span>
+            <a href="https://${wikiLang}.wikipedia.org/wiki/${encodeURIComponent(req.wiki_slug)}" target="_blank" rel="noopener" class="req-wiki">Wikipedia ↗</a>
+            ${badges}
+          </div>
+          <div class="req-actions">
+            <button class="req-btn req-approve" onclick="approveRequest(${req.id}, '${_re(req.wiki_title)}')">✓ Approve</button>
+            <button class="req-btn req-reject"  onclick="rejectRequest(${req.id}, '${_re(req.wiki_title)}')">✗ Reject</button>
+            <button class="req-btn req-ban"     onclick="banSubmitter(${req.id}, ${req.discord_id})">⛔ Ban</button>
+            <button class="req-btn req-edit"    onclick="toggleReqEdit(${req.id})">✏ Edit</button>
+          </div>
+        </div>
+        <div class="req-edit-panel" id="req-edit-${req.id}" style="display:none">
+          <div class="row g-2 align-items-end">
+            <div class="col-auto">
+              <label class="form-label">Faction</label>
+              <select class="form-select form-select-sm" id="req-edit-faction-${req.id}" style="width:135px">
+                <option value="">— auto —</option>
+                ${factionOpts}
+              </select>
+            </div>
+            <div class="col-auto">
+              <label class="form-label">Rarity</label>
+              <select class="form-select form-select-sm" id="req-edit-rarity-${req.id}" style="width:135px">
+                <option value="">— auto —</option>
+                ${rarityOpts}
+              </select>
+            </div>
+            <div class="col-auto">
+              <label class="form-label">Gender</label>
+              <select class="form-select form-select-sm" id="req-edit-gender-${req.id}" style="width:115px">
+                <option value="">— auto —</option>
+                ${genderOpts}
+              </select>
+            </div>
+            <div class="col-auto">
+              <button class="btn btn-run btn-sm px-3" onclick="saveReqEdit(${req.id})">SAVE</button>
+            </div>
+            <div class="col-auto" id="req-edit-result-${req.id}" style="font-size:.75rem"></div>
+          </div>
+          <div class="mt-2">
+            <label class="form-label">Description / Title <span style="color:var(--text-muted);font-weight:400">(shown on card)</span></label>
+            <input type="text" class="form-control form-control-sm" id="req-edit-title-${req.id}" maxlength="100" value="${_re(curTitle)}" placeholder="e.g. German YouTuber">
+          </div>
+          <div class="mt-2">
+            <label class="form-label">Image URLs — one per line (leave blank to use pipeline)</label>
+            <textarea class="form-control form-control-sm" id="req-edit-urls-${req.id}" rows="3" style="font-size:.75rem;font-family:monospace">${_re(curUrls)}</textarea>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function toggleReqEdit(id) {
+  const panel = document.getElementById('req-edit-' + id);
+  if (panel) panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+async function saveReqEdit(id) {
+  const faction   = document.getElementById('req-edit-faction-' + id).value;
+  const rarity    = document.getElementById('req-edit-rarity-' + id).value;
+  const gender    = document.getElementById('req-edit-gender-' + id).value;
+  const title     = (document.getElementById('req-edit-title-' + id).value || '').trim();
+  const urlsRaw   = document.getElementById('req-edit-urls-' + id).value;
+  const imageUrls = urlsRaw.split('\n').map(u => u.trim()).filter(Boolean);
+  const out       = document.getElementById('req-edit-result-' + id);
+
+  out.style.color = 'var(--text-muted)';
+  out.textContent = 'Saving…';
+
+  const r = await fetch('/api/admin/requests/edit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ request_id: id, faction: faction || null, rarity: rarity || null, gender: gender || null, title: title || null, image_urls: imageUrls }),
+  });
+  if (r.status === 401 || r.status === 403) { location.href = '/social-credit/login?next=/social-credit/admin'; return; }
+  const body = await r.json().catch(() => ({}));
+  if (r.ok) {
+    out.style.color = 'var(--green)';
+    out.textContent = 'Saved.';
+  } else {
+    out.style.color = 'var(--red)';
+    out.textContent = 'Error: ' + (body.error || r.status);
+  }
+}
+
+function _re(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function approveRequest(requestId, title) {
+  const $panel = document.getElementById('req-pipeline');
+  const $log   = document.getElementById('req-pipeline-log');
+  if (!$panel || !$log) return;
+
+  if (!confirm(`Approve "${title}" and run the full gacha pipeline?`)) return;
+
+  $panel.style.display = 'block';
+  $log.innerHTML = '';
+  document.getElementById('req-pipeline-title').textContent = title;
+
+  function addLine(msg, ok) {
+    const d = document.createElement('div');
+    d.className = ok === false ? 'pipe-line pipe-err' : 'pipe-line pipe-ok';
+    d.textContent = msg;
+    $log.appendChild(d);
+    $log.scrollTop = $log.scrollHeight;
+  }
+
+  const res = await fetch('/api/admin/requests/approve', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ request_id: requestId }),
+  });
+
+  if (res.headers.get('content-type')?.includes('event-stream')) {
+    const reader = res.body.getReader();
+    const dec    = new TextDecoder();
+    let buf = '';
+    let succeeded = false;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const parts = buf.split('\n\n');
+      buf = parts.pop();
+      for (const part of parts) {
+        const line = part.replace(/^data: /, '');
+        try {
+          const ev = JSON.parse(line);
+          addLine((ev.ok === false ? '⚠ ' : '✓ ') + ev.msg, ev.ok !== false);
+          if (ev.stage === 'done' && ev.ok !== false) succeeded = true;
+        } catch (_) {}
+      }
+    }
+    if (succeeded) {
+      const row = document.getElementById('req-' + requestId);
+      if (row) row.remove();
+    }
+  } else {
+    const body = await res.json().catch(() => ({}));
+    addLine('Error: ' + (body.error || res.status), false);
+  }
+}
+
+async function rejectRequest(requestId, title) {
+  const reason = prompt(`Reason for rejecting "${title}" (optional):`, '');
+  if (reason === null) return;
+  const r = await fetch('/api/admin/requests/reject', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ request_id: requestId, reason }),
+  });
+  const body = await r.json().catch(() => ({}));
+  if (r.ok) {
+    const row = document.getElementById('req-' + requestId);
+    if (row) row.remove();
+    alert('Rejected.');
+  } else {
+    alert('Error: ' + (body.error || r.status));
+  }
+}
+
+async function banSubmitter(requestId, discordId) {
+  if (!confirm('Ban this submitter? They will no longer be able to submit requests.')) return;
+  const r = await fetch('/api/admin/requests/ban', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ discord_id: discordId }),
+  });
+  if (r.ok) {
+    await rejectRequest(requestId, '');
+    alert('Submitter banned.');
+  } else {
+    const body = await r.json().catch(() => ({}));
+    alert('Error: ' + (body.error || r.status));
+  }
 }

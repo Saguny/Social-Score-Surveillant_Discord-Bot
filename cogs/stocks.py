@@ -168,6 +168,16 @@ def _render_chart(
     n  = len(closes)
     xs = list(range(n))
 
+    if n > 0:
+        all_vals = closes + (highs + lows if chart_type == "candlestick" else [])
+        v_min, v_max = min(all_vals), max(all_vals)
+        v_range = v_max - v_min if v_max > v_min else v_max * 0.01
+        pad = max(v_range * 0.25, v_max * 0.005)
+        y_bottom = v_min - pad
+        ax.set_ylim(y_bottom, v_max + pad)
+    else:
+        y_bottom = 0
+
     if chart_type == "candlestick" and n > 0:
         for i in range(n):
             o, h, l, c = opens[i], highs[i], lows[i], closes[i]
@@ -177,7 +187,7 @@ def _render_chart(
             ax.bar(i, body, bottom=min(o, c), color=clr, width=0.65, zorder=4)
     elif n > 0:
         ax.plot(xs, closes, color="#26a69a", linewidth=2.2, zorder=3)
-        ax.fill_between(xs, closes, min(closes) * 0.998,
+        ax.fill_between(xs, closes, y_bottom,
                         alpha=0.28, color="#26a69a", zorder=2)
 
     if entry_price is not None and n > 0:
@@ -186,7 +196,7 @@ def _render_chart(
         ax.text(0.01, entry_price, "Entry", transform=ax.get_yaxis_transform(),
                 color="#ffffff", fontsize=7, va="bottom", alpha=0.85)
     elif baseline is not None and baseline > 0 and n > 0:
-        # Day-open reference line — same treatment as the portfolio chart's
+        # Day-open reference line - same treatment as the portfolio chart's
         # baseline line, only shown when there's no entry/KO line to clash with.
         ax.axhline(y=baseline, color="#ffffff", linewidth=0.8,
                    linestyle="--", alpha=0.25, zorder=1)
@@ -234,7 +244,7 @@ def _render_chart(
 
 
 def _render_portfolio_chart(timeline: list, cost_basis: float = 0.0) -> bytes:
-    """Equity curve: [(label_str, total_value), ...] — Trade Republic style."""
+    """Equity curve: [(label_str, total_value), ...] - Trade Republic style."""
     labels = [t[0] for t in timeline]
     values = [float(t[1]) for t in timeline]
     n      = len(values)
@@ -256,8 +266,13 @@ def _render_portfolio_chart(timeline: list, cost_basis: float = 0.0) -> bytes:
         up        = last >= baseline
         color     = "#26a69a" if up else "#ef5350"
         xs        = list(range(n))
+        v_min, v_max = min(values), max(values)
+        v_range = v_max - v_min if v_max > v_min else v_max * 0.01
+        pad = max(v_range * 0.25, v_max * 0.005)
+        y_bottom = v_min - pad
+        ax.set_ylim(y_bottom, v_max + pad)
         ax.plot(xs, values, color=color, linewidth=2.2, zorder=3)
-        ax.fill_between(xs, values, min(values) * 0.998, alpha=0.22, color=color, zorder=2)
+        ax.fill_between(xs, values, y_bottom, alpha=0.22, color=color, zorder=2)
 
         pct  = (last - baseline) / baseline * 100 if baseline > 0 else 0.0
         sign = "+" if pct >= 0 else ""
@@ -270,7 +285,7 @@ def _render_portfolio_chart(timeline: list, cost_basis: float = 0.0) -> bytes:
         ax.text(0.5, 0.5, "Insufficient history", ha="center", va="center",
                 color="#888888", fontsize=10, transform=ax.transAxes)
 
-    # x-axis time labels — always pin last tick to final data point
+    # x-axis time labels - always pin last tick to final data point
     if labels and n > 1:
         num_ticks = min(6, n)
         positions = [round(i * (n - 1) / (num_ticks - 1)) for i in range(num_ticks)] if num_ticks > 1 else [0]
@@ -327,7 +342,7 @@ class PortfolioPeriodView(discord.ui.View):
 
 
 class StockChartView(discord.ui.View):
-    """Period-switcher buttons for /stocks chart — mirrors PortfolioPeriodView."""
+    """Period-switcher buttons for /stocks chart - mirrors PortfolioPeriodView."""
 
     def __init__(self, cog, ticker: str, chart_type: str, embed: discord.Embed, bse_bytes: bytes | None):
         super().__init__(timeout=300)
@@ -447,15 +462,27 @@ class StocksCog(commands.Cog, name="Stocks"):
                 continue
             price, yf_open = res
             if price and price > 0:
-                self._prices[ticker] = price
+                yuan_price = self._to_yuan(ticker, price)
+                self._prices[ticker] = yuan_price
                 if yf_open and yf_open > 0:
-                    self._day_opens[ticker] = yf_open
+                    self._day_opens[ticker] = self._to_yuan(ticker, yf_open)
                 elif self._day_opens.get(ticker, 0) <= 0:
-                    self._day_opens[ticker] = price
-                price_updates.append((ticker, price, self._day_opens[ticker]))
+                    self._day_opens[ticker] = yuan_price
+                price_updates.append((ticker, yuan_price, self._day_opens[ticker]))
 
         if price_updates:
             await self.bot.db.batch_upsert_stock_prices(price_updates)
+
+        # last resort: any ticker still at 0 after DB + yfinance -> use most recent price bar
+        still_zero = [t for t in REAL_TICKERS if self._prices.get(t, 0) <= 0]
+        if still_zero:
+            history_prices = await self.bot.db.get_latest_prices_from_history()
+            for ticker in still_zero:
+                p = history_prices.get(ticker, 0)
+                if p > 0:
+                    self._prices[ticker] = p
+                    if self._day_opens.get(ticker, 0) <= 0:
+                        self._day_opens[ticker] = p
 
         if self._prices.get(ETF_TICKER, 0) <= 0:
             base = ETF_INFO["base_price"]
@@ -503,22 +530,29 @@ class StocksCog(commands.Cog, name="Stocks"):
         real_pcts: dict[str, float] = {}
         for ticker in REAL_TICKERS:
             old = self._prices.get(ticker, 0.0)
-            if old <= 0:
-                continue
-
             exchange = REAL_STOCKS[ticker]["exchange"]
-            if not open_exchanges[exchange] or ticker in self._daily_locked or (
-                ticker in self._halted and now < self._halted[ticker]
-            ):
-                price_bars.append((ticker, now, old, old, old, old))
-                continue
 
             res = fetched.get(ticker)
             yf_price = None
             if res is not None and not isinstance(res, Exception):
                 yf_price, _ = res
 
-            new_price = yf_price if (yf_price and yf_price > 0) else old
+            if old <= 0:
+                if yf_price and yf_price > 0:
+                    yuan_price = self._to_yuan(ticker, yf_price)
+                    self._day_opens.setdefault(ticker, yuan_price)
+                    self._prices[ticker] = yuan_price
+                    price_updates.append((ticker, yuan_price, self._day_opens[ticker]))
+                    price_bars.append((ticker, now, yuan_price, yuan_price, yuan_price, yuan_price))
+                continue
+
+            if not open_exchanges[exchange] or ticker in self._daily_locked or (
+                ticker in self._halted and now < self._halted[ticker]
+            ):
+                price_bars.append((ticker, now, old, old, old, old))
+                continue
+
+            new_price = self._to_yuan(ticker, yf_price) if (yf_price and yf_price > 0) else old
 
             pct      = (new_price - old) / old
             day_open = self._day_opens.get(ticker, new_price)
@@ -736,16 +770,18 @@ class StocksCog(commands.Cog, name="Stocks"):
         day_open = self._day_opens.get(ticker)
         exchange = _exchange_for(ticker)
 
+        df = None
         if ticker in REAL_TICKERS:
             yf_period, yf_interval = _YF_PERIOD_MAP[period]
-            df = await loop.run_in_executor(None, _yf_history, ticker, yf_period, yf_interval)
-            if df is None or df.empty:
-                raise ValueError("No data from yfinance")
-            if period == "1D":
+            try:
+                df = await loop.run_in_executor(None, _yf_history, ticker, yf_period, yf_interval)
+            except Exception:
+                df = None
+            if df is not None and not df.empty and period == "1D":
                 open_ts = _last_market_open_ts(exchange)
                 df = df[df.index.astype("int64") // 10**9 >= open_ts]
-                if df.empty:
-                    raise ValueError("No price history yet for this period.")
+
+        if df is not None and not df.empty:
             opens      = [self._to_yuan(ticker, float(v)) for v in df["Open"]]
             highs      = [self._to_yuan(ticker, float(v)) for v in df["High"]]
             lows       = [self._to_yuan(ticker, float(v)) for v in df["Low"]]

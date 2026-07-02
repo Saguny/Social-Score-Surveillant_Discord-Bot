@@ -133,21 +133,21 @@ async function loadActivity(range) {
   ]);
 
   const socVals = eng.map(r => r.endorsements + r.rebukes);
-  set('tl-social-val', socVals.length ? fmt(socVals.reduce((a, b) => a + b, 0)) : '—');
+  set('tl-social-val', socVals.length ? fmt(socVals.reduce((a, b) => a + b, 0)) : '-');
   _sparkChart('chart-social', labels, socVals, '#7D9D9C', 3, v => v);
   _hideIfEmpty('chart-social', socVals.length);
 
   const port = d.portfolio || [];
   const portLabels = port.map(r => labelFn(r[0]));
   const portVals = port.map(r => r[1]);
-  set('tl-portfolio-val', portVals.length ? '¥' + fmt(portVals[portVals.length - 1]) : '—');
+  set('tl-portfolio-val', portVals.length ? '¥' + fmt(portVals[portVals.length - 1]) : '-');
   _sparkChart('chart-portfolio', portLabels, portVals, '#F5A855', 3, v => '¥' + fmt(v));
   _hideIfEmpty('chart-portfolio', portVals.length);
 
   const joins = d.joins || [];
   const joinLabels = joins.map(r => labelFn(r[0]));
   const joinVals = joins.map(r => r[1]);
-  set('tl-joins-val', joinVals.length ? fmt(joinVals.reduce((a, b) => a + b, 0)) : '—');
+  set('tl-joins-val', joinVals.length ? fmt(joinVals.reduce((a, b) => a + b, 0)) : '-');
   _sparkChart('chart-joins', joinLabels, joinVals, '#7D9D9C', 3, v => v);
   _hideIfEmpty('chart-joins', joinVals.length);
 }
@@ -159,7 +159,7 @@ async function loadYuanCirculation() {
   const yuan = d.yuan || [];
   const yuanLabels = yuan.map(r => _dayLabel(r[0]));
   const yuanVals = yuan.map(r => r[1]);
-  set('tl-yuan-val', yuanVals.length ? '¥' + fmt(yuanVals[yuanVals.length - 1]) : '—');
+  set('tl-yuan-val', yuanVals.length ? '¥' + fmt(yuanVals[yuanVals.length - 1]) : '-');
   _sparkChart('chart-yuan', yuanLabels, yuanVals, '#F4E557', 3, v => '¥' + fmt(v));
   _hideIfEmpty('chart-yuan', yuanVals.length);
 }
@@ -203,6 +203,23 @@ function fmtUptime(s) {
 function trunc(s,n){return s.length>n?s.slice(0,n)+'…':s;}
 function set(id,v){const e=document.getElementById(id);if(e)e.textContent=v;}
 function setHtml(id,v){const e=document.getElementById(id);if(e)e.innerHTML=v;}
+
+function _escAnnounce(s) {
+  return (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+async function loadAnnouncement() {
+  try {
+    const res = await fetch('/api/announcement');
+    if (!res.ok) return;
+    const d = await res.json();
+    if (d.enabled && d.message) {
+      setHtml('announce-wrap', `<div class="announce-banner announce-${d.severity || 'info'}">${_escAnnounce(d.message)}</div>`);
+    } else {
+      setHtml('announce-wrap', '');
+    }
+  } catch (e) {}
+}
 
 function trendHtml(now, prev) {
   if (!prev) return '';
@@ -255,7 +272,7 @@ function renderAnomalies(d) {
   if (ev_trend < -0.3)
     items.push({cls:'anomaly-warn', t:`⚠ Score event activity down ${Math.abs(ev_trend*100).toFixed(0)}% vs yesterday`});
   if (d.events_24h > 0 && d.neg_24h > d.pos_24h)
-    items.push({cls:'anomaly-warn', t:`⚠ More negative events than positive today — ${d.neg_24h} vs ${d.pos_24h} positive`});
+    items.push({cls:'anomaly-warn', t:`⚠ More negative events than positive today - ${d.neg_24h} vs ${d.pos_24h} positive`});
   if (d.wau > 0 && d.dau < d.wau/7 * 0.4)
     items.push({cls:'anomaly-warn', t:`⚠ DAU (${d.dau}) well below weekly average (${Math.round(d.wau/7)})`});
   if (d.net_delta_7d < -10)
@@ -332,12 +349,12 @@ async function loadFeed() {
 
 function renderStats(d) {
   const uptime  = d.uptime_seconds || 0;
-  const mps     = uptime > 0 ? (d.total_messages/uptime).toFixed(2) : '—';
+  const mps     = uptime > 0 ? (d.total_messages/uptime).toFixed(2) : '-';
   const tot_soc = (d.endorsements||0)+(d.rebukes||0);
 
   renderAnomalies(d);
 
-  set('mc-users',  fmt(d.total_users));
+  set('mc-users',  Number(d.total_users || 0).toLocaleString());
   set('mc-users-sub', '');
   set('mc-guilds', fmt(d.total_guilds));
   set('mc-uptime', fmtUptime(uptime));
@@ -347,17 +364,17 @@ function renderStats(d) {
   set('mc-wau',    fmt(d.wau));
 
   const mag = d.most_active_guild || {};
-  set('mc-mag',     mag.guild_name || mag.guild_id || '—');
+  set('mc-mag',     mag.guild_name || mag.guild_id || '-');
   set('mc-mag-sub', mag.total ? fmt(mag.total)+' msgs rated' : '');
 
-  set('mc-ping', d.discord_ping_ms ? d.discord_ping_ms+'ms' : '—');
+  set('mc-ping', d.discord_ping_ms ? d.discord_ping_ms+'ms' : '-');
   _setStatusClass('mc-ping', pingClass(d.discord_ping_ms));
 
   const dbCls = d.db_query_ms>600?'ping-bad':d.db_query_ms>350?'ping-warn':'ping-good';
-  set('mc-db', typeof d.db_query_ms === 'number' ? d.db_query_ms+'ms' : '—');
+  set('mc-db', typeof d.db_query_ms === 'number' ? d.db_query_ms+'ms' : '-');
   _setStatusClass('mc-db', typeof d.db_query_ms === 'number' ? dbCls : '');
 
-  set('mc-workers', d.sentiment_workers_max != null ? (d.sentiment_workers_active ?? 0)+'/'+d.sentiment_workers_max : '—');
+  set('mc-workers', d.sentiment_workers_max != null ? (d.sentiment_workers_active ?? 0)+'/'+d.sentiment_workers_max : '-');
 
   _pushLatencySample(d.db_query_ms, d.discord_ping_ms);
 
@@ -383,6 +400,7 @@ function renderStats(d) {
   set('ec-items', fmt(d.total_items));
   set('ec-fx',    fmt(d.active_effects));
   set('ec-fr',    fmt(d.fundraiser_yuan));
+  set('ec-treasury', fmt(d.treasury_total || 0));
   set('ec-rich',  fmt(d.highest_yuan));
 
   const ltPlayed = d.lottery_played || 0;
@@ -419,7 +437,7 @@ function renderStats(d) {
 
   set('ci-today',  fmt(d.checkins_today));
   setHtml('ci-t',  trendHtml(d.checkins_today, d.checkins_yday));
-  set('ci-rate',   d.dau > 0 ? Math.round(d.checkins_today / d.dau * 100) + '%' : '—');
+  set('ci-rate',   d.dau > 0 ? Math.round(d.checkins_today / d.dau * 100) + '%' : '-');
   set('ci-streak', fmt(d.highest_streak));
   set('ci-votes',  fmt(d.total_votes || 0));
   set('pr-ev',     fmt(d.prop_events));
@@ -430,12 +448,15 @@ function renderStats(d) {
   set('adv-neg', fmt(d.negative_events));
   set('adv-avd', (d.avg_delta>=0?'+':'')+d.avg_delta.toFixed(4));
   set('adv-pw',  fmt(d.prop_winners));
-  set('adv-pe',  d.prop_events > 0 ? (d.prop_subs/d.prop_events).toFixed(1) : '—');
-  set('adv-er',  tot_soc > 0 ? ((d.endorsements/tot_soc)*100).toFixed(1)+'%' : '—');
+  set('adv-pe',  d.prop_events > 0 ? (d.prop_subs/d.prop_events).toFixed(1) : '-');
+  set('adv-er',  tot_soc > 0 ? ((d.endorsements/tot_soc)*100).toFixed(1)+'%' : '-');
 
   document.getElementById('spinner').style.display = 'none';
   document.getElementById('main').style.display    = 'block';
-  set('last-updated', 'Updated '+new Date().toLocaleTimeString());
+  const _now = new Date();
+  const _ts = _now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  const _ds = _now.toLocaleDateString([], {month:'short', day:'numeric'});
+  set('last-updated', `Updated ${_ds} at ${_ts}`);
 }
 
 async function load() {
@@ -470,7 +491,7 @@ const STAT_TIPS = {
   'mc-dau':     'Citizens with at least one rated message in the last 24 hours.',
   'mc-mps':     'Lifetime average messages processed per second since the bot first started.',
   'mc-ping':    'Round-trip latency to Discord\'s gateway.',
-  'mc-db':      'Time for a trivial query to round-trip to the database. The DB runs on a separate Railway project from the bot, so this is expected to sit higher (~150-250ms) than a same-project setup (~5ms) would.',
+  'mc-db':      'Time for a trivial query to round-trip to the database.',
   'mc-uptime':  'Time since the bot process last started.',
   'mc-workers': 'Active / max sentiment-analysis worker processes.',
   'mc-mag':     'The server with the most rated messages all-time. Server identity is anonymized.',
@@ -492,7 +513,8 @@ const STAT_TIPS = {
   'ec-items':   'Total shop items purchased, all-time.',
   'ec-fx':      'Currently active shop effects (freezes, etc.) across all citizens.',
   'ec-fr':      'Total yuan raised through fundraisers, all-time.',
-  'tl-yuan-val':      'Yuan in circulation trend, sampled once daily — may lag the live "In Circulation" total above by up to 24h.',
+  'ec-treasury': 'Total yuan seized by the Bureau wealth tax on high-balance citizens, all-time.',
+  'tl-yuan-val':      'Yuan in circulation trend, sampled once daily - may lag the live "In Circulation" total above by up to 24h.',
   'tl-portfolio-val': 'Combined value of every citizen\'s stock and turbo holdings over the selected time range.',
   'ec-rich':    'The highest yuan balance currently held by any single citizen.',
   'mk-stocks':  'Total yuan currently invested in stocks across all portfolios.',
@@ -517,7 +539,9 @@ const STAT_TIPS = {
   'adv-er':     'Share of all endorsements and rebukes that were endorsements.',
   'tl-social-val': 'Endorsements plus rebukes given over the selected time range.',
   'sc-reb':     'Total rebukes given, all-time.',
-  'tl-dblatency-val': 'Rolling database round-trip time, sampled live. The DB runs on a separate Railway project from the bot, so this normally sits in the 150-250ms range rather than near-zero.',
+  'tl-dblatency-val': 'Rolling database round-trip time, sampled live.',
+  'cmd-today': 'Commands run since midnight UTC. Resets to 0 at 00:00 UTC.',
+  'cmd-24h':   'Rolling window: commands run in the last 24 hours, regardless of the calendar day.',
 };
 
 function _initTooltips() {
@@ -539,7 +563,162 @@ function _initTooltips() {
   });
 }
 
+// ── Command Analytics ────────────────────────────────────────────────────────
+
+let _cmdRange = '7d';
+let _cmdLoaded = false;
+
+function _barChart(canvasId, labels, datasets, opts = {}) {
+  const el = document.getElementById(canvasId);
+  if (!el) return;
+  if (_charts[canvasId]) { _charts[canvasId].destroy(); delete _charts[canvasId]; }
+  const horiz = !!opts.horizontal;
+  // For the category axis (labels), don't set a callback - Chart.js handles it.
+  // Only apply a format callback to the value axis.
+  const xTicks = { font: { size: 9 }, color: '#61677A', ...(horiz && opts.xFmt ? { callback: opts.xFmt } : {}) };
+  const yTicks = { font: { size: 9 }, color: '#61677A', ...(!horiz && opts.yFmt ? { callback: opts.yFmt } : {}) };
+  _charts[canvasId] = new Chart(el.getContext('2d'), {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      indexAxis: horiz ? 'y' : 'x',
+      plugins: {
+        legend: { display: !!opts.legend, position: 'top', labels: { boxWidth: 10, font: { size: 10 } } },
+        tooltip: { mode: 'nearest', axis: horiz ? 'y' : 'x', intersect: true },
+      },
+      scales: {
+        x: { grid: { color: 'rgba(97,103,122,.15)' }, ticks: xTicks, ...(opts.xMax != null ? { max: opts.xMax } : {}) },
+        y: { grid: { color: 'rgba(97,103,122,.15)' }, ticks: yTicks },
+      },
+    },
+  });
+}
+
+async function loadCommandAnalytics(range) {
+  if (range) {
+    _cmdRange = range;
+    document.querySelectorAll('#cmd-range-group button').forEach(b => {
+      b.classList.toggle('active', b.dataset.range === range);
+    });
+  }
+
+  const res = await fetch('/api/stats/commands?range=' + _cmdRange);
+  if (!res.ok) return;
+  const d = await res.json();
+  _cmdLoaded = true;
+
+  // Overview cards
+  const t = d.totals || {};
+  set('cmd-total',   fmt(t.total_executions || 0));
+  set('cmd-today',   fmt(t.executions_today || 0));
+  set('cmd-24h',     fmt(t.executions_24h || 0));
+  set('cmd-users',   fmt(t.unique_users || 0));
+  set('cmd-avgms',   (t.avg_execution_time_ms || 0).toFixed(0) + 'ms');
+  set('cmd-success', (t.overall_success_rate || 100).toFixed(1) + '%');
+
+  const topCmds = (d.top_commands || []).slice(0, 10);
+
+  // Usage over time (line chart)
+  const days      = d.usage_per_day || [];
+  const dayLabels = days.map(r => _dayLabel(r.day));
+  const dayUses   = days.map(r => r.uses);
+  _multiLineChart('chart-cmd-timeline', dayLabels, [
+    { label: 'Executions', data: dayUses, borderColor: '#F5A855', backgroundColor: '#F5A85522', fill: true, tension: .3 },
+  ]);
+
+  // Usage by hour bar chart
+  const hourBuckets = Array.from({ length: 24 }, (_, i) => ({ hour: i, uses: 0 }));
+  (d.usage_per_hour || []).forEach(r => { if (r.hour >= 0 && r.hour < 24) hourBuckets[r.hour].uses = r.uses; });
+  const hourLabels = hourBuckets.map(r => r.hour + ':00');
+  const hourUses   = hourBuckets.map(r => r.uses);
+  _barChart('chart-cmd-hour', hourLabels, [
+    { label: 'Uses', data: hourUses, backgroundColor: '#45C07A', borderRadius: 2 },
+  ], { xFmt: v => v });
+
+  // Avg execution time (horizontal bar)
+  const execRows    = (d.average_execution_time || []).slice(0, 8);
+  const execLabels  = execRows.map(r => r.command);
+  const execValues  = execRows.map(r => r.avg_ms);
+  _barChart('chart-cmd-exectime', execLabels, [
+    { label: 'Avg ms', data: execValues, backgroundColor: '#F4E557', borderRadius: 3 },
+  ], { horizontal: true, yFmt: v => v, xFmt: v => v + 'ms' });
+
+  // Success vs error rate (stacked bar per command, top 8)
+  const rateRows    = (d.per_command_rates || []).slice(0, 8);
+  const rateLabels  = rateRows.map(r => r.command);
+  const successPcts = rateRows.map(r => r.success_pct);
+  const errorPcts   = rateRows.map(r => r.error_pct);
+  _barChart('chart-cmd-rates', rateLabels, [
+    { label: 'Success %', data: successPcts, backgroundColor: '#3DAA6E', borderRadius: 2, stack: 'r' },
+    { label: 'Error %',   data: errorPcts,   backgroundColor: '#E85454', borderRadius: 2, stack: 'r' },
+  ], { legend: true, horizontal: true, xFmt: v => v + '%', xMax: 100 });
+
+  // Build unique-users and avg-exec-time maps for the top-commands table
+  const uniqueMap  = {};
+  (d.unique_users_per_command || []).forEach(r => { uniqueMap[r.command] = r.unique_users; });
+  const execMap    = {};
+  (d.average_execution_time || []).forEach(r => { execMap[r.command] = r.avg_ms; });
+  const rateMap    = {};
+  (d.per_command_rates || []).forEach(r => { rateMap[r.command] = r; });
+
+  // Top commands table
+  const tbody = document.getElementById('cmd-table-top-body');
+  if (tbody) {
+    if (!topCmds.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="sub text-center py-3">No data yet - commands will appear once the bot is used.</td></tr>';
+    } else {
+      tbody.innerHTML = topCmds.map((r, i) => {
+        const rate    = rateMap[r.command] || {};
+        const sucPct  = rate.success_pct != null ? rate.success_pct.toFixed(1) + '%' : '-';
+        const avgMs   = execMap[r.command] != null ? execMap[r.command].toFixed(0) + 'ms' : '-';
+        const uniq    = uniqueMap[r.command] != null ? fmt(uniqueMap[r.command]) : '-';
+        const rankCls = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+        return `<tr>
+          <td class="rank-cell lb-rank ${rankCls}">${i + 1}</td>
+          <td><strong>/${r.command}</strong></td>
+          <td>${fmt(r.uses)}</td>
+          <td>${uniq}</td>
+          <td class="${rate.success_pct >= 95 ? 'trend-up' : rate.success_pct < 80 ? 'trend-down' : ''}">${sucPct}</td>
+          <td>${avgMs}</td>
+        </tr>`;
+      }).join('');
+    }
+  }
+
+  // Recent activity table
+  const recentBody = document.getElementById('cmd-table-recent');
+  if (recentBody) {
+    const rows = (d.newest_commands || []).slice(0, 10);
+    if (!rows.length) {
+      recentBody.innerHTML = '<tr><td colspan="5" class="sub text-center py-3">No recent activity.</td></tr>';
+    } else {
+      recentBody.innerHTML = rows.map(r => {
+        const dt  = new Date(r.timestamp * 1000);
+        const mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][dt.getMonth()];
+        const t   = `${mon} ${dt.getDate()} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}:${String(dt.getSeconds()).padStart(2,'0')}`;
+        const sub   = r.subcommand || '-';
+        const ms    = r.execution_time_ms != null ? r.execution_time_ms + 'ms' : '-';
+        const badge = r.success
+          ? '<span class="cmd-badge-ok">OK</span>'
+          : `<span class="cmd-badge-err">${r.error_code || 'ERR'}</span>`;
+        return `<tr>
+          <td style="font-size:.68rem;opacity:.6">${t}</td>
+          <td><strong>/${r.command_name}</strong></td>
+          <td>${sub}</td>
+          <td>${ms}</td>
+          <td>${badge}</td>
+        </tr>`;
+      }).join('');
+    }
+  }
+}
+
+// ── End Command Analytics ────────────────────────────────────────────────────
+
 load();
+loadAnnouncement();
 loadActivity('7d');
 loadYuanCirculation();
 loadFeed();
@@ -547,3 +726,5 @@ _connectStream();
 _initTooltips();
 setInterval(() => loadActivity(_activityRange), 300000);
 setInterval(loadYuanCirculation, 300000);
+setInterval(loadAnnouncement, 60000);
+setInterval(() => { if (_cmdLoaded) loadCommandAnalytics(); }, 30000);

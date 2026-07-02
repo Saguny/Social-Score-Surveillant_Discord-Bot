@@ -50,6 +50,18 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',sans-seri
 .anomaly-warn { background:rgba(245,168,85,.12); border:1px solid rgba(245,168,85,.4); color:var(--orange); }
 .anomaly-ok   { background:rgba(61,170,110,.12); border:1px solid rgba(61,170,110,.4); color:var(--green); }
 
+.announce-overlay { max-width:100%; display:flex; justify-content:center; padding:0 1rem;
+                    margin-bottom:1rem; }
+.announce-banner { padding:.6rem 1.2rem; border-radius:6px; font-size:.85rem; white-space:nowrap;
+                    overflow:hidden; text-overflow:ellipsis; max-width:92vw;
+                    box-shadow:0 4px 14px rgba(0,0,0,.9); background:var(--bg-panel); }
+.announce-info   { background:rgba(244,229,87,.9); border:1px solid rgba(244,229,87,.9); color:var(--black); }
+.announce-warn   { background:rgba(245,168,85,.9); border:1px solid rgba(245,168,85,.9); color:var(--black); }
+.announce-danger { background:rgba(232,84,84,.9); border:1px solid rgba(232,84,84,.9); color:var(--black); }
+@media (max-width:576px) {
+  .announce-banner { white-space:normal; }
+}
+
 .drow { display:flex; align-items:center; gap:.7rem; margin-bottom:.55rem; }
 .dlbl { width:140px; color:var(--text-muted); flex-shrink:0; text-align:right; font-size:.7rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .dbar-wrap { flex:1; background:var(--bg-recessed); border-radius:4px; height:20px; overflow:hidden; position:relative; }
@@ -77,7 +89,7 @@ details[open] summary::before { content:'▼  '; }
 .ping-bad  { color:var(--red)!important; }
 
 .spinner-wrapper { display:flex; justify-content:center; padding:4rem; }
-.refresh-meta { color:var(--text-muted); font-size:.75rem; }
+.refresh-meta { color:var(--text-muted); font-size:.72rem; opacity:.55; white-space:nowrap; }
 ::-webkit-scrollbar{width:6px} ::-webkit-scrollbar-track{background:var(--bg)} ::-webkit-scrollbar-thumb{background:var(--accent);border-radius:3px}
 
 .shdr.d-flex { align-items:center; }
@@ -136,6 +148,25 @@ details[open] summary::before { content:'▼  '; }
 .feed-delta { flex-shrink:0; font-weight:700; width:46px; }
 .feed-user { color:var(--text-muted); flex-shrink:0; }
 .feed-reason { color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+.btn-compact { padding:.05rem .35rem !important; font-size:.66rem !important; line-height:1.4 !important; }
+.lb-row { display:flex; align-items:center; gap:.55rem; padding:.45rem 0; border-bottom:1px solid var(--border); font-size:.82rem; }
+.lb-row:last-child { border-bottom:none; }
+.lb-rank { width:24px; flex-shrink:0; text-align:right; font-size:.72rem; color:var(--text-faint); font-variant-numeric:tabular-nums; }
+.lb-rank.gold   { color:var(--yellow); font-weight:700; }
+.lb-rank.silver { color:var(--light-grey); font-weight:700; }
+.lb-rank.bronze { color:var(--orange); font-weight:700; }
+
+.cmd-table { color:var(--text); font-size:.78rem; }
+.cmd-table thead th { color:var(--text-muted); font-size:.65rem; text-transform:uppercase; letter-spacing:1px; border-bottom:1px solid var(--border); font-weight:600; }
+.cmd-table tbody td { border-bottom:1px solid var(--border); padding:.45rem .55rem; vertical-align:middle; color:var(--text) !important; background:transparent !important; }
+.cmd-table tbody tr:last-child td { border-bottom:none; }
+.cmd-table .rank-cell { color:var(--text-faint); width:28px; text-align:right; }
+.cmd-badge-ok  { display:inline-block; padding:.1rem .45rem; border-radius:3px; font-size:.65rem; background:rgba(61,170,110,.18); color:var(--green); }
+.cmd-badge-err { display:inline-block; padding:.1rem .45rem; border-radius:3px; font-size:.65rem; background:rgba(232,84,84,.15); color:var(--red); }
+.lb-name { flex:1; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.78rem; }
+.lb-val  { flex-shrink:0; font-weight:700; font-size:.78rem; color:var(--text); }
+.lb-val-sub { flex-shrink:0; font-size:.68rem; color:var(--text-faint); }
 
 .site-footer { text-align:center; color:var(--text-faint); font-size:.78rem; padding:1.5rem 0 2.5rem; }
 .site-footer a { color:var(--text-muted); text-decoration:none; }
