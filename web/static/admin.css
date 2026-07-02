@@ -136,6 +136,12 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',sans-seri
   margin-top:.6rem; padding-top:.6rem;
   border-top:1px solid var(--border);
 }
+.req-reject-panel {
+  margin-top:.6rem; padding-top:.6rem;
+  border-top:1px solid rgba(232,84,84,.25);
+}
+.req-cancel { background:rgba(97,103,122,.2); color:var(--grey); }
+.req-cancel:hover { background:rgba(97,103,122,.35); color:var(--text-muted); }
 .pipe-line { padding:.1rem 0; }
 .pipe-ok   { color:var(--green); }
 .pipe-err  { color:var(--yellow); }

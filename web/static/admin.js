@@ -377,7 +377,7 @@ async function loadPendingRequests() {
           </div>
           <div class="req-actions">
             <button class="req-btn req-approve" onclick="approveRequest(${req.id}, '${_re(req.wiki_title)}')">✓ Approve</button>
-            <button class="req-btn req-reject"  onclick="rejectRequest(${req.id}, '${_re(req.wiki_title)}')">✗ Reject</button>
+            <button class="req-btn req-reject"  onclick="toggleReqReject(${req.id})">✗ Reject</button>
             <button class="req-btn req-ban"     onclick="banSubmitter(${req.id}, ${req.discord_id})">⛔ Ban</button>
             <button class="req-btn req-edit"    onclick="toggleReqEdit(${req.id})">✏ Edit</button>
           </div>
@@ -419,6 +419,14 @@ async function loadPendingRequests() {
             <textarea class="form-control form-control-sm" id="req-edit-urls-${req.id}" rows="3" style="font-size:.75rem;font-family:monospace">${_re(curUrls)}</textarea>
           </div>
         </div>
+        <div class="req-reject-panel" id="req-reject-${req.id}" style="display:none">
+          <label style="font-size:.75rem;color:var(--text-muted);display:block;margin-bottom:.3rem">Reason for rejecting <span style="opacity:.6">(optional · will be sent to the submitter via DM)</span></label>
+          <textarea class="form-control form-control-sm" id="req-reject-reason-${req.id}" rows="2" style="font-size:.75rem" placeholder="e.g. Not a real historical figure, image quality too low…" maxlength="500"></textarea>
+          <div style="display:flex;gap:.4rem;margin-top:.4rem">
+            <button class="req-btn req-reject" onclick="confirmRejectRequest(${req.id})">✗ Confirm Reject</button>
+            <button class="req-btn req-cancel" onclick="toggleReqReject(${req.id})">Cancel</button>
+          </div>
+        </div>
       </div>`;
   }).join('');
 }
@@ -426,6 +434,38 @@ async function loadPendingRequests() {
 function toggleReqEdit(id) {
   const panel = document.getElementById('req-edit-' + id);
   if (panel) panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+function toggleReqReject(id) {
+  const panel = document.getElementById('req-reject-' + id);
+  if (!panel) return;
+  const opening = panel.style.display === 'none';
+  panel.style.display = opening ? 'block' : 'none';
+  if (opening) {
+    const ta = document.getElementById('req-reject-reason-' + id);
+    if (ta) { ta.value = ''; ta.focus(); }
+  }
+}
+
+async function confirmRejectRequest(requestId) {
+  const ta = document.getElementById('req-reject-reason-' + requestId);
+  const reason = ta ? ta.value.trim() : '';
+  await _doReject(requestId, reason);
+}
+
+async function _doReject(requestId, reason) {
+  const r = await fetch('/api/admin/requests/reject', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ request_id: requestId, reason }),
+  });
+  const body = await r.json().catch(() => ({}));
+  if (r.ok) {
+    const row = document.getElementById('req-' + requestId);
+    if (row) row.remove();
+  } else {
+    alert('Error: ' + (body.error || r.status));
+  }
 }
 
 async function saveReqEdit(id) {
@@ -515,24 +555,6 @@ async function approveRequest(requestId, title) {
   }
 }
 
-async function rejectRequest(requestId, title) {
-  const reason = prompt(`Reason for rejecting "${title}" (optional):`, '');
-  if (reason === null) return;
-  const r = await fetch('/api/admin/requests/reject', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ request_id: requestId, reason }),
-  });
-  const body = await r.json().catch(() => ({}));
-  if (r.ok) {
-    const row = document.getElementById('req-' + requestId);
-    if (row) row.remove();
-    alert('Rejected.');
-  } else {
-    alert('Error: ' + (body.error || r.status));
-  }
-}
-
 async function banSubmitter(requestId, discordId) {
   if (!confirm('Ban this submitter? They will no longer be able to submit requests.')) return;
   const r = await fetch('/api/admin/requests/ban', {
@@ -541,7 +563,7 @@ async function banSubmitter(requestId, discordId) {
     body: JSON.stringify({ discord_id: discordId }),
   });
   if (r.ok) {
-    await rejectRequest(requestId, '');
+    await _doReject(requestId, '');
     alert('Submitter banned.');
   } else {
     const body = await r.json().catch(() => ({}));
