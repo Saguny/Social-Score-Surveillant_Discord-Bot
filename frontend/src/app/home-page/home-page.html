@@ -1,9 +1,29 @@
 <div class="page-container">
     <h1 class="page-title">GLORY TO THE CCP!</h1>
-
-<ul>
-    <li>bing chilling</li>
-    <li>oder so idk bin nicht chinesisch</li>
-</ul>
-<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+    <p>Welcome to the Social Credit Surveillant!</p>
+    <p> A CCP-themed Discord bot that scores every message, assigns Party ranks, runs a live economy, fields a gacha
+        bureau of historical figures, current celebrities, and powers a Beijing Stock Exchange, all inside your server.
+    </p>
+    <div class="button-row">
+        <div class="page-button" (click)="this.overlay.showOverlay('link', 'Invite to Server', '', 'https://discord.com/oauth2/authorize?client_id=112345678901234567&permissions=8&scope=bot');">
+            <p class="page-button-description">Have fun</p>
+            <p class="page-button-title">Invite to Server</p>
+        </div>
+        <div class="page-button" [routerLink]="['/dashboard']">
+            <p class="page-button-description">See what's happening</p>
+            <p class="page-button-title">Dashboard</p>
+        </div>
+        <div class="page-button" [routerLink]="['/leaderboards']">
+            <p class="page-button-description">Check the rankings</p>
+            <p class="page-button-title">Leaderboards</p>
+        </div>
+        <div class="page-button">
+            <p class="page-button-description">Request a character</p>
+            <p class="page-button-title">Wishlist</p>
+        </div>
+        <div class="page-button">
+            <p class="page-button-description">Got a question?</p>
+            <p class="page-button-title">Support Server</p>
+        </div>
+    </div>
 </div>

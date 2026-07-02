@@ -1,0 +1,10 @@
+<div class="header">
+    <div class="header-left">
+        <a id="root-link" [routerLink]="['/']">社会信用 ★ ★ ★ ★ ★<br>Social Credit Surveillant</a>
+    </div>
+    <div class="header-right">
+        <a [routerLink]="['/dashboard']">Dashboard</a>
+        <a [routerLink]="['/leaderboards']">Leaderboards</a>
+        <a (click)="overlay.showOverlay('link', '', '', 'https://example.com/login')">Login</a>
+    </div>
+</div>

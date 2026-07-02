@@ -14,12 +14,12 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: rgba(0, 0, 0, 0.6);
+    background-color: rgba(0, 0, 0, 0.8);
     justify-content: center;
     align-items: center;
     display: flex;
-    backdrop-filter: blur(2px);
-    -webkit-backdrop-filter: blur(2px);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
 }
 
 .overlay {
@@ -30,7 +30,7 @@
     height: auto;
     max-height: 90vh;
     padding: 0 30px 20px;
-    border: 3px solid var(--border);
+    border: 3px solid var(--primary);
     background: linear-gradient(180deg, var(--background-top) 0%, var(--background-bottom) 100%);
     box-shadow: 0 0 40px 0 var(--background-top);
     border-radius: 10px;

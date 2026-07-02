@@ -1,0 +1,18 @@
+.footer {
+    margin-top: 30px;
+    font-size: 1.2em;
+    display: flex;
+    border: 3px solid var(--primary);
+    border-radius: 10px;
+    background: linear-gradient(180deg, var(--background-top) 0%, var(--background-bottom) 100%);
+    padding: 10px 20px;
+    align-items: center;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.footer-section {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}

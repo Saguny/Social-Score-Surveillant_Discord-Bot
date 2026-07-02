@@ -3,11 +3,13 @@ import { OverlayService } from '../app-services/overlay-service';
 import { RouterLink } from '@angular/router';
 
 @Component({
-  selector: 'app-home-page',
+  selector: 'app-footer',
   imports: [RouterLink],
-  templateUrl: './home-page.html',
-  styleUrl: './home-page.css',
+  templateUrl: './footer.html',
+  styleUrl: './footer.css',
 })
-export class HomePage {
-  constructor(public overlay: OverlayService) {}
+export class Footer {
+  constructor(
+    public overlay: OverlayService
+  ) {}
 }

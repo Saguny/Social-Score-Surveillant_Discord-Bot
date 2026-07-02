@@ -1,0 +1,27 @@
+.button-row {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.page-button {
+    border: 3px solid var(--primary);
+    border-radius: 10px;
+    background: linear-gradient(180deg, var(--background-top) 0%, var(--background-bottom) 100%);
+    padding: 0 20px;
+    display: block;
+    width: 300px;
+}
+
+.page-button:hover {
+    border: 3px solid var(--highlight);
+    background: linear-gradient(180deg, var(--background-bottom) 0%, var(--background-bottom) 100%);
+    cursor: pointer;
+}
+
+.page-button-title {
+    font-size: 1.5em;
+    color: var(--highlight);
+    margin: -10px 0 20px 0;
+}

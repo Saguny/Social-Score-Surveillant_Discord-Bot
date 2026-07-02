@@ -1,8 +1,9 @@
 :root {
     --background: #000;
-    --background-top: #630000a6;
-    --background-bottom: #e600002a;
-    --border: #920000a6;
+    --background-top: #470000a6;
+    --background-bottom: #08000050;
+    --body-background-top: #330000;
+    --body-background-bottom: #080000;
     --text: #fff;
     --highlight: #ffb200;
     --primary: #8f0000;
@@ -13,10 +14,13 @@
 }
 
 body {
-    margin: 20px;
-    padding: 0;
-    background-color: var(--background);
-    font-size: 0.9em;
+    margin: 0;
+    padding: 10px;
+    background: linear-gradient(180deg, var(--body-background-top) 0%, var(--body-background-bottom) 100%);
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    background-size: cover;
+    font-size: 1em;
     color: var(--text);
     font-family: "Space Grotesk", sans-serif;
     font-optical-sizing: auto;
@@ -52,47 +56,4 @@ a:hover {
 
 .page-container {
     font-size: 1.3em;
-}
-
-.button-primary {
-    font-size: 1.2em;
-    background-color: var(--highlight);
-    color: var(--background);
-    padding: 5px 10px;
-    border-radius: 10px;
-    text-decoration: none;
-    display: inline-block;
-    margin: 10px 0;
-    border: 3px solid var(--highlight);
-}
-
-.button-primary:hover {
-    background-color: var(--primary);
-    color: var(--highlight);
-    text-decoration: none;
-}
-
-.button-secondary {
-    font-size: 1.2em;
-    background-color: var(--background-top);
-    color: var(--highlight);
-    padding: 5px 10px;
-    border-radius: 10px;
-    text-decoration: none;
-    display: inline-block;
-    margin: 10px 0;
-    border: 3px solid var(--border);
-}
-
-.button-secondary:hover {
-    font-size: 1.2em;
-    background-color: var(--background-top);
-    color: var(--highlight);
-    padding: 5px 10px;
-    border-radius: 10px;
-    text-decoration: none;
-    display: inline-block;
-    margin: 10px 0;
-    border: 3px solid var(--highlight);
-    text-decoration: none;
 }

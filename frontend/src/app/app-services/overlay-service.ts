@@ -7,7 +7,6 @@ export type OverlayType =
     | "error"
     | "theme"
     | "link"
-    | "login"
     | "debug";
 
 export type OverlayState = {
@@ -25,7 +24,6 @@ export class OverlayService {
 
     showOverlay(type: OverlayType, title: string, message?: string, link?: string) {
         this.stateSubject.next({show: true, type, title, message, link});
-        //alert(`Overlay shown: ${type} - ${title}`);
     }
 
     hideOverlay() {

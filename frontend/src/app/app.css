@@ -1,54 +1,7 @@
-.app {
+#main-content {
     display: flex;
-    flex-direction: row;
-    width: 95vw;
-}
-
-.side-bar {
-    display: flex;
-    box-sizing: border-box;
-    flex-direction: column;
-    justify-content: space-between;
-    padding: 0 30px;
-    top: 20px;
-    position: fixed;
-    width: 260px;
-    height: calc(100vh - 40px);
-    border: 3px solid var(--border);
-    background: linear-gradient(180deg, var(--background-top) 0%, var(--background-bottom) 100%);
-    box-shadow: 0 0 40px 0 var(--background-top);
-    border-radius: 10px;
-}
-
-.side-bar:hover {
-    border: 3px solid var(--highlight);
-}
-
-.side-bar-elements {
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    height: 100%;
-    font-size: 1.3em;
-}
-
-.side-bar-links,
-.side-bar-infos {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-}
-
-.side-bar-infos {
-    font-size: 0.7em;
-    align-items: center;
-    padding-bottom: 30px;
-}
-
-.app-title a {
-    color: var(--highlight);
-}
-
-router-outlet {
-    margin-left: 300px;
+    width: 70vw;
+    margin: 0 auto;
+    padding: 0;
+    flex: 1;
 }

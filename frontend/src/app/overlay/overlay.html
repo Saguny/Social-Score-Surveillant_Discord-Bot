@@ -23,7 +23,7 @@
         </div>
         } @else if (state.type === 'link') {
         <div class="overlay">
-            <h1 class="overlay-title">{{ state.title }}</h1>
+            <h1 class="overlay-title">{{ state.title.toUpperCase() }}</h1>
             <p class="overlay-text">You are being redirected to the following link:</p>
             <p class="overlay-link">{{ state.link!.split('/')[0] + '//' + state.link!.split('/')[2] + "/" }}</p>
             <p class="overlay-text">Are you sure you want to proceed?</p>
