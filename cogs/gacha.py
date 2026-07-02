@@ -1269,6 +1269,39 @@ class GachaCog(commands.Cog, name="Gacha"):
         async with ctx.typing():
             await self._do_divorce(ctx.guild.id, ctx.author.id, name, ctx.send)
 
+    @commands.command(name="cooldown", aliases=["cd", "claim"])
+    async def prefix_cooldown(self, ctx: commands.Context):
+        async with ctx.typing():
+            r = get_redis()
+            guild_id = ctx.guild.id
+            user_id = ctx.author.id
+
+            max_rolls, roll_state, claim_raw, claim_ttl = await asyncio.gather(
+                self._max_rolls(user_id),
+                self._roll_state(guild_id, user_id),
+                r.get(f"gacha:claims:{guild_id}:{user_id}"),
+                r.ttl(f"gacha:claims:{guild_id}:{user_id}"),
+            )
+            rolls_used, roll_ttl = roll_state
+            claims_used = int(claim_raw) if claim_raw else 0
+
+            if claims_used >= MAX_CLAIMS_PER_HOUR and claim_ttl > 0:
+                mins = max(1, (int(claim_ttl) + 59) // 60)
+                claim_line = f"Your next claim is available in **{mins}min**"
+            else:
+                claim_line = "You can claim **now**"
+
+            rolls_left = max(0, max_rolls - rolls_used)
+            if rolls_left > 0:
+                roll_line = f"You have **{rolls_left}/{max_rolls}** rolls remaining"
+            else:
+                mins = max(1, (int(roll_ttl) + 59) // 60)
+                roll_line = f"Your rolls reset in **{mins}min**"
+
+            await ctx.send(
+                f"{claim_line}\n{roll_line}\nVote for the Bureau to reset your rolls `ccp vote`"
+            )
+
     @commands.command(name="reloadchars")
     @commands.is_owner()
     async def prefix_reload_chars(self, ctx: commands.Context):
