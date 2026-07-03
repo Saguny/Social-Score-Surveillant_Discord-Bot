@@ -116,7 +116,9 @@
     $result.innerHTML = `
       <div class="feedback fb-ingame">
         ✓ <strong>${_esc(d.wiki_title || 'This character')}</strong> is already in the game!
-      </div>`;
+      </div>
+      ${_urlFallbackHtml('Wrong person? Paste their Wikipedia URL')}`;
+    _bindUrlFallback();
   }
 
   function _parseTitleFromUrl(url) {
@@ -140,6 +142,7 @@
           spellcheck="false"
         >
         <div class="input-hint">We'll extract the article title and search again automatically.</div>
+        <div class="input-hint" style="margin-top:.25rem">No Wikipedia article? <a href="https://discord.gg/invite/k4W6YAPYhC" target="_blank" rel="noopener" style="color:var(--sage);text-decoration:none">Join the support server</a> and ask us directly.</div>
       </div>`;
   }
 
@@ -174,7 +177,10 @@
   function renderNotFound() {
     $result.innerHTML = `
       <div class="feedback fb-error">
-        ✗ No Wikipedia article found with that exact title. Check spelling or try the full official name.
+        ✗ No Wikipedia article found for that name. Check spelling or try their full official name.
+        If this character doesn't have a Wikipedia article, join the
+        <a href="https://discord.gg/invite/k4W6YAPYhC" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">support server</a>
+        and ask us directly.
       </div>
       ${_urlFallbackHtml("Can't find them by title?")}`;
     _bindUrlFallback();
