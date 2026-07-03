@@ -309,7 +309,8 @@ class GuideView(discord.ui.View):
                 "`ccp roll` · `ccp r` · `/roll` — Roll a random waifu\n"
                 "`ccp rollwaifu` · `ccp rw` · `/rollwaifu` — Female figures only\n"
                 "`ccp rollhusbando` · `ccp rh` · `/rollhusbando` — Male figures only\n"
-                "React with any emoji to claim · **10 rolls per hour** (up to +4 from vote streak)\n"
+                "React with any emoji to claim · **10 rolls per hour** base\n"
+                "Vote streak adds up to +4 rolls · Accelerated Processing upgrade adds up to +20\n"
                 "Voting on Top.gg resets your hourly rolls instantly"
             ),
             inline=False,
@@ -357,9 +358,21 @@ class GuideView(discord.ui.View):
         e.add_field(
             name="WISHLIST",
             value=(
-                "`ccp wish <name>` — Add to wishlist (max 20) · you'll be DM'd when they're claimed\n"
+                "`ccp wish <name>` — Add to wishlist (10 slots base, up to 30 with upgrades) · you'll be DM'd when they're claimed\n"
                 "`ccp wl` · `ccp wishlist` · `/wishlist view` — View your wishlist\n"
-                "`/wishlist remove <name>` — Remove from wishlist"
+                "`/wishlist remove <name>` — Remove from wishlist\n"
+                "Wishlisted characters have a 6% base chance to be forced on each roll (upgradeable to 15%)"
+            ),
+            inline=False,
+        )
+        e.add_field(
+            name="BUREAU UPGRADES",
+            value=(
+                "Permanent account upgrades purchased via `/buy`. Four tiers each.\n"
+                "**Expanded Dossier** (`/buy gacha_slots`) — wishlist capacity 10 → 15/20/25/30\n"
+                "**Accelerated Processing** (`/buy gacha_rolls`) — bonus rolls/hr +2/+5/+10/+20\n"
+                "**Priority Routing** (`/buy gacha_spawn`) — wishlist spawn rate 6% → 7.5/9.4/11.7/15%\n"
+                "View current tiers: `ccp upgrades`"
             ),
             inline=False,
         )

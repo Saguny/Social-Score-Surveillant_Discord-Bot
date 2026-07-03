@@ -4,7 +4,7 @@ import discord
 import asyncio
 from discord import app_commands
 from discord.ext import commands
-from config.shop import SHOP_ITEMS, BADGE_DISPLAY, COSMETIC_META
+from config.shop import SHOP_ITEMS, BADGE_DISPLAY, COSMETIC_META, GACHA_UPGRADE_TIERS
 from cogs.achievements import unlock as unlock_achievement, check_milestone
 
 _INVESTIGATION_BOUNTY_REWARD = 8000
@@ -15,6 +15,7 @@ _CATEGORY_DESCRIPTIONS = {
     "misc":     "Auxiliary services. Intelligence, evidence, and administrative tools.",
     "lottery":  "State Lottery Commission. Participation is voluntary. Outcomes are not.",
     "cosmetic": "Prestige registry. Status distinctions recorded in the Bureau's permanent files.",
+    "gacha":    "Waifu Bureau upgrades. Permanent enhancements to your gacha account. Cost increases each tier.",
 }
 
 _CATEGORY_LABELS = {
@@ -23,6 +24,7 @@ _CATEGORY_LABELS = {
     "misc":     "SERVICES",
     "lottery":  "LOTTERY",
     "cosmetic": "PRESTIGE",
+    "gacha":    "WAIFU BUREAU",
 }
 
 _THUMBNAIL         = "attachment://market.png"
@@ -438,6 +440,9 @@ class Economy(commands.Cog):
             "anon_identity":       self._buy_anon_identity,
             "immunity":            self._buy_immunity,
             "media_coverage":      self._buy_media_coverage,
+            "gacha_slots":         self._buy_gacha_upgrade,
+            "gacha_rolls":         self._buy_gacha_upgrade,
+            "gacha_spawn":         self._buy_gacha_upgrade,
         }
 
     def _post_score(self, interaction: discord.Interaction, member: discord.Member, old: float, new: float):
@@ -557,6 +562,17 @@ class Economy(commands.Cog):
         if item == "rehabilitate":
             rehab_count = await self.db.get_rehabilitation_count(gid, uid)
             cost = cfg["cost"] * (2 ** rehab_count)
+
+        if item in GACHA_UPGRADE_TIERS:
+            meta = GACHA_UPGRADE_TIERS[item]
+            tier = int(await self.db.get_counter(uid, f"gacha:upgrade:{meta['key']}") or 0)
+            max_tiers = len(meta["costs"])
+            if tier >= max_tiers:
+                await interaction.followup.send(
+                    f"**{cfg['name']}** is already at max tier ({max_tiers}/{max_tiers}).", ephemeral=True
+                )
+                return
+            cost = meta["costs"][tier]
 
         if item == "denounce" and target:
             last_denounce = await self.db.get_last_action_time(gid, uid, "denounce", target.id)
@@ -986,6 +1002,27 @@ class Economy(commands.Cog):
             embed.timestamp = discord.utils.utcnow()
             await interaction.followup.send(embed=embed)
         self._post_score(interaction, recipient, old, new)
+
+    async def _buy_gacha_upgrade(self, interaction, gid, uid, cfg, target, text, cost):
+        item_id = interaction.namespace.item
+        meta = GACHA_UPGRADE_TIERS[item_id]
+        counter_key = f"gacha:upgrade:{meta['key']}"
+        tier = int(await self.db.get_counter(uid, counter_key) or 0)
+        new_tier = tier + 1
+        await self.db.set_counter(uid, counter_key, new_tier)
+        max_tiers = len(meta["costs"])
+        value = meta["values"][new_tier - 1]
+        unit = meta["unit"]
+        maxed = new_tier >= max_tiers
+        next_cost = f"¥{meta['costs'][new_tier]:,}" if not maxed else "MAXED"
+        embed = discord.Embed(color=0x576F72, title="BUREAU UPGRADE PROCESSED", description="中华人民共和国社会信用局")
+        embed.add_field(name="UPGRADE", value=cfg["name"], inline=True)
+        embed.add_field(name="TIER", value=f"{new_tier}/{max_tiers}" + (" · **MAXED**" if maxed else ""), inline=True)
+        embed.add_field(name="NEW VALUE", value=f"{value} {unit}", inline=True)
+        if not maxed:
+            embed.add_field(name="NEXT TIER", value=next_cost, inline=True)
+        embed.timestamp = discord.utils.utcnow()
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
     async def _buy_cosmetic(self, interaction, gid, uid, item_id, cfg, target, text, cost):
         meta  = COSMETIC_META.get(item_id, {})

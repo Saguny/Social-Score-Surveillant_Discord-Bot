@@ -232,6 +232,31 @@ SHOP_ITEMS = {
         "category": "cosmetic",
         "cosmetic": True,
     },
+    # --- Waifu Bureau upgrades ---
+    "gacha_slots": {
+        "name": "Expanded Dossier",
+        "description": "Increases your wishlist capacity. Tier 1→15 · Tier 2→20 · Tier 3→25 · Tier 4→30 slots.",
+        "cost": 0,
+        "requires_target": False,
+        "requires_text": False,
+        "category": "gacha",
+    },
+    "gacha_rolls": {
+        "name": "Accelerated Processing",
+        "description": "Increases your hourly roll limit. Tier 1→+2 · Tier 2→+5 · Tier 3→+10 · Tier 4→+20 rolls.",
+        "cost": 0,
+        "requires_target": False,
+        "requires_text": False,
+        "category": "gacha",
+    },
+    "gacha_spawn": {
+        "name": "Priority Routing",
+        "description": "Increases wishlist spawn chance. Base 6% · Tier 1→7.5% · Tier 2→9.4% · Tier 3→11.7% · Tier 4→15%.",
+        "cost": 0,
+        "requires_target": False,
+        "requires_text": False,
+        "category": "gacha",
+    },
     "eternal_chairman": {
         "name": "Winnie the Pooh",
         "description": "Forbidden in 1.4 billion territories. Display name rendered in fullwidth script across every server the Bureau inhabits. Global cosmetic.",
@@ -260,4 +285,25 @@ COSMETIC_META = {
     "asset":            {"color": 0xF39C12, "label": "STATE-OWNED",             "suffix": " | ╠══ 𝙎𝙏𝘼𝙏𝙀-𝙊𝙒𝙉𝙀𝘿 ══╣",                                "note": "You are no longer a person. You are an asset of the People's Republic. Server-wide status."},
     "eternal_chairman": {"color": 0xFFB347, "label": "WINNIE THE POOH",         "suffix": " | ▓▒░【 𝙒𝙞𝙣𝙣𝙞𝙚 𝙩𝙝𝙚 𝙋𝙤𝙤𝙝 】░▒▓",                        "note": "Forbidden in 1.4 billion territories. Your name now renders in the sacred fullwidth script across every server the bureau inhabits. Global status."},
     "voter":            {"color": 0xE74C3C, "label": "LOYAL PATRIOT",           "suffix": " | ⟦ 𝘓𝘰𝘺𝘢𝘭 𝘗𝘢𝘵𝘳𝘪𝘰𝘵 ⟧",                                  "note": "Recognised for casting a ballot on the foreign registry Top.gg. Lasts 12 hours · vote again to renew. Recognised on every server the bureau inhabits."},
+}
+
+GACHA_UPGRADE_TIERS = {
+    "gacha_slots": {
+        "key":   "wishlist_slots",
+        "costs": [20_000, 80_000, 300_000, 1_000_000],
+        "values": [15, 20, 25, 30],
+        "unit":  "slots",
+    },
+    "gacha_rolls": {
+        "key":   "roll_bonus",
+        "costs": [15_000, 75_000, 350_000, 1_200_000],
+        "values": [2, 5, 10, 20],
+        "unit":  "bonus rolls/hr",
+    },
+    "gacha_spawn": {
+        "key":   "wishlist_spawn",
+        "costs": [25_000, 125_000, 500_000, 1_500_000],
+        "values": [7.5, 9.4, 11.7, 15.0],
+        "unit":  "% spawn rate",
+    },
 }

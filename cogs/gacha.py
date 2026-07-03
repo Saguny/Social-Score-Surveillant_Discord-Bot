@@ -13,6 +13,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from config.personalities import RARITY_WEIGHT
+from config.shop import SHOP_ITEMS, GACHA_UPGRADE_TIERS
 from cogs.achievements import unlock as unlock_achievement, check_milestone
 from infra.redis_client import get_redis
 
@@ -93,7 +94,13 @@ MAX_CLAIMS_PER_HOUR = 1
 MAX_STREAK_BONUS = 4
 HAREM_PAGE_SIZE  = 15
 BROWSE_PAGE_SIZE = 10
-WISHLIST_MAX   = 10
+WISHLIST_MAX     = 10
+
+# ── gacha upgrades ────────────────────────────────────────────────────────────
+WISHLIST_SPAWN_BASE  = 0.06
+WISHLIST_SPAWN_RATES = [v / 100 for v in GACHA_UPGRADE_TIERS["gacha_spawn"]["values"]]
+ROLL_BONUS_PER_TIER  = GACHA_UPGRADE_TIERS["gacha_rolls"]["values"]
+WISHLIST_SLOT_TIERS  = GACHA_UPGRADE_TIERS["gacha_slots"]["values"]
 
 FACTION_COLOR = {
     "reds":        0xA01414,
@@ -720,8 +727,18 @@ class GachaCog(commands.Cog, name="Gacha"):
     # ── roll helpers ─────────────────────────────────────────────────────────
 
     async def _max_rolls(self, user_id: int) -> int:
-        streak = await self.db.get_counter(user_id, "topgg_vote_streak:current") or 0
-        return BASE_ROLLS + min(int(streak), MAX_STREAK_BONUS)
+        streak, roll_tier = await asyncio.gather(
+            self.db.get_counter(user_id, "topgg_vote_streak:current"),
+            self.db.get_counter(user_id, "gacha:upgrade:roll_bonus"),
+        )
+        streak = int(streak or 0)
+        roll_tier = int(roll_tier or 0)
+        bonus = ROLL_BONUS_PER_TIER[roll_tier - 1] if roll_tier > 0 else 0
+        return BASE_ROLLS + min(streak, MAX_STREAK_BONUS) + bonus
+
+    async def _wishlist_max_slots(self, user_id: int) -> int:
+        tier = int(await self.db.get_counter(user_id, "gacha:upgrade:wishlist_slots") or 0)
+        return WISHLIST_SLOT_TIERS[tier - 1] if tier > 0 else WISHLIST_MAX
 
     async def _roll_state(self, guild_id: int, user_id: int) -> tuple[int, int]:
         r = get_redis()
@@ -766,8 +783,16 @@ class GachaCog(commands.Cog, name="Gacha"):
             warn_key = f"gacha:rl_warn:{guild_id}:{user_id}"
             if await r.set(warn_key, "1", nx=True, ex=15):
                 mins = max(1, (ttl + 59) // 60)
-                vote_bonus = max_rolls - BASE_ROLLS
-                limit_note = f" (+{vote_bonus} from vote streak)" if vote_bonus else ""
+                streak_val = await self.db.get_counter(user_id, "topgg_vote_streak:current") or 0
+                roll_tier  = await self.db.get_counter(user_id, "gacha:upgrade:roll_bonus") or 0
+                vote_bonus = min(int(streak_val), MAX_STREAK_BONUS)
+                shop_bonus = ROLL_BONUS_PER_TIER[int(roll_tier) - 1] if roll_tier else 0
+                notes = []
+                if vote_bonus:
+                    notes.append(f"+{vote_bonus} vote streak")
+                if shop_bonus:
+                    notes.append(f"+{shop_bonus} upgrade")
+                limit_note = f" ({', '.join(notes)})" if notes else ""
                 await send_fn(
                     f"**{display_name}**, the roulette is limited to "
                     f"**{max_rolls}** uses per hour{limit_note}. **{mins} min** left.\n"
@@ -775,7 +800,22 @@ class GachaCog(commands.Cog, name="Gacha"):
                 )
             return
 
+        # wishlist spawn bias
+        wishlist_ids, spawn_tier = await asyncio.gather(
+            self.db.get_wishlist(guild_id, user_id),
+            self.db.get_counter(user_id, "gacha:upgrade:wishlist_spawn"),
+        )
+        spawn_tier = int(spawn_tier or 0)
+        spawn_rate = WISHLIST_SPAWN_RATES[spawn_tier - 1] if spawn_tier > 0 else WISHLIST_SPAWN_BASE
+
         char_id, char = _roll_weighted(gender)
+        if wishlist_ids and random.random() < spawn_rate:
+            pool = [cid for cid in wishlist_ids if cid in _CHARS
+                    and (gender is None or _CHARS[cid].get("gender") == gender)]
+            if pool:
+                weights = [RARITY_WEIGHT.get(_CHARS[cid]["rarity"], 60) for cid in pool]
+                char_id = random.choices(pool, weights=weights)[0]
+                char = _CHARS[char_id]
         image_url = _pick_image(char)
 
         new_count, owner_id = await asyncio.gather(
@@ -1141,12 +1181,12 @@ class GachaCog(commands.Cog, name="Gacha"):
             await interaction.followup.send(f"No waifu found matching **{name}**.\nDon't see your favorite figure? Submit them for review: <https://off-by-one.digital/social-credit/submit>")
             return
         char_id = char.get("id", name)
-
-        result = await self.db.add_wishlist(interaction.guild.id, interaction.user.id, char_id, max_size=WISHLIST_MAX)
+        max_slots = await self._wishlist_max_slots(interaction.user.id)
+        result = await self.db.add_wishlist(interaction.guild.id, interaction.user.id, char_id, max_size=max_slots)
         if result == "added":
             await interaction.followup.send(f"Added **{char['name']}** {_stars(char['rarity'])} to your wishlist.")
         elif result == "full":
-            await interaction.followup.send(f"Your wishlist is full ({WISHLIST_MAX} max). Remove one first.")
+            await interaction.followup.send(f"Your wishlist is full ({max_slots} max). Remove one first or upgrade with `ccp upgrade wishlist_slots`.")
         else:
             await interaction.followup.send(f"**{char['name']}** is already on your wishlist.")
 
@@ -1298,6 +1338,7 @@ class GachaCog(commands.Cog, name="Gacha"):
             if not name:
                 await self._do_wishlist_view(ctx.guild.id, ctx.author, ctx.send)
                 return
+            max_slots = await self._wishlist_max_slots(ctx.author.id)
             char = _get_personality(name)
             if not char:
                 candidates = _search_personality_all(name)
@@ -1307,22 +1348,22 @@ class GachaCog(commands.Cog, name="Gacha"):
                     return
                 if len(candidates) > 1:
                     async def _wish_pick(c):
-                        result = await self.db.add_wishlist(ctx.guild.id, ctx.author.id, c["id"], max_size=WISHLIST_MAX)
+                        result = await self.db.add_wishlist(ctx.guild.id, ctx.author.id, c["id"], max_size=max_slots)
                         if result == "added":
                             await ctx.send(f"Added **{c['name']}** {_stars(c['rarity'])} to your wishlist.")
                         elif result == "full":
-                            await ctx.send(f"Your wishlist is full ({WISHLIST_MAX} max). Remove one first.")
+                            await ctx.send(f"Your wishlist is full ({max_slots} max). Remove one first or upgrade with `ccp upgrade wishlist_slots`.")
                         else:
                             await ctx.send(f"**{c['name']}** is already on your wishlist.")
                     await _show_char_picker(ctx.send, candidates, ctx.author.id, _wish_pick)
                     return
                 char = candidates[0]
             char_id = char["id"]
-            result = await self.db.add_wishlist(ctx.guild.id, ctx.author.id, char_id, max_size=WISHLIST_MAX)
+            result = await self.db.add_wishlist(ctx.guild.id, ctx.author.id, char_id, max_size=max_slots)
             if result == "added":
                 await ctx.send(f"Added **{char['name']}** {_stars(char['rarity'])} to your wishlist.")
             elif result == "full":
-                await ctx.send(f"Your wishlist is full ({WISHLIST_MAX} max). Remove one first.")
+                await ctx.send(f"Your wishlist is full ({max_slots} max). Remove one first or upgrade with `ccp upgrade wishlist_slots`.")
             else:
                 await ctx.send(f"**{char['name']}** is already on your wishlist.")
 
@@ -1702,6 +1743,43 @@ class GachaCog(commands.Cog, name="Gacha"):
             return
         await self.db.set_harem_thumbnail(guild_id, user.id, char["id"])
         await send_fn(f"**{char['name']}** is now your featured waifu.")
+
+
+    # ── gacha upgrades status ─────────────────────────────────────────────────
+
+    @commands.command(name="upgrades")
+    async def prefix_upgrades(self, ctx: commands.Context):
+        async with ctx.typing():
+            uid = ctx.author.id
+            tiers = {}
+            for item_id, meta in GACHA_UPGRADE_TIERS.items():
+                tiers[item_id] = int(await self.db.get_counter(uid, f"gacha:upgrade:{meta['key']}") or 0)
+
+            max_tiers = 4
+            embed = discord.Embed(title="Waifu Bureau · Upgrades", color=0x576F72)
+
+            icons = {"gacha_slots": "📋", "gacha_rolls": "🎰", "gacha_spawn": "🎯"}
+            for item_id, meta in GACHA_UPGRADE_TIERS.items():
+                tier = tiers[item_id]
+                label = SHOP_ITEMS[item_id]["name"]
+                costs = meta["costs"]
+                values = meta["values"]
+                unit = meta["unit"]
+
+                if tier >= max_tiers:
+                    current_val = values[tier - 1]
+                    status = f"Tier {tier}/{max_tiers} · **MAXED** · {current_val} {unit}"
+                else:
+                    current_val = values[tier - 1] if tier > 0 else ("10" if item_id == "gacha_slots" else ("0" if item_id == "gacha_rolls" else "6.0"))
+                    next_val = values[tier]
+                    status = f"Tier {tier}/{max_tiers} · {current_val} {unit} → {next_val} {unit} · ¥{costs[tier]:,}"
+
+                embed.add_field(
+                    name=f"{icons[item_id]} {label}",
+                    value=f"{status}\n`/buy {item_id}`",
+                    inline=False,
+                )
+            await ctx.send(embed=embed)
 
 
 async def setup(bot: commands.Bot):
