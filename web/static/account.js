@@ -149,10 +149,12 @@
     $el.innerHTML = achievements.map(a => {
       const tierClass = 'tier-' + (a.tier || 'silent');
       const date      = a.unlocked_at ? _timeAgo(a.unlocked_at) : '';
+      const pct       = typeof a.pct === 'number' ? a.pct.toFixed(1) + '%' : null;
       return `<div class="acc-ach-card ${tierClass}">
         <div class="acc-ach-name">${_esc(a.name)}</div>
         <div class="acc-ach-desc">${_esc(a.description)}</div>
         ${date ? `<div class="acc-ach-date">Unlocked ${date}</div>` : ''}
+        ${pct ? `<div class="acc-ach-pct">${pct}</div>` : ''}
       </div>`;
     }).join('');
   }

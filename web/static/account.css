@@ -213,7 +213,8 @@
   background: var(--bg-panel);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: .8rem 1rem;
+  padding: .8rem 1rem 1.6rem;
+  position: relative;
 }
 .acc-ach-card.tier-meta    { border-color: rgba(255,215,0,.45); }
 .acc-ach-card.tier-announce { border-color: rgba(125,157,156,.45); }
@@ -233,6 +234,13 @@
   font-size: .66rem;
   color: var(--text-faint, var(--text-muted));
   margin-top: .35rem;
+}
+.acc-ach-pct {
+  position: absolute;
+  bottom: .55rem;
+  right: .8rem;
+  font-size: .62rem;
+  color: var(--grey);
 }
 
 /* Badge grid */

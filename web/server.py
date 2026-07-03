@@ -1605,7 +1605,7 @@ async def _handle_account_api(request):
         return web.json_response(json.loads(cached))
 
     db = request.app["db"]
-    guild_data, req_data, ach_data, raw_badges, badge_pref, counters, best_streak_row = await asyncio.gather(
+    guild_data, req_data, ach_data, raw_badges, badge_pref, counters, best_streak_row, ach_counts, citizen_count = await asyncio.gather(
         db.get_user_all_guilds(user_id),
         db.get_user_requests_with_votes(user_id),
         db.get_unlocked_achievements(user_id),
@@ -1616,6 +1616,8 @@ async def _handle_account_api(request):
             "SELECT MAX(longest_checkin_streak) AS best FROM users WHERE user_id = $1",
             user_id,
         ),
+        db.get_achievement_counts(),
+        db.get_total_citizen_count(),
     )
 
     achievements = [
@@ -1625,6 +1627,7 @@ async def _handle_account_api(request):
             "name":           ACHIEVEMENTS.get(a["achievement_id"], {}).get("name", a["achievement_id"]),
             "description":    ACHIEVEMENTS.get(a["achievement_id"], {}).get("description", ""),
             "tier":           ACHIEVEMENTS.get(a["achievement_id"], {}).get("tier", "silent"),
+            "pct":            round(ach_counts.get(a["achievement_id"], 0) / citizen_count * 100, 1) if citizen_count else 0.0,
         }
         for a in ach_data
     ]
