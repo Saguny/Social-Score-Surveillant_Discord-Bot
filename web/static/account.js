@@ -373,6 +373,7 @@
             <td>${_fmtYuan(h.value)}</td>
             <td class="${_pnlClass(h.pnl)}">${pnlStr}</td>
             <td class="port-actions">
+              <button class="port-btn port-btn-ghost" onclick="_stockChart('${_esc(h.ticker)}','${_esc(h.name)}')">Chart</button>
               <button class="port-btn port-btn-buy" ${(market && market[h.exchange] && market[h.exchange].open) ? '' : 'disabled title="Market closed"'} onclick="_portBuy('${_esc(h.ticker)}','${_esc(h.name)}',${h.current_price},'${_esc(guildId)}')">Buy</button>
               <button class="port-btn port-btn-sell" onclick="_portSell('${_esc(h.ticker)}','${_esc(h.name)}',${h.current_price},'${_esc(guildId)}')">Sell</button>
             </td>

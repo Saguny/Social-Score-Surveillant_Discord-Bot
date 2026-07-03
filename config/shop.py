@@ -235,7 +235,7 @@ SHOP_ITEMS = {
     # --- Waifu Bureau upgrades ---
     "gacha_slots": {
         "name": "Wishlist Slots",
-        "description": "Tier 1->15 · Tier 2->20 · Tier 3->25 · Tier 4->30 wishlist slots.",
+        "description": "Increases your wishlist capacity.",
         "cost": 0,
         "requires_target": False,
         "requires_text": False,
@@ -243,7 +243,7 @@ SHOP_ITEMS = {
     },
     "gacha_rolls": {
         "name": "Bonus Rolls",
-        "description": "Tier 1->+2 · Tier 2->+5 · Tier 3->+10 · Tier 4->+20 bonus rolls/hr.",
+        "description": "Increases your hourly roll limit.",
         "cost": 0,
         "requires_target": False,
         "requires_text": False,
@@ -251,7 +251,7 @@ SHOP_ITEMS = {
     },
     "gacha_spawn": {
         "name": "Wishlist Spawn",
-        "description": "Base 6% · Tier 1->7.5% · Tier 2->9.4% · Tier 3->11.7% · Tier 4->15% wishlist spawn rate.",
+        "description": "Increases wishlist spawn chance.",
         "cost": 0,
         "requires_target": False,
         "requires_text": False,

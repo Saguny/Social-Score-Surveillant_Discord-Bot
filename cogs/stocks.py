@@ -308,7 +308,7 @@ def _render_portfolio_chart(timeline: list, cost_basis: float = 0.0) -> bytes:
 
 
 class PortfolioPeriodView(discord.ui.View):
-    def __init__(self, cog, guild_id, user_id, cost_basis, embed, bse_bytes):
+    def __init__(self, cog, guild_id, user_id, cost_basis, embed, bse_bytes, positions=None):
         super().__init__(timeout=300)
         self._cog        = cog
         self._guild_id   = guild_id
@@ -320,6 +320,18 @@ class PortfolioPeriodView(discord.ui.View):
             btn          = discord.ui.Button(label=label, style=discord.ButtonStyle.secondary)
             btn.callback = self._make_cb(label)
             self.add_item(btn)
+        if positions:
+            options = [
+                discord.SelectOption(
+                    label=f"{pos['ticker']} · {float(pos['shares']):g} sh",
+                    value=pos["ticker"],
+                    description=_ticker_info_name(pos["ticker"])[:100],
+                )
+                for pos in positions[:25]
+            ]
+            select          = discord.ui.Select(placeholder="View chart for a holding...", options=options)
+            select.callback = self._holding_chart_cb
+            self.add_item(select)
 
     def _make_cb(self, period_label: str):
         async def callback(itr: discord.Interaction):
@@ -339,6 +351,42 @@ class PortfolioPeriodView(discord.ui.View):
             new_attachments.append(discord.File(io.BytesIO(port_png), filename="portfolio.png"))
             await itr.edit_original_response(embed=self._embed, attachments=new_attachments, view=self)
         return callback
+
+    async def _holding_chart_cb(self, itr: discord.Interaction):
+        ticker = itr.data["values"][0]
+        await itr.response.defer(ephemeral=True)
+        try:
+            buf = await self._cog._build_chart(ticker, "1D", "line")
+        except Exception as e:
+            await itr.followup.send(f"Chart unavailable: {e}", ephemeral=True)
+            return
+        native   = self._cog._prices.get(ticker, 0.0)
+        day_open = self._cog._day_opens.get(ticker, native)
+        pct      = (native - day_open) / day_open * 100 if day_open > 0 else 0.0
+        color    = 0x26A69A if pct >= 0 else 0xEF5350
+        price    = self._cog._to_yuan(ticker, native)
+        info     = (REAL_STOCKS.get(ticker) or (ETF_INFO if ticker == ETF_TICKER else None) or PENNY_STOCKS.get(ticker) or {})
+        embed    = discord.Embed(title=f"{info.get('name_zh', ticker)} · {ticker}", color=color)
+        embed.add_field(name="Price",      value=_fmt_price(price), inline=True)
+        embed.add_field(name="Day Change", value=_fmt_pct(pct),     inline=True)
+        if ticker in REAL_STOCKS:
+            embed.add_field(name="Exchange", value=EXCHANGE_NAMES[REAL_STOCKS[ticker]["exchange"]], inline=True)
+        now = int(time.time())
+        if ticker in self._cog._pump_state:
+            embed.add_field(name="Status", value="🔥 PUMP EVENT · Price surging", inline=False)
+        elif ticker in self._cog._daily_locked:
+            embed.add_field(name="Status", value="⏸ Circuit breaker · daily limit hit", inline=False)
+        elif ticker in self._cog._halted and now < self._cog._halted[ticker]:
+            embed.add_field(name="Status", value="⏳ Temporarily halted", inline=False)
+        embed.set_image(url="attachment://chart.png")
+        if self._bse_bytes:
+            embed.set_thumbnail(url="attachment://bse.png")
+        view  = StockChartView(self._cog, ticker, "line", embed, self._bse_bytes)
+        files = []
+        if self._bse_bytes:
+            files.append(discord.File(io.BytesIO(self._bse_bytes), filename="bse.png"))
+        files.append(discord.File(buf, filename="chart.png"))
+        await itr.followup.send(embed=embed, files=files, view=view, ephemeral=True)
 
 
 class StockChartView(discord.ui.View):
@@ -1168,7 +1216,7 @@ class StocksCog(commands.Cog, name="Stocks"):
             embed.set_thumbnail(url="attachment://bse.png")
         embed.set_image(url="attachment://portfolio.png")
 
-        view  = PortfolioPeriodView(self, interaction.guild_id, interaction.user.id, cost_basis, embed, bse_bytes)
+        view  = PortfolioPeriodView(self, interaction.guild_id, interaction.user.id, cost_basis, embed, bse_bytes, positions=positions)
         files = []
         if bse_bytes:
             files.append(discord.File(io.BytesIO(bse_bytes), filename="bse.png"))
