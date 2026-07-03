@@ -34,7 +34,7 @@ def _fuzzy_match(query: str) -> dict | None:
     """Fuzzy match against all character names using difflib. Returns best match above threshold."""
     q = query.lower().strip()
     names = list(_NAME_INDEX.keys())
-    matches = difflib.get_close_matches(q, names, n=1, cutoff=0.55)
+    matches = difflib.get_close_matches(q, names, n=1, cutoff=0.70)
     if matches:
         cid = _NAME_INDEX[matches[0]]
         return {"id": cid, **_CHARS[cid]}
