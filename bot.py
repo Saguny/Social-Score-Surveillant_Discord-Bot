@@ -477,18 +477,21 @@ class SocialCreditBot(commands.AutoShardedBot):
                 )
             )
 
-    _COOLDOWN_EXEMPT_COMMANDS = {"roll", "rollwaifu", "rollhusbando"}
+    _COOLDOWN_EXEMPT_COMMANDS = {"roll", "rollwaifu", "rollhusbando", "r", "rw", "rh"}
 
     async def process_commands(self, message: discord.Message) -> None:
         _current_user_id.set(message.author.id)
         ctx = await self.get_context(message)
-        is_exempt = ctx.command and ctx.command.qualified_name in self._COOLDOWN_EXEMPT_COMMANDS
+        is_exempt = ctx.command and (
+            ctx.command.qualified_name in self._COOLDOWN_EXEMPT_COMMANDS
+            or ctx.invoked_with in self._COOLDOWN_EXEMPT_COMMANDS
+        )
         if not is_exempt and not await _check_cmd_cooldown(message.author.id):
             r = get_redis()
             warned = await r.set(f"cmdwarn:{message.author.id}", "1", nx=True, ex=int(CMD_COOLDOWN) or 1)
             if warned:
                 try:
-                    await message.channel.send("Slow down, citizen.", delete_after=3)
+                    await message.channel.send("Slow down, citizen.")
                 except discord.Forbidden:
                     pass
             return
