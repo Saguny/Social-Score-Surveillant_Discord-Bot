@@ -484,10 +484,13 @@ class SocialCreditBot(commands.AutoShardedBot):
         ctx = await self.get_context(message)
         is_exempt = ctx.command and ctx.command.qualified_name in self._COOLDOWN_EXEMPT_COMMANDS
         if not is_exempt and not await _check_cmd_cooldown(message.author.id):
-            try:
-                await message.channel.send("Slow down, citizen.", delete_after=3)
-            except discord.Forbidden:
-                pass
+            r = get_redis()
+            warned = await r.set(f"cmdwarn:{message.author.id}", "1", nx=True, ex=int(CMD_COOLDOWN) or 1)
+            if warned:
+                try:
+                    await message.channel.send("Slow down, citizen.", delete_after=3)
+                except discord.Forbidden:
+                    pass
             return
         if ctx.command and ctx.command.qualified_name not in OPTOUT_ALLOWED_PREFIX_COMMANDS:
             if await self.db.is_opted_out(message.author.id):

@@ -756,20 +756,23 @@ class GachaCog(commands.Cog, name="Gacha"):
     # ── shared logic ─────────────────────────────────────────────────────────
 
     async def _do_roll(self, guild_id: int, user_id: int, display_name: str, send_fn, gender: str | None = None):
+        r = get_redis()
         (max_rolls, (rolls_used, ttl)) = await asyncio.gather(
             self._max_rolls(user_id),
             self._roll_state(guild_id, user_id),
         )
 
         if rolls_used >= max_rolls:
-            mins = max(1, (ttl + 59) // 60)
-            vote_bonus = max_rolls - BASE_ROLLS
-            limit_note = f" (+{vote_bonus} from vote streak)" if vote_bonus else ""
-            await send_fn(
-                f"**{display_name}**, the roulette is limited to "
-                f"**{max_rolls}** uses per hour{limit_note}. **{mins} min** left.\n"
-                f"Vote to reset your rolls and increase your limit: `ccp vote`"
-            )
+            warn_key = f"gacha:rl_warn:{guild_id}:{user_id}"
+            if await r.set(warn_key, "1", nx=True, ex=15):
+                mins = max(1, (ttl + 59) // 60)
+                vote_bonus = max_rolls - BASE_ROLLS
+                limit_note = f" (+{vote_bonus} from vote streak)" if vote_bonus else ""
+                await send_fn(
+                    f"**{display_name}**, the roulette is limited to "
+                    f"**{max_rolls}** uses per hour{limit_note}. **{mins} min** left.\n"
+                    f"Vote to reset your rolls and increase your limit: `ccp vote`"
+                )
             return
 
         char_id, char = _roll_weighted(gender)
@@ -804,7 +807,6 @@ class GachaCog(commands.Cog, name="Gacha"):
         if guild and member:
             await unlock_achievement(self.bot, guild, member, "first_roll")
 
-        r = get_redis()
         pending = json.dumps({
             "char_id":   char_id,
             "guild_id":  guild_id,
