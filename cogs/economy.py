@@ -62,7 +62,7 @@ def _build_items_for_cat() -> dict[str, list[tuple[str, dict]]]:
     return cat_items
 
 
-async def _build_shop_embeds(username: str = "yourname", db=None, user_id: int | None = None, _gacha_tiers: dict | None = None) -> dict[str, discord.Embed]:
+async def _build_shop_embeds(username: str = "yourname", db=None, user_id: int | None = None, guild_id: int | None = None, _gacha_tiers: dict | None = None) -> dict[str, discord.Embed]:
     e_cosmetic = discord.Embed(color=0xFFB347, title="STATE PROCUREMENT OFFICE", description=_CATEGORY_DESCRIPTIONS["cosmetic"])
     e_cosmetic.set_thumbnail(url=_THUMBNAIL)
     for item_id in _COSMETIC_ORDER:
@@ -118,9 +118,9 @@ async def _build_shop_embeds(username: str = "yourname", db=None, user_id: int |
             by_cat.setdefault(cat, []).append((item_id, item))
 
     gacha_tiers: dict[str, int] = _gacha_tiers or {}
-    if not gacha_tiers and db and user_id:
+    if not gacha_tiers and db and user_id and guild_id:
         tier_vals = await asyncio.gather(*(
-            db.get_counter(user_id, f"gacha:upgrade:{GACHA_UPGRADE_TIERS[iid]['key']}")
+            db.get_counter(user_id, f"gacha:upgrade:{guild_id}:{GACHA_UPGRADE_TIERS[iid]['key']}")
             for iid in GACHA_UPGRADE_TIERS
         ))
         gacha_tiers = {iid: int(v or 0) for iid, v in zip(GACHA_UPGRADE_TIERS, tier_vals)}
@@ -528,12 +528,13 @@ class Economy(commands.Cog):
     async def shop(self, interaction: discord.Interaction):
         await interaction.response.defer(thinking=True)
         uid = interaction.user.id
+        gid = interaction.guild.id
         tier_vals = await asyncio.gather(*(
-            self.db.get_counter(uid, f"gacha:upgrade:{GACHA_UPGRADE_TIERS[iid]['key']}")
+            self.db.get_counter(uid, f"gacha:upgrade:{gid}:{GACHA_UPGRADE_TIERS[iid]['key']}")
             for iid in GACHA_UPGRADE_TIERS
         ))
         gacha_tiers = {iid: int(v or 0) for iid, v in zip(GACHA_UPGRADE_TIERS, tier_vals)}
-        embeds = await _build_shop_embeds(username=str(interaction.user), db=self.db, user_id=uid, _gacha_tiers=gacha_tiers)
+        embeds = await _build_shop_embeds(username=str(interaction.user), db=self.db, user_id=uid, guild_id=gid, _gacha_tiers=gacha_tiers)
         items_for_cat = _build_items_for_cat()
         view = ShopView(embeds, items_for_cat, gacha_tiers, self, active="core")
         await interaction.followup.send(
@@ -654,7 +655,7 @@ class Economy(commands.Cog):
 
         if item in GACHA_UPGRADE_TIERS:
             meta = GACHA_UPGRADE_TIERS[item]
-            tier = int(await self.db.get_counter(uid, f"gacha:upgrade:{meta['key']}") or 0)
+            tier = int(await self.db.get_counter(uid, f"gacha:upgrade:{gid}:{meta['key']}") or 0)
             max_tiers = len(meta["costs"])
             if tier >= max_tiers:
                 await interaction.followup.send(
@@ -1095,7 +1096,7 @@ class Economy(commands.Cog):
     async def _buy_gacha_upgrade(self, interaction, gid, uid, cfg, target, text, cost):
         item_id = interaction.namespace.item
         meta = GACHA_UPGRADE_TIERS[item_id]
-        counter_key = f"gacha:upgrade:{meta['key']}"
+        counter_key = f"gacha:upgrade:{gid}:{meta['key']}"
         tier = int(await self.db.get_counter(uid, counter_key) or 0)
         new_tier = tier + 1
         await self.db.set_counter(uid, counter_key, new_tier)
@@ -1245,8 +1246,9 @@ class Economy(commands.Cog):
         self, interaction: discord.Interaction, current: str
     ) -> list[app_commands.Choice[str]]:
         uid = interaction.user.id
+        gid = interaction.guild_id
         tier_vals = await asyncio.gather(*(
-            self.db.get_counter(uid, f"gacha:upgrade:{GACHA_UPGRADE_TIERS[iid]['key']}")
+            self.db.get_counter(uid, f"gacha:upgrade:{gid}:{GACHA_UPGRADE_TIERS[iid]['key']}")
             for iid in GACHA_UPGRADE_TIERS
         ))
         gacha_tiers = {iid: int(v or 0) for iid, v in zip(GACHA_UPGRADE_TIERS, tier_vals)}

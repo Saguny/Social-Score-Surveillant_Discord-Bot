@@ -27,18 +27,18 @@ def roll_weighted(gender: str | None = None) -> tuple[str, dict]:
     return cid, pool[cid]
 
 
-async def max_rolls(user_id: int, db) -> int:
+async def max_rolls(guild_id: int, user_id: int, db) -> int:
     streak, roll_tier = await asyncio.gather(
         db.get_counter(user_id, "topgg_vote_streak:current"),
-        db.get_counter(user_id, "gacha:upgrade:roll_bonus"),
+        db.get_counter(user_id, f"gacha:upgrade:{guild_id}:roll_bonus"),
     )
     roll_tier = int(roll_tier or 0)
     bonus     = ROLL_BONUS_PER_TIER[roll_tier - 1] if roll_tier > 0 else 0
     return BASE_ROLLS + min(int(streak or 0), MAX_STREAK_BONUS) + bonus
 
 
-async def wishlist_max_slots(user_id: int, db) -> int:
-    tier = int(await db.get_counter(user_id, "gacha:upgrade:wishlist_slots") or 0)
+async def wishlist_max_slots(guild_id: int, user_id: int, db) -> int:
+    tier = int(await db.get_counter(user_id, f"gacha:upgrade:{guild_id}:wishlist_slots") or 0)
     return WISHLIST_SLOT_TIERS[tier - 1] if tier > 0 else WISHLIST_MAX
 
 
@@ -52,7 +52,7 @@ async def do_roll(
     gender: str | None = None,
 ) -> None:
     max_r, (rolls_used, ttl) = await asyncio.gather(
-        max_rolls(user_id, db),
+        max_rolls(guild_id, user_id, db),
         cache.get_roll_state(guild_id, user_id),
     )
 
@@ -60,7 +60,7 @@ async def do_roll(
         if await cache.set_rate_limit_warned(guild_id, user_id):
             mins      = max(1, (ttl + 59) // 60)
             streak    = await db.get_counter(user_id, "topgg_vote_streak:current") or 0
-            roll_tier = await db.get_counter(user_id, "gacha:upgrade:roll_bonus") or 0
+            roll_tier = await db.get_counter(user_id, f"gacha:upgrade:{guild_id}:roll_bonus") or 0
             notes     = []
             if (vb := min(int(streak), MAX_STREAK_BONUS)):
                 notes.append(f"+{vb} vote streak")
@@ -76,7 +76,7 @@ async def do_roll(
 
     wishlist_ids, spawn_tier = await asyncio.gather(
         db.get_wishlist(guild_id, user_id),
-        db.get_counter(user_id, "gacha:upgrade:wishlist_spawn"),
+        db.get_counter(user_id, f"gacha:upgrade:{guild_id}:wishlist_spawn"),
     )
     spawn_tier = int(spawn_tier or 0)
     spawn_rate = WISHLIST_SPAWN_RATES[spawn_tier - 1] if spawn_tier > 0 else WISHLIST_SPAWN_BASE

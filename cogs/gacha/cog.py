@@ -278,7 +278,7 @@ class GachaCog(commands.Cog, name="Gacha"):
             await interaction.followup.send(f"No waifu found matching **{name}**.\nDon't see your favorite figure? Submit them for review: <{SUBMIT_URL}>")
             return
         char_id   = char.get("id", name)
-        max_slots = await self.service.wishlist_max_slots(interaction.user.id)
+        max_slots = await self.service.wishlist_max_slots(interaction.guild.id, interaction.user.id)
         result    = await self.bot.db.add_wishlist(interaction.guild.id, interaction.user.id, char_id, max_size=max_slots)
         if result == "added":
             await interaction.followup.send(f"Added **{char['name']}** {stars(char['rarity'])} to your wishlist.")
@@ -315,7 +315,7 @@ class GachaCog(commands.Cog, name="Gacha"):
             if not name:
                 await self.service.view_wishlist(ctx.guild.id, ctx.author, ctx.send)
                 return
-            max_slots = await self.service.wishlist_max_slots(ctx.author.id)
+            max_slots = await self.service.wishlist_max_slots(ctx.guild.id, ctx.author.id)
             char      = characters.get(name)
             if not char:
                 candidates = find_all(name)
@@ -403,7 +403,7 @@ class GachaCog(commands.Cog, name="Gacha"):
             user_id  = ctx.author.id
 
             max_r, roll_state, claim_state = await asyncio.gather(
-                self.service.max_rolls(user_id),
+                self.service.max_rolls(guild_id, user_id),
                 cache.get_roll_state(guild_id, user_id),
                 cache.get_claim_state(guild_id, user_id),
             )
@@ -468,7 +468,7 @@ class GachaCog(commands.Cog, name="Gacha"):
     @commands.command(name="upgrades")
     async def prefix_upgrades(self, ctx: commands.Context):
         async with ctx.typing():
-            embed = await self.service.upgrades_embed(ctx.author.id)
+            embed = await self.service.upgrades_embed(ctx.guild.id, ctx.author.id)
             await ctx.send(embed=embed)
 
     # ── owner util ────────────────────────────────────────────────────────────

@@ -27,11 +27,11 @@ class GachaService:
     async def roll(self, guild_id, user_id, display_name, send_fn, gender=None):
         await _rolls.do_roll(self.bot, self.db, guild_id, user_id, display_name, send_fn, gender)
 
-    async def max_rolls(self, user_id: int) -> int:
-        return await _rolls.max_rolls(user_id, self.db)
+    async def max_rolls(self, guild_id: int, user_id: int) -> int:
+        return await _rolls.max_rolls(guild_id, user_id, self.db)
 
-    async def wishlist_max_slots(self, user_id: int) -> int:
-        return await _rolls.wishlist_max_slots(user_id, self.db)
+    async def wishlist_max_slots(self, guild_id: int, user_id: int) -> int:
+        return await _rolls.wishlist_max_slots(guild_id, user_id, self.db)
 
     # claims
 
@@ -165,8 +165,8 @@ class GachaService:
 
     # economy / upgrades 
 
-    async def upgrades_embed(self, user_id: int) -> discord.Embed:
-        return await _economy.build_upgrades_embed(user_id, self.db)
+    async def upgrades_embed(self, guild_id: int, user_id: int) -> discord.Embed:
+        return await _economy.build_upgrades_embed(guild_id, user_id, self.db)
 
     # char cache managemen
 

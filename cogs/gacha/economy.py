@@ -3,13 +3,13 @@ import discord
 from config.shop import SHOP_ITEMS, GACHA_UPGRADE_TIERS
 
 
-async def build_upgrades_embed(user_id: int, db) -> discord.Embed:
+async def build_upgrades_embed(guild_id: int, user_id: int, db) -> discord.Embed:
     icons     = {"gacha_slots": "📋", "gacha_rolls": "🎰", "gacha_spawn": "🎯"}
     max_tiers = 4
     embed     = discord.Embed(title="Waifu Bureau · Upgrades", color=0x576F72)
 
     for item_id, meta in GACHA_UPGRADE_TIERS.items():
-        tier   = int(await db.get_counter(user_id, f"gacha:upgrade:{meta['key']}") or 0)
+        tier   = int(await db.get_counter(user_id, f"gacha:upgrade:{guild_id}:{meta['key']}") or 0)
         label  = SHOP_ITEMS[item_id]["name"]
         costs  = meta["costs"]
         values = meta["values"]
