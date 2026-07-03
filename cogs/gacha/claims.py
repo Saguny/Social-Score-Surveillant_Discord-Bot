@@ -1,4 +1,5 @@
 import asyncio
+import random
 
 import discord
 from cogs.achievements import unlock as unlock_achievement, check_milestone
@@ -52,7 +53,8 @@ async def process_claim(bot, payload: discord.RawReactionActionEvent) -> None:
     claimer_name = claimer.display_name if hasattr(claimer, "display_name") else str(claimer)
 
     if is_dupe:
-        yuan = DUPE_YUAN.get(char["rarity"], 100)
+        lo, hi = DUPE_YUAN.get(char["rarity"], (50, 175))
+        yuan   = random.randint(lo, hi)
         await bot.db.adjust_yuan(guild_id, claimer_id, yuan)
         try:
             channel = bot.get_channel(payload.channel_id) or await bot.fetch_channel(payload.channel_id)

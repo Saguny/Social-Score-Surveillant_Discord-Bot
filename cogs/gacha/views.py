@@ -1,10 +1,11 @@
 import asyncio
+import random
 
 import discord
 
 from . import characters
 from .constants import (
-    CLAIM_WINDOW, DUPE_YUAN, FACTION_LABEL, SUBMIT_URL,
+    CLAIM_WINDOW, DUPE_YUAN, DIVORCE_YUAN, FACTION_LABEL, SUBMIT_URL,
     HAREM_PAGE_SIZE, BROWSE_PAGE_SIZE,
 )
 from .embeds import stars, pick_image, image_embed, harem_image_embed, browse_embed
@@ -313,12 +314,69 @@ class DupeYuanView(discord.ui.View):
             await interaction.response.send_message("Already collected.", ephemeral=True)
             return
         self.stop()
-        yuan = DUPE_YUAN.get(self._char["rarity"], 100)
+        lo, hi = DUPE_YUAN.get(self._char["rarity"], (50, 175))
+        yuan = random.randint(lo, hi)
         await interaction.client.db.adjust_yuan(self._guild_id, self._roller_id, yuan)
         button.disabled = True
         button.emoji = discord.PartialEmoji(name="✅")
         await interaction.response.edit_message(view=self)
         await interaction.followup.send(f"**+¥{yuan:,}** · duplicate payout", ephemeral=True)
+
+
+class DivorceConfirmView(discord.ui.View):
+    def __init__(self, bot, guild_id: int, user_id: int, char: dict, yuan: int):
+        super().__init__(timeout=60)
+        self._bot      = bot
+        self._guild_id = guild_id
+        self._user_id  = user_id
+        self._char     = char
+        self._yuan     = yuan
+
+    def _disable_all(self):
+        for child in self.children:
+            child.disabled = True
+
+    @discord.ui.button(label="Divorce", style=discord.ButtonStyle.danger)
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self._user_id:
+            await interaction.response.send_message("This isn't your divorce.", ephemeral=True)
+            return
+        self.stop()
+        char_id = self._char.get("id")
+        from . import cache as _cache
+        ok, _ = await asyncio.gather(
+            self._bot.db.divorce_character(self._guild_id, self._user_id, char_id),
+            _cache.set_owner(self._guild_id, char_id, None),
+        )
+        self._disable_all()
+        if not ok:
+            await interaction.response.edit_message(
+                content=f"**{self._char['name']}** is no longer in your harem.", view=self
+            )
+            return
+        await self._bot.db.adjust_yuan(self._guild_id, self._user_id, self._yuan)
+        await interaction.response.edit_message(
+            content=f"💔 **{self._char['name']}** has been removed from your harem. **+¥{self._yuan:,}**",
+            view=self,
+        )
+        guild  = self._bot.get_guild(self._guild_id)
+        member = guild.get_member(self._user_id) if guild else None
+        if guild and member:
+            from cogs.achievements import unlock as unlock_achievement, check_milestone
+            divorces = await self._bot.db.increment_counter(self._user_id, "gacha_divorces")
+            await asyncio.gather(
+                unlock_achievement(self._bot, guild, member, "first_divorce"),
+                check_milestone(self._bot, guild, member, "gacha_divorces", divorces),
+            )
+
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self._user_id:
+            await interaction.response.send_message("This isn't your divorce.", ephemeral=True)
+            return
+        self.stop()
+        self._disable_all()
+        await interaction.response.edit_message(content="Divorce cancelled.", view=self)
 
 
 class CharacterSelectView(discord.ui.View):

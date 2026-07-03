@@ -1,5 +1,6 @@
 import asyncio
 import os
+import random
 import re
 
 import discord
@@ -8,10 +9,10 @@ from discord.ext import commands
 
 from . import cache, characters
 from .collection import filtered_chars
-from .constants import FACTION_COLOR, FACTION_LABEL, FACTION_ORDER, RARITY_ORDER, SUBMIT_URL
+from .constants import DIVORCE_YUAN, FACTION_COLOR, FACTION_LABEL, FACTION_ORDER, RARITY_ORDER, SUBMIT_URL
 from .search import figure_ac, find_all, find_one, owned_figure_ac, wishlist_figure_ac
 from .service import GachaService
-from .views import BrowseView, TradeView, show_char_picker
+from .views import BrowseView, DivorceConfirmView, TradeView, show_char_picker
 from .embeds import pick_image, stars
 
 _DASHBOARD_URL = os.getenv("DASHBOARD_URL", "https://off-by-one.digital/social-credit")
@@ -393,7 +394,6 @@ class GachaCog(commands.Cog, name="Gacha"):
             await self._do_divorce(ctx.guild.id, ctx.author.id, name, ctx.send)
 
     async def _do_divorce(self, guild_id: int, user_id: int, name: str, send_fn):
-        from cogs.achievements import unlock as unlock_achievement, check_milestone
         char = characters.get(name)
         if not char:
             candidates = find_all(name)
@@ -405,22 +405,17 @@ class GachaCog(commands.Cog, name="Gacha"):
                 return
             char = candidates[0]
         char_id = char.get("id", name)
-        ok, _   = await asyncio.gather(
-            self.bot.db.divorce_character(guild_id, user_id, char_id),
-            cache.set_owner(guild_id, char_id, None),
-        )
-        if not ok:
+        if not await self.bot.db.has_character(guild_id, user_id, char_id):
             await send_fn(f"You don't have **{char['name']}** in your harem.")
             return
-        await send_fn(f"💔 **{char['name']}** has been removed from your harem.")
-        guild  = self.bot.get_guild(guild_id)
-        member = guild.get_member(user_id) if guild else None
-        if guild and member:
-            divorces = await self.bot.db.increment_counter(user_id, "gacha_divorces")
-            await asyncio.gather(
-                unlock_achievement(self.bot, guild, member, "first_divorce"),
-                check_milestone(self.bot, guild, member, "gacha_divorces", divorces),
-            )
+        lo, hi = DIVORCE_YUAN.get(char["rarity"], (25, 125))
+        yuan   = random.randint(lo, hi)
+        view   = DivorceConfirmView(self.bot, guild_id, user_id, char, yuan)
+        await send_fn(
+            f"Divorce **{char['name']}** {stars(char['rarity'])}?\n"
+            f"You'll receive **¥{yuan:,}** · this cannot be undone.",
+            view=view,
+        )
 
     # ── cooldown ──────────────────────────────────────────────────────────────
 

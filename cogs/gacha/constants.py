@@ -54,11 +54,19 @@ RARITY_EMOJI = {
 }
 
 DUPE_YUAN = {
-    "legendary": 5000,
-    "epic":      2000,
-    "rare":      800,
-    "uncommon":  300,
-    "common":    100,
+    "legendary": (9000,  24000),
+    "epic":      (3600,  10500),
+    "rare":      (1500,  3600),
+    "uncommon":  (450,   1500),
+    "common":    (150,   525),
+}
+
+DIVORCE_YUAN = {
+    "legendary": (6000,  15000),
+    "epic":      (2400,  7500),
+    "rare":      (900,   3000),
+    "uncommon":  (300,   1050),
+    "common":    (75,    375),
 }
 
 DUPE_COLOR = 0xFF3366
