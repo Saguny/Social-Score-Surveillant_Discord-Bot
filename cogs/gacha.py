@@ -692,9 +692,9 @@ async def _show_char_picker(send_fn, candidates: list[dict], author_id: int, on_
         for c in candidates[:25]
     )
     embed = discord.Embed(color=0xCC0000, title="Multiple matches found", description=lines)
+    embed.set_footer(text=f"Don't see your favorite figure? Submit them at {_SUBMIT_URL}")
     view = CharacterSelectView(candidates[:25], on_pick, author_id)
     await send_fn(embed=embed, view=view)
-    await send_fn(f"Don't see your favorite figure? Submit them for review: <{_SUBMIT_URL}>")
 
 
 # ── Cog ────────────────────────────────────────────────────────────────────────
@@ -941,8 +941,7 @@ class GachaCog(commands.Cog, name="Gacha"):
         if not char:
             candidates = _search_personality_all(name)
             if not candidates:
-                await send_fn(f"No waifu found matching **{name}**.")
-                await send_fn(f"Don't see your favorite figure? Submit them for review: <{_SUBMIT_URL}>")
+                await send_fn(f"No waifu found matching **{name}**. Don't see your favorite figure? Submit them for review: <{_SUBMIT_URL}>")
                 return
             if len(candidates) > 1:
                 await _show_char_picker(send_fn, candidates, author_id, lambda c: self._do_whois(send_fn, c["id"], author_id))
@@ -1375,8 +1374,7 @@ class GachaCog(commands.Cog, name="Gacha"):
         if not char:
             candidates = _search_personality_all(name)
             if not candidates:
-                await send_fn(f"No waifu found matching **{name}**.")
-                await send_fn(f"Don't see your favorite figure? Submit them for review: <{_SUBMIT_URL}>")
+                await send_fn(f"No waifu found matching **{name}**. Don't see your favorite figure? Submit them for review: <{_SUBMIT_URL}>")
                 return
             if len(candidates) > 1:
                 await _show_char_picker(send_fn, candidates, user_id, lambda c: self._do_divorce(guild_id, user_id, c["id"], send_fn))
@@ -1600,7 +1598,7 @@ class GachaCog(commands.Cog, name="Gacha"):
             matches = _search_personality_all(name)
             if len(matches) > 1:
                 view = ImageChoiceView(self, matches)
-                await send_fn(f"Multiple waifus match **{name}** — pick one:", view=view)
+                await send_fn(f"Multiple waifus match **{name}** — pick one:\nDon't see your favorite figure? Submit them for review: <{_SUBMIT_URL}>", view=view)
                 return
             char = matches[0] if matches else None
         else:
@@ -1691,8 +1689,7 @@ class GachaCog(commands.Cog, name="Gacha"):
         if not char:
             candidates = _search_personality_all(name)
             if not candidates:
-                await send_fn(f"No waifu found matching **{name}**.", ephemeral=True)
-                await send_fn(f"Don't see your favorite figure? Submit them for review: <{_SUBMIT_URL}>", ephemeral=True)
+                await send_fn(f"No waifu found matching **{name}**. Don't see your favorite figure? Submit them for review: <{_SUBMIT_URL}>", ephemeral=True)
                 return
             if len(candidates) > 1:
                 await _show_char_picker(send_fn, candidates, user.id, lambda c: self._do_choose(guild_id, user, c["id"], send_fn))
