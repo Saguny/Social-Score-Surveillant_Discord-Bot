@@ -48,10 +48,14 @@ class GachaMixin:
         async with self._pool.acquire() as conn:
             row = await conn.fetchrow(
                 """
-                SELECT claim_count,
-                       RANK() OVER (ORDER BY claim_count DESC) AS rank,
-                       COUNT(*) OVER () AS total
-                FROM gacha_character_stats
+                WITH ranked AS (
+                    SELECT character_id, claim_count,
+                           DENSE_RANK() OVER (ORDER BY claim_count DESC) AS rank,
+                           COUNT(*) OVER () AS total
+                    FROM gacha_character_stats
+                )
+                SELECT rank, total, claim_count
+                FROM ranked
                 WHERE character_id = $1
                 """,
                 character_id,
@@ -67,10 +71,14 @@ class GachaMixin:
         async with self._pool.acquire() as conn:
             rows = await conn.fetch(
                 """
-                SELECT character_id, claim_count,
-                       RANK() OVER (ORDER BY claim_count DESC) AS rank,
-                       COUNT(*) OVER () AS total
-                FROM gacha_character_stats
+                WITH ranked AS (
+                    SELECT character_id, claim_count,
+                           DENSE_RANK() OVER (ORDER BY claim_count DESC) AS rank,
+                           COUNT(*) OVER () AS total
+                    FROM gacha_character_stats
+                )
+                SELECT character_id, rank, total, claim_count
+                FROM ranked
                 WHERE character_id = ANY($1)
                 """,
                 character_ids,
@@ -86,7 +94,7 @@ class GachaMixin:
             rows = await conn.fetch(
                 """
                 SELECT character_id, claim_count,
-                       RANK() OVER (ORDER BY claim_count DESC) AS rank
+                       DENSE_RANK() OVER (ORDER BY claim_count DESC) AS rank
                 FROM gacha_character_stats
                 ORDER BY claim_count DESC
                 LIMIT $1

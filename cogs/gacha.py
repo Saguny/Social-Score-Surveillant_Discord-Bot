@@ -834,20 +834,22 @@ class GachaCog(commands.Cog, name="Gacha"):
 
 
     async def _show_top(self, send_fn):
-        rows = await self.db.get_top_characters(15)
+        rows = await self.db.get_top_characters(10)
         if not rows:
             await send_fn("No waifus have been claimed yet.")
             return
+        medals = {1: "🥇", 2: "🥈", 3: "🥉"}
         lines = []
         for row in rows:
             char = _get_personality(row["character_id"])
             if not char:
                 continue
-            lines.append(
-                f"`#{row['rank']}` {_stars(char['rarity'])} **{char['name']}** — {row['claim_count']} claims"
-            )
+            pos = row["rank"]
+            prefix = medals.get(pos) or f"`#{pos}`"
+            emoji = RARITY_EMOJI.get(char["rarity"], "⚪")
+            lines.append(f"{prefix} {emoji} **{char['name']}** · {row['claim_count']} claims")
         embed = discord.Embed(
-            title="Most Claimed Waifus · Global",
+            title="🏆 Most Claimed · Global Top 10",
             description="\n".join(lines) or "None yet.",
             color=0xCC0000,
         )
