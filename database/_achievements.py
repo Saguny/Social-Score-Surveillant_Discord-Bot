@@ -35,7 +35,7 @@ class AchievementsMixin:
         return {r["achievement_id"]: int(r["n"]) for r in rows}
 
     async def get_total_citizen_count(self) -> int:
-        row = await self._pool.fetchrow("SELECT COUNT(DISTINCT user_id) AS n FROM users")
+        row = await self._pool.fetchrow("SELECT COUNT(DISTINCT user_id) AS n FROM achievements")
         return int(row["n"]) if row else 0
 
     async def get_achievement_server_rank(self, guild_id: int, user_id: int) -> tuple[int, int]:

@@ -1633,9 +1633,9 @@ async def _handle_account_api(request):
     badges = [
         {
             "id":    b,
-            "label": COSMETIC_META.get(b, {}).get("label", b.upper()),
+            "label": COSMETIC_META.get(b, {}).get("label", ACHIEVEMENTS.get(b, {}).get("name", b.upper())),
             "color": COSMETIC_META.get(b, {}).get("color", 0x7D9D9C),
-            "note":  COSMETIC_META.get(b, {}).get("note", ""),
+            "note":  COSMETIC_META.get(b, {}).get("note", "") or ACHIEVEMENTS.get(b, {}).get("description", ""),
         }
         for b in raw_badges
     ]
