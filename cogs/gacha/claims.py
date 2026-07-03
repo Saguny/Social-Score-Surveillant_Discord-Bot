@@ -98,7 +98,8 @@ async def process_claim(bot, payload: discord.RawReactionActionEvent) -> None:
                 if char.get("rarity") == "legendary" else []
             ),
             *(
-                [unlock_achievement(bot, guild, claimer, "wishlist_fulfilled")]
+                [unlock_achievement(bot, guild, claimer, "wishlist_fulfilled"),
+                 bot.db.remove_wishlist(guild_id, claimer_id, char_id)]
                 if char_id in wishlist else []
             ),
         )

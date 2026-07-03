@@ -371,7 +371,7 @@ class GuideView(discord.ui.View):
                 "Permanent account upgrades purchased via `/buy`. Four tiers each.\n"
                 "**Expanded Dossier** (`/buy gacha_slots`) — wishlist capacity 10 -> 15/20/25/30\n"
                 "**Accelerated Processing** (`/buy gacha_rolls`) — bonus rolls/hr +2/+5/+10/+20\n"
-                "**Priority Routing** (`/buy gacha_spawn`) — wishlist spawn rate 6% -> 7.5/9.4/11.7/15%\n"
+                "**Priority Routing** (`/buy gacha_spawn`) — wishlist spawn rate 2% -> 2.5/3.1/3.9/5%\n"
                 "View current tiers: `ccp upgrades`"
             ),
             inline=False,

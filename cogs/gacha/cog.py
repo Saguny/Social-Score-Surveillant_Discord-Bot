@@ -345,9 +345,38 @@ class GachaCog(commands.Cog, name="Gacha"):
                 await ctx.send(f"**{char['name']}** is already on your wishlist.")
 
     @commands.command(name="wl", aliases=["wishlist"])
-    async def prefix_wl(self, ctx: commands.Context):
+    async def prefix_wl(self, ctx: commands.Context, *, args: str = ""):
         async with ctx.typing():
-            await self.service.view_wishlist(ctx.guild.id, ctx.author, ctx.send)
+            parts = args.strip().split(None, 1)
+            if parts and parts[0].lower() == "remove":
+                name = parts[1] if len(parts) > 1 else ""
+                if not name:
+                    await ctx.send("Usage: `ccp wl remove <name>`")
+                    return
+                char = characters.get(name)
+                if not char:
+                    candidates = find_all(name)
+                    if not candidates:
+                        await ctx.send(f"No waifu found matching **{name}**.")
+                        return
+                    if len(candidates) > 1:
+                        async def _remove_pick(c):
+                            removed = await self.bot.db.remove_wishlist(ctx.guild.id, ctx.author.id, c["id"])
+                            if removed:
+                                await ctx.send(f"Removed **{c['name']}** from your wishlist.")
+                            else:
+                                await ctx.send(f"**{c['name']}** wasn't on your wishlist.")
+                        await show_char_picker(ctx.send, candidates, ctx.author.id, _remove_pick)
+                        return
+                    char = candidates[0]
+                char_id = char.get("id", name)
+                removed = await self.bot.db.remove_wishlist(ctx.guild.id, ctx.author.id, char_id)
+                if removed:
+                    await ctx.send(f"Removed **{char['name']}** from your wishlist.")
+                else:
+                    await ctx.send(f"**{char['name']}** wasn't on your wishlist.")
+            else:
+                await self.service.view_wishlist(ctx.guild.id, ctx.author, ctx.send)
 
     # ── divorce ───────────────────────────────────────────────────────────────
 

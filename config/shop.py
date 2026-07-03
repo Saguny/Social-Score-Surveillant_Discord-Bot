@@ -303,7 +303,7 @@ GACHA_UPGRADE_TIERS = {
     "gacha_spawn": {
         "key":   "wishlist_spawn",
         "costs": [25_000, 125_000, 500_000, 1_500_000],
-        "values": [7.5, 9.4, 11.7, 15.0],
+        "values": [2.5, 3.1, 3.9, 5.0],
         "unit":  "% wishlist spawn rate",
     },
 }
