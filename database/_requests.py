@@ -144,7 +144,7 @@ class GachaRequestsMixin:
         )
 
     async def set_request_approved_atomic(self, request_id: int) -> bool:
-        """Atomically transition status pending → approved. Returns True only on first approval."""
+        """Atomically transition status pending -> approved. Returns True only on first approval."""
         row = await self._pool.fetchrow(
             "UPDATE gacha_requests SET status = 'approved', reviewed_at = $2 WHERE id = $1 AND status = 'pending' RETURNING 1",
             request_id, int(time.time()),

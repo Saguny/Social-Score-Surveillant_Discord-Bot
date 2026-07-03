@@ -98,15 +98,17 @@ def _build_shop_embeds(username: str = "yourname") -> dict[str, discord.Embed]:
             by_cat.setdefault(cat, []).append((item_id, item))
 
     embeds: dict[str, discord.Embed] = {"cosmetic": e_cosmetic, "lottery": e_lottery}
-    for cat in ("core", "economy", "misc"):
+    for cat in ("core", "economy", "misc", "gacha"):
         embed = discord.Embed(color=0xCC0000, title="STATE PROCUREMENT OFFICE", description=_CATEGORY_DESCRIPTIONS[cat])
         embed.set_thumbnail(url=_THUMBNAIL)
         for item_id, item in by_cat.get(cat, []):
-            embed.add_field(
-                name=f"/buy {item_id}  ·  ¥{item['cost']:,}",
-                value=item['description'],
-                inline=False,
-            )
+            if item_id in GACHA_UPGRADE_TIERS:
+                tiers = GACHA_UPGRADE_TIERS[item_id]
+                costs = "  ·  ".join(f"¥{c:,}" for c in tiers["costs"])
+                name  = f"/buy {item_id}  ·  {costs}"
+            else:
+                name = f"/buy {item_id}  ·  ¥{item['cost']:,}"
+            embed.add_field(name=name, value=item['description'], inline=False)
         embeds[cat] = embed
 
     return embeds

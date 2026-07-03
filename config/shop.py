@@ -235,7 +235,7 @@ SHOP_ITEMS = {
     # --- Waifu Bureau upgrades ---
     "gacha_slots": {
         "name": "Expanded Dossier",
-        "description": "Increases your wishlist capacity. Tier 1→15 · Tier 2→20 · Tier 3→25 · Tier 4→30 slots.",
+        "description": "Increases your wishlist capacity. Tier 1->15 · Tier 2->20 · Tier 3->25 · Tier 4->30 slots.",
         "cost": 0,
         "requires_target": False,
         "requires_text": False,
@@ -243,7 +243,7 @@ SHOP_ITEMS = {
     },
     "gacha_rolls": {
         "name": "Accelerated Processing",
-        "description": "Increases your hourly roll limit. Tier 1→+2 · Tier 2→+5 · Tier 3→+10 · Tier 4→+20 rolls.",
+        "description": "Increases your hourly roll limit. Tier 1->+2 · Tier 2->+5 · Tier 3->+10 · Tier 4->+20 rolls.",
         "cost": 0,
         "requires_target": False,
         "requires_text": False,
@@ -251,7 +251,7 @@ SHOP_ITEMS = {
     },
     "gacha_spawn": {
         "name": "Priority Routing",
-        "description": "Increases wishlist spawn chance. Base 6% · Tier 1→7.5% · Tier 2→9.4% · Tier 3→11.7% · Tier 4→15%.",
+        "description": "Increases wishlist spawn chance. Base 6% · Tier 1->7.5% · Tier 2->9.4% · Tier 3->11.7% · Tier 4->15%.",
         "cost": 0,
         "requires_target": False,
         "requires_text": False,

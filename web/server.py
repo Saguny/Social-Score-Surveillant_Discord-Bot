@@ -453,7 +453,7 @@ async def _handle_requests_check(request):
 
 async def _prescore_request(db, request_id: int, wiki_slug: str, wiki_lang: str) -> None:
     try:
-        from gacha.pipeline import wiki_summary, wiki_views, wiki_gender, derive_faction, derive_rarity, derive_title, _gender_from_pronouns
+        from cogs.gacha.pipeline import wiki_summary, wiki_views, wiki_gender, derive_faction, derive_rarity, derive_title, _gender_from_pronouns
         sem     = asyncio.Semaphore(2)
         summary, monthly_views, gender = await asyncio.gather(
             wiki_summary(wiki_slug, sem, lang=wiki_lang),
@@ -1110,7 +1110,7 @@ _ROUTES = [
     {"method": "POST", "path": "/api/account/portfolio/turbo/open",        "auth": "discord", "description": "Open a turbo position — {guild_id, ticker, direction, leverage, cost}"},
     {"method": "POST", "path": "/api/account/portfolio/turbo/close",       "auth": "discord", "description": "Close a turbo position — {guild_id, ticker, turbo_id}"},
     {"method": "GET",  "path": "/api/requests/check",                      "auth": "public",  "description": "Check if a Wikipedia title is already submitted — ?title=",
-     "fields": "state (invalid|not_found|not_person|in_game|requested|valid) · in_game→character_id · requested→request_id, vote_count, has_voted, submitted_by · valid→wiki_slug, wiki_title, thumbnail_url, description, extract"},
+     "fields": "state (invalid|not_found|not_person|in_game|requested|valid) · in_game->character_id · requested->request_id, vote_count, has_voted, submitted_by · valid->wiki_slug, wiki_title, thumbnail_url, description, extract"},
     {"method": "GET",  "path": "/api/requests/wishlist",                   "auth": "public",  "description": "Pending submissions — ?page=&sort=votes|newest",
      "fields": "requests[] {id, wiki_slug, wiki_title, submitted_by, submitted_at, vote_count, has_voted, recent_voters[]}, logged_in"},
     {"method": "POST", "path": "/api/requests/submit",                     "auth": "discord", "description": "Submit a character — {wiki_title, reason?}"},
@@ -1432,7 +1432,7 @@ async def _handle_admin_requests_approve(request):
         # Stage 2 — run gacha pipeline (skipped if all overrides set)
         if has_full_overrides:
             await emit("pipeline", "All fields set manually — skipping pipeline.")
-            from gacha.pipeline import derive_stats
+            from cogs.gacha.pipeline import derive_stats
             faction_for_stats = req["override_faction"]
             char_data = {
                 "name":       wiki_title,
@@ -1448,7 +1448,7 @@ async def _handle_admin_requests_approve(request):
         else:
             await emit("pipeline", "Running gacha enrichment pipeline…")
             try:
-                from gacha.pipeline import process_slug
+                from cogs.gacha.pipeline import process_slug
                 wiki_lang = req.get("wiki_lang") or "en"
                 char_data = await process_slug(wiki_slug, lang=wiki_lang)
             except Exception as exc:
@@ -1470,7 +1470,7 @@ async def _handle_admin_requests_approve(request):
             if external:
                 await emit("images", f"Normalizing & uploading {len(external)} override image(s) to R2…")
                 try:
-                    from gacha.pipeline import upload_r2_multi
+                    from cogs.gacha.pipeline import upload_r2_multi
                     r2_sem = asyncio.Semaphore(4)
                     async with aiohttp.ClientSession() as r2_sess:
                         uploaded, upload_errors = await upload_r2_multi(r2_sess, char_id, external, r2_sem)
