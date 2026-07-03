@@ -42,7 +42,7 @@ _LOTTERY_TIERS = {
 }
 
 
-def _build_shop_embeds(username: str = "yourname") -> dict[str, discord.Embed]:
+async def _build_shop_embeds(username: str = "yourname", db=None, user_id: int | None = None) -> dict[str, discord.Embed]:
     e_cosmetic = discord.Embed(color=0xFFB347, title="STATE PROCUREMENT OFFICE", description=_CATEGORY_DESCRIPTIONS["cosmetic"])
     e_cosmetic.set_thumbnail(url=_THUMBNAIL)
     for item_id in _COSMETIC_ORDER:
@@ -97,15 +97,27 @@ def _build_shop_embeds(username: str = "yourname") -> dict[str, discord.Embed]:
         if cat not in ("cosmetic", "lottery"):
             by_cat.setdefault(cat, []).append((item_id, item))
 
+    gacha_tiers: dict[str, int] = {}
+    if db and user_id:
+        tier_vals = await asyncio.gather(*(
+            db.get_counter(user_id, f"gacha:upgrade:{GACHA_UPGRADE_TIERS[iid]['key']}")
+            for iid in GACHA_UPGRADE_TIERS
+        ))
+        gacha_tiers = {iid: int(v or 0) for iid, v in zip(GACHA_UPGRADE_TIERS, tier_vals)}
+
     embeds: dict[str, discord.Embed] = {"cosmetic": e_cosmetic, "lottery": e_lottery}
     for cat in ("core", "economy", "misc", "gacha"):
         embed = discord.Embed(color=0xCC0000, title="STATE PROCUREMENT OFFICE", description=_CATEGORY_DESCRIPTIONS[cat])
         embed.set_thumbnail(url=_THUMBNAIL)
         for item_id, item in by_cat.get(cat, []):
             if item_id in GACHA_UPGRADE_TIERS:
-                tiers = GACHA_UPGRADE_TIERS[item_id]
-                costs = "  ·  ".join(f"¥{c:,}" for c in tiers["costs"])
-                name  = f"/buy {item_id}  ·  {costs}"
+                tiers    = GACHA_UPGRADE_TIERS[item_id]
+                cur_tier = gacha_tiers.get(item_id, 0)
+                max_tier = len(tiers["costs"])
+                if cur_tier >= max_tier:
+                    name = f"/buy {item_id}  ·  MAXED"
+                else:
+                    name = f"/buy {item_id}  ·  ¥{tiers['costs'][cur_tier]:,}"
             else:
                 name = f"/buy {item_id}  ·  ¥{item['cost']:,}"
             embed.add_field(name=name, value=item['description'], inline=False)
@@ -457,7 +469,7 @@ class Economy(commands.Cog):
     @app_commands.command(name="shop", description="Browse the Social Credit Bureau's shop")
     async def shop(self, interaction: discord.Interaction):
         await interaction.response.defer(thinking=True)
-        embeds = _build_shop_embeds(username=str(interaction.user))
+        embeds = await _build_shop_embeds(username=str(interaction.user), db=self.db, user_id=interaction.user.id)
         view = ShopView(embeds, active="core")
         await interaction.followup.send(
             embed=embeds["core"],
