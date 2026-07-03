@@ -694,6 +694,9 @@ class Economy(commands.Cog):
         if item_id in _LOTTERY_TIERS:
             await self._buy_lottery(interaction, gid, uid, cfg, target, text, cost, item_id)
             return
+        if item_id in GACHA_UPGRADE_TIERS:
+            await self._buy_gacha_upgrade(interaction, gid, uid, cfg, target, text, cost, item_id)
+            return
         handler = self._buy_handlers.get(item_id)
         if handler:
             await handler(interaction, gid, uid, cfg, target, text, cost)
@@ -1093,8 +1096,7 @@ class Economy(commands.Cog):
             await interaction.followup.send(embed=embed)
         self._post_score(interaction, recipient, old, new)
 
-    async def _buy_gacha_upgrade(self, interaction, gid, uid, cfg, target, text, cost):
-        item_id = interaction.namespace.item
+    async def _buy_gacha_upgrade(self, interaction, gid, uid, cfg, target, text, cost, item_id):
         meta = GACHA_UPGRADE_TIERS[item_id]
         counter_key = f"gacha:upgrade:{gid}:{meta['key']}"
         tier = int(await self.db.get_counter(uid, counter_key) or 0)
