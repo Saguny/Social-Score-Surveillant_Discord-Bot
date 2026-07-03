@@ -484,6 +484,10 @@ class SocialCreditBot(commands.AutoShardedBot):
         ctx = await self.get_context(message)
         is_exempt = ctx.command and ctx.command.qualified_name in self._COOLDOWN_EXEMPT_COMMANDS
         if not is_exempt and not await _check_cmd_cooldown(message.author.id):
+            try:
+                await message.channel.send("Slow down, citizen.", delete_after=3)
+            except discord.Forbidden:
+                pass
             return
         if ctx.command and ctx.command.qualified_name not in OPTOUT_ALLOWED_PREFIX_COMMANDS:
             if await self.db.is_opted_out(message.author.id):
@@ -722,6 +726,8 @@ class SocialCreditBot(commands.AutoShardedBot):
                 pass
         elif isinstance(error, commands.MissingPermissions):
             await ctx.send("You do not have permission to use this command.")
+        elif isinstance(error, commands.MissingRequiredArgument):
+            await ctx.send(f"Missing argument: `{error.param.name}`. Use `ccp help` for usage.")
         elif isinstance(cause, discord.DiscordServerError):
             pass
         elif not isinstance(error, commands.CommandNotFound):

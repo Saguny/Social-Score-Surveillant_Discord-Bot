@@ -218,16 +218,19 @@ class Scoring(commands.Cog):
         except discord.Forbidden:
             pass
 
-    async def _handle_rank_change(self, guild: discord.Guild, member: discord.Member, channel: discord.TextChannel, old: float, new: float):
+    _RANK_HYSTERESIS = 3.0
+
+    async def _handle_rank_change(self, guild: discord.Guild, member: discord.Member, channel: discord.TextChannel, old: float, new: float, from_message: bool = False):
         old_rank = get_rank(old)
-        if new >= old:
-            new_rank = get_rank(new)
-        elif new <= old_rank["min"] - 1.0:
-            new_rank = get_rank(new)
-        else:
-            new_rank = old_rank
+        new_rank = get_rank(new)
         if old_rank["name"] == new_rank["name"]:
             return
+        if new > old:
+            if new < new_rank["min"] + self._RANK_HYSTERESIS:
+                return
+        else:
+            if new > old_rank["min"] - self._RANK_HYSTERESIS:
+                return
 
         promoted = new > old
         old_idx = get_rank_index(old_rank["name"])
@@ -264,9 +267,22 @@ class Scoring(commands.Cog):
                 if old_rank["name"] == RANKS[0]["name"]:
                     await unlock_achievement(self.bot, guild, member, "fastest_climb", channel=channel)
 
+        if not from_message:
+            await cache_set(
+                f"rankembed:{guild.id}:{member.id}",
+                json.dumps({"promoted": promoted, "old_rank": old_rank["name"], "new_rank": new_rank["name"], "yuan_label": yuan_label, "score": new}),
+                ex=86400,
+            )
+            return
+
+        await self._post_rank_embed(guild, member, channel, promoted, old_rank, new_rank, yuan_label, new)
+
+    async def _post_rank_embed(self, guild: discord.Guild, member: discord.Member, channel: discord.TextChannel, promoted: bool, old_rank: dict, new_rank: dict, yuan_label: str, score: float):
         rank_channel_id = await self.db.get_rank_announcement_channel(guild.id)
         rank_channel = guild.get_channel(rank_channel_id) if rank_channel_id else None
         announce_channel = rank_channel or channel
+        if not announce_channel:
+            return
 
         if promoted:
             try:
@@ -301,7 +317,7 @@ class Scoring(commands.Cog):
                     old_rank=old_rank["name"],
                     new_rank=new_rank["name"],
                     username=member.display_name,
-                    score=new,
+                    score=score,
                     yuan_label=yuan_label,
                     avatar_bytes=avatar_bytes,
                     badge_label=badge_label,
@@ -326,6 +342,22 @@ class Scoring(commands.Cog):
                 await announce_channel.send(embed=embed, file=discord.File("images/rank.png", filename="rank.png"))
             except discord.Forbidden:
                 pass
+
+    async def _flush_pending_rank_embed(self, guild: discord.Guild, member: discord.Member, channel: discord.TextChannel):
+        key = f"rankembed:{guild.id}:{member.id}"
+        raw = await cache_get(key)
+        if not raw:
+            return
+        await cache_delete(key)
+        try:
+            data = json.loads(raw)
+        except Exception:
+            return
+        old_rank = next((rk for rk in RANKS if rk["name"] == data["old_rank"]), None)
+        new_rank = next((rk for rk in RANKS if rk["name"] == data["new_rank"]), None)
+        if not old_rank or not new_rank:
+            return
+        await self._post_rank_embed(guild, member, channel, data["promoted"], old_rank, new_rank, data["yuan_label"], data["score"])
 
     async def _handle_execution_status(self, guild: discord.Guild, member: discord.Member, channel: discord.TextChannel, old: float, new: float):
         exec_role_name = "Execution Date: Tomorrow"
@@ -498,12 +530,13 @@ class Scoring(commands.Cog):
             if clean_days is not None:
                 await check_milestone(self.bot, message.guild, message.author, "clean_streak_days", clean_days, channel=message.channel)
 
-        self.bot.dispatch("score_change", message.guild, message.author, message.channel, old_score, new_score)
+        await self._flush_pending_rank_embed(message.guild, message.author, message.channel)
+        self.bot.dispatch("score_change", message.guild, message.author, message.channel, old_score, new_score, True)
         await self.db.clean_expired_effects()
 
     @commands.Cog.listener()
-    async def on_score_change(self, guild: discord.Guild, member: discord.Member, channel, old: float, new: float):
-        await self._handle_rank_change(guild, member, channel, old, new)
+    async def on_score_change(self, guild: discord.Guild, member: discord.Member, channel, old: float, new: float, from_message: bool = False):
+        await self._handle_rank_change(guild, member, channel, old, new, from_message)
         await self._handle_execution_status(guild, member, channel, old, new)
 
 

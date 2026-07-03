@@ -1,8 +1,10 @@
 import asyncio
+import difflib
 import io
 import json
 import os
 import random
+import re
 import time
 
 import aiohttp
@@ -28,30 +30,48 @@ def _get_personality(char_id: str) -> dict | None:
     return _CHARS.get(char_id)
 
 
+def _fuzzy_match(query: str) -> dict | None:
+    """Fuzzy match against all character names using difflib. Returns best match above threshold."""
+    q = query.lower().strip()
+    names = list(_NAME_INDEX.keys())
+    matches = difflib.get_close_matches(q, names, n=1, cutoff=0.55)
+    if matches:
+        cid = _NAME_INDEX[matches[0]]
+        return {"id": cid, **_CHARS[cid]}
+    # word-token fallback: score by how many query words appear in the name
+    q_words = set(q.split())
+    best, best_score = None, 0
+    for cid, ch in _CHARS.items():
+        name_words = set(ch["name"].lower().split())
+        score = len(q_words & name_words)
+        if score > best_score and score >= len(q_words) * 0.6:
+            best, best_score = {"id": cid, **ch}, score
+    return best
+
+
 def _search_personality(query: str) -> dict | None:
-    """Find by name (exact first, then substring). Returns dict with 'id' injected."""
     q = query.lower().strip()
     if q in _CHARS:
         return {"id": q, **_CHARS[q]}
     if q in _NAME_INDEX:
         cid = _NAME_INDEX[q]
         return {"id": cid, **_CHARS[cid]}
-    # substring fallback — only reached when no exact match exists
     for cid, ch in _CHARS.items():
         if q in ch["name"].lower():
             return {"id": cid, **ch}
-    return None
+    return _fuzzy_match(q)
 
 
 def _search_personality_all(query: str) -> list[dict]:
-    """Find every character matching by name (exact matches take priority over
-    substring matches). Returns dicts with 'id' injected. Used where multiple
-    characters can share the same name and the caller needs to disambiguate."""
     q = query.lower().strip()
     exact = [{"id": cid, **ch} for cid, ch in _CHARS.items() if ch["name"].lower() == q]
     if exact:
         return exact
-    return [{"id": cid, **ch} for cid, ch in _CHARS.items() if q in ch["name"].lower()]
+    substr = [{"id": cid, **ch} for cid, ch in _CHARS.items() if q in ch["name"].lower()]
+    if substr:
+        return substr
+    match = _fuzzy_match(q)
+    return [match] if match else []
 
 
 def _roll_weighted(gender: str | None = None) -> tuple[str, dict]:
@@ -122,7 +142,7 @@ DUPE_YUAN = {
     "common":    100,
 }
 
-DUPE_COLOR  = 0xB8860B
+DUPE_COLOR  = 0xFF3366
 DUPE_EMOJI  = "💴"
 
 
@@ -609,6 +629,74 @@ class HaremImageView(discord.ui.View):
         await interaction.response.edit_message(embed=self.build_embed(), view=self)
 
 
+_SUBMIT_URL = "https://off-by-one.digital/social-credit/submit"
+
+
+class DupeYuanView(discord.ui.View):
+    def __init__(self, char: dict, guild_id: int, roller_id: int):
+        super().__init__(timeout=CLAIM_WINDOW)
+        self._char = char
+        self._guild_id = guild_id
+        self._roller_id = roller_id
+        self._collected = False
+
+    @discord.ui.button(emoji="💰", style=discord.ButtonStyle.secondary)
+    async def collect(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self._roller_id:
+            await interaction.response.send_message("This isn't your roll.", ephemeral=True)
+            return
+        if self._collected:
+            await interaction.response.send_message("Already collected.", ephemeral=True)
+            return
+        self._collected = True
+        self.stop()
+        yuan = DUPE_YUAN.get(self._char["rarity"], 100)
+        await interaction.client.db.adjust_yuan(self._guild_id, self._roller_id, yuan)
+        button.disabled = True
+        button.emoji = discord.PartialEmoji(name="✅")
+        await interaction.response.edit_message(view=self)
+        await interaction.followup.send(f"**+¥{yuan:,}** · duplicate payout", ephemeral=True)
+
+
+class CharacterSelectView(discord.ui.View):
+    def __init__(self, candidates: list[dict], on_pick, author_id: int, timeout: int = 60):
+        super().__init__(timeout=timeout)
+        self._on_pick = on_pick
+        self._author_id = author_id
+        self._chars = {ch["id"]: ch for ch in candidates}
+        options = [
+            discord.SelectOption(
+                label=ch["name"][:100],
+                description=f"{ch['rarity']} · {ch.get('faction') or 'Unknown'}",
+                value=ch["id"],
+            )
+            for ch in candidates[:25]
+        ]
+        sel = discord.ui.Select(placeholder="Choose a character...", options=options)
+        sel.callback = self._handle
+        self.add_item(sel)
+
+    async def _handle(self, interaction: discord.Interaction):
+        if interaction.user.id != self._author_id:
+            await interaction.response.send_message("This isn't your selection.", ephemeral=True)
+            return
+        char = self._chars[interaction.data["values"][0]]
+        await interaction.response.defer()
+        self.stop()
+        await self._on_pick(char)
+
+
+async def _show_char_picker(send_fn, candidates: list[dict], author_id: int, on_pick) -> None:
+    lines = "\n".join(
+        f"· **{c['name']}** — {c['rarity']} · {c.get('faction') or 'Unknown'}"
+        for c in candidates[:25]
+    )
+    embed = discord.Embed(color=0xCC0000, title="Multiple matches found", description=lines)
+    view = CharacterSelectView(candidates[:25], on_pick, author_id)
+    await send_fn(embed=embed, view=view)
+    await send_fn(f"Don't see your favorite figure? Submit them for review: <{_SUBMIT_URL}>")
+
+
 # ── Cog ────────────────────────────────────────────────────────────────────────
 
 class GachaCog(commands.Cog, name="Gacha"):
@@ -708,7 +796,8 @@ class GachaCog(commands.Cog, name="Gacha"):
                     owner_name = None
 
         embed = _roll_embed(char, image_url, rolls_remaining, max_rolls, dupe=dupe, owner_name=owner_name)
-        msg = await send_fn(embed=embed)
+        buy_view = DupeYuanView(char, guild_id, user_id) if dupe else None
+        msg = await send_fn(embed=embed, view=buy_view)
 
         guild = self.bot.get_guild(guild_id)
         member = guild.get_member(user_id) if guild else None
@@ -844,12 +933,19 @@ class GachaCog(commands.Cog, name="Gacha"):
 
     # ── slash: top ────────────────────────────────────────────────────────────
 
-    async def _do_whois(self, send_fn, name: str):
+    async def _do_whois(self, send_fn, name: str, author_id: int = 0):
         import urllib.parse
-        char = _get_personality(name) or _search_personality(name)
+        char = _get_personality(name)
         if not char:
-            await send_fn(f"No waifu found matching **{name}**.\nDon't see your favorite figure? Submit them for review: <https://off-by-one.digital/social-credit/submit>")
-            return
+            candidates = _search_personality_all(name)
+            if not candidates:
+                await send_fn(f"No waifu found matching **{name}**.")
+                await send_fn(f"Don't see your favorite figure? Submit them for review: <{_SUBMIT_URL}>")
+                return
+            if len(candidates) > 1:
+                await _show_char_picker(send_fn, candidates, author_id, lambda c: self._do_whois(send_fn, c["id"], author_id))
+                return
+            char = candidates[0]
 
         wiki      = char.get("wiki") or char.get("id", name)
         faction   = FACTION_LABEL.get(char["faction"], char["faction"].upper())
@@ -892,7 +988,7 @@ class GachaCog(commands.Cog, name="Gacha"):
     @app_commands.autocomplete(name=_figure_ac)
     async def slash_whois(self, interaction: discord.Interaction, name: str):
         await interaction.response.defer()
-        await self._do_whois(interaction.followup.send, name)
+        await self._do_whois(interaction.followup.send, name, interaction.user.id)
 
     @app_commands.command(name="top", description="Global leaderboard of most-claimed waifus")
     async def slash_top(self, interaction: discord.Interaction):
@@ -1128,13 +1224,11 @@ class GachaCog(commands.Cog, name="Gacha"):
             if not name:
                 await ctx.send("Usage: `ccp whois <name>`")
                 return
-            await self._do_whois(ctx.send, name)
+            await self._do_whois(ctx.send, name, ctx.author.id)
 
     @commands.command(name="gift")
-    async def prefix_gift(self, ctx: commands.Context, name: str, *, user_str: str = ""):
+    async def prefix_gift(self, ctx: commands.Context, *, name: str = ""):
         async with ctx.typing():
-            # allow: ccp gift "waifu name" @user  OR  ccp gift figure_name @mention
-            # resolve mention from the message directly
             target = ctx.message.mentions[0] if ctx.message.mentions else None
             if target is None:
                 await ctx.send("Please mention the user to gift to: `ccp gift <waifu> @user`")
@@ -1146,10 +1240,35 @@ class GachaCog(commands.Cog, name="Gacha"):
                 await ctx.send("You can't gift to a bot.")
                 return
 
-            char = _search_personality(name)
-            if not char:
-                await ctx.send(f"No waifu found matching **{name}**.\nDon't see your favorite figure? Submit them for review: <https://off-by-one.digital/social-credit/submit>")
+            name = re.sub(r"<@!?\d+>", "", name).strip()
+            if not name:
+                await ctx.send("Please provide a waifu name: `ccp gift <waifu> @user`")
                 return
+
+            char = _get_personality(name)
+            if not char:
+                candidates = _search_personality_all(name)
+                if not candidates:
+                    await ctx.send(f"No waifu found matching **{name}**.")
+                    await ctx.send(f"Don't see your favorite figure? Submit them for review: <{_SUBMIT_URL}>")
+                    return
+                if len(candidates) > 1:
+                    async def _gift_pick(c, _target=target):
+                        ok = await self.db.gift_character(ctx.guild.id, ctx.author.id, _target.id, c["id"])
+                        if not ok:
+                            await ctx.send(f"You don't own **{c['name']}**.")
+                            return
+                        embed = discord.Embed(
+                            title="Waifu Gifted",
+                            description=f"{ctx.author.mention} gifted **{c['name']}** {_stars(c['rarity'])}\nto {_target.mention}",
+                            color=FACTION_COLOR.get(c["faction"], 0xCC0000),
+                        )
+                        if img := _pick_image(c):
+                            embed.set_thumbnail(url=img)
+                        await ctx.send(embed=embed)
+                    await _show_char_picker(ctx.send, candidates, ctx.author.id, _gift_pick)
+                    return
+                char = candidates[0]
 
             ok = await self.db.gift_character(ctx.guild.id, ctx.author.id, target.id, char["id"])
             if not ok:
@@ -1176,10 +1295,25 @@ class GachaCog(commands.Cog, name="Gacha"):
             if not name:
                 await self._do_wishlist_view(ctx.guild.id, ctx.author, ctx.send)
                 return
-            char = _search_personality(name)
+            char = _get_personality(name)
             if not char:
-                await ctx.send(f"No waifu found matching **{name}**.\nDon't see your favorite figure? Submit them for review: <https://off-by-one.digital/social-credit/submit>")
-                return
+                candidates = _search_personality_all(name)
+                if not candidates:
+                    await ctx.send(f"No waifu found matching **{name}**.")
+                    await ctx.send(f"Don't see your favorite figure? Submit them for review: <{_SUBMIT_URL}>")
+                    return
+                if len(candidates) > 1:
+                    async def _wish_pick(c):
+                        result = await self.db.add_wishlist(ctx.guild.id, ctx.author.id, c["id"], max_size=WISHLIST_MAX)
+                        if result == "added":
+                            await ctx.send(f"Added **{c['name']}** {_stars(c['rarity'])} to your wishlist.")
+                        elif result == "full":
+                            await ctx.send(f"Your wishlist is full ({WISHLIST_MAX} max). Remove one first.")
+                        else:
+                            await ctx.send(f"**{c['name']}** is already on your wishlist.")
+                    await _show_char_picker(ctx.send, candidates, ctx.author.id, _wish_pick)
+                    return
+                char = candidates[0]
             char_id = char["id"]
             result = await self.db.add_wishlist(ctx.guild.id, ctx.author.id, char_id, max_size=WISHLIST_MAX)
             if result == "added":
@@ -1235,10 +1369,17 @@ class GachaCog(commands.Cog, name="Gacha"):
     # ── divorce ───────────────────────────────────────────────────────────────
 
     async def _do_divorce(self, guild_id: int, user_id: int, name: str, send_fn):
-        char = _get_personality(name) or _search_personality(name)
+        char = _get_personality(name)
         if not char:
-            await send_fn(f"No waifu found matching **{name}**.\nDon't see your favorite figure? Submit them for review: <https://off-by-one.digital/social-credit/submit>")
-            return
+            candidates = _search_personality_all(name)
+            if not candidates:
+                await send_fn(f"No waifu found matching **{name}**.")
+                await send_fn(f"Don't see your favorite figure? Submit them for review: <{_SUBMIT_URL}>")
+                return
+            if len(candidates) > 1:
+                await _show_char_picker(send_fn, candidates, user_id, lambda c: self._do_divorce(guild_id, user_id, c["id"], send_fn))
+                return
+            char = candidates[0]
         char_id = char.get("id", name)
         ok, _ = await asyncio.gather(
             self.db.divorce_character(guild_id, user_id, char_id),
@@ -1544,10 +1685,17 @@ class GachaCog(commands.Cog, name="Gacha"):
         await send_fn(embed=view.build_embed(), view=view)
 
     async def _do_choose(self, guild_id: int, user: discord.Member | discord.User, name: str, send_fn):
-        char = _search_personality(name)
+        char = _get_personality(name)
         if not char:
-            await send_fn(f"No waifu found matching **{name}**.\nDon't see your favorite figure? Submit them for review: <https://off-by-one.digital/social-credit/submit>", ephemeral=True)
-            return
+            candidates = _search_personality_all(name)
+            if not candidates:
+                await send_fn(f"No waifu found matching **{name}**.", ephemeral=True)
+                await send_fn(f"Don't see your favorite figure? Submit them for review: <{_SUBMIT_URL}>", ephemeral=True)
+                return
+            if len(candidates) > 1:
+                await _show_char_picker(send_fn, candidates, user.id, lambda c: self._do_choose(guild_id, user, c["id"], send_fn))
+                return
+            char = candidates[0]
         if not await self.db.has_character(guild_id, user.id, char["id"]):
             await send_fn(f"**{char['name']}** is not in your harem.", ephemeral=True)
             return
