@@ -177,10 +177,7 @@
   function renderNotFound() {
     $result.innerHTML = `
       <div class="feedback fb-error">
-        ✗ No Wikipedia article found for that name. Check spelling or try their full official name.
-        If this character doesn't have a Wikipedia article, join the
-        <a href="https://discord.gg/invite/k4W6YAPYhC" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">support server</a>
-        and ask us directly.
+        ✗ No Wikipedia article found for that name. Check spelling or try their full official name. If this character doesn't have a Wikipedia article, <a href="https://discord.gg/invite/k4W6YAPYhC" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">join our support server</a> and ask us directly.
       </div>
       ${_urlFallbackHtml("Can't find them by title?")}`;
     _bindUrlFallback();
