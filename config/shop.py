@@ -234,24 +234,24 @@ SHOP_ITEMS = {
     },
     # --- Waifu Bureau upgrades ---
     "gacha_slots": {
-        "name": "Expanded Dossier",
-        "description": "Increases your wishlist capacity. Tier 1->15 · Tier 2->20 · Tier 3->25 · Tier 4->30 slots.",
+        "name": "Wishlist Slots",
+        "description": "Tier 1->15 · Tier 2->20 · Tier 3->25 · Tier 4->30 wishlist slots.",
         "cost": 0,
         "requires_target": False,
         "requires_text": False,
         "category": "gacha",
     },
     "gacha_rolls": {
-        "name": "Accelerated Processing",
-        "description": "Increases your hourly roll limit. Tier 1->+2 · Tier 2->+5 · Tier 3->+10 · Tier 4->+20 rolls.",
+        "name": "Bonus Rolls",
+        "description": "Tier 1->+2 · Tier 2->+5 · Tier 3->+10 · Tier 4->+20 bonus rolls/hr.",
         "cost": 0,
         "requires_target": False,
         "requires_text": False,
         "category": "gacha",
     },
     "gacha_spawn": {
-        "name": "Priority Routing",
-        "description": "Increases wishlist spawn chance. Base 6% · Tier 1->7.5% · Tier 2->9.4% · Tier 3->11.7% · Tier 4->15%.",
+        "name": "Wishlist Spawn",
+        "description": "Base 6% · Tier 1->7.5% · Tier 2->9.4% · Tier 3->11.7% · Tier 4->15% wishlist spawn rate.",
         "cost": 0,
         "requires_target": False,
         "requires_text": False,
@@ -292,7 +292,7 @@ GACHA_UPGRADE_TIERS = {
         "key":   "wishlist_slots",
         "costs": [20_000, 80_000, 300_000, 1_000_000],
         "values": [15, 20, 25, 30],
-        "unit":  "slots",
+        "unit":  "wishlist slots",
     },
     "gacha_rolls": {
         "key":   "roll_bonus",
@@ -304,6 +304,6 @@ GACHA_UPGRADE_TIERS = {
         "key":   "wishlist_spawn",
         "costs": [25_000, 125_000, 500_000, 1_500_000],
         "values": [7.5, 9.4, 11.7, 15.0],
-        "unit":  "% spawn rate",
+        "unit":  "% wishlist spawn rate",
     },
 }

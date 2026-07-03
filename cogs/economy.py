@@ -41,8 +41,28 @@ _LOTTERY_TIERS = {
     "lottery_chairman": {"win": (300_000, 500_000),  "jackpot": (1_000_000, 2_000_000)},
 }
 
+_PUBLIC_ITEMS = {
+    "lottery", "lottery_standard", "lottery_premium", "lottery_elite",
+    "lottery_chairman", "lottery_dono", "dispute", "inspection", "criticism", "pact",
+}
 
-async def _build_shop_embeds(username: str = "yourname", db=None, user_id: int | None = None) -> dict[str, discord.Embed]:
+
+def _build_items_for_cat() -> dict[str, list[tuple[str, dict]]]:
+    cat_items: dict[str, list] = {}
+    for item_id in _COSMETIC_ORDER:
+        if item_id in SHOP_ITEMS:
+            cat_items.setdefault("cosmetic", []).append((item_id, SHOP_ITEMS[item_id]))
+    for item_id in _LOTTERY_ORDER + ["lottery_dono"]:
+        if item_id in SHOP_ITEMS:
+            cat_items.setdefault("lottery", []).append((item_id, SHOP_ITEMS[item_id]))
+    for item_id, item in SHOP_ITEMS.items():
+        cat = item.get("category", "core")
+        if cat not in ("cosmetic", "lottery"):
+            cat_items.setdefault(cat, []).append((item_id, item))
+    return cat_items
+
+
+async def _build_shop_embeds(username: str = "yourname", db=None, user_id: int | None = None, _gacha_tiers: dict | None = None) -> dict[str, discord.Embed]:
     e_cosmetic = discord.Embed(color=0xFFB347, title="STATE PROCUREMENT OFFICE", description=_CATEGORY_DESCRIPTIONS["cosmetic"])
     e_cosmetic.set_thumbnail(url=_THUMBNAIL)
     for item_id in _COSMETIC_ORDER:
@@ -97,8 +117,8 @@ async def _build_shop_embeds(username: str = "yourname", db=None, user_id: int |
         if cat not in ("cosmetic", "lottery"):
             by_cat.setdefault(cat, []).append((item_id, item))
 
-    gacha_tiers: dict[str, int] = {}
-    if db and user_id:
+    gacha_tiers: dict[str, int] = _gacha_tiers or {}
+    if not gacha_tiers and db and user_id:
         tier_vals = await asyncio.gather(*(
             db.get_counter(user_id, f"gacha:upgrade:{GACHA_UPGRADE_TIERS[iid]['key']}")
             for iid in GACHA_UPGRADE_TIERS
@@ -126,25 +146,63 @@ async def _build_shop_embeds(username: str = "yourname", db=None, user_id: int |
     return embeds
 
 
+class ShopSelect(discord.ui.Select):
+    def __init__(self, items: list[tuple[str, dict]], gacha_tiers: dict[str, int], cog):
+        self.cog = cog
+        options = []
+        for item_id, item in items[:25]:
+            if item_id == "lottery_dono":
+                cost_str = "your entire balance"
+            elif item_id in GACHA_UPGRADE_TIERS:
+                meta = GACHA_UPGRADE_TIERS[item_id]
+                tier = gacha_tiers.get(item_id, 0)
+                cost_str = "MAXED" if tier >= len(meta["costs"]) else f"¥{meta['costs'][tier]:,}"
+            else:
+                cost_str = f"¥{item['cost']:,}"
+            label = f"{item['name']} · {cost_str}"[:100]
+            desc = ("Requires a target citizen." if item.get("requires_target") else item.get("description", ""))[:100]
+            options.append(discord.SelectOption(label=label, value=item_id, description=desc))
+        super().__init__(placeholder="Buy from this category...", options=options, min_values=1, max_values=1)
+
+    async def callback(self, interaction: discord.Interaction):
+        item_id = self.values[0]
+        cfg = SHOP_ITEMS[item_id]
+        if cfg.get("requires_target"):
+            suffix = " and a reason" if cfg.get("requires_text") else ""
+            await interaction.response.send_message(
+                f"This item requires a target citizen{suffix}. Use `/buy {item_id} @citizen`.",
+                ephemeral=True,
+            )
+            return
+        await interaction.response.defer(ephemeral=item_id not in _PUBLIC_ITEMS)
+        await self.cog._execute_buy(interaction, item_id)
+
+
 class ShopView(discord.ui.View):
-    def __init__(self, embeds: dict[str, discord.Embed], active: str = "core"):
+    def __init__(self, embeds: dict[str, discord.Embed], items_for_cat: dict, gacha_tiers: dict, cog, active: str = "core"):
         super().__init__(timeout=300)
         self.embeds = embeds
+        self.items_for_cat = items_for_cat
+        self.gacha_tiers = gacha_tiers
+        self.cog = cog
         self.active = active
-        self._refresh_buttons()
+        self._refresh_ui()
 
-    def _refresh_buttons(self):
+    def _refresh_ui(self):
         self.clear_items()
         for cat, label in _CATEGORY_LABELS.items():
             style = discord.ButtonStyle.primary if cat == self.active else discord.ButtonStyle.secondary
             btn = discord.ui.Button(label=label, style=style, custom_id=cat)
             btn.callback = self._make_callback(cat)
             self.add_item(btn)
+        items = self.items_for_cat.get(self.active, [])
+        if items:
+            self.add_item(ShopSelect(items, self.gacha_tiers, self.cog))
 
     def _make_callback(self, cat: str):
         async def callback(interaction: discord.Interaction):
             self.active = cat
-            self._refresh_buttons()
+            self._refresh_ui()
             await interaction.response.edit_message(embed=self.embeds[cat], view=self)
         return callback
 
@@ -469,8 +527,15 @@ class Economy(commands.Cog):
     @app_commands.command(name="shop", description="Browse the Social Credit Bureau's shop")
     async def shop(self, interaction: discord.Interaction):
         await interaction.response.defer(thinking=True)
-        embeds = await _build_shop_embeds(username=str(interaction.user), db=self.db, user_id=interaction.user.id)
-        view = ShopView(embeds, active="core")
+        uid = interaction.user.id
+        tier_vals = await asyncio.gather(*(
+            self.db.get_counter(uid, f"gacha:upgrade:{GACHA_UPGRADE_TIERS[iid]['key']}")
+            for iid in GACHA_UPGRADE_TIERS
+        ))
+        gacha_tiers = {iid: int(v or 0) for iid, v in zip(GACHA_UPGRADE_TIERS, tier_vals)}
+        embeds = await _build_shop_embeds(username=str(interaction.user), db=self.db, user_id=uid, _gacha_tiers=gacha_tiers)
+        items_for_cat = _build_items_for_cat()
+        view = ShopView(embeds, items_for_cat, gacha_tiers, self, active="core")
         await interaction.followup.send(
             embed=embeds["core"],
             view=view,
@@ -539,7 +604,6 @@ class Economy(commands.Cog):
             return
 
         cfg = SHOP_ITEMS[item]
-        gid = interaction.guild.id
         uid = interaction.user.id
 
         if cfg["requires_target"] and target is None:
@@ -552,10 +616,21 @@ class Economy(commands.Cog):
             await interaction.response.send_message("Invalid target.", ephemeral=True)
             return
 
-        _public_items = {"lottery", "lottery_standard", "lottery_premium", "lottery_elite", "lottery_chairman", "lottery_dono", "dispute", "inspection", "criticism", "pact"}
-        await interaction.response.defer(ephemeral=item not in _public_items)
+        await interaction.response.defer(ephemeral=item not in _PUBLIC_ITEMS)
+        await self._execute_buy(interaction, item, target, text)
 
-        if item == "protection" and target and await self.db.get_effect(interaction.guild.id, target.id, "protection"):
+    async def _execute_buy(
+        self,
+        interaction: discord.Interaction,
+        item: str,
+        target: discord.Member = None,
+        text: str = None,
+    ):
+        cfg = SHOP_ITEMS[item]
+        gid = interaction.guild.id
+        uid = interaction.user.id
+
+        if item == "protection" and target and await self.db.get_effect(gid, target.id, "protection"):
             await interaction.followup.send(
                 f"{target.mention} already has active Political Protection.", ephemeral=True
             )
@@ -1169,11 +1244,26 @@ class Economy(commands.Cog):
     async def item_autocomplete(
         self, interaction: discord.Interaction, current: str
     ) -> list[app_commands.Choice[str]]:
-        return [
-            app_commands.Choice(name=f"{v['name']} · ¥{v['cost']:,}", value=k)
-            for k, v in SHOP_ITEMS.items()
-            if current.lower() in k or current.lower() in v["name"].lower()
-        ][:25]
+        uid = interaction.user.id
+        tier_vals = await asyncio.gather(*(
+            self.db.get_counter(uid, f"gacha:upgrade:{GACHA_UPGRADE_TIERS[iid]['key']}")
+            for iid in GACHA_UPGRADE_TIERS
+        ))
+        gacha_tiers = {iid: int(v or 0) for iid, v in zip(GACHA_UPGRADE_TIERS, tier_vals)}
+
+        choices = []
+        for k, v in SHOP_ITEMS.items():
+            if not (current.lower() in k or current.lower() in v["name"].lower()):
+                continue
+            if k in GACHA_UPGRADE_TIERS:
+                meta = GACHA_UPGRADE_TIERS[k]
+                tier = gacha_tiers[k]
+                max_tier = len(meta["costs"])
+                cost_str = "MAXED" if tier >= max_tier else f"¥{meta['costs'][tier]:,}"
+            else:
+                cost_str = f"¥{v['cost']:,}"
+            choices.append(app_commands.Choice(name=f"{v['name']} · {cost_str}", value=k))
+        return choices[:25]
 
 
 async def setup(bot: commands.Bot):
