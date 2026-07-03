@@ -486,7 +486,7 @@ class SocialCreditBot(commands.AutoShardedBot):
             ctx.command.qualified_name in self._COOLDOWN_EXEMPT_COMMANDS
             or ctx.invoked_with in self._COOLDOWN_EXEMPT_COMMANDS
         )
-        if not is_exempt and not await _check_cmd_cooldown(message.author.id):
+        if ctx.command and not is_exempt and not await _check_cmd_cooldown(message.author.id):
             r = get_redis()
             warned = await r.set(f"cmdwarn:{message.author.id}", "1", nx=True, ex=int(CMD_COOLDOWN) or 1)
             if warned:
