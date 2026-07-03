@@ -47,6 +47,7 @@
 .wiki-input:focus { border-color: var(--sage); }
 .wiki-input::placeholder { color: var(--grey); }
 .input-hint { font-size: .72rem; color: var(--grey); margin-top: .35rem; }
+.input-hint.hint-error { color: var(--red); }
 
 /* Feedback banners */
 .feedback {
@@ -129,6 +130,14 @@
 .wrong-person-hint { font-size: .72rem; color: var(--grey); text-align: center;
                      margin-top: .6rem; }
 .wrong-person-hint a { color: var(--sage); text-decoration: none; }
+
+/* URL fallback section */
+.fallback-section {
+  margin-top: .85rem;
+  padding: .85rem 1rem;
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: 8px;
+}
 
 /* TOS section */
 .tos-section { margin-top: 1rem; background: var(--bg-panel);

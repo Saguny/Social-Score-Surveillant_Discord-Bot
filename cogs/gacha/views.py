@@ -305,22 +305,20 @@ class DupeYuanView(discord.ui.View):
 
     @discord.ui.button(emoji="💰", style=discord.ButtonStyle.secondary)
     async def collect(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self._roller_id:
-            await interaction.response.send_message("This isn't your roll.", ephemeral=True)
-            return
         from . import cache as _cache
         data, _ = await _cache.pop_pending(self.message_id)
         if data is None:
             await interaction.response.send_message("Already collected.", ephemeral=True)
             return
         self.stop()
+        claimer_id = interaction.user.id
         lo, hi = DUPE_YUAN.get(self._char["rarity"], (50, 175))
         yuan = random.randint(lo, hi)
-        await interaction.client.db.adjust_yuan(self._guild_id, self._roller_id, yuan)
+        await interaction.client.db.adjust_yuan(self._guild_id, claimer_id, yuan)
         button.disabled = True
         button.emoji = discord.PartialEmoji(name="✅")
         await interaction.response.edit_message(view=self)
-        await interaction.followup.send(f"**+¥{yuan:,}** · duplicate payout", ephemeral=True)
+        await interaction.followup.send(f"**{interaction.user.display_name}** +¥{yuan:,} · duplicate payout")
 
 
 class DivorceConfirmView(discord.ui.View):

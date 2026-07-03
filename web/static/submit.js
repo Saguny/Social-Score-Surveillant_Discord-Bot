@@ -119,11 +119,65 @@
       </div>`;
   }
 
+  function _parseTitleFromUrl(url) {
+    try {
+      const match = url.match(/\/wiki\/([^?#]+)/);
+      if (!match) return null;
+      return decodeURIComponent(match[1]).replace(/_/g, ' ');
+    } catch (_) { return null; }
+  }
+
+  function _urlFallbackHtml(label) {
+    return `
+      <div class="fallback-section">
+        <div class="input-label" style="margin-top:.1rem">${label}</div>
+        <input
+          id="url-fallback"
+          class="wiki-input"
+          type="text"
+          placeholder="Paste their Wikipedia URL — e.g. https://en.wikipedia.org/wiki/Xi_Jinping"
+          autocomplete="off"
+          spellcheck="false"
+        >
+        <div class="input-hint">We'll extract the article title and search again automatically.</div>
+      </div>`;
+  }
+
+  function _bindUrlFallback() {
+    const el = document.getElementById('url-fallback');
+    if (!el) return;
+    const hint = el.nextElementSibling;
+    el.addEventListener('input', (e) => {
+      const val = e.target.value.trim();
+      if (!val) {
+        if (hint) { hint.textContent = 'We\'ll extract the article title and search again automatically.'; hint.classList.remove('hint-error'); }
+        return;
+      }
+      if (!val.includes('wikipedia.org')) {
+        if (hint) { hint.textContent = '⚠ Please paste a link from wikipedia.org'; hint.classList.add('hint-error'); }
+        return;
+      }
+      const title = _parseTitleFromUrl(val);
+      if (!title) {
+        if (hint) { hint.textContent = '⚠ Couldn\'t find a /wiki/ path in that URL — try copying the address bar URL directly.'; hint.classList.add('hint-error'); }
+        return;
+      }
+      if (hint) { hint.textContent = `Searching for "${title}"…`; hint.classList.remove('hint-error'); }
+      $input.value = title;
+      _lastTitle   = null;
+      _currentData = null;
+      clearTimeout(_debounce);
+      _debounce = setTimeout(() => doCheck(title), _DEBOUNCE_MS);
+    });
+  }
+
   function renderNotFound() {
     $result.innerHTML = `
       <div class="feedback fb-error">
         ✗ No Wikipedia article found with that exact title. Check spelling or try the full official name.
-      </div>`;
+      </div>
+      ${_urlFallbackHtml("Can't find them by title?")}`;
+    _bindUrlFallback();
   }
 
   function renderNotPerson(d) {
@@ -164,11 +218,9 @@
           First requested ${when} by <b>@${_esc(d.submitted_by || '?')}</b>
         </div>
       </div>
-      <div class="wrong-person-hint">
-        Not the right person? <a href="#" id="clear-link">Try a different title</a>
-      </div>`;
+      ${_urlFallbackHtml('Not the right person? Paste their Wikipedia URL')}`;
     document.getElementById('support-btn')?.addEventListener('click', onSupportClick);
-    document.getElementById('clear-link')?.addEventListener('click', onClearClick);
+    _bindUrlFallback();
   }
 
   function renderValid(d) {
@@ -185,15 +237,13 @@
       <div class="submit-hint" id="submit-hint">
         ${_user ? 'Check all boxes to submit.' : '<a href="/social-credit/auth/discord?next=/social-credit/submit">Log in with Discord</a> to submit.'}
       </div>
-      <div class="wrong-person-hint">
-        Not the right person? <a href="#" id="clear-link">Try a different title</a>
-      </div>`;
+      ${_urlFallbackHtml('Not the right person? Paste their Wikipedia URL')}`;
 
     document.querySelectorAll('.tos-chk').forEach(chk => {
       chk.addEventListener('change', updateSubmitBtn);
     });
     document.getElementById('submit-btn')?.addEventListener('click', onSubmitClick);
-    document.getElementById('clear-link')?.addEventListener('click', onClearClick);
+    _bindUrlFallback();
     updateSubmitBtn();
   }
 
