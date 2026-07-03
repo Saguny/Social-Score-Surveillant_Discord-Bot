@@ -91,7 +91,7 @@ class AnalyticsMixin:
                        ROUND(AVG(execution_time_ms)::numeric, 1) AS avg_ms
                 FROM command_analytics
                 WHERE ($1 = 0 OR timestamp >= $1)
-                GROUP BY command_name ORDER BY avg_ms DESC LIMIT 15
+                GROUP BY command_name
                 """,
                 since,
             ),

@@ -638,7 +638,7 @@ async function loadCommandAnalytics(range) {
   ], { xFmt: v => v });
 
   // Avg execution time (horizontal bar)
-  const execRows    = (d.average_execution_time || []).slice(0, 8);
+  const execRows    = [...(d.average_execution_time || [])].sort((a, b) => b.avg_ms - a.avg_ms).slice(0, 8);
   const execLabels  = execRows.map(r => r.command);
   const execValues  = execRows.map(r => r.avg_ms);
   _barChart('chart-cmd-exectime', execLabels, [
