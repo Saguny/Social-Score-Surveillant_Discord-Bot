@@ -398,14 +398,16 @@ class GachaCog(commands.Cog, name="Gacha"):
     @commands.command(name="cooldown", aliases=["cd", "claim"])
     async def prefix_cooldown(self, ctx: commands.Context):
         async with ctx.typing():
+            import time as _time
             from .constants import MAX_CLAIMS_PER_HOUR
             guild_id = ctx.guild.id
             user_id  = ctx.author.id
 
-            max_r, roll_state, claim_state = await asyncio.gather(
+            max_r, roll_state, claim_state, voter_expiry = await asyncio.gather(
                 self.service.max_rolls(guild_id, user_id),
                 cache.get_roll_state(guild_id, user_id),
                 cache.get_claim_state(guild_id, user_id),
+                self.bot.db.get_voter_badge_expiry(user_id),
             )
             rolls_used, roll_ttl   = roll_state
             claims_used, claim_ttl = claim_state
@@ -423,9 +425,13 @@ class GachaCog(commands.Cog, name="Gacha"):
                 mins      = max(1, (roll_ttl + 59) // 60)
                 roll_line = f"Your rolls reset in **{mins}min**"
 
-            await ctx.send(
-                f"{claim_line}\n{roll_line}\nVote for the Bureau to reset your rolls `ccp vote`"
-            )
+            now = int(_time.time())
+            if voter_expiry and voter_expiry > now:
+                vote_line = f"Vote available <t:{voter_expiry}:R> (<t:{voter_expiry}:f>)"
+            else:
+                vote_line = "You may vote right now! `ccp vote`"
+
+            await ctx.send(f"{claim_line}\n{roll_line}\n{vote_line}")
 
     # ── suggestions ───────────────────────────────────────────────────────────
 

@@ -97,6 +97,13 @@ class EconomyMixin:
             user_id, badge, int(time.time()), expires_at,
         )
 
+    async def get_voter_badge_expiry(self, user_id: int) -> int | None:
+        row = await self._pool.fetchrow(
+            "SELECT expires_at FROM cosmetic_badges WHERE user_id=$1 AND badge='voter'",
+            user_id,
+        )
+        return row["expires_at"] if row else None
+
     async def clean_expired_cosmetic_badges(self):
         await self._pool.execute(
             "DELETE FROM cosmetic_badges WHERE expires_at IS NOT NULL AND expires_at <= $1",
