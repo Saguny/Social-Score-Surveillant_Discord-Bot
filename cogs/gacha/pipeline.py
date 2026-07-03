@@ -161,12 +161,20 @@ _PERSON_DESC_RE = re.compile(
     r"director|actor|actress|comedian|filmmaker|"
     r"boxer|footballer|athlete|chess player|racing driver|"
     r"banker|financier|magnate|tycoon|investor|"
-    r"astronaut|aviator|mountaineer|oceanographer"
+    r"astronaut|aviator|mountaineer|oceanographer|"
+    r"YouTuber|streamer|content creator|vlogger|podcaster|influencer"
     r")\b",
     re.IGNORECASE,
 )
 
 _BORN_RE = re.compile(r"\b(born|died)\b|\b\d{3,4}\s*[–\-]\s*\d{2,4}\b", re.IGNORECASE)
+
+_BORN_RE_BROAD = re.compile(
+    r"\b(born|died|geboren|gestorben|nacido|nacida|né|née|nato|nata)\b"
+    r"|\(\*\s*\d"
+    r"|\b(18|19|20)\d{2}\b",
+    re.IGNORECASE,
+)
 
 _GENDER_QID: dict[str, str] = {
     "Q6581097": "male",
@@ -203,10 +211,16 @@ async def _aget(url: str, sem: asyncio.Semaphore, headers: dict | None = None) -
 
 
 def _is_person_summary(d: dict) -> bool:
-    desc = (d.get("description") or "").strip()
+    desc    = (d.get("description") or "").strip()
+    extract = (d.get("extract") or "")[:500]
     if _NOT_PERSON_RE.search(desc):
         return False
-    return bool(_PERSON_DESC_RE.search(desc)) or bool(_BORN_RE.search(desc))
+    return (
+        bool(_PERSON_DESC_RE.search(desc))
+        or bool(_BORN_RE.search(desc))
+        or bool(_BORN_RE_BROAD.search(extract))
+        or bool(_PERSON_DESC_RE.search(extract))
+    )
 
 
 def _gender_from_pronouns(extract: str) -> str | None:

@@ -370,9 +370,13 @@ async def _fetch_wikipedia_preview_lang(slug: str, lang: str, session: aiohttp.C
         return None
 
 
-async def _fetch_wikipedia_preview(slug: str) -> dict | None:
+async def _fetch_wikipedia_preview(slug: str, preferred_lang: str | None = None) -> dict | None:
+    langs = list(_WIKI_LANGS)
+    if preferred_lang and preferred_lang in langs:
+        langs.remove(preferred_lang)
+        langs.insert(0, preferred_lang)
     async with aiohttp.ClientSession() as session:
-        for lang in _WIKI_LANGS:
+        for lang in langs:
             result = await _fetch_wikipedia_preview_lang(slug, lang, session)
             if result is not None:
                 return result
@@ -1407,6 +1411,7 @@ async def _handle_admin_requests_approve(request):
         await response.write(f"data: {payload}\n\n".encode())
 
     wiki_slug = req["wiki_slug"]
+    wiki_lang = req.get("wiki_lang") or "en"
 
     try:
         has_full_overrides = (
@@ -1421,7 +1426,7 @@ async def _handle_admin_requests_approve(request):
             wiki_title = req["wiki_title"]
         else:
             await emit("wiki", "Fetching Wikipedia article…")
-            wiki = await _fetch_wikipedia_preview(wiki_slug)
+            wiki = await _fetch_wikipedia_preview(wiki_slug, preferred_lang=wiki_lang)
             if wiki is None:
                 await emit("wiki", "Wikipedia article not found. Approve anyway? Skipping enrichment.", ok=False)
                 wiki_title = req["wiki_title"]
@@ -1449,8 +1454,17 @@ async def _handle_admin_requests_approve(request):
             await emit("pipeline", "Running gacha enrichment pipeline…")
             try:
                 from cogs.gacha.pipeline import process_slug
-                wiki_lang = req.get("wiki_lang") or "en"
                 char_data = await process_slug(wiki_slug, lang=wiki_lang)
+                if char_data is None:
+                    langs_tried = {wiki_lang}
+                    for fallback in _WIKI_LANGS:
+                        if fallback in langs_tried:
+                            continue
+                        langs_tried.add(fallback)
+                        char_data = await process_slug(wiki_slug, lang=fallback)
+                        if char_data is not None:
+                            await emit("pipeline", f"Enriched via {fallback}.wikipedia.org.")
+                            break
             except Exception as exc:
                 await emit("pipeline", f"Pipeline error: {exc}. Saving with minimal data.", ok=False)
                 char_data = None
