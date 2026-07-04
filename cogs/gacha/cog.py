@@ -98,13 +98,23 @@ class GachaCog(commands.Cog, name="Gacha"):
         await interaction.response.defer(ephemeral=True)
         await self.service.do_choose(interaction.guild.id, interaction.user, name, interaction.followup.send)
 
-    @commands.command(name="harem", aliases=["collection"])
+    @commands.command(name="harem", aliases=["collection", "h"])
     async def prefix_collection(self, ctx: commands.Context, user: discord.Member = None):
+        async with ctx.typing():
+            await self.service.show_collection(ctx.guild.id, user or ctx.author, ctx.send)
+
+    @commands.command(name="haremrank", aliases=["hr"])
+    async def prefix_collection_rank(self, ctx: commands.Context, user: discord.Member = None):
         async with ctx.typing():
             await self.service.show_collection(ctx.guild.id, user or ctx.author, ctx.send)
 
     @commands.command(name="haremimage", aliases=["hi", "haremi"])
     async def prefix_harem_image(self, ctx: commands.Context, user: discord.Member = None):
+        async with ctx.typing():
+            await self.service.do_harem_image(ctx.guild.id, user or ctx.author, ctx.send)
+
+    @commands.command(name="haremimagerank", aliases=["hir"])
+    async def prefix_harem_image_rank(self, ctx: commands.Context, user: discord.Member = None):
         async with ctx.typing():
             await self.service.do_harem_image(ctx.guild.id, user or ctx.author, ctx.send)
 
