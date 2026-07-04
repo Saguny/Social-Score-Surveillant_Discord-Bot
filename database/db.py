@@ -79,15 +79,15 @@ TABLES = [
         guild_id             BIGINT,
         user_id              BIGINT,
         score                DOUBLE PRECISION DEFAULT 750.0,
-        yuan                 INTEGER DEFAULT 0,
+        yuan                 BIGINT DEFAULT 0,
         message_count        INTEGER DEFAULT 0,
         has_chatted          INTEGER DEFAULT 0,
         highest_score        DOUBLE PRECISION DEFAULT 750.0,
         lowest_score         DOUBLE PRECISION DEFAULT 750.0,
         times_reported       INTEGER DEFAULT 0,
         times_filed_reports  INTEGER DEFAULT 0,
-        total_yuan_earned    INTEGER DEFAULT 0,
-        total_yuan_spent     INTEGER DEFAULT 0,
+        total_yuan_earned    BIGINT DEFAULT 0,
+        total_yuan_spent     BIGINT DEFAULT 0,
         times_endorsed       INTEGER DEFAULT 0,
         times_rebuked        INTEGER DEFAULT 0,
         endorsements_given   INTEGER DEFAULT 0,
@@ -620,3 +620,6 @@ class Database(
             await conn.execute("ALTER TABLE gacha_requests ADD COLUMN IF NOT EXISTS wiki_extract TEXT NOT NULL DEFAULT ''")
             await conn.execute("ALTER TABLE gacha_requests ADD COLUMN IF NOT EXISTS wiki_lang TEXT NOT NULL DEFAULT 'en'")
             await conn.execute("ALTER TABLE gacha_requests ADD COLUMN IF NOT EXISTS override_title TEXT DEFAULT NULL")
+            await conn.execute("ALTER TABLE users ALTER COLUMN yuan               TYPE BIGINT USING yuan::BIGINT")
+            await conn.execute("ALTER TABLE users ALTER COLUMN total_yuan_earned  TYPE BIGINT USING total_yuan_earned::BIGINT")
+            await conn.execute("ALTER TABLE users ALTER COLUMN total_yuan_spent   TYPE BIGINT USING total_yuan_spent::BIGINT")

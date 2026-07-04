@@ -115,7 +115,7 @@ async def do_roll(
     embed    = roll_embed(char, image_url, rolls_remaining, max_r, dupe=dupe, owner_name=owner_name)
     buy_view = DupeYuanView(char, guild_id, user_id) if dupe else None
     try:
-        msg = await send_fn(embed=embed, view=buy_view)
+        msg = await send_fn(embed=embed, **{"view": buy_view} if buy_view is not None else {})
     except discord.HTTPException:
         await cache.decrement_rolls(guild_id, user_id)
         return
