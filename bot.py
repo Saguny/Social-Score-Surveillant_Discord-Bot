@@ -138,7 +138,7 @@ class CreditCommandTree(discord.app_commands.CommandTree):
         else:
             qualified_name = interaction.command.qualified_name if interaction.command else None
             print(f"[error] /{qualified_name}: {type(error).__name__}: {cause!r}")
-            msg = "An internal error occurred. Please try again."
+            msg = "An internal error occurred. Please notify us at https://discord.gg/invite/k4W6YAPYhC"
         try:
             if interaction.response.is_done():
                 await interaction.followup.send(msg, ephemeral=True)
