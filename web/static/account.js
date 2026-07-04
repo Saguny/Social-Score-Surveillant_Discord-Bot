@@ -9,11 +9,11 @@
   function _timeAgo(ts) {
     if (!ts) return '';
     const diff = Math.floor(Date.now() / 1000) - ts;
-    if (diff < 60)    return 'just now';
-    if (diff < 3600)  return Math.floor(diff/60) + 'm ago';
-    if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
+    if (diff < 60)    return t('just now');
+    if (diff < 3600)  return Math.floor(diff/60) + t('m_ago');
+    if (diff < 86400) return Math.floor(diff/3600) + t('h_ago');
     const d = Math.floor(diff / 86400);
-    return d === 1 ? '1 day ago' : d + ' days ago';
+    return d === 1 ? '1' + t('day_ago') : d + t('days_ago');
   }
 
   function _hex(n) {
@@ -64,12 +64,12 @@
   function renderGuilds(guilds) {
     const $el = document.getElementById('acc-guilds');
     if (!guilds.length) {
-      $el.innerHTML = `<div class="acc-empty">No servers found.</div>`;
+      $el.innerHTML = `<div class="acc-empty">${t('No servers found.')}</div>`;
       return;
     }
     $el.innerHTML = `<table class="acc-guild-table">
       <thead><tr>
-        <th>Server</th><th>Score</th><th>¥ Yuan</th><th>Rank</th>
+        <th>${t('Server')}</th><th>${t('Score')}</th><th>¥ Yuan</th><th>${t('Rank')}</th>
       </tr></thead>
       <tbody>
         ${guilds.map(g => {
@@ -88,20 +88,20 @@
   function renderRequests(requests) {
     const $el = document.getElementById('acc-requests');
     if (!requests.length) {
-      $el.innerHTML = `<div class="acc-empty">No submissions yet. <a href="/social-credit/submit" style="color:var(--sage)">Suggest a character!</a></div>`;
+      $el.innerHTML = `<div class="acc-empty">${t('No submissions yet.')} <a href="/social-credit/submit" style="color:var(--sage)">${t('Suggest a character!')}</a></div>`;
       return;
     }
     $el.innerHTML = requests.map(r => {
-      const pill     = `<span class="acc-status-pill acc-status-${_esc(r.status)}">${_esc(r.status)}</span>`;
+      const pill     = `<span class="acc-status-pill acc-status-${_esc(r.status)}">${_esc(t(r.status))}</span>`;
       const wikiLink = `<a href="https://en.wikipedia.org/wiki/${encodeURIComponent(r.wiki_slug)}" target="_blank" rel="noopener" style="font-size:.72rem;color:var(--sage);text-decoration:none">Wikipedia ↗</a>`;
-      const votes    = `<div class="acc-vote-badge">${r.vote_count} vote${r.vote_count === 1 ? '' : 's'}</div>`;
+      const votes    = `<div class="acc-vote-badge">${r.vote_count} ${t(r.vote_count === 1 ? 'vote' : 'votes')}</div>`;
       const withdraw = r.status === 'pending'
-        ? `<button class="acc-withdraw-btn" onclick="_withdrawRequest(${r.id}, this)">Withdraw</button>`
+        ? `<button class="acc-withdraw-btn" onclick="_withdrawRequest(${r.id}, this)">${t('Withdraw')}</button>`
         : '';
       return `<div class="acc-req-row" id="req-row-${r.id}">
         <div class="acc-req-meta">
           <div class="acc-req-title">${_esc(r.wiki_title)}</div>
-          <div class="acc-req-sub">submitted ${_timeAgo(r.submitted_at)}</div>
+          <div class="acc-req-sub">${t('submitted')} ${_timeAgo(r.submitted_at)}</div>
         </div>
         <div style="display:flex;align-items:center;gap:.6rem;flex-shrink:0;flex-wrap:wrap">
           ${votes}${pill}${withdraw}${wikiLink}
@@ -111,9 +111,9 @@
   }
 
   window._withdrawRequest = async function(requestId, btn) {
-    if (!confirm('Withdraw this character suggestion? This cannot be undone.')) return;
+    if (!confirm(t('Withdraw this character suggestion? This cannot be undone.'))) return;
     btn.disabled   = true;
-    btn.textContent = 'Withdrawing…';
+    btn.textContent = t('Withdrawing…');
 
     const r = await fetch('/api/requests/delete', {
       method: 'POST', credentials: 'same-origin',
@@ -124,7 +124,7 @@
 
     if (!r.ok) {
       btn.disabled    = false;
-      btn.textContent = 'Withdraw';
+      btn.textContent = t('Withdraw');
       alert(result.error || 'Failed to withdraw.');
       return;
     }
@@ -134,16 +134,16 @@
 
     const $el = document.getElementById('acc-requests');
     if ($el && !$el.querySelector('.acc-req-row')) {
-      $el.innerHTML = `<div class="acc-empty">No submissions yet. <a href="/social-credit/submit" style="color:var(--sage)">Suggest a character!</a></div>`;
+      $el.innerHTML = `<div class="acc-empty">${t('No submissions yet.')} <a href="/social-credit/submit" style="color:var(--sage)">${t('Suggest a character!')}</a></div>`;
     }
   };
 
   function renderAchievements(achievements) {
     const $el  = document.getElementById('acc-achievements');
     const $cnt = document.getElementById('acc-ach-count');
-    $cnt.textContent = achievements.length + ' unlocked';
+    $cnt.textContent = achievements.length + ' ' + t('unlocked');
     if (!achievements.length) {
-      $el.innerHTML = `<div class="acc-empty">No achievements unlocked yet.</div>`;
+      $el.innerHTML = `<div class="acc-empty">${t('No achievements unlocked yet.')}</div>`;
       return;
     }
     $el.innerHTML = achievements.map(a => {
@@ -153,7 +153,7 @@
       return `<div class="acc-ach-card ${tierClass}">
         <div class="acc-ach-name">${_esc(a.name)}</div>
         <div class="acc-ach-desc">${_esc(a.description)}</div>
-        ${date ? `<div class="acc-ach-date">Unlocked ${date}</div>` : ''}
+        ${date ? `<div class="acc-ach-date">${t('Unlocked')} ${date}</div>` : ''}
         ${pct ? `<div class="acc-ach-pct">${pct}</div>` : ''}
       </div>`;
     }).join('');
@@ -162,14 +162,14 @@
   function renderBadges(badges, badgePref) {
     const $el = document.getElementById('acc-badges');
     if (!badges.length) {
-      $el.innerHTML = `<div class="acc-empty">No cosmetic badges yet.</div>`;
+      $el.innerHTML = `<div class="acc-empty">${t('No cosmetic badges yet.')}</div>`;
       return;
     }
     $el.innerHTML = badges.map(b => {
       const color    = _hex(b.color || 0x7D9D9C);
       const isActive = b.id === badgePref;
       return `<div class="acc-badge-card">
-        ${isActive ? `<span class="acc-badge-active">ACTIVE</span>` : ''}
+        ${isActive ? `<span class="acc-badge-active">${t('ACTIVE')}</span>` : ''}
         <div class="acc-badge-label">
           <span class="acc-badge-dot" style="background:${color}"></span>
           ${_esc(b.label)}
@@ -190,14 +190,14 @@
     if (identity) {
       identity.innerHTML = `
         <div class="acc-info" style="flex:1">
-          <div class="acc-username">You have been logged out.</div>
+          <div class="acc-username">${t('You have been logged out.')}</div>
         </div>
-        <a href="/social-credit/auth/discord?next=/social-credit/account" class="acc-logout-btn">Log in</a>
+        <a href="/social-credit/auth/discord?next=/social-credit/account" class="acc-logout-btn">${t('Log in')}</a>
       `;
     }
     ['acc-guilds','acc-requests','acc-achievements','acc-badges'].forEach(id => {
       const el = document.getElementById(id);
-      if (el) el.innerHTML = '<div class="acc-empty">Log in to view your account.</div>';
+      if (el) el.innerHTML = `<div class="acc-empty">${t('Log in to view your account.')}</div>`;
     });
     const stats = document.getElementById('acc-stats-global');
     if (stats) stats.querySelectorAll('.n').forEach(el => { el.textContent = '–'; });
@@ -205,6 +205,9 @@
 
   // ── Portfolio ─────────────────────────────────────────────────────────────
 
+  let _accountData      = null;
+  let _portLastData     = null;
+  let _portTurbAvail    = null;
   let _portGuildId = null;
   let _portChart   = null;
   let _portPeriod  = '1D';
@@ -220,7 +223,7 @@
   function _marketBadge(exchange, market) {
     if (!market || !market[exchange]) return '';
     const open  = market[exchange].open;
-    return `<span class="${open ? 'port-mkt-open' : 'port-mkt-closed'}">${open ? 'OPEN' : 'CLOSED'}</span>`;
+    return `<span class="${open ? 'port-mkt-open' : 'port-mkt-closed'}">${open ? t('OPEN') : t('CLOSED')}</span>`;
   }
 
   function initPortfolio(guilds) {
@@ -257,15 +260,15 @@
 
     document.getElementById('port-no-server').style.display = guilds.length ? '' : 'none';
     if (!guilds.length) {
-      document.getElementById('port-content').innerHTML = '<div class="acc-empty">You have no servers with this bot.</div>';
+      document.getElementById('port-content').innerHTML = `<div class="acc-empty">${t('You have no servers with this bot.')}</div>`;
     }
   }
 
   async function loadPortfolio(guildId) {
-    document.getElementById('port-holdings').innerHTML     = '<div class="acc-empty">Loading…</div>';
-    document.getElementById('port-turbos').innerHTML       = '<div class="acc-empty">Loading…</div>';
-    document.getElementById('port-market').innerHTML       = '<div class="acc-empty">Loading…</div>';
-    document.getElementById('port-turbos-avail').innerHTML = '<div class="acc-empty">Loading…</div>';
+    document.getElementById('port-holdings').innerHTML     = `<div class="acc-empty">${t('Loading…')}</div>`;
+    document.getElementById('port-turbos').innerHTML       = `<div class="acc-empty">${t('Loading…')}</div>`;
+    document.getElementById('port-market').innerHTML       = `<div class="acc-empty">${t('Loading…')}</div>`;
+    document.getElementById('port-turbos-avail').innerHTML = `<div class="acc-empty">${t('Loading…')}</div>`;
 
     const [portRes, turbAvailRes] = await Promise.all([
       fetch(`/api/account/portfolio?guild_id=${guildId}`, { credentials: 'same-origin' }),
@@ -274,12 +277,14 @@
 
     if (!portRes.ok) {
       const err = await portRes.json().catch(() => ({}));
-      document.getElementById('port-holdings').innerHTML = `<div class="acc-empty">${_esc(err.error || 'Failed to load portfolio.')}</div>`;
+      document.getElementById('port-holdings').innerHTML = `<div class="acc-empty">${_esc(err.error || t('Failed to load portfolio.'))}</div>`;
       return;
     }
 
     const data      = await portRes.json();
     const turbAvail = turbAvailRes.ok ? await turbAvailRes.json() : { turbos: [], min_cost: 100 };
+    _portLastData  = data;
+    _portTurbAvail = turbAvail;
 
     document.getElementById('port-yuan').textContent = _fmtYuan(data.yuan);
     renderHoldings(data.holdings, guildId, data.market);
@@ -352,12 +357,12 @@
   function renderHoldings(holdings, guildId, market) {
     const $el = document.getElementById('port-holdings');
     if (!holdings.length) {
-      $el.innerHTML = '<div class="acc-empty">No holdings. Use <code>/stocks buy</code> in Discord to buy stocks.</div>';
+      $el.innerHTML = `<div class="acc-empty">${t('No holdings. Use /stocks buy in Discord to buy stocks.')}</div>`;
       return;
     }
     $el.innerHTML = `<div class="port-table-wrap"><table class="port-table">
       <thead><tr>
-        <th>Ticker</th><th>Shares</th><th>Avg Cost</th><th>Price</th><th>Value</th><th>P&amp;L</th><th></th>
+        <th>${t('Ticker')}</th><th>${t('Shares')}</th><th>${t('Avg Cost')}</th><th>${t('Price')}</th><th>${t('Value')}</th><th>${t('P&L')}</th><th></th>
       </tr></thead>
       <tbody>
         ${holdings.map(h => {
@@ -375,9 +380,9 @@
             <td>${_fmtYuan(h.value)}</td>
             <td class="${_pnlClass(h.pnl)}">${pnlStr}</td>
             <td class="port-actions">
-              <button class="port-btn port-btn-ghost" onclick="_stockChart('${_esc(h.ticker)}','${_esc(h.name)}')">Chart</button>
-              <button class="port-btn port-btn-buy" ${(market && market[h.exchange] && market[h.exchange].open) ? '' : 'disabled title="Market closed"'} onclick="_portBuy('${_esc(h.ticker)}','${_esc(h.name)}',${h.current_price},'${_esc(guildId)}')">Buy</button>
-              <button class="port-btn port-btn-sell" onclick="_portSell('${_esc(h.ticker)}','${_esc(h.name)}',${h.current_price},'${_esc(guildId)}')">Sell</button>
+              <button class="port-btn port-btn-ghost" onclick="_stockChart('${_esc(h.ticker)}','${_esc(h.name)}')">${t('Chart')}</button>
+              <button class="port-btn port-btn-buy" ${(market && market[h.exchange] && market[h.exchange].open) ? '' : `disabled title="${t('Market closed')}"`} onclick="_portBuy('${_esc(h.ticker)}','${_esc(h.name)}',${h.current_price},'${_esc(guildId)}')">${t('Buy')}</button>
+              <button class="port-btn port-btn-sell" onclick="_portSell('${_esc(h.ticker)}','${_esc(h.name)}',${h.current_price},'${_esc(guildId)}')">${t('Sell')}</button>
             </td>
           </tr>`;
         }).join('')}
@@ -388,12 +393,12 @@
   function renderOpenTurbos(positions, guildId, market) {
     const $el = document.getElementById('port-turbos');
     if (!positions.length) {
-      $el.innerHTML = '<div class="acc-empty">No open turbo positions.</div>';
+      $el.innerHTML = `<div class="acc-empty">${t('No open turbo positions.')}</div>`;
       return;
     }
     $el.innerHTML = `<div class="port-table-wrap"><table class="port-table">
       <thead><tr>
-        <th>Ticker</th><th>Dir</th><th>Lev</th><th>Entry</th><th>Knockout</th><th>Current</th><th>Value</th><th>P&amp;L</th><th></th>
+        <th>${t('Ticker')}</th><th>${t('Dir')}</th><th>${t('Lev')}</th><th>${t('Entry')}</th><th>${t('Knockout')}</th><th>${t('Current')}</th><th>${t('Value')}</th><th>${t('P&L')}</th><th></th>
       </tr></thead>
       <tbody>
         ${positions.map(p => `<tr>
@@ -409,8 +414,8 @@
           <td>${_fmtYuan(p.value)}</td>
           <td class="${_pnlClass(p.pnl)}">${_pnlFmt(p.pnl)}</td>
           <td class="port-actions">
-            <button class="port-btn port-btn-ghost" onclick="_portTurboChart('${_esc(p.ticker)}','${_esc(p.name)}','${_esc(p.direction)}',${p.leverage},${p.entry_price},${p.knockout})">Chart</button>
-            <button class="port-btn port-btn-sell" onclick="_portCloseT(${p.position_id},'${_esc(guildId)}')">Close</button>
+            <button class="port-btn port-btn-ghost" onclick="_portTurboChart('${_esc(p.ticker)}','${_esc(p.name)}','${_esc(p.direction)}',${p.leverage},${p.entry_price},${p.knockout})">${t('Chart')}</button>
+            <button class="port-btn port-btn-sell" onclick="_portCloseT(${p.position_id},'${_esc(guildId)}')">${t('Close')}</button>
           </td>
         </tr>`).join('')}
       </tbody>
@@ -420,12 +425,12 @@
   function renderTurbosAvail(turbos, guildId, market) {
     const $el = document.getElementById('port-turbos-avail');
     if (!turbos.length) {
-      $el.innerHTML = '<div class="acc-empty">No turbo certificates generated yet today.</div>';
+      $el.innerHTML = `<div class="acc-empty">${t('No turbo certificates generated yet today.')}</div>`;
       return;
     }
     $el.innerHTML = `<div class="port-table-wrap"><table class="port-table">
       <thead><tr>
-        <th>ID</th><th>Ticker</th><th>Dir</th><th>Lev</th><th>Entry</th><th>Knockout</th><th>Current</th><th></th>
+        <th>ID</th><th>${t('Ticker')}</th><th>${t('Dir')}</th><th>${t('Lev')}</th><th>${t('Entry')}</th><th>${t('Knockout')}</th><th>${t('Current')}</th><th></th>
       </tr></thead>
       <tbody>
         ${turbos.map(t => `<tr>
@@ -441,8 +446,8 @@
           <td class="pnl-neg">${_fmtPrice(t.knockout)}</td>
           <td>${_fmtPrice(t.current_price)}</td>
           <td class="port-actions">
-            <button class="port-btn port-btn-ghost" onclick="_portTurboChart('${_esc(t.ticker)}','${_esc(t.name)}','${_esc(t.direction)}',${t.leverage},${t.entry_price},${t.knockout})">Chart</button>
-            <button class="port-btn port-btn-buy" onclick="_portOpenT(${t.id},'${_esc(t.ticker)}','${_esc(t.name)}',${t.leverage},'${_esc(guildId)}')">Open</button>
+            <button class="port-btn port-btn-ghost" onclick="_portTurboChart('${_esc(t.ticker)}','${_esc(t.name)}','${_esc(t.direction)}',${t.leverage},${t.entry_price},${t.knockout})">${t('Chart')}</button>
+            <button class="port-btn port-btn-buy" onclick="_portOpenT(${t.id},'${_esc(t.ticker)}','${_esc(t.name)}',${t.leverage},'${_esc(guildId)}')">${t('Open')}</button>
           </td>
         </tr>`).join('')}
       </tbody>
@@ -457,13 +462,13 @@
     _tradePrice  = price;
     _tradeGuild  = guildId;
 
-    document.getElementById('trade-modal-title').textContent = (mode === 'buy' ? 'Buy ' : 'Sell ') + ticker;
+    document.getElementById('trade-modal-title').textContent = t(mode === 'buy' ? 'Buy' : 'Sell') + ' ' + ticker;
     document.getElementById('trade-modal-info').innerHTML =
-      `<strong>${_esc(name)}</strong> · Current price: <strong>${_fmtPrice(price)}</strong>`;
+      `<strong>${_esc(name)}</strong> · ${t('Current price:')} <strong>${_fmtPrice(price)}</strong>`;
     document.getElementById('trade-shares').value = '';
     document.getElementById('trade-cost-preview').textContent = '';
     document.getElementById('trade-modal-err').style.display  = 'none';
-    document.getElementById('trade-confirm-btn').textContent  = mode === 'buy' ? 'Buy' : 'Sell';
+    document.getElementById('trade-confirm-btn').textContent  = t(mode === 'buy' ? 'Buy' : 'Sell');
     document.getElementById('trade-confirm-btn').className    =
       'port-btn ' + (mode === 'buy' ? 'port-btn-action' : 'port-btn-sell');
     document.getElementById('trade-confirm-btn').disabled = false;
@@ -471,7 +476,7 @@
     document.getElementById('trade-shares').oninput = () => {
       const s = parseFloat(document.getElementById('trade-shares').value) || 0;
       document.getElementById('trade-cost-preview').textContent =
-        s > 0 ? (mode === 'buy' ? 'Cost: ' : 'Proceeds: ') + _fmtYuan(Math.round(s * price)) : '';
+        s > 0 ? t(mode === 'buy' ? 'Cost:' : 'Proceeds:') + ' ' + _fmtYuan(Math.round(s * price)) : '';
     };
 
     document.getElementById('trade-confirm-btn').onclick = _submitTrade;
@@ -482,7 +487,7 @@
 
   async function _submitTrade() {
     const shares = parseFloat(document.getElementById('trade-shares').value);
-    if (!shares || shares <= 0) { _showTradeErr('Enter a valid share amount.'); return; }
+    if (!shares || shares <= 0) { _showTradeErr(t('Enter a valid share amount.')); return; }
     document.getElementById('trade-modal-err').style.display  = 'none';
     document.getElementById('trade-confirm-btn').disabled = true;
 
@@ -495,7 +500,7 @@
     const result = await r.json();
     document.getElementById('trade-confirm-btn').disabled = false;
 
-    if (!r.ok) { _showTradeErr(result.error || 'Trade failed.'); return; }
+    if (!r.ok) { _showTradeErr(result.error || t('Trade failed.')); return; }
 
     bootstrap.Modal.getInstance(document.getElementById('tradeModal')).hide();
     document.getElementById('port-yuan').textContent = _fmtYuan(result.new_yuan);
@@ -528,7 +533,7 @@
 
   async function _submitTurboOpen() {
     const cost = parseInt(document.getElementById('turbo-cost').value);
-    if (!cost || cost < 100) { _showTurboErr('Minimum ¥100.'); return; }
+    if (!cost || cost < 100) { _showTurboErr(t('Minimum ¥100.')); return; }
     document.getElementById('turbo-modal-err').style.display = 'none';
     document.getElementById('turbo-confirm-btn').disabled    = true;
 
@@ -540,7 +545,7 @@
     const result = await r.json();
     document.getElementById('turbo-confirm-btn').disabled = false;
 
-    if (!r.ok) { _showTurboErr(result.error || 'Failed to open position.'); return; }
+    if (!r.ok) { _showTurboErr(result.error || t('Failed to open position.')); return; }
 
     bootstrap.Modal.getInstance(document.getElementById('turboModal')).hide();
     document.getElementById('port-yuan').textContent = _fmtYuan(result.new_yuan);
@@ -556,7 +561,7 @@
   // ── Turbo close ───────────────────────────────────────────────────────────
 
   async function _closeTurboPosition(positionId, guildId) {
-    if (!confirm('Close this turbo position? Proceeds will be credited to your yuan balance.')) return;
+    if (!confirm(t('Close this turbo position? Proceeds will be credited to your yuan balance.'))) return;
 
     const r = await fetch('/api/account/portfolio/turbo/close', {
       method: 'POST', credentials: 'same-origin',
@@ -564,7 +569,7 @@
       body: JSON.stringify({ guild_id: guildId, position_id: positionId }),
     });
     const result = await r.json();
-    if (!r.ok) { alert(result.error || 'Failed to close position.'); return; }
+    if (!r.ok) { alert(result.error || t('Failed to close position.')); return; }
 
     document.getElementById('port-yuan').textContent = _fmtYuan(result.new_yuan);
     loadPortfolio(_portGuildId);
@@ -577,7 +582,7 @@
 
   function renderAllStocks(tickers, guildId, market) {
     const $el = document.getElementById('port-market');
-    if (!tickers.length) { $el.innerHTML = '<div class="acc-empty">No market data available.</div>'; return; }
+    if (!tickers.length) { $el.innerHTML = `<div class="acc-empty">${t('No market data available.')}</div>`; return; }
 
     const byGroup = {};
     for (const t of tickers) {
@@ -600,7 +605,7 @@
       else if (diff < 3600)   rel = `in ${Math.round(diff / 60)}m`;
       else if (diff < 86400)  rel = `in ${Math.floor(diff / 3600)}h ${Math.round((diff % 3600) / 60)}m`;
       else                    rel = `in ${Math.floor(diff / 86400)}d`;
-      const label = open ? 'Closes' : 'Opens';
+      const label = open ? t('Closes') : t('Opens');
       return `<span class="port-mkt-time">${label} ${time} · ${date} (${rel})</span>`;
     }
 
@@ -608,25 +613,25 @@
       const rows = byGroup[group];
       const ex   = rows[0].exchange;
       const open = market && market[ex] && market[ex].open;
-      const badge = `<span class="${open ? 'port-mkt-open' : 'port-mkt-closed'}">${open ? 'OPEN' : 'CLOSED'}</span>`;
+      const badge = `<span class="${open ? 'port-mkt-open' : 'port-mkt-closed'}">${open ? t('OPEN') : t('CLOSED')}</span>`;
       return `
         <div class="port-exchange-hdr">${_EXCHANGE_LABELS[group] || group} ${badge} ${_mktTiming(ex)}</div>
         <div class="port-table-wrap"><table class="port-table">
-          <thead><tr><th>Ticker</th><th>Name</th><th>Price</th><th>Owned</th><th></th></tr></thead>
+          <thead><tr><th>${t('Ticker')}</th><th>${t('Name')}</th><th>${t('Price')}</th><th>${t('Owned')}</th><th></th></tr></thead>
           <tbody>
             ${rows.map(t => {
               const owned = t.owned_shares > 0
                 ? `<span class="port-owned">${t.owned_shares % 1 === 0 ? t.owned_shares : Number(t.owned_shares).toFixed(4)} sh</span>`
                 : '<span class="port-dimmed">–</span>';
-              const buyDisabled = open ? '' : 'disabled title="Market closed"';
+              const buyDisabled = open ? '' : `disabled title="${t('Market closed')}"` ;
               return `<tr>
                 <td><span class="port-ticker">${_esc(t.ticker)}</span></td>
                 <td class="port-ticker-name">${_esc(t.name)}</td>
                 <td>${_fmtPrice(t.current_price)}</td>
                 <td>${owned}</td>
                 <td class="port-actions">
-                  <button class="port-btn port-btn-ghost" onclick="_stockChart('${_esc(t.ticker)}','${_esc(t.name)}')">Chart</button>
-                  <button class="port-btn port-btn-buy" ${buyDisabled} onclick="_portBuy('${_esc(t.ticker)}','${_esc(t.name)}',${t.current_price},'${_esc(guildId)}')">Buy</button>
+                  <button class="port-btn port-btn-ghost" onclick="_stockChart('${_esc(t.ticker)}','${_esc(t.name)}')">${t('Chart')}</button>
+                  <button class="port-btn port-btn-buy" ${buyDisabled} onclick="_portBuy('${_esc(t.ticker)}','${_esc(t.name)}',${t.current_price},'${_esc(guildId)}')">${t('Buy')}</button>
                 </td>
               </tr>`;
             }).join('')}
@@ -781,11 +786,12 @@
   async function init() {
     const r = await fetch('/api/account', { credentials: 'same-origin' }).catch(() => null);
 
-    if (!r) { showContentError('Network error — please refresh.'); return; }
+    if (!r) { showContentError(t('Network error — please refresh.')); return; }
     if (r.status === 401) { window.location.href = '/social-credit/auth/discord?next=/social-credit/account'; return; }
-    if (!r.ok) { showContentError('Failed to load account data — please refresh.'); return; }
+    if (!r.ok) { showContentError(t('Failed to load account data — please refresh.')); return; }
 
     const d = await r.json();
+    _accountData = d;
     renderIdentity(d.discord);
     renderCounters(d.counters || {});
     renderGuilds(d.guilds || []);
@@ -796,6 +802,20 @@
   }
 
   init();
+
+  document.addEventListener('i18n:changed', () => {
+    if (!_accountData) return;
+    renderGuilds(_accountData.guilds || []);
+    renderRequests(_accountData.requests || []);
+    renderAchievements(_accountData.achievements || []);
+    renderBadges(_accountData.badges || [], _accountData.badge_preference);
+    if (_portGuildId && _portLastData) {
+      renderHoldings(_portLastData.holdings, _portGuildId, _portLastData.market);
+      renderOpenTurbos(_portLastData.turbos, _portGuildId, _portLastData.market);
+      renderAllStocks(_portLastData.all_tickers || [], _portGuildId, _portLastData.market);
+      if (_portTurbAvail) renderTurbosAvail(_portTurbAvail.turbos, _portGuildId, _portLastData.market);
+    }
+  });
 
   document.addEventListener('click', async (e) => {
     const link = e.target.closest('a.acc-logout-btn');

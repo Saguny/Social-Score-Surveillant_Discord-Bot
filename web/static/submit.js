@@ -33,13 +33,13 @@
       $bar.innerHTML = `
         ${av}
         <span class="uname">@${_esc(user.username)}</span>
-        <span style="font-size:.75rem;color:var(--grey)">You are logged in</span>
-        <a href="/social-credit/auth/discord/logout?next=/social-credit/submit" class="logout-link">Log out</a>`;
+        <span style="font-size:.75rem;color:var(--grey)">${t('You are logged in')}</span>
+        <a href="/social-credit/auth/discord/logout?next=/social-credit/submit" class="logout-link">${t('Log out')}</a>`;
     } else {
       $bar.innerHTML = `
         <div class="avatar-placeholder"></div>
-        <span style="font-size:.82rem;color:var(--text-muted)">Log in to submit or vote on characters</span>
-        <a href="/social-credit/auth/discord?next=/social-credit/submit" class="login-link">🔗 Login with Discord</a>`;
+        <span style="font-size:.82rem;color:var(--text-muted)">${t('Log in to submit or vote on characters')}</span>
+        <a href="/social-credit/auth/discord?next=/social-credit/submit" class="login-link">🔗 ${t('Login with Discord')}</a>`;
     }
   }
 
@@ -60,11 +60,11 @@
 
   function _timeAgo(ts) {
     const diff = Math.floor(Date.now() / 1000) - ts;
-    if (diff < 60)    return 'just now';
-    if (diff < 3600)  return `${Math.floor(diff/60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+    if (diff < 60)    return t('just now');
+    if (diff < 3600)  return `${Math.floor(diff/60)}${t('m_ago')}`;
+    if (diff < 86400) return `${Math.floor(diff/3600)}${t('h_ago')}`;
     const days = Math.floor(diff/86400);
-    return days === 1 ? '1 day ago' : `${days} days ago`;
+    return days === 1 ? `1${t('day_ago')}` : `${days}${t('days_ago')}`;
   }
 
   function _avatarStack(voters) {
@@ -236,7 +236,7 @@
         <label class="tos-row"><input type="checkbox" class="tos-chk"> I understand submissions may be rejected without explanation.</label>
         <label class="tos-row"><input type="checkbox" class="tos-chk"> I have not submitted this person before in the last 24 hours.</label>
       </div>
-      <button class="submit-btn" id="submit-btn" disabled>SUBMIT FOR REVIEW</button>
+      <button class="submit-btn" id="submit-btn" disabled>${t('SUBMIT FOR REVIEW')}</button>
       <div class="submit-hint" id="submit-hint">
         ${_user ? 'Check all boxes to submit.' : '<a href="/social-credit/auth/discord?next=/social-credit/submit">Log in with Discord</a> to submit.'}
       </div>
@@ -300,7 +300,7 @@
 
   async function onSupportClick(e) {
     const btn = e.currentTarget;
-    if (!_user) { toast('Log in to support characters', 'error'); return; }
+    if (!_user) { toast(t('Log in to support characters'), 'error'); return; }
     const reqId = parseInt(btn.dataset.id, 10);
     btn.disabled = true;
     try {
@@ -311,11 +311,11 @@
         body: JSON.stringify({ request_id: reqId }),
       });
       const body = await r.json();
-      if (!r.ok) { toast(body.error || 'Error', 'error'); btn.disabled = false; return; }
+      if (!r.ok) { toast(body.error || t('Error'), 'error'); btn.disabled = false; return; }
       // re-fetch to get updated counts
       if (_lastTitle) doCheck(_lastTitle);
     } catch (_) {
-      toast('Network error', 'error');
+      toast(t('Network error'), 'error');
       btn.disabled = false;
     }
   }
@@ -324,7 +324,7 @@
     if (!_user) return;
     if (!_currentData || _currentData.state !== 'valid') return;
     const btn = document.getElementById('submit-btn');
-    if (btn) { btn.disabled = true; btn.textContent = 'SUBMITTING…'; }
+    if (btn) { btn.disabled = true; btn.textContent = t('SUBMITTING…'); }
     try {
       const r = await fetch('/api/requests/submit', {
         method: 'POST',
@@ -341,16 +341,16 @@
           if (_lastTitle) doCheck(_lastTitle);
           return;
         }
-        toast(body.error || 'Submission failed', 'error');
-        if (btn) { btn.disabled = false; btn.textContent = 'SUBMIT FOR REVIEW'; }
+        toast(body.error || t('Submission failed'), 'error');
+        if (btn) { btn.disabled = false; btn.textContent = t('SUBMIT FOR REVIEW'); }
         return;
       }
-      toast('Submitted! Thank you for your suggestion.', 'success');
+      toast(t('Submitted! Thank you for your suggestion.'), 'success');
       // re-check to flip to "requested" state
       if (_lastTitle) doCheck(_lastTitle);
     } catch (_) {
-      toast('Network error', 'error');
-      if (btn) { btn.disabled = false; btn.textContent = 'SUBMIT FOR REVIEW'; }
+      toast(t('Network error'), 'error');
+      if (btn) { btn.disabled = false; btn.textContent = t('SUBMIT FOR REVIEW'); }
     }
   }
 
@@ -369,6 +369,19 @@
 
   // ── init ───────────────────────────────────────────────────────────────────
   loadUser();
+
+  document.addEventListener('i18n:changed', () => {
+    renderBar(_user);
+    if (_currentData) {
+      switch (_currentData.state) {
+        case 'in_game':    renderInGame(_currentData);    break;
+        case 'requested':  renderRequested(_currentData); break;
+        case 'valid':      renderValid(_currentData);     break;
+        case 'not_found':  renderNotFound();              break;
+        case 'not_person': renderNotPerson(_currentData); break;
+      }
+    }
+  });
 
   document.addEventListener('click', async (e) => {
     const link = e.target.closest('a.logout-link');

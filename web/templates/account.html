@@ -10,20 +10,22 @@
   <link rel="stylesheet" href="/static/dashboard.css">
   <link rel="stylesheet" href="/static/submit.css">
   <link rel="stylesheet" href="/static/account.css?v=3">
+  <script src="/static/i18n.js"></script>
 </head>
 <body>
 
 <nav class="navbar px-4 py-3 mb-3">
   <a class="navbar-brand" href="/social-credit">社会信用 Social Credit</a>
   <div class="d-flex gap-3 align-items-center flex-wrap">
-    <a href="/social-credit"             class="nav-link">HOME</a>
-    <a href="/social-credit/dashboard"    class="nav-link">DASHBOARD</a>
-    <a href="/social-credit/leaderboards" class="nav-link">LEADERBOARDS</a>
-    <a href="/social-credit/wishlist"     class="nav-link">WISHLIST</a>
-    <a href="/social-credit/submit"       class="nav-link">SUBMIT</a>
-    <a href="/social-credit/account"      class="nav-link active">MY ACCOUNT</a>
-    <a href="/social-credit/privacy"      class="nav-link">PRIVACY</a>
-    <a href="/social-credit/terms"        class="nav-link">TERMS</a>
+    <a href="/social-credit"             class="nav-link" data-i18n="HOME">HOME</a>
+    <a href="/social-credit/dashboard"    class="nav-link" data-i18n="DASHBOARD">DASHBOARD</a>
+    <a href="/social-credit/leaderboards" class="nav-link" data-i18n="LEADERBOARDS">LEADERBOARDS</a>
+    <a href="/social-credit/wishlist"     class="nav-link" data-i18n="WISHLIST">WISHLIST</a>
+    <a href="/social-credit/submit"       class="nav-link" data-i18n="SUBMIT">SUBMIT</a>
+    <a href="/social-credit/account"      class="nav-link active" data-i18n="MY ACCOUNT">MY ACCOUNT</a>
+    <a href="/social-credit/privacy"      class="nav-link" data-i18n="PRIVACY">PRIVACY</a>
+    <a href="/social-credit/terms"        class="nav-link" data-i18n="TERMS">TERMS</a>
+    <select id="lang-select" class="lang-select" onchange="setLang(this.value)"></select>
   </div>
 </nav>
 
@@ -37,16 +39,16 @@
         <div class="acc-username" id="acc-username">Loading…</div>
         <div class="acc-sub" id="acc-sub"></div>
       </div>
-      <a href="/social-credit/auth/discord/logout" class="acc-logout-btn">Log out</a>
+      <a href="/social-credit/auth/discord/logout" class="acc-logout-btn" data-i18n="Log out">Log out</a>
     </div>
 
     <!-- Tab nav -->
     <ul class="nav nav-tabs acc-tabs mb-4" id="accTabs">
-      <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tab-overview">Overview</a></li>
-      <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-portfolio" id="tab-portfolio-link">Portfolio</a></li>
-      <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-requests">Requests</a></li>
-      <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-achievements">Achievements</a></li>
-      <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-badges">Badges</a></li>
+      <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tab-overview" data-i18n="Overview">Overview</a></li>
+      <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-portfolio" id="tab-portfolio-link" data-i18n="Portfolio">Portfolio</a></li>
+      <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-requests" data-i18n="Requests">Requests</a></li>
+      <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-achievements" data-i18n="Achievements">Achievements</a></li>
+      <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-badges" data-i18n="Badges">Badges</a></li>
     </ul>
 
     <div class="tab-content" id="accTabContent">
@@ -54,17 +56,17 @@
       <!-- ── Overview ─────────────────────────────── -->
       <div class="tab-pane fade show active" id="tab-overview">
 
-        <div class="acc-shdr">Global Stats</div>
+        <div class="acc-shdr" data-i18n="Global Stats">Global Stats</div>
         <div class="acc-stat-grid" id="acc-stats-global">
-          <div class="acc-stat-tile"><div class="n" id="s-checkin">–</div><div class="lbl">Check-in Streak</div></div>
-          <div class="acc-stat-tile"><div class="n" id="s-checkin-best">–</div><div class="lbl">Best Streak</div></div>
-          <div class="acc-stat-tile"><div class="n" id="s-votes">–</div><div class="lbl">Total Votes</div></div>
-          <div class="acc-stat-tile"><div class="n" id="s-vote-streak">–</div><div class="lbl">Vote Streak</div></div>
-          <div class="acc-stat-tile"><div class="n" id="s-prestige">–</div><div class="lbl">Prestige Level</div></div>
-          <div class="acc-stat-tile"><div class="n" id="s-gacha">–</div><div class="lbl">Gacha Approved</div></div>
+          <div class="acc-stat-tile"><div class="n" id="s-checkin">–</div><div class="lbl" data-i18n="Check-in Streak">Check-in Streak</div></div>
+          <div class="acc-stat-tile"><div class="n" id="s-checkin-best">–</div><div class="lbl" data-i18n="Best Streak">Best Streak</div></div>
+          <div class="acc-stat-tile"><div class="n" id="s-votes">–</div><div class="lbl" data-i18n="Total Votes">Total Votes</div></div>
+          <div class="acc-stat-tile"><div class="n" id="s-vote-streak">–</div><div class="lbl" data-i18n="Vote Streak">Vote Streak</div></div>
+          <div class="acc-stat-tile"><div class="n" id="s-prestige">–</div><div class="lbl" data-i18n="Prestige Level">Prestige Level</div></div>
+          <div class="acc-stat-tile"><div class="n" id="s-gacha">–</div><div class="lbl" data-i18n="Gacha Approved">Gacha Approved</div></div>
         </div>
 
-        <div class="acc-shdr mt-4">Server Breakdown</div>
+        <div class="acc-shdr mt-4" data-i18n="Server Breakdown">Server Breakdown</div>
         <div id="acc-guilds">
           <div class="acc-empty">Loading…</div>
         </div>
@@ -76,9 +78,9 @@
 
         <!-- Server selector -->
         <div class="port-server-row">
-          <label class="port-server-label">Server</label>
+          <label class="port-server-label" data-i18n="Server">Server</label>
           <select id="port-guild-select" class="port-guild-select">
-            <option value="">Select a server…</option>
+            <option value="" data-i18n="Select a server…">Select a server…</option>
           </select>
           <span id="port-yuan" class="port-yuan"></span>
         </div>
@@ -87,7 +89,7 @@
 
           <!-- Portfolio value chart -->
           <div class="acc-shdr d-flex align-items-center justify-content-between mt-3">
-            <span>Portfolio Value</span>
+            <span data-i18n="Portfolio Value">Portfolio Value</span>
             <div class="port-period-row">
               <button class="port-period active" data-period="1D">1D</button>
               <button class="port-period" data-period="5D">5D</button>
@@ -98,30 +100,30 @@
           </div>
           <div class="port-chart-wrap">
             <canvas id="port-chart"></canvas>
-            <div class="port-chart-empty" id="port-chart-empty" style="display:none">No history yet — history is recorded every 2 minutes while the bot is running.</div>
+            <div class="port-chart-empty" id="port-chart-empty" style="display:none" data-i18n="No history yet — history is recorded every 2 minutes while the bot is running.">No history yet — history is recorded every 2 minutes while the bot is running.</div>
           </div>
 
           <!-- Holdings -->
-          <div class="acc-shdr mt-4">Holdings</div>
+          <div class="acc-shdr mt-4" data-i18n="Holdings">Holdings</div>
           <div id="port-holdings">
             <div class="acc-empty">Loading…</div>
           </div>
 
           <!-- Open Turbo Positions -->
-          <div class="acc-shdr mt-4">Open Turbo Positions</div>
+          <div class="acc-shdr mt-4" data-i18n="Open Turbo Positions">Open Turbo Positions</div>
           <div id="port-turbos">
             <div class="acc-empty">Loading…</div>
           </div>
 
           <!-- Stock Market -->
-          <div class="acc-shdr mt-4">Stock Market</div>
+          <div class="acc-shdr mt-4" data-i18n="Stock Market">Stock Market</div>
           <div id="port-market">
             <div class="acc-empty">Loading…</div>
           </div>
 
           <!-- Available Turbos -->
           <div class="acc-shdr mt-4 d-flex align-items-center justify-content-between">
-            <span>Today's Turbo Certificates</span>
+            <span data-i18n="Today's Turbo Certificates">Today's Turbo Certificates</span>
             <span id="port-min-cost" style="font-size:.75rem;color:var(--text-muted)"></span>
           </div>
           <div id="port-turbos-avail">
@@ -130,14 +132,14 @@
 
         </div>
 
-        <div id="port-no-server" class="acc-empty mt-4" style="display:none">Select a server above to view your portfolio.</div>
+        <div id="port-no-server" class="acc-empty mt-4" style="display:none" data-i18n="Select a server above to view your portfolio.">Select a server above to view your portfolio.</div>
 
       </div>
 
       <!-- ── Requests ───────────────────────────────── -->
       <div class="tab-pane fade" id="tab-requests">
 
-        <div class="acc-shdr">My Submissions</div>
+        <div class="acc-shdr" data-i18n="My Submissions">My Submissions</div>
         <div id="acc-requests">
           <div class="acc-empty">Loading…</div>
         </div>
@@ -148,7 +150,7 @@
       <div class="tab-pane fade" id="tab-achievements">
 
         <div class="acc-shdr d-flex justify-content-between align-items-center">
-          <span>Achievements</span>
+          <span data-i18n="Achievements">Achievements</span>
           <span id="acc-ach-count" style="font-size:.78rem;font-weight:400;color:var(--text-muted)"></span>
         </div>
         <div id="acc-achievements" class="acc-ach-grid">
@@ -160,7 +162,7 @@
       <!-- ── Badges ──────────────────────────────────── -->
       <div class="tab-pane fade" id="tab-badges">
 
-        <div class="acc-shdr">Cosmetic Badges</div>
+        <div class="acc-shdr" data-i18n="Cosmetic Badges">Cosmetic Badges</div>
         <div id="acc-badges" class="acc-badge-grid">
           <div class="acc-empty">Loading…</div>
         </div>
@@ -177,20 +179,20 @@
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content port-modal">
       <div class="modal-header border-0 pb-0">
-        <h6 class="modal-title" id="trade-modal-title">Trade</h6>
+        <h6 class="modal-title" id="trade-modal-title" data-i18n="Trade">Trade</h6>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body pt-2">
         <div id="trade-modal-info" class="port-modal-info mb-3"></div>
         <div class="d-flex align-items-center gap-2 mb-2">
-          <input type="number" id="trade-shares" class="port-input flex-grow-1" placeholder="Shares" min="0.0001" step="any">
+          <input type="number" id="trade-shares" class="port-input flex-grow-1" placeholder="Shares" data-i18n-placeholder="Shares" min="0.0001" step="any">
           <span id="trade-cost-preview" class="port-cost-preview"></span>
         </div>
         <div id="trade-modal-err" class="port-err" style="display:none"></div>
       </div>
       <div class="modal-footer border-0 pt-0">
-        <button class="port-btn port-btn-ghost" data-bs-dismiss="modal">Cancel</button>
-        <button class="port-btn port-btn-action" id="trade-confirm-btn">Confirm</button>
+        <button class="port-btn port-btn-ghost" data-bs-dismiss="modal" data-i18n="Cancel">Cancel</button>
+        <button class="port-btn port-btn-action" id="trade-confirm-btn" data-i18n="Confirm">Confirm</button>
       </div>
     </div>
   </div>
@@ -229,30 +231,30 @@
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content port-modal">
       <div class="modal-header border-0 pb-0">
-        <h6 class="modal-title" id="turbo-modal-title">Open Turbo Position</h6>
+        <h6 class="modal-title" id="turbo-modal-title" data-i18n="Open Turbo Position">Open Turbo Position</h6>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body pt-2">
         <div id="turbo-modal-info" class="port-modal-info mb-3"></div>
         <div class="d-flex align-items-center gap-2 mb-2">
-          <input type="number" id="turbo-cost" class="port-input flex-grow-1" placeholder="Yuan to invest" min="100" step="1">
+          <input type="number" id="turbo-cost" class="port-input flex-grow-1" placeholder="Yuan to invest" data-i18n-placeholder="Yuan to invest" min="100" step="1">
         </div>
         <div id="turbo-modal-err" class="port-err" style="display:none"></div>
       </div>
       <div class="modal-footer border-0 pt-0">
-        <button class="port-btn port-btn-ghost" data-bs-dismiss="modal">Cancel</button>
-        <button class="port-btn port-btn-action" id="turbo-confirm-btn">Open Position</button>
+        <button class="port-btn port-btn-ghost" data-bs-dismiss="modal" data-i18n="Cancel">Cancel</button>
+        <button class="port-btn port-btn-action" id="turbo-confirm-btn" data-i18n="Open Position">Open Position</button>
       </div>
     </div>
   </div>
 </div>
 
 <footer class="site-footer">
-  Made with ♥ by <a href="/">OFF-BY-ONE</a> ·
-  <a href="https://discord.gg/invite/k4W6YAPYhC" target="_blank" rel="noopener">Support Server</a> ·
-  <a href="https://top.gg/bot/856163780265902151" target="_blank" rel="noopener">Invite Bot</a> ·
-  <a href="/social-credit/privacy">Privacy</a> ·
-  <a href="/social-credit/terms">Terms</a>
+  <span data-i18n="Made with ♥ by">Made with ♥ by</span> <a href="/">OFF-BY-ONE</a> ·
+  <a href="https://discord.gg/invite/k4W6YAPYhC" target="_blank" rel="noopener" data-i18n="Support Server">Support Server</a> ·
+  <a href="https://top.gg/bot/856163780265902151" target="_blank" rel="noopener" data-i18n="Invite Bot">Invite Bot</a> ·
+  <a href="/social-credit/privacy" data-i18n="PRIVACY">Privacy</a> ·
+  <a href="/social-credit/terms" data-i18n="TERMS">Terms</a>
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>

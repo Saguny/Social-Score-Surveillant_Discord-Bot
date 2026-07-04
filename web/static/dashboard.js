@@ -120,16 +120,16 @@ async function loadActivity(range) {
   const ciVals = eng.map(r => r.checkins);
 
   _multiLineChart('chart-activity-msgs', labels, [
-    { label: 'Messages',    data: msgVals,   borderColor: '#7D9D9C', backgroundColor: '#7D9D9C22', fill: false, tension: .3 },
+    { label: t('Messages'),    data: msgVals,   borderColor: '#7D9D9C', backgroundColor: '#7D9D9C22', fill: false, tension: .3 },
   ]);
 
   _multiLineChart('chart-activity-score', labels, [
-    { label: 'Score Delta', data: scoreVals, borderColor: '#3DAA6E', backgroundColor: '#3DAA6E22', fill: false, tension: .3 },
+    { label: t('Score Delta'), data: scoreVals, borderColor: '#3DAA6E', backgroundColor: '#3DAA6E22', fill: false, tension: .3 },
   ]);
 
   _multiLineChart('chart-activity-dau', labels, [
-    { label: 'DAU',         data: dauVals,   borderColor: '#F5A855', backgroundColor: '#F5A85522', fill: false, tension: .3 },
-    { label: 'Check-ins',   data: ciVals,    borderColor: '#F4E557', backgroundColor: '#F4E55722', fill: false, tension: .3 },
+    { label: t('DAU'),         data: dauVals,   borderColor: '#F5A855', backgroundColor: '#F5A85522', fill: false, tension: .3 },
+    { label: t('Check-ins'),   data: ciVals,    borderColor: '#F4E557', backgroundColor: '#F4E55722', fill: false, tension: .3 },
   ]);
 
   const socVals = eng.map(r => r.endorsements + r.rebukes);
@@ -189,6 +189,7 @@ const TIERS = [
   {label:'Cadre Member',         key:'t7', min:1100, max:1200, color:'#45C07A'},
   {label:'General Secretary',    key:'t8', min:1200, max:1301, color:'#F4E557'},
 ];
+function _tierLabel(tier) { return t(tier.label); }
 
 function fmt(n) {
   n = Number(n);
@@ -224,10 +225,10 @@ async function loadAnnouncement() {
 function trendHtml(now, prev) {
   if (!prev) return '';
   const pct = (now - prev) / prev * 100;
-  if (Math.abs(pct) < 2) return '<span class="trend-flat">-> stable</span>';
+  if (Math.abs(pct) < 2) return `<span class="trend-flat">${t('-> stable')}</span>`;
   const arrow = pct > 0 ? '↑' : '↓';
   const cls   = pct > 0 ? 'trend-up' : 'trend-down';
-  return `<span class="${cls}">${arrow} ${Math.abs(pct).toFixed(0)}% vs prev 24h</span>`;
+  return `<span class="${cls}">${arrow} ${Math.abs(pct).toFixed(0)}${t('% vs prev 24h')}</span>`;
 }
 
 function renderDist(dist, avg) {
@@ -239,7 +240,7 @@ function renderDist(dist, avg) {
     const w   = (n/maxN*100).toFixed(1);
     const isAvg = avg >= t.min && avg < t.max;
     return `<div class="drow">
-      <div class="dlbl">${t.label}</div>
+      <div class="dlbl">${_tierLabel(t)}</div>
       <div class="dbar-wrap">
         <div class="dbar" style="width:${w}%;background:${t.color}"></div>
         ${isAvg ? '<span class="avg-tag">AVG</span>' : ''}
@@ -262,8 +263,8 @@ function renderReasons(reasons) {
       <div class="rcnt">${fmt(r.cnt)}</div>
     </div>`;
   }
-  setHtml('reasons-pos', pos.length ? pos.map(r=>row(r,maxP,'var(--green)')).join('') : '<div class="sub">No data yet</div>');
-  setHtml('reasons-neg', neg.length ? neg.map(r=>row(r,maxN,'var(--red)')).join('')   : '<div class="sub">No data yet</div>');
+  setHtml('reasons-pos', pos.length ? pos.map(r=>row(r,maxP,'var(--green)')).join('') : `<div class="sub">${t('No data yet')}</div>`);
+  setHtml('reasons-neg', neg.length ? neg.map(r=>row(r,maxN,'var(--red)')).join('')   : `<div class="sub">${t('No data yet')}</div>`);
 }
 
 function renderAnomalies(d) {
@@ -344,7 +345,7 @@ async function loadFeed() {
   if (!res.ok) return;
   const d = await res.json();
   const events = _collapseRepeats(d.events || []);
-  setHtml('live-feed', events.length ? events.map(_feedRow).join('') : '<div class="sub">No data yet</div>');
+  setHtml('live-feed', events.length ? events.map(_feedRow).join('') : `<div class="sub">${t('No data yet')}</div>`);
 }
 
 function renderStats(d) {
@@ -456,7 +457,7 @@ function renderStats(d) {
   const _now = new Date();
   const _ts = _now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
   const _ds = _now.toLocaleDateString([], {month:'short', day:'numeric'});
-  set('last-updated', `Updated ${_ds} at ${_ts}`);
+  set('last-updated', `${t('Updated')} ${_ds} at ${_ts}`);
 }
 
 async function load() {
@@ -486,62 +487,62 @@ function _connectStream() {
 }
 
 const STAT_TIPS = {
-  'mc-users':   'Citizens who have sent at least one rated message, across every server.',
-  'mc-guilds':  'Number of Discord servers currently running this bot.',
-  'mc-dau':     'Citizens with at least one rated message in the last 24 hours.',
-  'mc-mps':     'Lifetime average messages processed per second since the bot first started.',
-  'mc-ping':    'Round-trip latency to Discord\'s gateway.',
-  'mc-db':      'Time for a trivial query to round-trip to the database.',
-  'mc-uptime':  'Time since the bot process last started.',
-  'mc-workers': 'Active / max sentiment-analysis worker processes.',
-  'mc-mag':     'The server with the most rated messages all-time. Server identity is anonymized.',
-  'mc-wau':     'Citizens with at least one rated message in the last 7 days.',
-  'tl-joins-val':       'New servers added over the selected time range.',
-  'act-ev':     'Score-changing events (messages, endorsements, etc.) in the last 24 hours.',
-  'act-pos':    'Positive score events in the last 24 hours.',
-  'act-neg':    'Negative score events in the last 24 hours.',
-  'act-net7':   'Sum of every citizen\'s score change over the last 7 days.',
-  'ci-today':   'Citizens who have checked in today.',
-  'ci-rate':    'Check-ins today divided by daily active users.',
-  'ci-streak':  'Longest check-in streak ever recorded by any single citizen.',
-  'ci-votes':   'Total top.gg votes received, all-time.',
-  'pr-ev':      'Propaganda events that have been run.',
-  'pr-subs':    'Total submissions across all propaganda events.',
-  'ec-circ':    'Total yuan currently held by all citizens combined.',
-  'ec-earn':    'Total yuan ever earned, all-time.',
-  'ec-spent':   'Total yuan ever spent in the shop, all-time.',
-  'ec-items':   'Total shop items purchased, all-time.',
-  'ec-fx':      'Currently active shop effects (freezes, etc.) across all citizens.',
-  'ec-fr':      'Total yuan raised through fundraisers, all-time.',
-  'ec-treasury': 'Total yuan seized by the Bureau wealth tax on high-balance citizens, all-time.',
+  'mc-users':         'Citizens who have sent at least one rated message, across every server.',
+  'mc-guilds':        'Number of Discord servers currently running this bot.',
+  'mc-dau':           'Citizens with at least one rated message in the last 24 hours.',
+  'mc-mps':           'Lifetime average messages processed per second since the bot first started.',
+  'mc-ping':          'Round-trip latency to Discord\'s gateway.',
+  'mc-db':            'Time for a trivial query to round-trip to the database.',
+  'mc-uptime':        'Time since the bot process last started.',
+  'mc-workers':       'Active / max sentiment-analysis worker processes.',
+  'mc-mag':           'The server with the most rated messages all-time. Server identity is anonymized.',
+  'mc-wau':           'Citizens with at least one rated message in the last 7 days.',
+  'tl-joins-val':     'New servers added over the selected time range.',
+  'act-ev':           'Score-changing events (messages, endorsements, etc.) in the last 24 hours.',
+  'act-pos':          'Positive score events in the last 24 hours.',
+  'act-neg':          'Negative score events in the last 24 hours.',
+  'act-net7':         'Sum of every citizen\'s score change over the last 7 days.',
+  'ci-today':         'Citizens who have checked in today.',
+  'ci-rate':          'Check-ins today divided by daily active users.',
+  'ci-streak':        'Longest check-in streak ever recorded by any single citizen.',
+  'ci-votes':         'Total top.gg votes received, all-time.',
+  'pr-ev':            'Propaganda events that have been run.',
+  'pr-subs':          'Total submissions across all propaganda events.',
+  'ec-circ':          'Total yuan currently held by all citizens combined.',
+  'ec-earn':          'Total yuan ever earned, all-time.',
+  'ec-spent':         'Total yuan ever spent in the shop, all-time.',
+  'ec-items':         'Total shop items purchased, all-time.',
+  'ec-fx':            'Currently active shop effects (freezes, etc.) across all citizens.',
+  'ec-fr':            'Total yuan raised through fundraisers, all-time.',
+  'ec-treasury':      'Total yuan seized by the Bureau wealth tax on high-balance citizens, all-time.',
   'tl-yuan-val':      'Yuan in circulation trend, sampled once daily - may lag the live "In Circulation" total above by up to 24h.',
   'tl-portfolio-val': 'Combined value of every citizen\'s stock and turbo holdings over the selected time range.',
-  'ec-rich':    'The highest yuan balance currently held by any single citizen.',
-  'mk-stocks':  'Total yuan currently invested in stocks across all portfolios.',
-  'mk-turbos':  'Total yuan currently committed to open turbo certificate positions.',
-  'mk-trades':  'Total stock trades executed, all-time.',
-  'lt-played':  'Total lottery tickets purchased, all-time.',
-  'lt-won':     'Lottery tickets won, all-time.',
-  'lt-net':     'Net yuan won or lost by all citizens combined, all-time.',
-  'lt-edge':    'House edge: net winnings or losses divided by tickets played.',
-  'mk-ko':      'Turbo certificate positions knocked out, all-time.',
-  'sc-avg':     'Average social credit score across all citizens who have chatted.',
-  'sc-high':    'Highest score ever reached by any citizen.',
-  'sc-low':     'Lowest score ever reached by any citizen.',
-  'sc-msgs':    'Total messages that have been scored, all-time.',
-  'sc-ampu':    'Average rated messages per citizen.',
-  'sc-end':     'Total endorsements given, all-time.',
-  'adv-pos':    'Total positive score events, all-time.',
-  'adv-neg':    'Total negative score events, all-time.',
-  'adv-avd':    'Average score change per event, all-time.',
-  'adv-pw':     'Citizens who have won a propaganda event.',
-  'adv-pe':     'Average submissions per propaganda event.',
-  'adv-er':     'Share of all endorsements and rebukes that were endorsements.',
-  'tl-social-val': 'Endorsements plus rebukes given over the selected time range.',
-  'sc-reb':     'Total rebukes given, all-time.',
+  'ec-rich':          'The highest yuan balance currently held by any single citizen.',
+  'mk-stocks':        'Total yuan currently invested in stocks across all portfolios.',
+  'mk-turbos':        'Total yuan currently committed to open turbo certificate positions.',
+  'mk-trades':        'Total stock trades executed, all-time.',
+  'lt-played':        'Total lottery tickets purchased, all-time.',
+  'lt-won':           'Lottery tickets won, all-time.',
+  'lt-net':           'Net yuan won or lost by all citizens combined, all-time.',
+  'lt-edge':          'House edge: net winnings or losses divided by tickets played.',
+  'mk-ko':            'Turbo certificate positions knocked out, all-time.',
+  'sc-avg':           'Average social credit score across all citizens who have chatted.',
+  'sc-high':          'Highest score ever reached by any citizen.',
+  'sc-low':           'Lowest score ever reached by any citizen.',
+  'sc-msgs':          'Total messages that have been scored, all-time.',
+  'sc-ampu':          'Average rated messages per citizen.',
+  'sc-end':           'Total endorsements given, all-time.',
+  'adv-pos':          'Total positive score events, all-time.',
+  'adv-neg':          'Total negative score events, all-time.',
+  'adv-avd':          'Average score change per event, all-time.',
+  'adv-pw':           'Citizens who have won a propaganda event.',
+  'adv-pe':           'Average submissions per propaganda event.',
+  'adv-er':           'Share of all endorsements and rebukes that were endorsements.',
+  'tl-social-val':    'Endorsements plus rebukes given over the selected time range.',
+  'sc-reb':           'Total rebukes given, all-time.',
   'tl-dblatency-val': 'Rolling database round-trip time, sampled live.',
-  'cmd-today': 'Commands run since midnight UTC. Resets to 0 at 00:00 UTC.',
-  'cmd-24h':   'Rolling window: commands run in the last 24 hours, regardless of the calendar day.',
+  'cmd-today':        'Commands run since midnight UTC. Resets to 0 at 00:00 UTC.',
+  'cmd-24h':          'Rolling window: commands run in the last 24 hours, regardless of the calendar day.',
 };
 
 function _initTooltips() {
@@ -557,7 +558,7 @@ function _initTooltips() {
     icon.textContent = '?';
     icon.setAttribute('data-bs-toggle', 'tooltip');
     icon.setAttribute('data-bs-placement', 'top');
-    icon.setAttribute('title', text);
+    icon.setAttribute('title', t(text));
     lbl.appendChild(icon);
     if (window.bootstrap) new bootstrap.Tooltip(icon);
   });
@@ -625,7 +626,7 @@ async function loadCommandAnalytics(range) {
   const dayLabels = days.map(r => _dayLabel(r.day));
   const dayUses   = days.map(r => r.uses);
   _multiLineChart('chart-cmd-timeline', dayLabels, [
-    { label: 'Executions', data: dayUses, borderColor: '#F5A855', backgroundColor: '#F5A85522', fill: true, tension: .3 },
+    { label: t('Executions'), data: dayUses, borderColor: '#F5A855', backgroundColor: '#F5A85522', fill: true, tension: .3 },
   ]);
 
   // Usage by hour bar chart
@@ -634,7 +635,7 @@ async function loadCommandAnalytics(range) {
   const hourLabels = hourBuckets.map(r => r.hour + ':00');
   const hourUses   = hourBuckets.map(r => r.uses);
   _barChart('chart-cmd-hour', hourLabels, [
-    { label: 'Uses', data: hourUses, backgroundColor: '#45C07A', borderRadius: 2 },
+    { label: t('Uses'), data: hourUses, backgroundColor: '#45C07A', borderRadius: 2 },
   ], { xFmt: v => v });
 
   // Avg execution time (horizontal bar)
@@ -651,8 +652,8 @@ async function loadCommandAnalytics(range) {
   const successPcts = rateRows.map(r => r.success_pct);
   const errorPcts   = rateRows.map(r => r.error_pct);
   _barChart('chart-cmd-rates', rateLabels, [
-    { label: 'Success %', data: successPcts, backgroundColor: '#3DAA6E', borderRadius: 2, stack: 'r' },
-    { label: 'Error %',   data: errorPcts,   backgroundColor: '#E85454', borderRadius: 2, stack: 'r' },
+    { label: t('Success %'), data: successPcts, backgroundColor: '#3DAA6E', borderRadius: 2, stack: 'r' },
+    { label: t('Error %'),   data: errorPcts,   backgroundColor: '#E85454', borderRadius: 2, stack: 'r' },
   ], { legend: true, horizontal: true, xFmt: v => v + '%', xMax: 100 });
 
   // Build unique-users and avg-exec-time maps for the top-commands table
@@ -667,7 +668,7 @@ async function loadCommandAnalytics(range) {
   const tbody = document.getElementById('cmd-table-top-body');
   if (tbody) {
     if (!topCmds.length) {
-      tbody.innerHTML = '<tr><td colspan="6" class="sub text-center py-3">No data yet - commands will appear once the bot is used.</td></tr>';
+      tbody.innerHTML = `<tr><td colspan="6" class="sub text-center py-3">${t('No data yet - commands will appear once the bot is used.')}</td></tr>`;
     } else {
       tbody.innerHTML = topCmds.map((r, i) => {
         const rate    = rateMap[r.command] || {};

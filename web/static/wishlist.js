@@ -2,8 +2,9 @@
 (function () {
   'use strict';
 
-  let _user = null;
-  let _sort = 'votes';
+  let _user         = null;
+  let _sort         = 'votes';
+  let _lastRequests = null;
 
   const $list  = document.getElementById('wl-list');
   const $bar   = document.getElementById('discord-bar');
@@ -27,11 +28,11 @@
 
   function _timeAgo(ts) {
     const diff = Math.floor(Date.now() / 1000) - ts;
-    if (diff < 60)    return 'just now';
-    if (diff < 3600)  return `${Math.floor(diff/60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+    if (diff < 60)    return t('just now');
+    if (diff < 3600)  return `${Math.floor(diff/60)}${t('m_ago')}`;
+    if (diff < 86400) return `${Math.floor(diff/3600)}${t('h_ago')}`;
     const days = Math.floor(diff/86400);
-    return days === 1 ? '1 day ago' : `${days} days ago`;
+    return days === 1 ? `1${t('day_ago')}` : `${days}${t('days_ago')}`;
   }
 
   // ── Discord login bar ──────────────────────────────────────────────────────
@@ -43,13 +44,13 @@
       $bar.innerHTML = `
         ${av}
         <span class="uname">@${_esc(user.username)}</span>
-        <span style="font-size:.75rem;color:var(--grey)">You are logged in</span>
-        <a href="/social-credit/auth/discord/logout?next=/social-credit/wishlist" class="logout-link">Log out</a>`;
+        <span style="font-size:.75rem;color:var(--grey)">${t('You are logged in')}</span>
+        <a href="/social-credit/auth/discord/logout?next=/social-credit/wishlist" class="logout-link">${t('Log out')}</a>`;
     } else {
       $bar.innerHTML = `
         <div class="avatar-placeholder"></div>
-        <span style="font-size:.82rem;color:var(--text-muted)">Log in to vote on character requests</span>
-        <a href="/social-credit/auth/discord?next=/social-credit/wishlist" class="login-link">🔗 Login with Discord</a>`;
+        <span style="font-size:.82rem;color:var(--text-muted)">${t('Log in to vote on character requests')}</span>
+        <a href="/social-credit/auth/discord?next=/social-credit/wishlist" class="login-link">🔗 ${t('Login with Discord')}</a>`;
     }
   }
 
@@ -65,8 +66,8 @@
   function renderList(items) {
     if (!items || !items.length) {
       $list.innerHTML = `<div class="wl-empty">
-        Nothing here yet.
-        <a href="/social-credit/submit" style="color:var(--sage)">Be the first to suggest someone!</a>
+        ${t('Nothing here yet.')}
+        <a href="/social-credit/submit" style="color:var(--sage)">${t('Be the first to suggest someone!')}</a>
       </div>`;
       return;
     }
@@ -99,18 +100,18 @@
             </div>
             <div class="wl-votes">
               <div class="n" style="font-size:.7rem;color:var(--sage);font-weight:700;">✓</div>
-              <div class="lbl">approved${approvedWhen ? ' ' + approvedWhen : ''}</div>
+              <div class="lbl">${t('approved')}${approvedWhen ? ' ' + approvedWhen : ''}</div>
             </div>
           </div>`;
       }
 
       let btnHtml;
       if (!_user) {
-        btnHtml = `<button class="wl-support-btn login-req" data-id="${item.id}" data-action="login">▲ Vote</button>`;
+        btnHtml = `<button class="wl-support-btn login-req" data-id="${item.id}" data-action="login">${t('▲ Vote')}</button>`;
       } else if (item.has_voted) {
-        btnHtml = `<button class="wl-support-btn voted" data-id="${item.id}" data-action="remove">✓ Voted</button>`;
+        btnHtml = `<button class="wl-support-btn voted" data-id="${item.id}" data-action="remove">${t('✓ Voted')}</button>`;
       } else {
-        btnHtml = `<button class="wl-support-btn" data-id="${item.id}" data-action="add">▲ Vote</button>`;
+        btnHtml = `<button class="wl-support-btn" data-id="${item.id}" data-action="add">${t('▲ Vote')}</button>`;
       }
 
       return `
@@ -124,7 +125,7 @@
           </div>
           <div class="wl-votes">
             <div class="n" id="vc-${item.id}">${item.vote_count}</div>
-            <div class="lbl">${item.vote_count === 1 ? 'vote' : 'votes'}</div>
+            <div class="lbl">${t(item.vote_count === 1 ? 'vote' : 'votes')}</div>
           </div>
           ${btnHtml}
         </div>`;
@@ -161,12 +162,12 @@
       const $vc   = document.getElementById('vc-' + reqId);
       if ($vc) $vc.textContent = body.vote_count;
 
-      btn.textContent    = voted ? '✓ Voted' : '▲ Vote';
+      btn.textContent    = voted ? t('✓ Voted') : t('▲ Vote');
       btn.dataset.action = voted ? 'remove'  : 'add';
       btn.classList.toggle('voted', voted);
       btn.disabled = false;
     } catch (_) {
-      toast('Network error', 'error');
+      toast(t('Network error'), 'error');
       btn.disabled = false;
     }
   }
@@ -185,20 +186,26 @@
 
   // ── load wishlist ──────────────────────────────────────────────────────────
   async function loadList() {
-    $list.innerHTML = '<div class="wl-empty">Loading…</div>';
+    $list.innerHTML = '<div class="wl-empty">' + t('Loading…') + '</div>';
     try {
       const r = await fetch(`/api/requests/wishlist?sort=${_sort}`, { credentials: 'same-origin' });
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const data = await r.json();
-      renderList(data.requests || []);
+      _lastRequests = data.requests || [];
+      renderList(_lastRequests);
     } catch (_) {
-      $list.innerHTML = '<div class="wl-empty">Failed to load — please refresh.</div>';
+      $list.innerHTML = '<div class="wl-empty">' + t('Failed to load — please refresh.') + '</div>';
     }
   }
 
   // ── init ───────────────────────────────────────────────────────────────────
   initSortButtons();
   loadUser().then(loadList);
+
+  document.addEventListener('i18n:changed', () => {
+    renderBar(_user);
+    if (_lastRequests) renderList(_lastRequests);
+  });
 
   document.addEventListener('click', async (e) => {
     const link = e.target.closest('a.logout-link');

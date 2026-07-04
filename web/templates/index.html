@@ -12,19 +12,23 @@
       crossorigin="anonymous"
     />
     <link rel="stylesheet" href="/static/dashboard.css" />
+    <script src="/static/i18n.js"></script>
   </head>
   <body>
     <nav class="navbar px-4 py-3 mb-3">
       <a class="navbar-brand" href="/social-credit">社会信用 Social Credit</a>
       <div class="d-flex gap-3 align-items-center">
-        <a class="nav-link" href="/social-credit">HOME</a>
-        <a class="nav-link active" href="/social-credit/dashboard">DASHBOARD</a>
-        <a class="nav-link" href="/social-credit/leaderboards">LEADERBOARDS</a>
-        <a class="nav-link" href="/social-credit/wishlist">WISHLIST</a>
-        <a class="nav-link" href="/social-credit/submit">SUBMIT</a>
-        <a class="nav-link" href="/social-credit/account">MY ACCOUNT</a>
-        <a class="nav-link" href="/social-credit/privacy">PRIVACY</a>
-        <a class="nav-link" href="/social-credit/terms">TERMS</a>
+        <a class="nav-link" href="/social-credit" data-i18n="HOME">HOME</a>
+        <a class="nav-link active" href="/social-credit/dashboard" data-i18n="DASHBOARD">DASHBOARD</a>
+        <a class="nav-link" href="/social-credit/leaderboards" data-i18n="LEADERBOARDS">LEADERBOARDS</a>
+        <a class="nav-link" href="/social-credit/wishlist" data-i18n="WISHLIST">WISHLIST</a>
+        <a class="nav-link" href="/social-credit/submit" data-i18n="SUBMIT">SUBMIT</a>
+        <a class="nav-link" href="/social-credit/account" data-i18n="MY ACCOUNT">MY ACCOUNT</a>
+        <a class="nav-link" href="/social-credit/privacy" data-i18n="PRIVACY">PRIVACY</a>
+        <a class="nav-link" href="/social-credit/terms" data-i18n="TERMS">TERMS</a>
+        <select id="lang-select" class="lang-select" onchange="setLang(this.value)">
+          <option value="en">EN</option>
+        </select>
         <span class="refresh-meta" id="last-updated"></span>
       </div>
     </nav>
@@ -37,29 +41,29 @@
       <div class="row g-3 mb-2">
         <div class="col-md-3">
           <div class="sc hero">
-            <div class="lbl">Citizens</div>
+            <div class="lbl" data-i18n="Citizens">Citizens</div>
             <div class="val val-white" id="mc-users">-</div>
             <div class="sub" id="mc-users-sub"></div>
           </div>
         </div>
         <div class="col-md-3">
           <div class="sc hero">
-            <div class="lbl">Servers</div>
+            <div class="lbl" data-i18n="Servers">Servers</div>
             <div class="val val-white" id="mc-guilds">-</div>
           </div>
         </div>
         <div class="col-md-3">
           <div class="sc hero">
-            <div class="lbl">Daily Active Users</div>
+            <div class="lbl" data-i18n="Daily Active Users">Daily Active Users</div>
             <div class="val val-white" id="mc-dau">-</div>
             <div class="sub" id="mc-dau-sub"></div>
           </div>
         </div>
         <div class="col-md-3">
           <div class="sc hero">
-            <div class="lbl">Messages / sec</div>
+            <div class="lbl" data-i18n="Messages / sec">Messages / sec</div>
             <div class="val val-white" id="mc-mps">-</div>
-            <div class="sub">lifetime avg</div>
+            <div class="sub" data-i18n="lifetime avg">lifetime avg</div>
           </div>
         </div>
       </div>
@@ -67,72 +71,54 @@
       <div class="row g-3 mb-2">
         <div class="col-6 col-md-3">
           <div class="sc">
-            <div class="lbl">Discord</div>
+            <div class="lbl" data-i18n="Discord">Discord</div>
             <div class="val" id="mc-ping">-</div>
           </div>
         </div>
         <div class="col-6 col-md-3">
           <div class="sc">
-            <div class="lbl">Database</div>
+            <div class="lbl" data-i18n="Database">Database</div>
             <div class="val" id="mc-db">-</div>
           </div>
         </div>
         <div class="col-6 col-md-3">
           <div class="sc">
-            <div class="lbl">Uptime</div>
+            <div class="lbl" data-i18n="Uptime">Uptime</div>
             <div class="val val-white" id="mc-uptime">-</div>
           </div>
         </div>
         <div class="col-6 col-md-3">
           <div class="sc">
-            <div class="lbl">Sentiment Workers</div>
+            <div class="lbl" data-i18n="Sentiment Workers">Sentiment Workers</div>
             <div class="val val-white" id="mc-workers">-</div>
           </div>
         </div>
       </div>
 
       <div class="shdr d-flex justify-content-between align-items-center">
-        <span>Activity</span>
+        <span data-i18n="Activity">Activity</span>
         <div class="btn-group" role="group" id="activity-range-group">
-          <button
-            class="btn btn-run btn-sm px-3"
-            data-range="24h"
-            onclick="loadActivity('24h')"
-          >
-            24H
-          </button>
-          <button
-            class="btn btn-run btn-sm px-3 active"
-            data-range="7d"
-            onclick="loadActivity('7d')"
-          >
-            7D
-          </button>
-          <button
-            class="btn btn-run btn-sm px-3"
-            data-range="30d"
-            onclick="loadActivity('30d')"
-          >
-            30D
-          </button>
+          <button class="btn btn-run btn-sm px-3" data-range="24h" onclick="loadActivity('24h')" data-i18n="24H">24H</button>
+          <button class="btn btn-run btn-sm px-3 active" data-range="7d" onclick="loadActivity('7d')" data-i18n="7D">7D</button>
+          <button class="btn btn-run btn-sm px-3" data-range="30d" onclick="loadActivity('30d')" data-i18n="30D">30D</button>
         </div>
       </div>
       <div class="row g-3 mb-1">
         <div class="col-12 col-lg-8">
           <div class="sc sc-auto">
-            <div class="lbl" style="margin-bottom: 0.4rem">Messages</div>
+            <div class="lbl" style="margin-bottom: 0.4rem" data-i18n="Messages">Messages</div>
             <div class="activity-chart-wrap activity-chart-wrap-msgs">
               <canvas id="chart-activity-msgs"></canvas>
             </div>
           </div>
           <div class="sc sc-auto mt-3">
-            <div class="lbl" style="margin-bottom: 0.4rem">Score Delta</div>
+            <div class="lbl" style="margin-bottom: 0.4rem" data-i18n="Score Delta">Score Delta</div>
             <div class="activity-chart-wrap activity-chart-wrap-eng">
               <canvas id="chart-activity-score"></canvas>
             </div>
           </div>
           <div class="sc sc-auto mt-3">
-            <div class="lbl" style="margin-bottom: 0.4rem">DAU · Check-ins</div>
+            <div class="lbl" style="margin-bottom: 0.4rem" data-i18n="DAU · Check-ins">DAU · Check-ins</div>
             <div class="activity-chart-wrap activity-chart-wrap-eng">
               <canvas id="chart-activity-dau"></canvas>
             </div>
@@ -140,18 +126,15 @@
         </div>
         <div class="col-12 col-lg-4 d-flex flex-column gap-3">
           <div class="sc flex-grow-1">
-            <div class="lbl" style="margin-bottom: 0.6rem">Live Feed</div>
+            <div class="lbl" style="margin-bottom: 0.6rem" data-i18n="Live Feed">Live Feed</div>
             <div class="feed-wrap" id="live-feed">
-              <div class="sub">No data yet</div>
+              <div class="sub" data-i18n="No data yet">No data yet</div>
             </div>
           </div>
           <div class="sc sc-auto spark-tile">
-            <div class="lbl">DB Latency (live)</div>
+            <div class="lbl" data-i18n="DB Latency (live)">DB Latency (live)</div>
             <div class="val" id="tl-dblatency-val">-</div>
-            <div
-              class="spark-canvas-wrap spark-canvas-wrap-axis"
-              id="chart-dblatency-wrap"
-            >
+            <div class="spark-canvas-wrap spark-canvas-wrap-axis" id="chart-dblatency-wrap">
               <canvas id="chart-dblatency"></canvas>
             </div>
           </div>
@@ -160,78 +143,39 @@
 
       <ul class="nav nav-tabs" id="dash-tabs" role="tablist">
         <li class="nav-item" role="presentation">
-          <button
-            class="nav-link active"
-            data-bs-toggle="tab"
-            data-bs-target="#tab-overview"
-            type="button"
-          >
-            Overview
-          </button>
+          <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-overview" type="button" data-i18n="Overview">Overview</button>
         </li>
         <li class="nav-item" role="presentation">
-          <button
-            class="nav-link"
-            data-bs-toggle="tab"
-            data-bs-target="#tab-economy"
-            type="button"
-          >
-            Economy
-          </button>
+          <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-economy" type="button" data-i18n="Economy">Economy</button>
         </li>
         <li class="nav-item" role="presentation">
-          <button
-            class="nav-link"
-            data-bs-toggle="tab"
-            data-bs-target="#tab-scores"
-            type="button"
-          >
-            Scores
-          </button>
+          <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-scores" type="button" data-i18n="Scores">Scores</button>
         </li>
         <li class="nav-item" role="presentation">
-          <button
-            class="nav-link"
-            data-bs-toggle="tab"
-            data-bs-target="#tab-commands"
-            type="button"
-            onclick="loadCommandAnalytics()"
-          >
-            Commands
-          </button>
+          <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-commands" type="button" onclick="loadCommandAnalytics()" data-i18n="Commands">Commands</button>
         </li>
       </ul>
 
       <div class="tab-content">
-        <div
-          class="tab-pane fade show active"
-          id="tab-overview"
-          role="tabpanel"
-        >
-          <div class="shdr">Engagement</div>
+        <div class="tab-pane fade show active" id="tab-overview" role="tabpanel">
+          <div class="shdr" data-i18n="Engagement">Engagement</div>
           <div class="row g-3 mb-1">
             <div class="col-md-4">
               <div class="sc">
-                <div class="lbl">Most Active Guild</div>
-                <div
-                  class="val"
-                  style="font-size: 1.3rem; word-break: break-word"
-                  id="mc-mag"
-                >
-                  -
-                </div>
+                <div class="lbl" data-i18n="Most Active Guild">Most Active Guild</div>
+                <div class="val" style="font-size: 1.3rem; word-break: break-word" id="mc-mag">-</div>
                 <div class="sub" id="mc-mag-sub"></div>
               </div>
             </div>
             <div class="col-md-4">
               <div class="sc">
-                <div class="lbl">Weekly Active Users</div>
+                <div class="lbl" data-i18n="Weekly Active Users">Weekly Active Users</div>
                 <div class="val" id="mc-wau">-</div>
               </div>
             </div>
             <div class="col-md-4 spark-tile-col">
               <div class="sc spark-tile">
-                <div class="lbl">Server Joins</div>
+                <div class="lbl" data-i18n="Server Joins">Server Joins</div>
                 <div class="val" id="tl-joins-val">-</div>
                 <div class="spark-canvas-wrap" id="chart-joins-wrap">
                   <canvas id="chart-joins"></canvas>
@@ -240,76 +184,76 @@
             </div>
           </div>
 
-          <div class="shdr">Score Activity · 24h</div>
+          <div class="shdr" data-i18n="Score Activity · 24h">Score Activity · 24h</div>
           <div class="row g-3 mb-1">
             <div class="col-6 col-md-3">
               <div class="sc">
-                <div class="lbl">Score Events</div>
+                <div class="lbl" data-i18n="Score Events">Score Events</div>
                 <div class="val" id="act-ev">-</div>
                 <div class="sub" id="act-ev-t"></div>
               </div>
             </div>
             <div class="col-6 col-md-3">
               <div class="sc">
-                <div class="lbl">Positive</div>
+                <div class="lbl" data-i18n="Positive">Positive</div>
                 <div class="val trend-up" id="act-pos">-</div>
                 <div class="sub" id="act-pos-t"></div>
               </div>
             </div>
             <div class="col-6 col-md-3">
               <div class="sc">
-                <div class="lbl">Negative</div>
+                <div class="lbl" data-i18n="Negative">Negative</div>
                 <div class="val trend-down" id="act-neg">-</div>
                 <div class="sub" id="act-neg-t"></div>
               </div>
             </div>
             <div class="col-6 col-md-3">
               <div class="sc">
-                <div class="lbl">Net Score Delta · 7 Days</div>
+                <div class="lbl" data-i18n="Net Score Delta · 7 Days">Net Score Delta · 7 Days</div>
                 <div class="val" id="act-net7">-</div>
               </div>
             </div>
           </div>
 
-          <div class="shdr">Check-ins &amp; Propaganda</div>
+          <div class="shdr" data-i18n="Check-ins & Propaganda">Check-ins &amp; Propaganda</div>
           <div class="row g-3 mb-1">
             <div class="col-6 col-sm-3">
               <div class="sc">
-                <div class="lbl">Check-ins Today</div>
+                <div class="lbl" data-i18n="Check-ins Today">Check-ins Today</div>
                 <div class="val" id="ci-today">-</div>
                 <div class="sub" id="ci-t"></div>
               </div>
             </div>
             <div class="col-6 col-sm-3">
               <div class="sc">
-                <div class="lbl">Check-in Rate</div>
+                <div class="lbl" data-i18n="Check-in Rate">Check-in Rate</div>
                 <div class="val" id="ci-rate">-</div>
-                <div class="sub">of DAU</div>
+                <div class="sub" data-i18n="of DAU">of DAU</div>
               </div>
             </div>
             <div class="col-6 col-sm-3">
               <div class="sc">
-                <div class="lbl">All-time Best Streak</div>
+                <div class="lbl" data-i18n="All-time Best Streak">All-time Best Streak</div>
                 <div class="val" id="ci-streak">-</div>
-                <div class="sub">days</div>
+                <div class="sub" data-i18n="days">days</div>
               </div>
             </div>
             <div class="col-6 col-sm-3">
               <div class="sc">
-                <div class="lbl">Top.gg Votes</div>
+                <div class="lbl" data-i18n="Top.gg Votes">Top.gg Votes</div>
                 <div class="val" id="ci-votes">-</div>
-                <div class="sub">all-time</div>
+                <div class="sub" data-i18n="all-time">all-time</div>
               </div>
             </div>
             <div class="col-6 col-sm-3">
               <div class="sc">
-                <div class="lbl">Propaganda Events Run</div>
+                <div class="lbl" data-i18n="Propaganda Events Run">Propaganda Events Run</div>
                 <div class="val" id="pr-ev">-</div>
               </div>
             </div>
             <div class="col-6 col-sm-3">
               <div class="sc">
-                <div class="lbl">Propaganda Submissions</div>
+                <div class="lbl" data-i18n="Propaganda Submissions">Propaganda Submissions</div>
                 <div class="val" id="pr-subs">-</div>
                 <div class="sub" id="pr-avg"></div>
               </div>
@@ -321,53 +265,53 @@
           <div class="row g-3 mb-1">
             <div class="col-6 col-sm-4 col-md-2">
               <div class="sc">
-                <div class="lbl">In Circulation</div>
+                <div class="lbl" data-i18n="In Circulation">In Circulation</div>
                 <div class="val" id="ec-circ">-</div>
               </div>
             </div>
             <div class="col-6 col-sm-4 col-md-2">
               <div class="sc">
-                <div class="lbl">Total Earned</div>
+                <div class="lbl" data-i18n="Total Earned">Total Earned</div>
                 <div class="val" id="ec-earn">-</div>
               </div>
             </div>
             <div class="col-6 col-sm-4 col-md-2">
               <div class="sc">
-                <div class="lbl">Total Spent</div>
+                <div class="lbl" data-i18n="Total Spent">Total Spent</div>
                 <div class="val" id="ec-spent">-</div>
               </div>
             </div>
             <div class="col-6 col-sm-4 col-md-2">
               <div class="sc">
-                <div class="lbl">Items Purchased</div>
+                <div class="lbl" data-i18n="Items Purchased">Items Purchased</div>
                 <div class="val" id="ec-items">-</div>
               </div>
             </div>
             <div class="col-6 col-sm-4 col-md-2">
               <div class="sc">
-                <div class="lbl">Active Effects</div>
+                <div class="lbl" data-i18n="Active Effects">Active Effects</div>
                 <div class="val" id="ec-fx">-</div>
               </div>
             </div>
             <div class="col-6 col-sm-4 col-md-2">
               <div class="sc">
-                <div class="lbl">Fundraiser Yuan</div>
+                <div class="lbl" data-i18n="Fundraiser Yuan">Fundraiser Yuan</div>
                 <div class="val" id="ec-fr">-</div>
-                <div class="sub">total raised</div>
+                <div class="sub" data-i18n="total raised">total raised</div>
               </div>
             </div>
             <div class="col-6 col-sm-4 col-md-2">
               <div class="sc">
-                <div class="lbl">Bureau Treasury</div>
+                <div class="lbl" data-i18n="Bureau Treasury">Bureau Treasury</div>
                 <div class="val" id="ec-treasury">-</div>
-                <div class="sub">wealth tax collected</div>
+                <div class="sub" data-i18n="wealth tax collected">wealth tax collected</div>
               </div>
             </div>
           </div>
           <div class="row g-3 mb-1">
             <div class="col-6 col-sm-4 col-md-2 spark-tile-col">
               <div class="sc spark-tile">
-                <div class="lbl">Yuan In Circulation (Daily)</div>
+                <div class="lbl" data-i18n="Yuan In Circulation (Daily)">Yuan In Circulation (Daily)</div>
                 <div class="val" id="tl-yuan-val">-</div>
                 <div class="spark-canvas-wrap" id="chart-yuan-wrap">
                   <canvas id="chart-yuan"></canvas>
@@ -376,7 +320,7 @@
             </div>
             <div class="col-6 col-sm-4 col-md-2 spark-tile-col">
               <div class="sc spark-tile">
-                <div class="lbl">Portfolio Value</div>
+                <div class="lbl" data-i18n="Portfolio Value">Portfolio Value</div>
                 <div class="val" id="tl-portfolio-val">-</div>
                 <div class="spark-canvas-wrap" id="chart-portfolio-wrap">
                   <canvas id="chart-portfolio"></canvas>
@@ -385,45 +329,45 @@
             </div>
             <div class="col-6 col-sm-4 col-md-2">
               <div class="sc">
-                <div class="lbl">Richest Citizen</div>
+                <div class="lbl" data-i18n="Richest Citizen">Richest Citizen</div>
                 <div class="val" id="ec-rich">-</div>
-                <div class="sub">current balance</div>
+                <div class="sub" data-i18n="current balance">current balance</div>
               </div>
             </div>
             <div class="col-6 col-sm-4 col-md-2">
               <div class="sc">
-                <div class="lbl">Yuan in Stocks</div>
+                <div class="lbl" data-i18n="Yuan in Stocks">Yuan in Stocks</div>
                 <div class="val" id="mk-stocks">-</div>
-                <div class="sub">portfolio value</div>
+                <div class="sub" data-i18n="portfolio value">portfolio value</div>
               </div>
             </div>
             <div class="col-6 col-sm-4 col-md-2">
               <div class="sc">
-                <div class="lbl">Yuan in Turbos</div>
+                <div class="lbl" data-i18n="Yuan in Turbos">Yuan in Turbos</div>
                 <div class="val" id="mk-turbos">-</div>
-                <div class="sub">open positions</div>
+                <div class="sub" data-i18n="open positions">open positions</div>
               </div>
             </div>
             <div class="col-6 col-sm-4 col-md-2">
               <div class="sc">
-                <div class="lbl">Stock Trades</div>
+                <div class="lbl" data-i18n="Stock Trades">Stock Trades</div>
                 <div class="val" id="mk-trades">-</div>
-                <div class="sub">all-time</div>
+                <div class="sub" data-i18n="all-time">all-time</div>
               </div>
             </div>
           </div>
 
-          <div class="shdr">Lottery</div>
+          <div class="shdr" data-i18n="Lottery">Lottery</div>
           <div class="row g-3 mb-1">
             <div class="col-6 col-sm-3">
               <div class="sc">
-                <div class="lbl">Tickets Played</div>
+                <div class="lbl" data-i18n="Tickets Played">Tickets Played</div>
                 <div class="val" id="lt-played">-</div>
               </div>
             </div>
             <div class="col-6 col-sm-3">
               <div class="sc">
-                <div class="lbl">Won · Lost</div>
+                <div class="lbl" data-i18n="Won · Lost">Won · Lost</div>
                 <div class="val">
                   <span class="trend-up" id="lt-won">-</span> ·
                   <span class="trend-down" id="lt-lost">-</span>
@@ -433,23 +377,23 @@
             </div>
             <div class="col-6 col-sm-3">
               <div class="sc">
-                <div class="lbl">Net Earnings</div>
+                <div class="lbl" data-i18n="Net Earnings">Net Earnings</div>
                 <div class="val" id="lt-net">-</div>
-                <div class="sub">all citizens combined</div>
+                <div class="sub" data-i18n="all citizens combined">all citizens combined</div>
               </div>
             </div>
             <div class="col-6 col-sm-3">
               <div class="sc">
-                <div class="lbl">House Edge</div>
+                <div class="lbl" data-i18n="House Edge">House Edge</div>
                 <div class="val" id="lt-edge">-</div>
-                <div class="sub">net / tickets</div>
+                <div class="sub" data-i18n="net / tickets">net / tickets</div>
               </div>
             </div>
             <div class="col-6 col-sm-3">
               <div class="sc">
-                <div class="lbl">Knockouts</div>
+                <div class="lbl" data-i18n="Knockouts">Knockouts</div>
                 <div class="val trend-down" id="mk-ko">-</div>
-                <div class="sub">all-time</div>
+                <div class="sub" data-i18n="all-time">all-time</div>
               </div>
             </div>
           </div>
@@ -459,9 +403,7 @@
           <div class="row g-3 mb-1">
             <div class="col-md-5">
               <div class="sc h-100">
-                <div class="lbl" style="margin-bottom: 0.7rem">
-                  Distribution
-                </div>
+                <div class="lbl" style="margin-bottom: 0.7rem" data-i18n="Distribution">Distribution</div>
                 <div id="dist-chart"></div>
               </div>
             </div>
@@ -469,19 +411,19 @@
               <div class="row g-3">
                 <div class="col-12">
                   <div class="sc">
-                    <div class="lbl">Avg Score</div>
+                    <div class="lbl" data-i18n="Avg Score">Avg Score</div>
                     <div class="val" id="sc-avg">-</div>
                   </div>
                 </div>
                 <div class="col-12">
                   <div class="sc">
-                    <div class="lbl">All-time High</div>
+                    <div class="lbl" data-i18n="All-time High">All-time High</div>
                     <div class="val trend-up" id="sc-high">-</div>
                   </div>
                 </div>
                 <div class="col-12">
                   <div class="sc">
-                    <div class="lbl">All-time Low</div>
+                    <div class="lbl" data-i18n="All-time Low">All-time Low</div>
                     <div class="val trend-down" id="sc-low">-</div>
                   </div>
                 </div>
@@ -489,61 +431,61 @@
             </div>
             <div class="col-md-4">
               <div class="sc">
-                <div class="lbl">Messages Rated</div>
+                <div class="lbl" data-i18n="Messages Rated">Messages Rated</div>
                 <div class="val" id="sc-msgs">-</div>
-                <div class="sub" style="margin-bottom: 0.7rem">all-time</div>
-                <div class="lbl">Avg Msgs / User</div>
+                <div class="sub" style="margin-bottom: 0.7rem" data-i18n="all-time">all-time</div>
+                <div class="lbl" data-i18n="Avg Msgs / User">Avg Msgs / User</div>
                 <div class="val" style="font-size: 1.2rem" id="sc-ampu">-</div>
               </div>
             </div>
           </div>
 
-          <div class="shdr">Advanced Metrics</div>
+          <div class="shdr" data-i18n="Advanced Metrics">Advanced Metrics</div>
           <div class="row g-3 mb-1">
             <div class="col-6 col-sm-4 col-md-2">
               <div class="sc">
-                <div class="lbl">+Events All-time</div>
+                <div class="lbl" data-i18n="+Events All-time">+Events All-time</div>
                 <div class="val" style="font-size: 1.2rem" id="adv-pos">-</div>
               </div>
             </div>
             <div class="col-6 col-sm-4 col-md-2">
               <div class="sc">
-                <div class="lbl">-Events All-time</div>
+                <div class="lbl" data-i18n="-Events All-time">-Events All-time</div>
                 <div class="val" style="font-size: 1.2rem" id="adv-neg">-</div>
               </div>
             </div>
             <div class="col-6 col-sm-4 col-md-2">
               <div class="sc">
-                <div class="lbl">Avg Delta / Event</div>
+                <div class="lbl" data-i18n="Avg Delta / Event">Avg Delta / Event</div>
                 <div class="val" style="font-size: 1.2rem" id="adv-avd">-</div>
               </div>
             </div>
             <div class="col-6 col-sm-4 col-md-2">
               <div class="sc">
-                <div class="lbl">Propaganda Winners</div>
+                <div class="lbl" data-i18n="Propaganda Winners">Propaganda Winners</div>
                 <div class="val" style="font-size: 1.2rem" id="adv-pw">-</div>
               </div>
             </div>
             <div class="col-6 col-sm-4 col-md-2">
               <div class="sc">
-                <div class="lbl">Avg Subs / Event</div>
+                <div class="lbl" data-i18n="Avg Subs / Event">Avg Subs / Event</div>
                 <div class="val" style="font-size: 1.2rem" id="adv-pe">-</div>
               </div>
             </div>
             <div class="col-6 col-sm-4 col-md-2">
               <div class="sc">
-                <div class="lbl">E/R Ratio</div>
+                <div class="lbl" data-i18n="E/R Ratio">E/R Ratio</div>
                 <div class="val" style="font-size: 1.2rem" id="adv-er">-</div>
-                <div class="sub">% endorsements</div>
+                <div class="sub" data-i18n="% endorsements">% endorsements</div>
               </div>
             </div>
           </div>
 
-          <div class="shdr">Endorsements &amp; Rebukes</div>
+          <div class="shdr" data-i18n="Endorsements & Rebukes">Endorsements &amp; Rebukes</div>
           <div class="row g-3 mb-1">
             <div class="col-6 col-sm-4 spark-tile-col">
               <div class="sc spark-tile">
-                <div class="lbl">Combined Activity</div>
+                <div class="lbl" data-i18n="Combined Activity">Combined Activity</div>
                 <div class="val" id="tl-social-val">-</div>
                 <div class="spark-canvas-wrap" id="chart-social-wrap">
                   <canvas id="chart-social"></canvas>
@@ -552,39 +494,29 @@
             </div>
             <div class="col-6 col-sm-4">
               <div class="sc">
-                <div class="lbl">Endorsements</div>
+                <div class="lbl" data-i18n="Endorsements">Endorsements</div>
                 <div class="val trend-up" id="sc-end">-</div>
-                <div class="sub" id="sc-er">all-time</div>
+                <div class="sub" id="sc-er" data-i18n="all-time">all-time</div>
               </div>
             </div>
             <div class="col-6 col-sm-4">
               <div class="sc">
-                <div class="lbl">Rebukes</div>
+                <div class="lbl" data-i18n="Rebukes">Rebukes</div>
                 <div class="val trend-down" id="sc-reb">-</div>
-                <div class="sub">all-time</div>
+                <div class="sub" data-i18n="all-time">all-time</div>
               </div>
             </div>
           </div>
           <div class="row g-3 mb-1">
             <div class="col-md-6">
               <div class="sc h-100">
-                <div
-                  class="lbl"
-                  style="margin-bottom: 0.6rem; color: var(--green)"
-                >
-                  ▲ Positive Reasons
-                </div>
+                <div class="lbl" style="margin-bottom: 0.6rem; color: var(--green)" data-i18n="▲ Positive Reasons">▲ Positive Reasons</div>
                 <div id="reasons-pos"></div>
               </div>
             </div>
             <div class="col-md-6">
               <div class="sc h-100">
-                <div
-                  class="lbl"
-                  style="margin-bottom: 0.6rem; color: var(--red)"
-                >
-                  ▼ Negative Reasons
-                </div>
+                <div class="lbl" style="margin-bottom: 0.6rem; color: var(--red)" data-i18n="▼ Negative Reasons">▼ Negative Reasons</div>
                 <div id="reasons-neg"></div>
               </div>
             </div>
@@ -592,178 +524,121 @@
         </div>
 
         <div class="tab-pane fade" id="tab-commands" role="tabpanel">
-          <div
-            class="d-flex justify-content-between align-items-center mt-2 mb-1"
-          >
-            <span class="shdr" style="margin: 0; border: none"
-              >Command Analytics</span
-            >
+          <div class="d-flex justify-content-between align-items-center mt-2 mb-1">
+            <span class="shdr" style="margin: 0; border: none" data-i18n="Command Analytics">Command Analytics</span>
             <div class="btn-group" role="group" id="cmd-range-group">
-              <button
-                class="btn btn-run btn-sm px-3"
-                data-range="24h"
-                onclick="loadCommandAnalytics('24h')"
-              >
-                24H
-              </button>
-              <button
-                class="btn btn-run btn-sm px-3 active"
-                data-range="7d"
-                onclick="loadCommandAnalytics('7d')"
-              >
-                7D
-              </button>
-              <button
-                class="btn btn-run btn-sm px-3"
-                data-range="30d"
-                onclick="loadCommandAnalytics('30d')"
-              >
-                30D
-              </button>
-              <button
-                class="btn btn-run btn-sm px-3"
-                data-range="all"
-                onclick="loadCommandAnalytics('all')"
-              >
-                All Time
-              </button>
+              <button class="btn btn-run btn-sm px-3" data-range="24h" onclick="loadCommandAnalytics('24h')" data-i18n="24H">24H</button>
+              <button class="btn btn-run btn-sm px-3 active" data-range="7d" onclick="loadCommandAnalytics('7d')" data-i18n="7D">7D</button>
+              <button class="btn btn-run btn-sm px-3" data-range="30d" onclick="loadCommandAnalytics('30d')" data-i18n="30D">30D</button>
+              <button class="btn btn-run btn-sm px-3" data-range="all" onclick="loadCommandAnalytics('all')" data-i18n="All Time">All Time</button>
             </div>
           </div>
 
-          <!-- Overview cards -->
           <div class="row g-3 mb-1">
             <div class="col-6 col-md-2">
               <div class="sc">
-                <div class="lbl">Total Executed</div>
+                <div class="lbl" data-i18n="Total Executed">Total Executed</div>
                 <div class="val" id="cmd-total">-</div>
               </div>
             </div>
             <div class="col-6 col-md-2">
               <div class="sc">
-                <div class="lbl">Today</div>
+                <div class="lbl" data-i18n="Today">Today</div>
                 <div class="val" id="cmd-today">-</div>
               </div>
             </div>
             <div class="col-6 col-md-2">
               <div class="sc">
-                <div class="lbl">Last 24h</div>
+                <div class="lbl" data-i18n="Last 24h">Last 24h</div>
                 <div class="val" id="cmd-24h">-</div>
               </div>
             </div>
             <div class="col-6 col-md-2">
               <div class="sc">
-                <div class="lbl">Unique Users</div>
+                <div class="lbl" data-i18n="Unique Users">Unique Users</div>
                 <div class="val" id="cmd-users">-</div>
               </div>
             </div>
             <div class="col-6 col-md-2">
               <div class="sc">
-                <div class="lbl">Avg Exec Time</div>
+                <div class="lbl" data-i18n="Avg Exec Time">Avg Exec Time</div>
                 <div class="val" id="cmd-avgms">-</div>
               </div>
             </div>
             <div class="col-6 col-md-2">
               <div class="sc">
-                <div class="lbl">Success Rate</div>
+                <div class="lbl" data-i18n="Success Rate">Success Rate</div>
                 <div class="val trend-up" id="cmd-success">-</div>
               </div>
             </div>
           </div>
 
-          <!-- Charts row 1 -->
-          <div class="shdr">Usage Charts</div>
+          <div class="shdr" data-i18n="Usage Charts">Usage Charts</div>
           <div class="row g-3 mb-1">
             <div class="col-12">
               <div class="sc sc-auto">
-                <div class="lbl" style="margin-bottom: 0.4rem">
-                  Usage Over Time
-                </div>
-                <div style="height: 220px">
-                  <canvas id="chart-cmd-timeline"></canvas>
-                </div>
+                <div class="lbl" style="margin-bottom: 0.4rem" data-i18n="Usage Over Time">Usage Over Time</div>
+                <div style="height: 220px"><canvas id="chart-cmd-timeline"></canvas></div>
               </div>
             </div>
           </div>
-
-          <!-- Charts row 2 -->
           <div class="row g-3 mb-1">
             <div class="col-12 col-lg-4">
               <div class="sc sc-auto">
-                <div class="lbl" style="margin-bottom: 0.4rem">
-                  Usage by Hour
-                </div>
-                <div style="height: 200px">
-                  <canvas id="chart-cmd-hour"></canvas>
-                </div>
+                <div class="lbl" style="margin-bottom: 0.4rem" data-i18n="Usage by Hour">Usage by Hour</div>
+                <div style="height: 200px"><canvas id="chart-cmd-hour"></canvas></div>
               </div>
             </div>
             <div class="col-12 col-lg-4">
               <div class="sc sc-auto">
-                <div class="lbl" style="margin-bottom: 0.4rem">
-                  Average Execution Time (ms)
-                </div>
-                <div style="height: 200px">
-                  <canvas id="chart-cmd-exectime"></canvas>
-                </div>
+                <div class="lbl" style="margin-bottom: 0.4rem" data-i18n="Average Execution Time (ms)">Average Execution Time (ms)</div>
+                <div style="height: 200px"><canvas id="chart-cmd-exectime"></canvas></div>
               </div>
             </div>
             <div class="col-12 col-lg-4">
               <div class="sc sc-auto">
-                <div class="lbl" style="margin-bottom: 0.4rem">
-                  Success vs Error Rate
-                </div>
-                <div style="height: 200px">
-                  <canvas id="chart-cmd-rates"></canvas>
-                </div>
+                <div class="lbl" style="margin-bottom: 0.4rem" data-i18n="Success vs Error Rate">Success vs Error Rate</div>
+                <div style="height: 200px"><canvas id="chart-cmd-rates"></canvas></div>
               </div>
             </div>
           </div>
 
-          <!-- Top commands table -->
-          <div class="shdr">Top Commands</div>
+          <div class="shdr" data-i18n="Top Commands">Top Commands</div>
           <div class="sc sc-auto mb-3">
             <div class="table-responsive">
-              <table
-                class="table table-dark table-sm cmd-table mb-0"
-                id="cmd-table-top"
-              >
+              <table class="table table-dark table-sm cmd-table mb-0" id="cmd-table-top">
                 <thead>
                   <tr>
-                    <th>#</th>
-                    <th>Command</th>
-                    <th>Uses</th>
-                    <th>Unique Users</th>
-                    <th>Success %</th>
-                    <th>Avg Exec Time</th>
+                    <th data-i18n="#">#</th>
+                    <th data-i18n="Command">Command</th>
+                    <th data-i18n="Uses">Uses</th>
+                    <th data-i18n="Unique Users">Unique Users</th>
+                    <th data-i18n="Success %">Success %</th>
+                    <th data-i18n="Avg Exec Time">Avg Exec Time</th>
                   </tr>
                 </thead>
                 <tbody id="cmd-table-top-body">
-                  <tr>
-                    <td colspan="6" class="sub text-center py-3">Loading…</td>
-                  </tr>
+                  <tr><td colspan="6" class="sub text-center py-3" data-i18n="Loading…">Loading…</td></tr>
                 </tbody>
               </table>
             </div>
           </div>
 
-          <!-- Recent activity table -->
-          <div class="shdr">Recent Command Activity</div>
+          <div class="shdr" data-i18n="Recent Command Activity">Recent Command Activity</div>
           <div class="sc sc-auto mb-3">
             <div class="table-responsive">
               <table class="table table-dark table-sm cmd-table mb-0">
                 <thead>
                   <tr>
-                    <th>Time</th>
-                    <th>Command</th>
-                    <th>Subcommand</th>
-                    <th>Exec Time</th>
-                    <th>Status</th>
+                    <th data-i18n="Time">Time</th>
+                    <th data-i18n="Command">Command</th>
+                    <th data-i18n="Subcommand">Subcommand</th>
+                    <th data-i18n="Exec Time">Exec Time</th>
+                    <th data-i18n="Status">Status</th>
                   </tr>
                 </thead>
                 <tbody id="cmd-table-recent">
-                  <tr>
-                    <td colspan="5" class="sub text-center py-3">Loading…</td>
-                  </tr>
+                  <tr><td colspan="5" class="sub text-center py-3" data-i18n="Loading…">Loading…</td></tr>
                 </tbody>
               </table>
             </div>
@@ -775,19 +650,15 @@
     </div>
 
     <footer class="site-footer">
-      Made with ♥ by <a href="/">OFF-BY-ONE</a> ·
-      <a href="https://discord.gg/invite/k4W6YAPYhC" target="_blank" rel="noopener">Support Server</a> ·
-      <a href="https://top.gg/bot/856163780265902151" target="_blank" rel="noopener">Invite Bot</a> ·
-      <a href="/social-credit/privacy">Privacy</a> ·
-      <a href="/social-credit/terms">Terms</a>
+      <span data-i18n="Made with ♥ by">Made with ♥ by</span> <a href="/">OFF-BY-ONE</a> ·
+      <a href="https://discord.gg/invite/k4W6YAPYhC" target="_blank" rel="noopener" data-i18n="Support Server">Support Server</a> ·
+      <a href="https://top.gg/bot/856163780265902151" target="_blank" rel="noopener" data-i18n="Invite Bot">Invite Bot</a> ·
+      <a href="/social-credit/privacy" data-i18n="PRIVACY">Privacy</a> ·
+      <a href="/social-credit/terms" data-i18n="TERMS">Terms</a>
     </footer>
 
     <div class="spinner-wrapper" id="spinner">
-      <div
-        class="spinner-border"
-        style="color: var(--text-muted)"
-        role="status"
-      ></div>
+      <div class="spinner-border" style="color: var(--text-muted)" role="status"></div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
