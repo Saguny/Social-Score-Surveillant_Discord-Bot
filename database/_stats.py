@@ -389,15 +389,21 @@ class StatsMixin:
                 "by_score": [{"user_id": r["user_id"], "avg_score": r["avg_score"]} for r in data["by_score"]],
             }
 
+        active_cutoff = int(time.time()) - 7 * 86400
         by_yuan, by_score = await asyncio.gather(
             self._pool.fetch(
-                "SELECT user_id, SUM(yuan) AS total_yuan FROM users GROUP BY user_id ORDER BY total_yuan DESC LIMIT $1",
-                limit,
+                """
+                SELECT user_id, SUM(yuan) AS total_yuan FROM users
+                GROUP BY user_id HAVING MAX(last_active) >= $2
+                ORDER BY total_yuan DESC LIMIT $1
+                """,
+                limit, active_cutoff,
             ),
             self._pool.fetch(
                 """
                 WITH agg AS (
-                    SELECT user_id, AVG(score) AS avg_score FROM users GROUP BY user_id
+                    SELECT user_id, AVG(score) AS avg_score FROM users
+                    GROUP BY user_id HAVING MAX(last_active) >= $2
                 )
                 SELECT agg.user_id, agg.avg_score
                 FROM agg
@@ -405,7 +411,7 @@ class StatsMixin:
                 ORDER BY agg.avg_score DESC, COALESCE(pc.value, 0) DESC
                 LIMIT $1
                 """,
-                limit,
+                limit, active_cutoff,
             ),
         )
         result = {"by_yuan": by_yuan, "by_score": by_score}
@@ -458,10 +464,15 @@ class StatsMixin:
         if cached is not None:
             return json.loads(cached)
 
+        active_cutoff = int(time.time()) - 7 * 86400
         if days is None:
             rows = await self._pool.fetch(
-                "SELECT user_id, SUM(total_yuan_earned) AS earned FROM users GROUP BY user_id ORDER BY earned DESC LIMIT $1",
-                limit,
+                """
+                SELECT user_id, SUM(total_yuan_earned) AS earned FROM users
+                GROUP BY user_id HAVING MAX(last_active) >= $2
+                ORDER BY earned DESC LIMIT $1
+                """,
+                limit, active_cutoff,
             )
             result = [{"user_id": r["user_id"], "earned": int(r["earned"])} for r in rows]
         else:
@@ -475,16 +486,17 @@ class StatsMixin:
                     ORDER BY user_id, day DESC
                 ),
                 current AS (
-                    SELECT user_id, SUM(total_yuan_earned) AS current_total
+                    SELECT user_id, SUM(total_yuan_earned) AS current_total, MAX(last_active) AS last_active
                     FROM users GROUP BY user_id
                 )
                 SELECT c.user_id, c.current_total - COALESCE(b.baseline_total, 0) AS earned
                 FROM current c
                 LEFT JOIN baseline b ON b.user_id = c.user_id
+                WHERE c.last_active >= $3
                 ORDER BY earned DESC
                 LIMIT $2
                 """,
-                cutoff, limit,
+                cutoff, limit, active_cutoff,
             )
             result = [{"user_id": r["user_id"], "earned": int(r["earned"])} for r in rows]
 
@@ -497,11 +509,12 @@ class StatsMixin:
         if cached is not None:
             return json.loads(cached)
 
+        active_cutoff = int(time.time()) - 7 * 86400
         rows = await self._pool.fetch(
             """
             WITH agg AS (
                 SELECT user_id, AVG(score) AS avg_score, SUM(yuan) AS total_yuan
-                FROM users GROUP BY user_id
+                FROM users GROUP BY user_id HAVING MAX(last_active) >= $2
             )
             SELECT agg.user_id, agg.avg_score, agg.total_yuan
             FROM agg
@@ -509,7 +522,7 @@ class StatsMixin:
             ORDER BY agg.avg_score DESC, agg.total_yuan DESC, COALESCE(pc.value, 0) DESC
             LIMIT $1
             """,
-            limit,
+            limit, active_cutoff,
         )
         result = [
             {"user_id": r["user_id"], "avg_score": float(r["avg_score"]), "total_yuan": int(r["total_yuan"])}
