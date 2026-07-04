@@ -495,9 +495,9 @@ class Guide(commands.Cog):
         return view, view.build("overview")
 
     async def _send_guide(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer()
         view, embed = self._make_guide_view()
-        await interaction.followup.send(embed=embed, view=view, file=discord.File(BUREAU_IMAGE, filename="security.png"), ephemeral=True)
+        await interaction.followup.send(embed=embed, view=view, file=discord.File(BUREAU_IMAGE, filename="security.png"))
 
     @app_commands.command(name="guide", description="Full guide to the Social Credit System")
     async def guide(self, interaction: discord.Interaction):
