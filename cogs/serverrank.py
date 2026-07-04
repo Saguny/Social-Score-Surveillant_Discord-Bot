@@ -152,14 +152,21 @@ class ServerRankCog(commands.Cog, name="ServerRank"):
                 rank_str = f"#{rank_val} of {total_guilds}" if rank_val else "unranked"
                 top_pct = 1.0 if rank_val == 1 else max(1.0, (rank_val / total_guilds * 100)) if isinstance(rank_val, int) and isinstance(total_guilds, int) else None
                 pct_str = f" · TOP {top_pct:.0f}%" if top_pct is not None else ""
-                standing_lines = [
-                    f"Bracket: **{this_bracket}**",
-                    f"Rank: **{rank_str}{pct_str}**",
-                    f"{METRIC_LABELS[tab]}: **{_fmt_metric(tab, this_val)}**",
-                ]
-                if not visible:
-                    standing_lines.append("*Hidden · use `/serverrank visibility on` to appear on this list*")
-                embed.add_field(name="YOUR STANDING", value="\n".join(standing_lines), inline=False)
+                if bkt != _BRACKET_ALL and this_bracket != bkt:
+                    embed.add_field(
+                        name="YOUR STANDING",
+                        value=f"Your server is in the **{this_bracket}** bracket · select that bracket to see your standing",
+                        inline=False,
+                    )
+                else:
+                    standing_lines = [
+                        f"Bracket: **{this_bracket}**",
+                        f"Rank: **{rank_str}{pct_str}**",
+                        f"{METRIC_LABELS[tab]}: **{_fmt_metric(tab, this_val)}**",
+                    ]
+                    if not visible:
+                        standing_lines.append("*Hidden · use `/serverrank visibility on` to appear on this list*")
+                    embed.add_field(name="YOUR STANDING", value="\n".join(standing_lines), inline=False)
 
             embed.set_thumbnail(url="attachment://security.png")
             embed.set_footer(text=f"{_METRIC_DESCRIPTIONS[tab]} · /serverrank me for your full profile · /serverrank visibility [on|off] · GLORY TO THE CCP!")

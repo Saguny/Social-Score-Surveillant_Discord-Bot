@@ -919,7 +919,7 @@ async def _handle_leaderboard(request):
 
 
 _VALID_GUILD_METRICS  = {"happiness", "gdp", "civic", "literacy", "incarceration", "politburo"}
-_VALID_GUILD_BRACKETS = {"Outpost", "Town", "Metropolis"}
+_VALID_GUILD_BRACKETS = {"Hamlet", "Village", "Town", "City", "Metropolis"}
 
 async def _handle_guild_leaderboard(request):
     db = request.app["db"]
