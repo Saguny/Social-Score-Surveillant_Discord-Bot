@@ -127,6 +127,17 @@ async def _reward_guild(
     return await _reward_guild_remote(db, guild_id, user_id, total_votes, vote_streak, yuan_reward, score_delta)
 
 
+async def _reset_gacha_user_state(user_id: int, guild_ids: list[int]) -> None:
+    from infra.redis_client import get_redis
+    r = get_redis()
+    reset_keys = [
+        *[f"gacha:rolls:{guild_id}:{user_id}" for guild_id in guild_ids],
+        *[f"gacha:claims:{guild_id}:{user_id}" for guild_id in guild_ids],
+    ]
+    if reset_keys:
+        await r.delete(*reset_keys)
+
+
 async def process_vote(bot: commands.Bot, user_id: int):
     db = bot.db
     if await db.is_opted_out(user_id):
@@ -148,12 +159,8 @@ async def process_vote(bot: commands.Bot, user_id: int):
         yuan_reward *= VOTE_WEEKEND_MULTIPLIER
         score_delta = round(score_delta * VOTE_WEEKEND_MULTIPLIER, 2)
 
-    from infra.redis_client import get_redis
-    r = get_redis()
     guild_ids = await db.get_user_guild_ids(user_id)
-    roll_keys = [f"gacha:rolls:{gid}:{user_id}" for gid in guild_ids]
-    if roll_keys:
-        await r.delete(*roll_keys)
+    await _reset_gacha_user_state(user_id, guild_ids)
 
     results = await asyncio.gather(
         *(_reward_guild(bot, db, gid, user_id, total_votes, vote_streak, yuan_reward, score_delta) for gid in guild_ids)
@@ -187,7 +194,7 @@ async def process_vote(bot: commands.Bot, user_id: int):
             f"combo bonus was applied in the server(s) where you checked in."
         )
     lines.append("⚡ Vote boost active for 12h: 2× score and yuan earned from chat messages.")
-    lines.append("🎴 Your gacha rolls have been reset — you can roll again now.")
+    lines.append("🎴 Your gacha rolls and claims have been reset — you can roll and claim again now.")
 
     embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")
     embed.add_field(
