@@ -46,6 +46,7 @@ CREDITS_LINES = [
 
 _TOPIC_OPTIONS = [
     discord.SelectOption(label="Overview",          value="overview",     description="What is the Social Credit System?"),
+    discord.SelectOption(label="Waifu Bureau",      value="gacha",        description="Roll, claim, trade, and collect historical waifus"),
     discord.SelectOption(label="Scoring Rules",     value="scoring",      description="How messages are evaluated"),
     discord.SelectOption(label="Ranks & Execution", value="ranks",        description="Rank tiers, execution list, prestige"),
     discord.SelectOption(label="Stat Commands",     value="stats",        description="/score, /stats, /leaderboard and more"),
@@ -55,7 +56,6 @@ _TOPIC_OPTIONS = [
     discord.SelectOption(label="Markets",           value="markets",      description="Stocks, turbos, circuit breakers"),
     discord.SelectOption(label="Events & Posters",  value="events",       description="Propaganda events and daily posters"),
     discord.SelectOption(label="State Decorations", value="achievements", description="Achievement system overview"),
-    discord.SelectOption(label="Waifu Bureau",      value="gacha",        description="Roll, claim, trade, and collect historical waifus"),
     discord.SelectOption(label="Mod Commands",      value="mod",          description="Mod-only commands and server settings"),
     discord.SelectOption(label="Privacy & Legal",   value="privacy",      description="/optout, /optin, and disclaimer"),
 ]
@@ -92,8 +92,8 @@ class GuideView(discord.ui.View):
             inline=False,
         )
         e.add_field(name="YUAN",             value=f"The currency of the state. Earned through productivity. Spent on influence. [Support server]({SUPPORT_URL}) members earn +15% on every contribution.", inline=False)
-        e.add_field(name="WHAT AWAITS YOU",  value="Party ranks · State Decorations · Prestige · Global Standing · Propaganda Events · The Beijing Stock Exchange · **Waifu Bureau**", inline=False)
-        e.add_field(name="YOUR FIRST INSPECTION", value="Report to `/checkin` and cast your `/vote` on Top.gg on the same day - the two combine for a bonus payout on top of either reward alone. Review your `/score`. The Nation will determine your worth.", inline=False)
+        e.add_field(name="WHAT AWAITS YOU",  value="Party ranks · State Decorations · Prestige · Global Standing · Propaganda Events · The Beijing Stock Exchange · Waifu Bureau", inline=False)
+        e.add_field(name="YOUR FIRST INSPECTION", value="Report to `/checkin` and cast your `/vote` on Top.gg on the same day — the two combine for a bonus payout on top of either reward alone. Then `/roll` your first waifu from over 1,000 historical figures. Review your `/score`. The Nation will determine your worth.", inline=False)
         e.add_field(name="BUREAU RESOURCES", value=f"[Public Dashboard]({DASHBOARD_URL}) · [Support Server]({SUPPORT_URL}) · [Invite the Bureau]({INVITE_URL})", inline=False)
         return e
 
@@ -186,8 +186,7 @@ class GuideView(discord.ui.View):
                 "`rehabilitate` ¥3,000+ · Restore +3.00 rating. Cost doubles with each use · Gift-eligible\n"
                 "`appeal` ¥2,500 · Halve the next incoming penalty of -1.00 or worse (12h window) · Gift-eligible\n"
                 "`exception` ¥12,000 · Nullify the next negative action entirely (24h window) · Gift-eligible\n"
-                "`reeducation` ¥12,000 · Suspend a target's rating for 2h\n"
-                "`media_coverage` ¥15,000 · Arrange immediate State Media coverage. Grants +4.00 rating · Gift-eligible"
+                "`reeducation` ¥12,000 · Suspend a target's rating for 2h"
             ),
             inline=False,
         )
