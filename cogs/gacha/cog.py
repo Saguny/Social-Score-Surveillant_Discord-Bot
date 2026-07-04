@@ -10,7 +10,7 @@ from discord.ext import commands
 from . import cache, characters
 from .collection import filtered_chars
 from .constants import DIVORCE_YUAN, FACTION_COLOR, FACTION_LABEL, FACTION_ORDER, RARITY_ORDER, SUBMIT_URL
-from .search import figure_ac, find_all, find_one, owned_figure_ac, wishlist_figure_ac
+from .search import figure_ac, find_all, find_one, owned_figure_ac, target_owned_figure_ac, wishlist_figure_ac
 from .service import GachaService
 from .views import BrowseView, DivorceConfirmView, TradeView, show_char_picker
 from .embeds import pick_image, stars
@@ -174,7 +174,7 @@ class GachaCog(commands.Cog, name="Gacha"):
         offer="The waifu you're giving away",
         request="The waifu you want in return",
     )
-    @app_commands.autocomplete(offer=owned_figure_ac, request=figure_ac)
+    @app_commands.autocomplete(offer=owned_figure_ac, request=target_owned_figure_ac)
     async def slash_trade(
         self,
         interaction: discord.Interaction,

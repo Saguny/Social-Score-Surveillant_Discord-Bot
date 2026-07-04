@@ -377,6 +377,81 @@ class DivorceConfirmView(discord.ui.View):
         await interaction.response.edit_message(content="Divorce cancelled.", view=self)
 
 
+class GiftView(discord.ui.View):
+    TIMEOUT = 300
+
+    def __init__(self, db, guild_id: int, giver: discord.Member, target: discord.Member, char: dict):
+        super().__init__(timeout=self.TIMEOUT)
+        self._db       = db
+        self._guild_id = guild_id
+        self._giver    = giver
+        self._target   = target
+        self._char     = char
+        self._settled  = False
+
+    def _pending_embed(self) -> discord.Embed:
+        char = self._char
+        e = discord.Embed(
+            title="Gift Incoming",
+            description=(
+                f"{self._giver.mention} wants to gift **{char['name']}** {stars(char['rarity'])}\n"
+                f"to {self._target.mention}\n\n"
+                f"{self._target.mention} · Decline within 5 minutes or the gift goes through."
+            ),
+            color=FACTION_COLOR.get(char.get("faction"), 0xCC0000),
+        )
+        if img := pick_image(char):
+            e.set_thumbnail(url=img)
+        return e
+
+    def _disable_all(self):
+        for item in self.children:
+            item.disabled = True
+
+    async def on_timeout(self):
+        if self._settled:
+            return
+        self._settled = True
+        self._disable_all()
+        char = self._char
+        embed = discord.Embed(
+            title="Gift Expired",
+            description=f"{self._target.mention} didn't respond · **{char['name']}** was not sent.",
+            color=0x888888,
+        )
+        if img := pick_image(char):
+            embed.set_thumbnail(url=img)
+        try:
+            await self.message.edit(embed=embed, view=self)
+        except Exception:
+            pass
+
+    @discord.ui.button(label="Decline", style=discord.ButtonStyle.danger)
+    async def decline_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self._target.id:
+            await interaction.response.send_message("This gift isn't for you.", ephemeral=True)
+            return
+        if self._settled:
+            await interaction.response.send_message("Already resolved.", ephemeral=True)
+            return
+        self._settled = True
+        self.stop()
+        self._disable_all()
+        char = self._char
+        embed = discord.Embed(
+            title="Gift Declined",
+            description=f"{self._target.mention} declined **{char['name']}** from {self._giver.mention}.",
+            color=0x888888,
+        )
+        if img := pick_image(char):
+            embed.set_thumbnail(url=img)
+        try:
+            await interaction.response.defer()
+        except discord.HTTPException:
+            pass
+        await interaction.edit_original_response(embed=embed, view=self)
+
+
 class CharacterSelectView(discord.ui.View):
     def __init__(self, candidates: list[dict], on_pick, author_id: int, timeout: int = 60):
         super().__init__(timeout=timeout)

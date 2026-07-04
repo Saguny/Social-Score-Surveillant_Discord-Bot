@@ -1,10 +1,9 @@
 import discord
 
 from . import characters
-from .constants import FACTION_COLOR, SUBMIT_URL
-from .embeds import stars, pick_image
+from .constants import SUBMIT_URL
 from .search import find_all
-from .views import show_char_picker
+from .views import GiftView, show_char_picker
 
 
 async def do_gift(
@@ -27,28 +26,21 @@ async def do_gift(
         if len(candidates) > 1:
             await show_char_picker(
                 send_fn, candidates, giver.id,
-                lambda c: _finish_gift(guild_id, giver, target, c, send_fn, db),
+                lambda c: _start_gift(guild_id, giver, target, c, send_fn, db),
             )
             return
         char = candidates[0]
 
-    await _finish_gift(guild_id, giver, target, char, send_fn, db)
+    await _start_gift(guild_id, giver, target, char, send_fn, db)
 
 
-async def _finish_gift(guild_id, giver, target, char, send_fn, db) -> None:
+async def _start_gift(guild_id, giver, target, char, send_fn, db) -> None:
     char_id = char.get("id", "")
-    ok = await db.gift_character(guild_id, giver.id, target.id, char_id)
-    if not ok:
+    owned = await db.get_character_owner(guild_id, char_id)
+    if owned != giver.id:
         await send_fn(f"You don't own **{char['name']}**.")
         return
-    embed = discord.Embed(
-        title="Waifu Gifted",
-        description=(
-            f"{giver.mention} gifted **{char['name']}** {stars(char['rarity'])}\n"
-            f"to {target.mention}"
-        ),
-        color=FACTION_COLOR.get(char["faction"], 0xCC0000),
-    )
-    if img := pick_image(char):
-        embed.set_thumbnail(url=img)
-    await send_fn(embed=embed)
+
+    view = GiftView(db, guild_id, giver, target, char)
+    msg  = await send_fn(content=target.mention, embed=view._pending_embed(), view=view)
+    view.message = msg

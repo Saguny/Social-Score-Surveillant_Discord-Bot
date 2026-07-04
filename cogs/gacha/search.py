@@ -89,6 +89,29 @@ async def owned_figure_ac(
     ]
 
 
+async def target_owned_figure_ac(
+    interaction: discord.Interaction, current: str
+) -> list[app_commands.Choice[str]]:
+    if not interaction.guild:
+        return []
+    target = interaction.namespace.user
+    if not isinstance(target, discord.Member):
+        return []
+    rows    = await interaction.client.db.get_user_collection(interaction.guild.id, target.id)
+    owned   = {r["character_id"] for r in rows}
+    chars   = characters.all_chars()
+    q       = current.lower()
+    results = [
+        (cid, chars[cid]) for cid in owned
+        if cid in chars and (q in chars[cid]["name"].lower() or q in cid)
+    ]
+    results.sort(key=lambda x: (not x[1]["name"].lower().startswith(q), x[1]["name"]))
+    return [
+        app_commands.Choice(name=f"{RARITY_EMOJI.get(ch['rarity'], '')} {ch['name']}", value=cid)
+        for cid, ch in results[:25]
+    ]
+
+
 async def wishlist_figure_ac(
     interaction: discord.Interaction, current: str
 ) -> list[app_commands.Choice[str]]:
