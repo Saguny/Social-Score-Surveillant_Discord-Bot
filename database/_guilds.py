@@ -306,10 +306,11 @@ class GuildRankMixin:
 
         now = int(time.time())
         active_cutoff = now - CIVIC_PARTICIPATION_ACTIVE_DAYS * 86400
+        guild_active_cutoff = now - 7 * 86400
 
         if metric == "politburo":
             rows = await self._pool.fetch(
-                """
+                f"""
                 SELECT
                     gc.guild_id,
                     gc.guild_name,
@@ -325,6 +326,7 @@ class GuildRankMixin:
                 JOIN users u ON u.guild_id = gc.guild_id
                 GROUP BY gc.guild_id, gc.guild_name
                 HAVING COUNT(DISTINCT u.user_id) FILTER (WHERE u.has_chatted = 1) >= $2
+                    AND MAX(u.last_active) >= {guild_active_cutoff}
                 ORDER BY value DESC NULLS LAST
                 LIMIT $3
                 """,
@@ -345,12 +347,12 @@ class GuildRankMixin:
                 for name, lo, hi in GUILD_RANK_BRACKETS:
                     if name == bracket:
                         if hi is None:
-                            bracket_filter = f"HAVING COUNT(*) FILTER (WHERE u.has_chatted = 1) >= {lo}"
+                            bracket_filter = f"HAVING COUNT(*) FILTER (WHERE u.has_chatted = 1) >= {lo} AND MAX(u.last_active) >= {guild_active_cutoff}"
                         else:
-                            bracket_filter = f"HAVING COUNT(*) FILTER (WHERE u.has_chatted = 1) BETWEEN {lo} AND {hi}"
+                            bracket_filter = f"HAVING COUNT(*) FILTER (WHERE u.has_chatted = 1) BETWEEN {lo} AND {hi} AND MAX(u.last_active) >= {guild_active_cutoff}"
                         break
             else:
-                bracket_filter = f"HAVING COUNT(*) FILTER (WHERE u.has_chatted = 1) >= {GUILD_RANK_MIN_CITIZENS}"
+                bracket_filter = f"HAVING COUNT(*) FILTER (WHERE u.has_chatted = 1) >= {GUILD_RANK_MIN_CITIZENS} AND MAX(u.last_active) >= {guild_active_cutoff}"
 
             literacy_join = ""
             if metric == "literacy":
