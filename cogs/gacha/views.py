@@ -5,7 +5,7 @@ import discord
 
 from . import characters
 from .constants import (
-    CLAIM_WINDOW, DUPE_YUAN, DIVORCE_YUAN, FACTION_LABEL, SUBMIT_URL,
+    CLAIM_WINDOW, DUPE_YUAN, DIVORCE_YUAN, FACTION_COLOR, FACTION_LABEL, SUBMIT_URL,
     HAREM_PAGE_SIZE, BROWSE_PAGE_SIZE,
 )
 from .embeds import stars, pick_image, image_embed, harem_image_embed, browse_embed
