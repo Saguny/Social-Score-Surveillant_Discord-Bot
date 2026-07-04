@@ -396,7 +396,7 @@ class GiftView(discord.ui.View):
             description=(
                 f"{self._giver.mention} wants to gift **{char['name']}** {stars(char['rarity'])}\n"
                 f"to {self._target.mention}\n\n"
-                f"{self._target.mention} · Decline within 5 minutes or the gift goes through."
+                f"{self._target.mention} · Decline within 5 minutes or the gift expires."
             ),
             color=FACTION_COLOR.get(char.get("faction"), 0xCC0000),
         )
@@ -425,6 +425,41 @@ class GiftView(discord.ui.View):
             await self.message.edit(embed=embed, view=self)
         except Exception:
             pass
+
+    @discord.ui.button(label="Accept", style=discord.ButtonStyle.success)
+    async def accept_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self._target.id:
+            await interaction.response.send_message("This gift isn't for you.", ephemeral=True)
+            return
+        if self._settled:
+            await interaction.response.send_message("Already resolved.", ephemeral=True)
+            return
+        self._settled = True
+        self.stop()
+        self._disable_all()
+        char = self._char
+        ok = await self._db.gift_character(self._guild_id, self._giver.id, self._target.id, char["id"])
+        if ok:
+            from .cache import set_owner
+            await set_owner(self._guild_id, char["id"], self._target.id)
+            embed = discord.Embed(
+                title="Gift Accepted",
+                description=f"{self._target.mention} received **{char['name']}** from {self._giver.mention}.",
+                color=FACTION_COLOR.get(char.get("faction"), 0xCC0000),
+            )
+        else:
+            embed = discord.Embed(
+                title="Gift Failed",
+                description=f"{self._giver.mention} no longer owns **{char['name']}**.",
+                color=0x888888,
+            )
+        if img := pick_image(char):
+            embed.set_thumbnail(url=img)
+        try:
+            await interaction.response.defer()
+        except discord.HTTPException:
+            pass
+        await interaction.edit_original_response(embed=embed, view=self)
 
     @discord.ui.button(label="Decline", style=discord.ButtonStyle.danger)
     async def decline_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
