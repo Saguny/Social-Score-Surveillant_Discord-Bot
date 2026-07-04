@@ -433,21 +433,21 @@
         <th>ID</th><th>${t('Ticker')}</th><th>${t('Dir')}</th><th>${t('Lev')}</th><th>${t('Entry')}</th><th>${t('Knockout')}</th><th>${t('Current')}</th><th></th>
       </tr></thead>
       <tbody>
-        ${turbos.map(t => `<tr>
-          <td class="port-dimmed">#${t.id}</td>
+        ${turbos.map(turbo => `<tr>
+          <td class="port-dimmed">#${turbo.id}</td>
           <td>
-            <span class="port-ticker">${_esc(t.ticker)}</span>
-            ${_marketBadge(t.exchange, market)}
-            <div class="port-ticker-name">${_esc(t.name)}</div>
+            <span class="port-ticker">${_esc(turbo.ticker)}</span>
+            ${_marketBadge(turbo.exchange, market)}
+            <div class="port-ticker-name">${_esc(turbo.name)}</div>
           </td>
-          <td><span class="${t.direction === 'LONG' ? 'port-long' : 'port-short'}">${t.direction}</span></td>
-          <td>${t.leverage}x</td>
-          <td>${_fmtPrice(t.entry_price)}</td>
-          <td class="pnl-neg">${_fmtPrice(t.knockout)}</td>
-          <td>${_fmtPrice(t.current_price)}</td>
+          <td><span class="${turbo.direction === 'LONG' ? 'port-long' : 'port-short'}">${turbo.direction}</span></td>
+          <td>${turbo.leverage}x</td>
+          <td>${_fmtPrice(turbo.entry_price)}</td>
+          <td class="pnl-neg">${_fmtPrice(turbo.knockout)}</td>
+          <td>${_fmtPrice(turbo.current_price)}</td>
           <td class="port-actions">
-            <button class="port-btn port-btn-ghost" onclick="_portTurboChart('${_esc(t.ticker)}','${_esc(t.name)}','${_esc(t.direction)}',${t.leverage},${t.entry_price},${t.knockout})">${t('Chart')}</button>
-            <button class="port-btn port-btn-buy" onclick="_portOpenT(${t.id},'${_esc(t.ticker)}','${_esc(t.name)}',${t.leverage},'${_esc(guildId)}')">${t('Open')}</button>
+            <button class="port-btn port-btn-ghost" onclick="_portTurboChart('${_esc(turbo.ticker)}','${_esc(turbo.name)}','${_esc(turbo.direction)}',${turbo.leverage},${turbo.entry_price},${turbo.knockout})">${t('Chart')}</button>
+            <button class="port-btn port-btn-buy" onclick="_portOpenT(${turbo.id},'${_esc(turbo.ticker)}','${_esc(turbo.name)}',${turbo.leverage},'${_esc(guildId)}')">${t('Open')}</button>
           </td>
         </tr>`).join('')}
       </tbody>
@@ -585,10 +585,10 @@
     if (!tickers.length) { $el.innerHTML = `<div class="acc-empty">${t('No market data available.')}</div>`; return; }
 
     const byGroup = {};
-    for (const t of tickers) {
-      const g = t.exchange_label;
+    for (const ticker of tickers) {
+      const g = ticker.exchange_label;
       if (!byGroup[g]) byGroup[g] = [];
-      byGroup[g].push(t);
+      byGroup[g].push(ticker);
     }
 
     function _mktTiming(ex) {
@@ -619,19 +619,19 @@
         <div class="port-table-wrap"><table class="port-table">
           <thead><tr><th>${t('Ticker')}</th><th>${t('Name')}</th><th>${t('Price')}</th><th>${t('Owned')}</th><th></th></tr></thead>
           <tbody>
-            ${rows.map(t => {
-              const owned = t.owned_shares > 0
-                ? `<span class="port-owned">${t.owned_shares % 1 === 0 ? t.owned_shares : Number(t.owned_shares).toFixed(4)} sh</span>`
+            ${rows.map(row => {
+              const owned = row.owned_shares > 0
+                ? `<span class="port-owned">${row.owned_shares % 1 === 0 ? row.owned_shares : Number(row.owned_shares).toFixed(4)} sh</span>`
                 : '<span class="port-dimmed">–</span>';
               const buyDisabled = open ? '' : `disabled title="${t('Market closed')}"` ;
               return `<tr>
-                <td><span class="port-ticker">${_esc(t.ticker)}</span></td>
-                <td class="port-ticker-name">${_esc(t.name)}</td>
-                <td>${_fmtPrice(t.current_price)}</td>
+                <td><span class="port-ticker">${_esc(row.ticker)}</span></td>
+                <td class="port-ticker-name">${_esc(row.name)}</td>
+                <td>${_fmtPrice(row.current_price)}</td>
                 <td>${owned}</td>
                 <td class="port-actions">
-                  <button class="port-btn port-btn-ghost" onclick="_stockChart('${_esc(t.ticker)}','${_esc(t.name)}')">${t('Chart')}</button>
-                  <button class="port-btn port-btn-buy" ${buyDisabled} onclick="_portBuy('${_esc(t.ticker)}','${_esc(t.name)}',${t.current_price},'${_esc(guildId)}')">${t('Buy')}</button>
+                  <button class="port-btn port-btn-ghost" onclick="_stockChart('${_esc(row.ticker)}','${_esc(row.name)}')">${t('Chart')}</button>
+                  <button class="port-btn port-btn-buy" ${buyDisabled} onclick="_portBuy('${_esc(row.ticker)}','${_esc(row.name)}',${row.current_price},'${_esc(guildId)}')">${t('Buy')}</button>
                 </td>
               </tr>`;
             }).join('')}

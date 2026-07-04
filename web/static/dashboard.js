@@ -611,13 +611,13 @@ async function loadCommandAnalytics(range) {
   _cmdLoaded = true;
 
   // Overview cards
-  const t = d.totals || {};
-  set('cmd-total',   fmt(t.total_executions || 0));
-  set('cmd-today',   fmt(t.executions_today || 0));
-  set('cmd-24h',     fmt(t.executions_24h || 0));
-  set('cmd-users',   fmt(t.unique_users || 0));
-  set('cmd-avgms',   (t.avg_execution_time_ms || 0).toFixed(0) + 'ms');
-  set('cmd-success', (t.overall_success_rate || 100).toFixed(1) + '%');
+  const totals = d.totals || {};
+  set('cmd-total',   fmt(totals.total_executions || 0));
+  set('cmd-today',   fmt(totals.executions_today || 0));
+  set('cmd-24h',     fmt(totals.executions_24h || 0));
+  set('cmd-users',   fmt(totals.unique_users || 0));
+  set('cmd-avgms',   (totals.avg_execution_time_ms || 0).toFixed(0) + 'ms');
+  set('cmd-success', (totals.overall_success_rate || 100).toFixed(1) + '%');
 
   const topCmds = (d.top_commands || []).slice(0, 10);
 
