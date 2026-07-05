@@ -8,6 +8,12 @@ from cogs.achievements import unlock as unlock_achievement, check_milestone
 from infra.guild_notify import publish_guild_notify
 from infra.redis_cache import cache_set
 
+def _fallback_channel(guild: discord.Guild) -> discord.TextChannel | None:
+    if guild.system_channel and guild.system_channel.permissions_for(guild.me).send_messages:
+        return guild.system_channel
+    return next((c for c in guild.text_channels if c.permissions_for(guild.me).send_messages), None)
+
+
 VOTE_URL = "https://top.gg/bot/856163780265902151/vote"
 VOTE_SCORE_BASE = 2.0
 VOTE_YUAN_BASE = 1500
@@ -75,7 +81,7 @@ class VoteReminderView(discord.ui.View):
             pass
 
 
-async def _apply_vote_reward_db(db, guild_id: int, user_id: int, yuan_reward: int, score_delta: float) -> bool:
+async def _apply_vote_reward_db(db, guild_id: int, user_id: int, yuan_reward: int, score_delta: float) -> tuple[bool, float, float]:
     user_row = await db.get_user(guild_id, user_id)
     combo = False
     if user_row:
@@ -85,11 +91,11 @@ async def _apply_vote_reward_db(db, guild_id: int, user_id: int, yuan_reward: in
             combo = True
     final_yuan = yuan_reward + (VOTE_CHECKIN_COMBO_YUAN if combo else 0)
     final_score = round(score_delta + (VOTE_CHECKIN_COMBO_SCORE if combo else 0), 2)
-    await asyncio.gather(
+    (old_score, new_score), _ = await asyncio.gather(
         db.update_score(guild_id, user_id, final_score, "topgg vote"),
         db.adjust_yuan(guild_id, user_id, final_yuan),
     )
-    return combo
+    return combo, old_score, new_score
 
 
 async def _reward_guild_local(
@@ -99,7 +105,8 @@ async def _reward_guild_local(
     member = guild.get_member(user_id)
     if not member:
         return None
-    combo = await _apply_vote_reward_db(db, guild.id, user_id, yuan_reward, score_delta)
+    combo, old_score, new_score = await _apply_vote_reward_db(db, guild.id, user_id, yuan_reward, score_delta)
+    bot.dispatch("score_change", guild, member, _fallback_channel(guild), old_score, new_score)
     await unlock_achievement(bot, guild, member, "first_vote")
     await check_milestone(bot, guild, member, "topgg_votes_total", total_votes)
     await check_milestone(bot, guild, member, "topgg_vote_streak", vote_streak)
@@ -110,9 +117,10 @@ async def _reward_guild_remote(
     db, guild_id: int, user_id: int, total_votes: int, vote_streak: int,
     yuan_reward: int, score_delta: float,
 ) -> tuple[str, bool]:
-    combo = await _apply_vote_reward_db(db, guild_id, user_id, yuan_reward, score_delta)
+    combo, old_score, new_score = await _apply_vote_reward_db(db, guild_id, user_id, yuan_reward, score_delta)
     await publish_guild_notify(guild_id, "vote_achievement_check", {
         "user_id": user_id, "total_votes": total_votes, "vote_streak": vote_streak,
+        "old_score": old_score, "new_score": new_score,
     })
     return f"guild {guild_id}", combo
 

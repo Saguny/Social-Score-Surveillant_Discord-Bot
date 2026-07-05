@@ -230,6 +230,10 @@ async def _handle_guild_notify(bot: commands.Bot, guild: discord.Guild, event_ty
     elif event_type == "vote_achievement_check":
         if member:
             from cogs.achievements import unlock as unlock_achievement, check_milestone
+            old_score = data.get("old_score")
+            new_score = data.get("new_score")
+            if old_score is not None and new_score is not None:
+                bot.dispatch("score_change", guild, member, _fallback_guild_channel(guild), old_score, new_score)
             await unlock_achievement(bot, guild, member, "first_vote")
             await check_milestone(bot, guild, member, "topgg_votes_total", data.get("total_votes"))
             await check_milestone(bot, guild, member, "topgg_vote_streak", data.get("vote_streak"))
