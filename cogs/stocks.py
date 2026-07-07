@@ -25,7 +25,7 @@ from config.stocks import (
     REAL_STOCKS, REAL_TICKERS,
     FX_TICKERS, FX_FALLBACK_RATES, FX_REFRESH_INTERVAL,
     TURBO_LEVERAGES, TURBOS_PER_DAY, TURBO_MIN_COST,
-    PRICE_UPDATE_INTERVAL,
+    PRICE_UPDATE_INTERVAL, INTERPOLATION_INTERVAL, INTERPOLATION_VOL,
     CIRCUIT_BREAKER_HALT_PCT, CIRCUIT_BREAKER_HALT_SECS, CIRCUIT_BREAKER_DAILY_PCT,
     PUMP_TRIGGER_PROB, PUMP_DURATION_SECS, PUMP_DRIFT_PER_TICK, PUMP_CRASH_PCT,
     _YF_PERIOD_MAP, _PERIOD_SECONDS,
@@ -360,11 +360,10 @@ class PortfolioPeriodView(discord.ui.View):
         except Exception as e:
             await itr.followup.send(f"Chart unavailable: {e}", ephemeral=True)
             return
-        native   = self._cog._prices.get(ticker, 0.0)
-        day_open = self._cog._day_opens.get(ticker, native)
-        pct      = (native - day_open) / day_open * 100 if day_open > 0 else 0.0
+        price    = self._cog._prices.get(ticker, 0.0)
+        day_open = self._cog._day_opens.get(ticker, price)
+        pct      = (price - day_open) / day_open * 100 if day_open > 0 else 0.0
         color    = 0x26A69A if pct >= 0 else 0xEF5350
-        price    = self._cog._to_yuan(ticker, native)
         info     = (REAL_STOCKS.get(ticker) or (ETF_INFO if ticker == ETF_TICKER else None) or PENNY_STOCKS.get(ticker) or {})
         embed    = discord.Embed(title=f"{info.get('name_zh', ticker)} · {ticker}", color=color)
         embed.add_field(name="Price",      value=_fmt_price(price), inline=True)
@@ -427,6 +426,7 @@ class StocksCog(commands.Cog, name="Stocks"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self._prices: dict[str, float]         = {}
+        self._real_prices: dict[str, float]    = {}
         self._day_opens: dict[str, float]       = {}
         self._halted: dict[str, float]          = {}
         self._daily_locked: set[str]            = set()
@@ -436,9 +436,11 @@ class StocksCog(commands.Cog, name="Stocks"):
         self._fx_rates: dict[str, float]        = dict(FX_FALLBACK_RATES)
         self._fx_last_refresh: float            = 0.0
         self._price_task.start()
+        self._interpolation_task.start()
 
     def cog_unload(self):
         self._price_task.cancel()
+        self._interpolation_task.cancel()
 
     def _make_bse_file(self) -> discord.File | None:
         try:
@@ -488,6 +490,23 @@ class StocksCog(commands.Cog, name="Stocks"):
         await self.bot.wait_until_ready()
         await self._initialize_prices()
 
+    @tasks.loop(seconds=INTERPOLATION_INTERVAL)
+    async def _interpolation_task(self):
+        if not self._real_prices:
+            return
+        for ticker, real in self._real_prices.items():
+            current = self._prices.get(ticker, real)
+            if current <= 0 or real <= 0:
+                continue
+            drift  = (real - current) / real * 0.1
+            shock  = random.gauss(0, INTERPOLATION_VOL)
+            factor = 1.0 + drift + shock
+            self._prices[ticker] = max(current * factor, real * 0.90)
+
+    @_interpolation_task.before_loop
+    async def _before_interpolation_task(self):
+        await self.bot.wait_until_ready()
+
     # ── Startup ───────────────────────────────────────────────────────────────
 
     async def _initialize_prices(self):
@@ -511,7 +530,8 @@ class StocksCog(commands.Cog, name="Stocks"):
             price, yf_open = res
             if price and price > 0:
                 yuan_price = self._to_yuan(ticker, price)
-                self._prices[ticker] = yuan_price
+                self._prices[ticker]      = yuan_price
+                self._real_prices[ticker] = yuan_price
                 if yf_open and yf_open > 0:
                     self._day_opens[ticker] = self._to_yuan(ticker, yf_open)
                 elif self._day_opens.get(ticker, 0) <= 0:
@@ -590,6 +610,7 @@ class StocksCog(commands.Cog, name="Stocks"):
                     yuan_price = self._to_yuan(ticker, yf_price)
                     self._day_opens.setdefault(ticker, yuan_price)
                     self._prices[ticker] = yuan_price
+                    self._real_prices[ticker] = yuan_price
                     price_updates.append((ticker, yuan_price, self._day_opens[ticker]))
                     price_bars.append((ticker, now, yuan_price, yuan_price, yuan_price, yuan_price))
                 continue
@@ -614,8 +635,9 @@ class StocksCog(commands.Cog, name="Stocks"):
                 asyncio.create_task(self._grant_held_through_halt(ticker))
                 price_bars.append((ticker, now, old, old, old, old))
             else:
-                self._prices[ticker] = new_price
-                real_pcts[ticker]    = pct
+                self._prices[ticker]      = new_price
+                self._real_prices[ticker] = new_price
+                real_pcts[ticker]         = pct
                 price_updates.append((ticker, new_price, day_open))
                 price_bars.append((ticker, now, old,
                                    max(old, new_price), min(old, new_price), new_price))
@@ -678,7 +700,7 @@ class StocksCog(commands.Cog, name="Stocks"):
         user_values: dict[tuple[int, int], float] = {}
         for p in all_stock_positions:
             key   = (int(p["guild_id"]), int(p["user_id"]))
-            yuan_price = self._to_yuan(p["ticker"], self._prices.get(p["ticker"], 0.0))
+            yuan_price = self._prices.get(p["ticker"], 0.0)
             user_values[key] = user_values.get(key, 0.0) + yuan_price * float(p["shares"])
         for tp in all_turbo_positions:
             key     = (int(tp["guild_id"]), int(tp["user_id"]))
@@ -849,8 +871,6 @@ class StocksCog(commands.Cog, name="Stocks"):
             closes     = [float(r["close"]) for r in rows]
             timestamps = [datetime.datetime.fromtimestamp(int(r["ts"]), tz=_NYSE_TZ).strftime(ts_fmt) for r in rows]
 
-        if ticker in REAL_TICKERS and day_open is not None:
-            day_open = self._to_yuan(ticker, day_open)
 
         # Only use the official day-open as the chart's baseline when the chart
         # is actually showing the since-open window; longer periods should still
@@ -879,8 +899,7 @@ class StocksCog(commands.Cog, name="Stocks"):
             day_open = self._day_opens.get(ticker, price)
             pct      = (price - day_open) / day_open * 100 if day_open > 0 else 0.0
             sign     = "+" if pct >= 0 else ""
-            yuan_price = self._to_yuan(ticker, price)
-            label    = f"{ticker} · {name} · {_fmt_price(yuan_price)} ({sign}{pct:.1f}%)"
+            label    = f"{ticker} · {name} · {_fmt_price(price)} ({sign}{pct:.1f}%)"
             choices.append(app_commands.Choice(name=label[:100], value=ticker))
         return choices[:25]
 
@@ -908,12 +927,11 @@ class StocksCog(commands.Cog, name="Stocks"):
         def _group_lines(stocks_dict: dict) -> list[str]:
             out = []
             for ticker, info in stocks_dict.items():
-                native    = self._prices.get(ticker, 0.0)
-                day_open  = self._day_opens.get(ticker, native)
-                pct       = (native - day_open) / day_open * 100 if day_open > 0 else 0.0
+                price     = self._prices.get(ticker, 0.0)
+                day_open  = self._day_opens.get(ticker, price)
+                pct       = (price - day_open) / day_open * 100 if day_open > 0 else 0.0
                 arrow     = "▲" if pct >= 0 else "▼"
-                price     = self._to_yuan(ticker, native)
-                open_yuan = self._to_yuan(ticker, day_open)
+                open_yuan = day_open
                 status_tag = ""
                 if not exchange_status[info["exchange"]]["open"]:
                     status_tag = " 🔴"
@@ -984,11 +1002,10 @@ class StocksCog(commands.Cog, name="Stocks"):
         except Exception as e:
             return await interaction.followup.send(f"Chart unavailable: {e}", ephemeral=True)
 
-        native   = self._prices.get(ticker, 0.0)
-        day_open = self._day_opens.get(ticker, native)
-        pct      = (native - day_open) / day_open * 100 if day_open > 0 else 0.0
+        price    = self._prices.get(ticker, 0.0)
+        day_open = self._day_opens.get(ticker, price)
+        pct      = (price - day_open) / day_open * 100 if day_open > 0 else 0.0
         color    = 0x26A69A if pct >= 0 else 0xEF5350
-        price    = self._to_yuan(ticker, native)
 
         info  = (REAL_STOCKS.get(ticker) or (ETF_INFO if ticker == ETF_TICKER else None)
                  or PENNY_STOCKS.get(ticker) or {})
@@ -1053,8 +1070,7 @@ class StocksCog(commands.Cog, name="Stocks"):
 
         result = await self.bot.db.buy_stock(interaction.guild_id, interaction.user.id, ticker, shares)
         if not result:
-            price = self._to_yuan(ticker, native)
-            total = int(math.ceil(price * shares))
+            total = int(math.ceil(native * shares))
             return await interaction.followup.send(f"Insufficient yuan. Cost: ¥{total:,}", ephemeral=True)
 
         price = result["price"]
@@ -1089,10 +1105,9 @@ class StocksCog(commands.Cog, name="Stocks"):
         if shares <= 0:
             return await interaction.followup.send("Shares must be positive.", ephemeral=True)
 
-        native = self._prices.get(ticker, 0.0)
-        if native <= 0:
+        price = self._prices.get(ticker, 0.0)
+        if price <= 0:
             return await interaction.followup.send("Price data unavailable.", ephemeral=True)
-        price = self._to_yuan(ticker, native)
 
         result = await self.bot.db.sell_stock(interaction.guild_id, interaction.user.id, ticker, shares, price)
         if result is None:
@@ -1140,7 +1155,7 @@ class StocksCog(commands.Cog, name="Stocks"):
             ticker = pos["ticker"]
             shares = float(pos["shares"])
             avg    = float(pos["avg_cost"])
-            price  = self._to_yuan(ticker, self._prices.get(ticker, 0.0))
+            price  = self._prices.get(ticker, 0.0)
             value  = price * shares
             pnl    = int((price - avg) * shares)
             sign   = "+" if pnl >= 0 else "-"
@@ -1250,9 +1265,8 @@ class StocksCog(commands.Cog, name="Stocks"):
                     price   = prices.get(ticker, float(t["entry_price"]))
                     factor  = max(0.0, _turbo_value_factor(direction, float(t["entry_price"]), float(t["knockout"]), price))
                     ko_dist = abs(price - float(t["knockout"])) / price * 100 if price > 0 else 0.0
-                    ko_yuan = self._to_yuan(ticker, float(t["knockout"]))
                     lines.append(
-                        f"`#{t['id']}` {t['leverage']}x · KO {_fmt_price(ko_yuan)} · {ko_dist:.1f}% away · factor {factor:.3f}"
+                        f"`#{t['id']}` {t['leverage']}x · KO {_fmt_price(float(t['knockout']))} · {ko_dist:.1f}% away · factor {factor:.3f}"
                     )
                 embed.add_field(name=direction, value="\n".join(lines), inline=True)
             embed.set_footer(text=f"Min ¥{TURBO_MIN_COST:,} · /turbos open <id> <yuan> · /turbos chart <id>")
@@ -1301,8 +1315,8 @@ class StocksCog(commands.Cog, name="Stocks"):
 
         try:
             buf = await self._build_chart(ticker, period, "line",
-                                          entry_price=self._to_yuan(ticker, entry),
-                                          knockout=self._to_yuan(ticker, knockout),
+                                          entry_price=entry,
+                                          knockout=knockout,
                                           direction=direction)
         except Exception as e:
             return await interaction.followup.send(f"Chart unavailable: {e}", ephemeral=True)
@@ -1313,9 +1327,9 @@ class StocksCog(commands.Cog, name="Stocks"):
             description=_ticker_info_name(ticker),
             color=color,
         )
-        embed.add_field(name="Current",     value=_fmt_price(self._to_yuan(ticker, price)),    inline=True)
-        embed.add_field(name="Entry",       value=_fmt_price(self._to_yuan(ticker, entry)),    inline=True)
-        embed.add_field(name="Knockout",    value=_fmt_price(self._to_yuan(ticker, knockout)), inline=True)
+        embed.add_field(name="Current",     value=_fmt_price(price),    inline=True)
+        embed.add_field(name="Entry",       value=_fmt_price(entry),    inline=True)
+        embed.add_field(name="Knockout",    value=_fmt_price(knockout), inline=True)
         embed.add_field(name="KO Distance", value=f"{ko_dist:.1f}%",   inline=True)
         embed.add_field(name="Factor",      value=f"{factor:.4f}",      inline=True)
         embed.add_field(name="Period",      value=period,               inline=True)
@@ -1362,8 +1376,8 @@ class StocksCog(commands.Cog, name="Stocks"):
 
         embed = discord.Embed(title="持仓开立 · Position Opened", color=color)
         embed.add_field(name="Certificate",   value=f"#{turbo_id} {turbo['direction']} {turbo['leverage']}x {ticker}", inline=False)
-        embed.add_field(name="Entry Price",   value=_fmt_price(self._to_yuan(ticker, entry)),    inline=True)
-        embed.add_field(name="Knockout",      value=_fmt_price(self._to_yuan(ticker, knockout)), inline=True)
+        embed.add_field(name="Entry Price",   value=_fmt_price(entry),    inline=True)
+        embed.add_field(name="Knockout",      value=_fmt_price(knockout), inline=True)
         embed.add_field(name="KO Distance",   value=f"{ko_dist:.1f}%",          inline=True)
         embed.add_field(name="Invested",      value=f"¥{cost:,}",               inline=True)
         embed.add_field(name="Current Value", value=f"¥{int(cost * factor):,}", inline=True)

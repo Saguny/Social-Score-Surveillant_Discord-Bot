@@ -74,7 +74,7 @@ class CheckIn(commands.Cog):
         embed = discord.Embed(color=event_color, title="DAILY CENSUS RECORDED", description="中华人民共和国社会信用局")
         embed.add_field(name="BUREAU REPORT", value=event_text, inline=False)
         embed.add_field(name="STREAK", value=f"Day {streak}", inline=True)
-        embed.add_field(name="ALLOCATION", value=f"¥{yuan:,} · +{delta:.2f} rating · {rewarded} nations", inline=True)
+        embed.add_field(name="ALLOCATION", value=f"¥{yuan:,} · +{delta:.2f} rating · {rewarded} {'nation' if rewarded == 1 else 'nations'}", inline=True)
         if at_cap:
             embed.add_field(name="NEXT", value="Maximum allocation reached.", inline=False)
         elif streak > 1:

@@ -452,7 +452,7 @@ class SocialCreditBot(commands.AutoShardedBot):
                 return f"{str(user)} {_suffix_for(preferred)}{star_suffix}"
 
             _ORDER = ["voter", "verified", "figure", "influencer", "associate", "asset"]
-            for badge_id in reversed(_ORDER):
+            for badge_id in _ORDER:
                 if badge_id in badge_set:
                     return f"{str(user)} {_suffix_for(badge_id)}{star_suffix}"
 

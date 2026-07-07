@@ -85,7 +85,7 @@ class BadgesCog(commands.Cog, name="Badges"):
     @app_commands.describe(choice="The badge to display")
     async def select(self, interaction: discord.Interaction, choice: str):
         await interaction.response.defer()
-        owned = set(await self.db.get_cosmetic_badges(interaction.user.id))
+        owned = set(await self.db.get_cosmetic_badges(interaction.user.id, permanent_only=True))
         if choice not in owned:
             await interaction.followup.send("You do not own that badge.", ephemeral=True)
             return
@@ -96,7 +96,7 @@ class BadgesCog(commands.Cog, name="Badges"):
 
     @select.autocomplete("choice")
     async def select_autocomplete(self, interaction: discord.Interaction, current: str):
-        owned = await self.db.get_cosmetic_badges(interaction.user.id)
+        owned = await self.db.get_cosmetic_badges(interaction.user.id, permanent_only=True)
         choices = []
         for badge_id in owned:
             name = _display_name(badge_id)
@@ -109,7 +109,7 @@ class BadgesCog(commands.Cog, name="Badges"):
         await interaction.response.defer()
         uid = interaction.user.id
         owned, pref = await asyncio.gather(
-            self.db.get_cosmetic_badges(uid),
+            self.db.get_cosmetic_badges(uid, permanent_only=True),
             self.db.get_badge_preference(uid),
         )
         if not owned:

@@ -80,11 +80,17 @@ class EconomyMixin:
             user_id, badge, int(time.time()),
         )
 
-    async def get_cosmetic_badges(self, user_id: int) -> list[str]:
-        rows = await self._pool.fetch(
-            "SELECT badge FROM cosmetic_badges WHERE user_id = $1 AND (expires_at IS NULL OR expires_at > $2)",
-            user_id, int(time.time()),
-        )
+    async def get_cosmetic_badges(self, user_id: int, permanent_only: bool = False) -> list[str]:
+        if permanent_only:
+            rows = await self._pool.fetch(
+                "SELECT badge FROM cosmetic_badges WHERE user_id = $1 AND expires_at IS NULL",
+                user_id,
+            )
+        else:
+            rows = await self._pool.fetch(
+                "SELECT badge FROM cosmetic_badges WHERE user_id = $1 AND (expires_at IS NULL OR expires_at > $2)",
+                user_id, int(time.time()),
+            )
         return [row["badge"] for row in rows]
 
     async def add_temporary_cosmetic_badge(self, user_id: int, badge: str, expires_at: int):
