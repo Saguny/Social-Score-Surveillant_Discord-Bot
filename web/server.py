@@ -1720,7 +1720,7 @@ async def _handle_portfolio_data(request):
     holdings, positions, prices_rows, user_row = await asyncio.gather(
         db.get_portfolio(guild_id, user_id),
         db.get_open_turbo_positions(guild_id, user_id),
-        db._pool.fetch("SELECT ticker, price FROM stocks"),
+        db._pool.fetch("SELECT ticker, price, open_price FROM stocks"),
         db._pool.fetchrow(
             "SELECT yuan FROM users WHERE guild_id = $1 AND user_id = $2",
             guild_id, user_id,
@@ -1730,7 +1730,8 @@ async def _handle_portfolio_data(request):
     if not user_row:
         return web.json_response({"error": "Not a member of this server"}, status=403)
 
-    prices = {r["ticker"]: float(r["price"]) for r in prices_rows}
+    prices     = {r["ticker"]: float(r["price"])      for r in prices_rows}
+    day_opens  = {r["ticker"]: float(r["open_price"]) for r in prices_rows if r["open_price"]}
 
     holdings_out = []
     for h in holdings:
@@ -1742,6 +1743,8 @@ async def _handle_portfolio_data(request):
         cost_val  = avg_cost * shares
         pnl       = value - cost_val
         pnl_pct   = (pnl / cost_val * 100) if cost_val > 0 else 0.0
+        day_open  = day_opens.get(ticker)
+        day_pct   = ((cur - day_open) / day_open * 100) if day_open else 0.0
         holdings_out.append({
             "ticker":        ticker,
             "name":          _stock_name(ticker),
@@ -1752,6 +1755,7 @@ async def _handle_portfolio_data(request):
             "value":         int(value),
             "pnl":           int(pnl),
             "pnl_pct":       round(pnl_pct, 2),
+            "day_pct":       round(day_pct, 2),
         })
 
     turbos_out = []
@@ -1793,13 +1797,16 @@ async def _handle_portfolio_data(request):
     for exchange_label, tickers in ticker_groups:
         for t in tickers:
             ex = _stock_exchange(t)
+            cur      = prices.get(t, 0.0)
+            day_open = day_opens.get(t)
             all_tickers_out.append({
-                "ticker":        t,
-                "name":          _stock_name(t),
-                "exchange":      ex,
+                "ticker":         t,
+                "name":           _stock_name(t),
+                "exchange":       ex,
                 "exchange_label": exchange_label,
-                "current_price": round(prices.get(t, 0.0), 4),
-                "owned_shares":  held_shares.get(t, 0.0),
+                "current_price":  round(cur, 4),
+                "owned_shares":   held_shares.get(t, 0.0),
+                "day_pct":        round((cur - day_open) / day_open * 100, 2) if day_open else 0.0,
             })
 
     return web.json_response({
@@ -1828,10 +1835,17 @@ async def _handle_portfolio_history(request):
     since    = int(time.time()) - _PERIOD_SECONDS[period]
     db       = request.app["db"]
 
-    rows = await db.get_portfolio_history(guild_id, user_id, since)
+    now       = int(time.time())
+    day_start = now - (now % 86400)
+
+    rows, day_open_row = await asyncio.gather(
+        db.get_portfolio_history(guild_id, user_id, since),
+        db.get_portfolio_day_open(guild_id, user_id, day_start),
+    )
     return web.json_response({
-        "period": period,
-        "points": [{"ts": r["ts"], "value": int(r["value"])} for r in rows],
+        "period":   period,
+        "points":   [{"ts": r["ts"], "value": int(r["value"])} for r in rows],
+        "day_open": int(day_open_row["value"]) if day_open_row else None,
     })
 
 
@@ -1852,14 +1866,16 @@ async def _handle_stock_chart(request):
 
     rows, price_row = await asyncio.gather(
         db.get_price_history(ticker, since),
-        db._pool.fetchrow("SELECT price FROM stocks WHERE ticker = $1", ticker),
+        db._pool.fetchrow("SELECT price, open_price FROM stocks WHERE ticker = $1", ticker),
     )
-    current = float(price_row["price"]) if price_row else None
+    current  = float(price_row["price"])      if price_row else None
+    day_open = float(price_row["open_price"]) if price_row else None
 
     return web.json_response({
         "ticker":        ticker,
         "period":        period,
         "current_price": current,
+        "day_open":      day_open,
         "points":        [{"ts": r["ts"], "close": float(r["close"])} for r in rows],
     })
 

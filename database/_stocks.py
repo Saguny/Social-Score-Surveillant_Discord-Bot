@@ -84,6 +84,15 @@ class StocksMixin:
     async def get_all_portfolios(self) -> list:
         return await self._pool.fetch("SELECT guild_id, user_id, ticker, shares FROM portfolios")
 
+    async def get_portfolio_user_yuan(self) -> list:
+        return await self._pool.fetch(
+            """
+            SELECT DISTINCT u.guild_id, u.user_id, u.yuan
+            FROM users u
+            WHERE EXISTS (SELECT 1 FROM portfolios p WHERE p.guild_id = u.guild_id AND p.user_id = u.user_id)
+            """
+        )
+
     async def batch_insert_portfolio_history(self, records: list) -> None:
         if not records:
             return
@@ -96,6 +105,12 @@ class StocksMixin:
         return await self._pool.fetch(
             "SELECT ts, value FROM portfolio_history WHERE guild_id = $1 AND user_id = $2 AND ts >= $3 ORDER BY ts",
             guild_id, user_id, since_ts,
+        )
+
+    async def get_portfolio_day_open(self, guild_id: int, user_id: int, day_start: int):
+        return await self._pool.fetchrow(
+            "SELECT value FROM portfolio_history WHERE guild_id = $1 AND user_id = $2 AND ts >= $3 ORDER BY ts ASC LIMIT 1",
+            guild_id, user_id, day_start,
         )
 
     async def prune_portfolio_history(self) -> None:

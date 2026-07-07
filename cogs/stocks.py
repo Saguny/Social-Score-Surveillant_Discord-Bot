@@ -694,8 +694,11 @@ class StocksCog(commands.Cog, name="Stocks"):
                 price_bars.append((ticker, now, old,
                                    max(old, new_price), min(old, new_price), new_price))
 
-        all_stock_positions = await self.bot.db.get_all_portfolios()
-        all_turbo_positions = await self.bot.db.get_all_open_turbo_positions()
+        all_stock_positions, all_turbo_positions, user_yuan_rows = await asyncio.gather(
+            self.bot.db.get_all_portfolios(),
+            self.bot.db.get_all_open_turbo_positions(),
+            self.bot.db.get_portfolio_user_yuan(),
+        )
 
         user_values: dict[tuple[int, int], float] = {}
         for p in all_stock_positions:
@@ -709,6 +712,9 @@ class StocksCog(commands.Cog, name="Stocks"):
                 tp["direction"], float(tp["entry_price"]), float(tp["knockout"]), current
             ))
             user_values[key] = user_values.get(key, 0.0) + int(tp["cost"]) * factor
+        for row in user_yuan_rows:
+            key = (int(row["guild_id"]), int(row["user_id"]))
+            user_values[key] = user_values.get(key, 0.0) + int(row["yuan"])
 
         history_records = [
             (gid, uid, now, int(val))

@@ -9,7 +9,7 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
   <link rel="stylesheet" href="/static/dashboard.css">
   <link rel="stylesheet" href="/static/submit.css">
-  <link rel="stylesheet" href="/static/account.css?v=3">
+  <link rel="stylesheet" href="/static/account.css?v=6">
   <script src="/static/i18n.js"></script>
 </head>
 <body>
@@ -82,52 +82,83 @@
           <select id="port-guild-select" class="port-guild-select">
             <option value="" data-i18n="Select a server…">Select a server…</option>
           </select>
-          <span id="port-yuan" class="port-yuan"></span>
+          <div class="port-wealth" id="port-wealth" style="display:none">
+            <div class="port-wealth-row"><span class="port-wealth-lbl">Balance</span><span id="port-yuan" class="port-wealth-val"></span></div>
+            <div class="port-wealth-row"><span class="port-wealth-lbl">Net Worth</span><span id="port-networth" class="port-wealth-val port-wealth-net"></span></div>
+            <div class="port-wealth-mkt"><span id="port-mkt-status" class="port-mkt-status-pill"></span></div>
+          </div>
         </div>
 
         <div id="port-content" style="display:none">
 
-          <!-- Portfolio value chart -->
-          <div class="acc-shdr d-flex align-items-center justify-content-between mt-3">
-            <span data-i18n="Portfolio Value">Portfolio Value</span>
-            <div class="port-period-row">
-              <button class="port-period active" data-period="1D">1D</button>
-              <button class="port-period" data-period="5D">5D</button>
-              <button class="port-period" data-period="1M">1M</button>
-              <button class="port-period" data-period="6M">6M</button>
-              <button class="port-period" data-period="1Y">1Y</button>
+          <!-- Inner nav -->
+          <div class="port-subnav">
+            <button class="port-subnav-btn active" data-port-view="portfolio" data-i18n="My Portfolio">My Portfolio</button>
+            <button class="port-subnav-btn" data-port-view="stocks" data-i18n="Stocks">Stocks</button>
+            <button class="port-subnav-btn" data-port-view="turbos" data-i18n="Turbo Certificates">Turbo Certificates</button>
+          </div>
+
+          <!-- ── My Portfolio view ── -->
+          <div id="port-view-portfolio">
+
+            <!-- Summary bar (market status embedded right side) -->
+            <div id="port-summary" class="port-summary-bar" style="display:none">
+              <div class="port-sum-tile">
+                <div class="port-sum-label" data-i18n="Portfolio Value">Portfolio Value</div>
+                <div class="port-sum-val" id="port-summary-value">–</div>
+              </div>
+              <div class="port-sum-divider"></div>
+              <div class="port-sum-tile">
+                <div class="port-sum-label" id="port-sum-pnl-label">–</div>
+                <div id="port-summary-pnl">–</div>
+              </div>
+              <div id="port-market-status" class="port-market-status ms-auto"></div>
             </div>
-          </div>
-          <div class="port-chart-wrap">
-            <canvas id="port-chart"></canvas>
-            <div class="port-chart-empty" id="port-chart-empty" style="display:none" data-i18n="No history yet — history is recorded every 2 minutes while the bot is running.">No history yet — history is recorded every 2 minutes while the bot is running.</div>
+
+            <!-- Portfolio value chart -->
+            <div class="acc-shdr d-flex align-items-center justify-content-between mt-3">
+              <span data-i18n="Portfolio Value">Portfolio Value</span>
+              <div class="port-period-row" id="port-chart-periods">
+                <button class="port-period" data-period="5M">5M</button>
+                <button class="port-period" data-period="1H">1H</button>
+                <button class="port-period" data-period="6H">6H</button>
+                <button class="port-period active" data-period="1D">1D</button>
+                <button class="port-period" data-period="7D">7D</button>
+                <button class="port-period" data-period="1M">1M</button>
+              </div>
+            </div>
+            <div class="port-chart-wrap">
+              <canvas id="port-chart"></canvas>
+              <div class="port-chart-empty" id="port-chart-empty" style="display:none" data-i18n="No history yet — history is recorded every 2 minutes while the bot is running.">No history yet — history is recorded every 2 minutes while the bot is running.</div>
+            </div>
+
+            <!-- Holdings -->
+            <div class="acc-shdr hold-list-hdr mt-4">
+              <div class="hold-list-hdr-spc"></div>
+              <span class="hold-list-hdr-title" data-i18n="Holdings">Holdings</span>
+              <span class="hold-list-hdr-col" data-i18n="PRICE">PRICE</span>
+              <span class="hold-list-hdr-col hold-list-hdr-col-lg" data-i18n="TOTAL RETURN">TOTAL RETURN</span>
+              <div class="hold-list-hdr-act"></div>
+            </div>
+            <div id="port-holdings"><div class="acc-empty">Loading…</div></div>
+
+            <!-- Open Turbo Positions -->
+            <div class="acc-shdr mt-4" data-i18n="Open Turbo Positions">Open Turbo Positions</div>
+            <div id="port-turbos"><div class="acc-empty">Loading…</div></div>
+
           </div>
 
-          <!-- Holdings -->
-          <div class="acc-shdr mt-4" data-i18n="Holdings">Holdings</div>
-          <div id="port-holdings">
-            <div class="acc-empty">Loading…</div>
+          <!-- ── Stocks view ── -->
+          <div id="port-view-stocks" style="display:none">
+            <div id="port-market"><div class="acc-empty">Loading…</div></div>
           </div>
 
-          <!-- Open Turbo Positions -->
-          <div class="acc-shdr mt-4" data-i18n="Open Turbo Positions">Open Turbo Positions</div>
-          <div id="port-turbos">
-            <div class="acc-empty">Loading…</div>
-          </div>
-
-          <!-- Stock Market -->
-          <div class="acc-shdr mt-4" data-i18n="Stock Market">Stock Market</div>
-          <div id="port-market">
-            <div class="acc-empty">Loading…</div>
-          </div>
-
-          <!-- Available Turbos -->
-          <div class="acc-shdr mt-4 d-flex align-items-center justify-content-between">
-            <span data-i18n="Today's Turbo Certificates">Today's Turbo Certificates</span>
-            <span id="port-min-cost" style="font-size:.75rem;color:var(--text-muted)"></span>
-          </div>
-          <div id="port-turbos-avail">
-            <div class="acc-empty">Loading…</div>
+          <!-- ── Turbo Certificates view ── -->
+          <div id="port-view-turbos" style="display:none">
+            <div class="d-flex justify-content-end mb-1 mt-2">
+              <span id="port-min-cost" style="font-size:.75rem;color:var(--text-muted)"></span>
+            </div>
+            <div id="port-turbos-avail"><div class="acc-empty">Loading…</div></div>
           </div>
 
         </div>
@@ -203,18 +234,22 @@
   <div class="modal-dialog modal-dialog-centered modal-lg">
     <div class="modal-content port-modal">
       <div class="modal-header border-0 pb-0">
-        <h6 class="modal-title" id="turbo-chart-title">Chart</h6>
+        <div class="d-flex align-items-center gap-2">
+          <div id="turbo-chart-logo"></div>
+          <h6 class="modal-title mb-0" id="turbo-chart-title">Chart</h6>
+        </div>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body pt-2">
         <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
           <div id="turbo-chart-meta" style="font-size:.8rem;color:var(--text-muted)"></div>
           <div class="port-period-row" id="turbo-chart-periods">
+            <button class="port-period" data-period="5M">5M</button>
+            <button class="port-period" data-period="1H">1H</button>
+            <button class="port-period" data-period="6H">6H</button>
             <button class="port-period active" data-period="1D">1D</button>
-            <button class="port-period" data-period="5D">5D</button>
+            <button class="port-period" data-period="7D">7D</button>
             <button class="port-period" data-period="1M">1M</button>
-            <button class="port-period" data-period="6M">6M</button>
-            <button class="port-period" data-period="1Y">1Y</button>
           </div>
         </div>
         <div class="port-chart-wrap" style="height:260px">
@@ -259,6 +294,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-<script src="/static/account.js?v=5"></script>
+<script src="/static/account.js?v=39"></script>
 </body>
 </html>

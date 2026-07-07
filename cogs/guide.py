@@ -470,11 +470,15 @@ class Guide(commands.Cog):
             for line in wikitext.splitlines():
                 if line.startswith("*") and not line.startswith("**"):
                     q = line.lstrip("*").strip()
+                    q = re.sub(r"\[https?://[^\s\]]+\s+([^\]]+)\]", r"\1", q)
+                    q = re.sub(r"\[https?://[^\s\]]+\]", "", q)
                     q = re.sub(r"\[\[(?:[^|\]]*\|)?([^\]]+)\]\]", r"\1", q)
                     q = re.sub(r"\{\{[^}]+\}\}", "", q)
                     q = re.sub(r"'''?", "", q)
                     q = re.sub(r"<[^>]+>", "", q)
                     q = q.strip()
+                    if "http" in q:
+                        continue
                     if 20 < len(q) < 500:
                         quotes.append(q)
             if quotes:
