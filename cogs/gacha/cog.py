@@ -68,7 +68,7 @@ class GachaCog(commands.Cog, name="Gacha"):
     @app_commands.autocomplete(name=figure_ac)
     async def slash_image(self, interaction: discord.Interaction, name: str):
         await interaction.response.defer()
-        await self.service.show_card(name, interaction.followup.send)
+        await self.service.show_card(name, interaction.followup.send, guild_id=interaction.guild.id)
 
     @commands.command(name="image", aliases=["im"])
     async def prefix_image(self, ctx: commands.Context, *, name: str = ""):
@@ -76,7 +76,7 @@ class GachaCog(commands.Cog, name="Gacha"):
             if not name:
                 await ctx.send("Usage: `ccp image <waifu name>`")
                 return
-            await self.service.show_card(name, ctx.send)
+            await self.service.show_card(name, ctx.send, guild_id=ctx.guild.id)
 
     # ── collection / harem ────────────────────────────────────────────────────
 

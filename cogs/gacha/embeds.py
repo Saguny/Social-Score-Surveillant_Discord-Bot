@@ -80,7 +80,14 @@ def claimed_embed(
     return embed
 
 
-def image_embed(char: dict, url: str, index: int, total: int, rank_text: str) -> discord.Embed:
+def image_embed(
+    char: dict,
+    url: str,
+    index: int,
+    total: int,
+    rank_text: str,
+    owner_name: str | None = None,
+) -> discord.Embed:
     faction_label = FACTION_LABEL.get(char["faction"], char["faction"].upper())
     page = f"  ·  {index + 1}/{total}" if total > 1 else ""
     embed = discord.Embed(
@@ -89,7 +96,8 @@ def image_embed(char: dict, url: str, index: int, total: int, rank_text: str) ->
         color=FACTION_COLOR.get(char["faction"], 0xCC0000),
     )
     embed.set_image(url=url)
-    embed.set_footer(text=f"{rank_text}{page}")
+    owner_part = f"Belongs to {owner_name}  ·  " if owner_name else ""
+    embed.set_footer(text=f"{owner_part}{rank_text}{page}{_suggested_by(char)}")
     return embed
 
 
@@ -112,7 +120,7 @@ def harem_image_embed(
         color=0xFF69B4,
     )
     embed.set_image(url=image_url)
-    embed.set_footer(text=f"Belongs to {owner_name}  ·  {idx + 1}/{total}")
+    embed.set_footer(text=f"Belongs to {owner_name}  ·  {idx + 1}/{total}{_suggested_by(char)}")
     return embed
 
 

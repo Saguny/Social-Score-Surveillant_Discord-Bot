@@ -1,4 +1,3 @@
-import asyncio
 import urllib.parse
 
 import aiohttp
@@ -64,26 +63,40 @@ class GachaService:
 
     # image card
 
-    async def build_card(self, char_id: str, char: dict):
+    async def _resolve_owner_name(self, guild_id: int, char_id: str) -> str | None:
+        owner_id = await cache.get_owner(guild_id, char_id, self.db)
+        if not owner_id:
+            return None
+        guild  = self.bot.get_guild(guild_id)
+        member = guild.get_member(owner_id) if guild else None
+        if member is None:
+            try:
+                member = await self.bot.fetch_user(owner_id)
+            except Exception:
+                return None
+        return member.display_name if hasattr(member, "display_name") else str(member)
+
+    async def build_card(self, char_id: str, char: dict, guild_id: int | None = None):
         urls = char.get("image_urls") or []
         if not urls:
             return None, None
-        rank_info = await self.db.get_character_rank(char_id)
+        rank_info  = await self.db.get_character_rank(char_id)
+        owner_name = await self._resolve_owner_name(guild_id, char_id) if guild_id else None
         rank_text = (
             f"Global #{rank_info['rank']}  ·  {rank_info['claims']} claims"
             if rank_info["rank"] else "Unclaimed globally"
         )
         if len(urls) == 1:
-            return image_embed(char, urls[0], 0, len(urls), rank_text), None
-        view = ImageView(char, urls, rank_text)
+            return image_embed(char, urls[0], 0, len(urls), rank_text, owner_name), None
+        view = ImageView(char, urls, rank_text, owner_name)
         return view.build_embed(), view
 
-    async def show_card(self, name: str, send_fn):
+    async def show_card(self, name: str, send_fn, guild_id: int | None = None):
         char = characters.get(name)
         if not char:
             matches = find_all(name)
             if len(matches) > 1:
-                view = ImageChoiceView(self, matches)
+                view = ImageChoiceView(self, matches, guild_id=guild_id)
                 await send_fn(
                     f"Multiple waifus match **{name}** — pick one:\n"
                     f"Don't see your favorite figure? Submit them for review: <{SUBMIT_URL}>",
@@ -99,7 +112,7 @@ class GachaService:
             return
 
         char_id    = char.get("id", name)
-        embed, view = await self.build_card(char_id, char)
+        embed, view = await self.build_card(char_id, char, guild_id=guild_id)
         if embed is None:
             await send_fn(f"No image available for **{char['name']}**.")
             return

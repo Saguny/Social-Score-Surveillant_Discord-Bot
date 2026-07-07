@@ -206,12 +206,13 @@ class TradeView(discord.ui.View):
 
 
 class ImageView(discord.ui.View):
-    def __init__(self, char: dict, urls: list[str], rank_text: str):
+    def __init__(self, char: dict, urls: list[str], rank_text: str, owner_name: str | None = None):
         super().__init__(timeout=120)
-        self.char      = char
-        self.urls      = urls
-        self.rank_text = rank_text
-        self.index     = 0
+        self.char       = char
+        self.urls       = urls
+        self.rank_text  = rank_text
+        self.owner_name = owner_name
+        self.index      = 0
         self._update_buttons()
 
     def _update_buttons(self):
@@ -219,7 +220,7 @@ class ImageView(discord.ui.View):
         self.next_btn.disabled = self.index >= len(self.urls) - 1
 
     def build_embed(self) -> discord.Embed:
-        return image_embed(self.char, self.urls[self.index], self.index, len(self.urls), self.rank_text)
+        return image_embed(self.char, self.urls[self.index], self.index, len(self.urls), self.rank_text, self.owner_name)
 
     @discord.ui.button(label="◀", style=discord.ButtonStyle.secondary)
     async def prev_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -237,9 +238,10 @@ class ImageView(discord.ui.View):
 class ImageChoiceView(discord.ui.View):
     """Shown when a name matches more than one character."""
 
-    def __init__(self, service, matches: list[dict]):
+    def __init__(self, service, matches: list[dict], guild_id: int | None = None):
         super().__init__(timeout=60)
-        self.service = service
+        self.service  = service
+        self.guild_id = guild_id
         opts = [
             discord.SelectOption(
                 label=ch["name"][:100],
@@ -259,7 +261,8 @@ class ImageChoiceView(discord.ui.View):
         if not char:
             await interaction.response.edit_message(content="That waifu no longer exists.", embed=None, view=None)
             return
-        embed, view = await self.service.build_card(cid, {"id": cid, **char})
+        guild_id = self.guild_id or (interaction.guild.id if interaction.guild else None)
+        embed, view = await self.service.build_card(cid, {"id": cid, **char}, guild_id=guild_id)
         if embed is None:
             await interaction.response.edit_message(content=f"No image available for **{char['name']}**.", embed=None, view=None)
             return

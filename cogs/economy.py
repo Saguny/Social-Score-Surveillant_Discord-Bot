@@ -332,6 +332,7 @@ class RequestView(discord.ui.View):
             if not await db.spend_yuan(gid, self.target.id, self.amount):
                 user = await db.get_user(gid, self.target.id)
                 embed = discord.Embed(color=0x8B0000, title="REQUEST FAILED", description="中华人民共和国社会信用局")
+                embed.set_thumbnail(url=_TREASURY_THUMBNAIL)
                 embed.add_field(name="REASON", value=f"Insufficient funds. {self.target.mention} has ¥{user['yuan']:,} · Required: ¥{self.amount:,}", inline=False)
                 await interaction.edit_original_response(embed=embed, view=self)
                 return
@@ -345,6 +346,7 @@ class RequestView(discord.ui.View):
             requester_new = requester_data["yuan"]
 
             embed = discord.Embed(color=0x2d7a2d, title="REQUEST FULFILLED", description="中华人民共和国社会信用局")
+            embed.set_thumbnail(url=_TREASURY_THUMBNAIL)
             embed.add_field(name="PAYER", value=self.target.mention, inline=True)
             embed.add_field(name="RECIPIENT", value=self.requester.mention, inline=True)
             embed.add_field(name="AMOUNT", value=f"¥{self.amount:,}", inline=False)
@@ -368,6 +370,7 @@ class RequestView(discord.ui.View):
                 await check_milestone(bot, interaction.guild, self.target, "large_transfers_made", large_transfers, channel=interaction.channel)
         else:
             embed = discord.Embed(color=0x888888, title="REQUEST DECLINED", description="中华人民共和国社会信用局")
+            embed.set_thumbnail(url=_TREASURY_THUMBNAIL)
             embed.add_field(name="OUTCOME", value=f"{self.target.mention} declined the request of ¥{self.amount:,}.", inline=False)
             embed.timestamp = discord.utils.utcnow()
 
