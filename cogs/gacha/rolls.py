@@ -14,11 +14,26 @@ from .constants import (
 from .embeds import roll_embed, pick_image, stars
 from .views import DupeYuanView
 
+_SCORE_MOD_HIGH   = 900.0
+_SCORE_MOD_LOW    = 650.0
+_SCORE_MOD_MAX    = 0.05
+_RARITY_BOOSTED   = {"rare", "epic", "legendary"}
+
+
+def _score_rarity_modifier(score: float) -> float:
+    if score >= _SCORE_MOD_HIGH:
+        return _SCORE_MOD_MAX
+    if score <= _SCORE_MOD_LOW:
+        return -_SCORE_MOD_MAX
+    t = (score - _SCORE_MOD_LOW) / (_SCORE_MOD_HIGH - _SCORE_MOD_LOW)
+    return (t * 2 - 1) * _SCORE_MOD_MAX
+
 
 def roll_weighted(
     gender: str | None = None,
     wishlist_ids: list[str] | None = None,
     wishlist_boost: float = 0.0,
+    score_modifier: float = 0.0,
 ) -> tuple[str, dict]:
     chars = characters.all_chars()
     if gender:
@@ -28,7 +43,9 @@ def roll_weighted(
     keys         = list(pool.keys())
     wishlist_set = set(wishlist_ids or [])
     weights      = [
-        RARITY_WEIGHT.get(pool[k]["rarity"], 60) + (wishlist_boost if k in wishlist_set else 0.0)
+        RARITY_WEIGHT.get(pool[k]["rarity"], 60) * (
+            1 + score_modifier if pool[k]["rarity"] in _RARITY_BOOSTED else 1.0
+        ) + (wishlist_boost if k in wishlist_set else 0.0)
         for k in keys
     ]
     cid = random.choices(keys, weights=weights)[0]
@@ -59,10 +76,13 @@ async def do_roll(
     send_fn,
     gender: str | None = None,
 ) -> None:
-    max_r, (rolls_used, ttl) = await asyncio.gather(
+    max_r, (rolls_used, ttl), user_row = await asyncio.gather(
         max_rolls(guild_id, user_id, db),
         cache.get_roll_state(guild_id, user_id),
+        db.get_user(guild_id, user_id),
     )
+
+    score_mod = _score_rarity_modifier(float(user_row["score"]) if user_row else 750.0)
 
     if rolls_used >= max_r:
         if await cache.set_rate_limit_warned(guild_id, user_id):
@@ -90,7 +110,7 @@ async def do_roll(
     spawn_rate     = WISHLIST_SPAWN_RATES[spawn_tier - 1] if spawn_tier > 0 else WISHLIST_SPAWN_BASE
     wishlist_boost = spawn_rate * 100  # convert 0.02–0.05 → 2.0–5.0 weight units per wishlisted char
 
-    char_id, char = roll_weighted(gender, wishlist_ids=wishlist_ids or None, wishlist_boost=wishlist_boost)
+    char_id, char = roll_weighted(gender, wishlist_ids=wishlist_ids or None, wishlist_boost=wishlist_boost, score_modifier=score_mod)
 
     image_url = pick_image(char)
     new_count, owner_id = await asyncio.gather(
