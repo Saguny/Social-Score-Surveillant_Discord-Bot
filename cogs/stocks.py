@@ -1050,15 +1050,15 @@ class StocksCog(commands.Cog, name="Stocks"):
         native = self._prices.get(ticker, 0.0)
         if native <= 0:
             return await interaction.followup.send("Price data unavailable.", ephemeral=True)
-        price = self._to_yuan(ticker, native)
 
-        total = int(math.ceil(price * shares))
-        if total < 1:
-            return await interaction.followup.send("Order too small.", ephemeral=True)
-
-        ok = await self.bot.db.buy_stock(interaction.guild_id, interaction.user.id, ticker, shares, price, total)
-        if not ok:
+        result = await self.bot.db.buy_stock(interaction.guild_id, interaction.user.id, ticker, shares)
+        if not result:
+            price = self._to_yuan(ticker, native)
+            total = int(math.ceil(price * shares))
             return await interaction.followup.send(f"Insufficient yuan. Cost: ¥{total:,}", ephemeral=True)
+
+        price = result["price"]
+        total = result["total_cost"]
 
         await unlock_achievement(self.bot, interaction.guild, interaction.user, "first_trade")
         await self._track_exchange_trade(interaction.guild, interaction.user, exchange)
