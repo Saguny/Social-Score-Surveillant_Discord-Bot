@@ -124,13 +124,13 @@ async def do_roll(
     if dupe:
         guild_obj = bot.get_guild(guild_id)
         member    = guild_obj.get_member(owner_id) if guild_obj else None
-        if member:
-            owner_name = member.display_name
-        else:
+        if member is None:
             try:
-                owner_name = (await bot.fetch_user(owner_id)).display_name
+                member = await bot.fetch_user(owner_id)
             except Exception:
                 pass
+        if member:
+            owner_name = await bot.format_user_full(member, guild_id)
 
     embed    = roll_embed(char, image_url, rolls_remaining, max_r, dupe=dupe, owner_name=owner_name)
     buy_view = DupeYuanView(char, guild_id, user_id) if dupe else None

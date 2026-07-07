@@ -50,7 +50,7 @@ async def process_claim(bot, payload: discord.RawReactionActionEvent) -> None:
             claimer = await bot.fetch_user(claimer_id)
         except Exception:
             return
-    claimer_name = claimer.display_name if hasattr(claimer, "display_name") else str(claimer)
+    claimer_name = await bot.format_user_full(claimer, guild_id)
 
     if is_dupe:
         lo, hi = DUPE_YUAN.get(char["rarity"], (50, 175))

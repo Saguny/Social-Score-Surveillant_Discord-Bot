@@ -74,7 +74,7 @@ class GachaService:
                 member = await self.bot.fetch_user(owner_id)
             except Exception:
                 return None
-        return member.display_name if hasattr(member, "display_name") else str(member)
+        return await self.bot.format_user_full(member, guild_id)
 
     async def build_card(self, char_id: str, char: dict, guild_id: int | None = None):
         urls = char.get("image_urls") or []

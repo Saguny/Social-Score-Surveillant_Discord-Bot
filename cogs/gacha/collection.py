@@ -46,7 +46,7 @@ async def show_collection(
     guild_id: int, user: discord.Member | discord.User, send_fn, db, bot
 ) -> None:
     rows = await db.get_user_collection(guild_id, user.id)
-    name = user.display_name if hasattr(user, "display_name") else str(user)
+    name = await bot.format_user_full(user, guild_id)
     if not rows:
         await send_fn(f"**{name}** has no waifus yet. Use `/roll` to start collecting!")
         return
