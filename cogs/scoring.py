@@ -59,6 +59,7 @@ class Scoring(commands.Cog):
         self._last_messages: dict[tuple, str] = {}
         self._session: aiohttp.ClientSession | None = None
         self._executor: concurrent.futures.ProcessPoolExecutor | None = None
+        self._role_locks: dict[tuple[int, str], asyncio.Lock] = {}
 
     async def cog_load(self):
         self._session = aiohttp.ClientSession()
@@ -192,8 +193,15 @@ class Scoring(commands.Cog):
 
     async def _get_or_create_role(self, guild: discord.Guild, name: str) -> discord.Role:
         role = discord.utils.get(guild.roles, name=name)
-        if not role:
-            role = await guild.create_role(name=name)
+        if role:
+            return role
+        key = (guild.id, name)
+        if key not in self._role_locks:
+            self._role_locks[key] = asyncio.Lock()
+        async with self._role_locks[key]:
+            role = discord.utils.get(guild.roles, name=name)
+            if not role:
+                role = await guild.create_role(name=name)
         return role
 
     async def _announce_bracket_promotion(self, guild: discord.Guild):
@@ -225,14 +233,10 @@ class Scoring(commands.Cog):
         new_rank = get_rank(new)
         if old_rank["name"] == new_rank["name"]:
             return
-        if new > old:
-            if new < new_rank["min"] + self._RANK_HYSTERESIS:
-                return
-        else:
-            if new > old_rank["min"] - self._RANK_HYSTERESIS:
-                return
 
         promoted = new > old
+        if not promoted and new > old_rank["min"] - self._RANK_HYSTERESIS:
+            return
         old_idx = get_rank_index(old_rank["name"])
         new_idx = get_rank_index(new_rank["name"])
 
@@ -251,12 +255,11 @@ class Scoring(commands.Cog):
 
         if await self.db.get_assign_rank_roles(guild.id):
             try:
-                old_role = discord.utils.get(guild.roles, name=old_rank["name"])
-                if old_role and old_role in member.roles:
-                    await member.remove_roles(old_role)
-                if new > EXECUTION_THRESHOLD:
-                    new_role = await self._get_or_create_role(guild, new_rank["name"])
-                    await member.add_roles(new_role)
+                new_role = await self._get_or_create_role(guild, new_rank["name"]) if new > EXECUTION_THRESHOLD else None
+                updated = [r for r in member.roles if r.name != old_rank["name"]]
+                if new_role and new_role not in updated:
+                    updated.append(new_role)
+                await member.edit(roles=updated)
             except discord.Forbidden:
                 pass
 
@@ -289,7 +292,7 @@ class Scoring(commands.Cog):
                 avatar_bytes = None
                 try:
                     url = str(member.display_avatar.replace(size=256).url)
-                    async with self._session.get(url) as resp:
+                    async with self._session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as resp:
                         if resp.status == 200:
                             avatar_bytes = await resp.read()
                 except Exception:
@@ -376,11 +379,11 @@ class Scoring(commands.Cog):
 
             if entered:
                 exec_role = await self._get_or_create_role(guild, exec_role_name)
-                for rank in RANKS:
-                    r = discord.utils.get(guild.roles, name=rank["name"])
-                    if r and r in member.roles:
-                        await member.remove_roles(r)
-                await member.add_roles(exec_role)
+                rank_names = {r["name"] for r in RANKS}
+                updated = [r for r in member.roles if r.name not in rank_names]
+                if exec_role not in updated:
+                    updated.append(exec_role)
+                await member.edit(roles=updated)
 
                 confiscated = await self.db.confiscate_yuan(guild.id, member.id)
                 citizen_str = await self.bot.format_user_full(member, guild.id)
