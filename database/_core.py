@@ -41,14 +41,20 @@ class CoreMixin:
                     guild_id, user_id,
                 )
 
-    async def register_guild_members(self, guild_id, user_ids):
-        async with self._pool.acquire() as conn:
-            async with conn.transaction():
-                await self._ensure_guild(conn, guild_id)
-                await conn.executemany(
-                    "INSERT INTO users (guild_id, user_id, score, highest_score, lowest_score) VALUES ($1, $2, 750.0, 750.0, 750.0) ON CONFLICT (guild_id, user_id) DO NOTHING",
-                    [(guild_id, uid) for uid in user_ids],
-                )
+    async def register_guild_members(self, guild_id, user_ids, chunk_size: int = 500):
+        if not user_ids:
+            return
+        await self._pool.execute(
+            "INSERT INTO guild_config (guild_id) VALUES ($1) ON CONFLICT DO NOTHING",
+            guild_id,
+        )
+        sql = "INSERT INTO users (guild_id, user_id, score, highest_score, lowest_score) VALUES ($1, $2, 750.0, 750.0, 750.0) ON CONFLICT (guild_id, user_id) DO NOTHING"
+        ids = list(user_ids)
+        for i in range(0, len(ids), chunk_size):
+            chunk = ids[i : i + chunk_size]
+            async with self._pool.acquire() as conn:
+                await conn.executemany(sql, [(guild_id, uid) for uid in chunk])
+            await asyncio.sleep(0)
 
     async def log_guild_join(self, guild_id):
         await self._pool.execute(
