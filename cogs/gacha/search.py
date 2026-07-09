@@ -95,7 +95,7 @@ async def target_owned_figure_ac(
     if not interaction.guild:
         return []
     target = interaction.namespace.user
-    if not isinstance(target, discord.Member):
+    if target is None or not hasattr(target, "id"):
         return []
     rows    = await interaction.client.db.get_user_collection(interaction.guild.id, target.id)
     owned   = {r["character_id"] for r in rows}
