@@ -113,6 +113,20 @@ class StocksMixin:
             guild_id, user_id, day_start,
         )
 
+    async def get_portfolio_price_chart(self, guild_id: int, user_id: int, since_ts: int) -> list:
+        return await self._pool.fetch(
+            """
+            SELECT ph.ts, SUM(ph.close * p.shares)::bigint AS value
+            FROM stock_price_history ph
+            JOIN portfolios p ON ph.ticker = p.ticker
+              AND p.guild_id = $1 AND p.user_id = $2
+            WHERE ph.ts >= $3
+            GROUP BY ph.ts
+            ORDER BY ph.ts
+            """,
+            guild_id, user_id, since_ts,
+        )
+
     async def prune_portfolio_history(self) -> None:
         cutoff = int(time.time()) - 366 * 86400
         await self._pool.execute("DELETE FROM portfolio_history WHERE ts < $1", cutoff)

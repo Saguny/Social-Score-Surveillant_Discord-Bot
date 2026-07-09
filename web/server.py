@@ -1835,6 +1835,15 @@ async def _handle_portfolio_history(request):
     since    = int(time.time()) - _PERIOD_SECONDS[period]
     db       = request.app["db"]
 
+    _PRICE_CHART_PERIODS = {"5M", "1H", "6H", "1D"}
+    if period in _PRICE_CHART_PERIODS:
+        rows = await db.get_portfolio_price_chart(guild_id, user_id, since)
+        return web.json_response({
+            "period":   period,
+            "points":   [{"ts": r["ts"], "value": int(r["value"])} for r in rows],
+            "day_open": None,
+        })
+
     now       = int(time.time())
     day_start = now - (now % 86400)
 
