@@ -647,13 +647,21 @@ class StocksCog(commands.Cog, name="Stocks"):
         if not nyse_open or ETF_TICKER in self._daily_locked:
             price_bars.append((ETF_TICKER, now, old_etf, old_etf, old_etf, old_etf))
         elif real_pcts:
-            avg_pct = sum(real_pcts.values()) / len(real_pcts)
-            new_etf = max(0.01, old_etf * (1 + avg_pct))
-            self._prices[ETF_TICKER] = new_etf
+            avg_pct  = sum(real_pcts.values()) / len(real_pcts)
+            new_etf  = max(0.01, old_etf * (1 + avg_pct))
             etf_open = self._day_opens.get(ETF_TICKER, new_etf)
-            price_updates.append((ETF_TICKER, new_etf, etf_open))
-            price_bars.append((ETF_TICKER, now, old_etf,
-                               max(old_etf, new_etf), min(old_etf, new_etf), new_etf))
+            day_pct  = (new_etf - etf_open) / etf_open if etf_open > 0 else 0.0
+            if abs(day_pct) >= CIRCUIT_BREAKER_DAILY_PCT:
+                self._daily_locked.add(ETF_TICKER)
+                price_bars.append((ETF_TICKER, now, old_etf, old_etf, old_etf, old_etf))
+            elif abs(avg_pct) >= CIRCUIT_BREAKER_HALT_PCT:
+                self._halted[ETF_TICKER] = now + CIRCUIT_BREAKER_HALT_SECS
+                price_bars.append((ETF_TICKER, now, old_etf, old_etf, old_etf, old_etf))
+            else:
+                self._prices[ETF_TICKER] = new_etf
+                price_updates.append((ETF_TICKER, new_etf, etf_open))
+                price_bars.append((ETF_TICKER, now, old_etf,
+                                   max(old_etf, new_etf), min(old_etf, new_etf), new_etf))
         else:
             price_bars.append((ETF_TICKER, now, old_etf, old_etf, old_etf, old_etf))
 
@@ -694,10 +702,9 @@ class StocksCog(commands.Cog, name="Stocks"):
                 price_bars.append((ticker, now, old,
                                    max(old, new_price), min(old, new_price), new_price))
 
-        all_stock_positions, all_turbo_positions, user_yuan_rows = await asyncio.gather(
+        all_stock_positions, all_turbo_positions = await asyncio.gather(
             self.bot.db.get_all_portfolios(),
             self.bot.db.get_all_open_turbo_positions(),
-            self.bot.db.get_portfolio_user_yuan(),
         )
 
         user_values: dict[tuple[int, int], float] = {}
@@ -712,9 +719,6 @@ class StocksCog(commands.Cog, name="Stocks"):
                 tp["direction"], float(tp["entry_price"]), float(tp["knockout"]), current
             ))
             user_values[key] = user_values.get(key, 0.0) + int(tp["cost"]) * factor
-        for row in user_yuan_rows:
-            key = (int(row["guild_id"]), int(row["user_id"]))
-            user_values[key] = user_values.get(key, 0.0) + int(row["yuan"])
 
         history_records = [
             (gid, uid, now, int(val))
