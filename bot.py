@@ -738,6 +738,12 @@ class SocialCreditBot(commands.AutoShardedBot):
             await ctx.send("You do not have permission to use this command.")
         elif isinstance(error, commands.MissingRequiredArgument):
             await ctx.send(f"Missing argument: `{error.param.name}`. Use `ccp help` for usage.")
+        elif isinstance(error, (commands.MemberNotFound, commands.UserNotFound)):
+            await ctx.send(f"Member `{error.argument}` not found.")
+        elif isinstance(error, (commands.ChannelNotFound, commands.RoleNotFound)):
+            await ctx.send(f"Could not find `{error.argument}`. Try mentioning it directly.")
+        elif isinstance(error, commands.BadArgument):
+            await ctx.send(f"Invalid argument: {error}")
         elif isinstance(cause, discord.DiscordServerError):
             pass
         elif not isinstance(error, commands.CommandNotFound):
