@@ -357,7 +357,7 @@
         loadAnnouncement();
       }
       if (target === '#tab-logs') {
-        if (!_logSvc) switchLogService('gateway');
+        switchLogService(_logSvc || 'gateway');
       }
     });
   });

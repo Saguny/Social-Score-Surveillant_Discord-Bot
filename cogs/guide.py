@@ -636,14 +636,15 @@ class Guide(commands.Cog):
         member_count = sum(g.member_count or 0 for g in self.bot.guilds)
         discord_ms   = round(self.bot.latency * 1000)
 
+        t0 = time.time()
+        await self.bot.db.ping()
+        db_ms = round((time.time() - t0) * 1000, 1)
+
         cached = await get_redis().get(GLOBAL_STATS_CACHE_KEY)
         if cached:
             stats = json.loads(cached)
-            db_ms = "cached"
         else:
-            t0 = time.time()
             stats = await self.bot.db.get_global_stats()
-            db_ms = round((time.time() - t0) * 1000, 1)
 
         e = discord.Embed(
             color=0xCC0000,
