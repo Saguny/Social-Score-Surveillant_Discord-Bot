@@ -4,6 +4,7 @@ import random
 import time
 import asyncio
 import datetime
+import requests
 from zoneinfo import ZoneInfo
 
 import discord
@@ -86,11 +87,20 @@ def _fmt_pct(pct: float) -> str:
     return f"{sign}{abs(pct):.2f}%"
 
 
+class _TimeoutAdapter(requests.adapters.HTTPAdapter):
+    def send(self, *args, **kwargs):
+        kwargs.setdefault("timeout", 8)
+        return super().send(*args, **kwargs)
+
+
 def _yf_price_info(ticker: str) -> tuple:
     """Returns (last_price, day_open). Kept at module level for executor pickling."""
     try:
         import yfinance as yf
-        fi    = yf.Ticker(ticker).fast_info
+        session = requests.Session()
+        session.mount("https://", _TimeoutAdapter())
+        session.mount("http://",  _TimeoutAdapter())
+        fi    = yf.Ticker(ticker, session=session).fast_info
         last  = float(fi.last_price) if fi.last_price else None
         open_ = None
         for attr in ("open", "day_open", "regular_market_open"):
