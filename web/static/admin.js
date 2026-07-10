@@ -584,6 +584,65 @@ async function approveRequest(requestId, title) {
   }
 }
 
+// ── Live log viewer ───────────────────────────────────────────────────────────
+
+let _logEs = null;
+let _logSvc = null;
+const _LOG_MAX = 1000;
+
+function switchLogService(svc) {
+  document.querySelectorAll('.log-svc-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.svc === svc);
+  });
+  _openLogStream(svc);
+}
+
+function _openLogStream(svc) {
+  if (_logEs) { _logEs.close(); _logEs = null; }
+  _logSvc = svc;
+  const panel = document.getElementById('log-panel');
+  const status = document.getElementById('log-status');
+  if (!panel || !status) return;
+
+  panel.innerHTML = '';
+  status.textContent = 'Connecting to ' + svc + '…';
+  status.className = 'log-status-bar log-status-connecting';
+
+  _logEs = new EventSource('/api/admin/logs/stream?service=' + encodeURIComponent(svc));
+
+  _logEs.onopen = () => {
+    status.textContent = svc + ' \xb7 live';
+    status.className = 'log-status-bar log-status-live';
+  };
+
+  _logEs.onmessage = (e) => {
+    try {
+      const d = JSON.parse(e.data);
+      _appendLogLine(panel, d.line || '');
+    } catch (_) {}
+  };
+
+  _logEs.onerror = () => {
+    status.textContent = svc + ' \xb7 disconnected — retrying…';
+    status.className = 'log-status-bar log-status-err';
+  };
+}
+
+function _appendLogLine(panel, text) {
+  const div = document.createElement('div');
+  const lo = text.toLowerCase();
+  div.className = 'log-line' + (lo.includes('error') || lo.includes('critical') ? ' log-line-err' : lo.includes('warn') ? ' log-line-warn' : '');
+  div.textContent = text;
+  panel.appendChild(div);
+  while (panel.children.length > _LOG_MAX) panel.removeChild(panel.firstChild);
+  panel.scrollTop = panel.scrollHeight;
+}
+
+function clearLog() {
+  const panel = document.getElementById('log-panel');
+  if (panel) panel.innerHTML = '';
+}
+
 async function banSubmitter(requestId, discordId) {
   if (!confirm('Ban this submitter? They will no longer be able to submit requests.')) return;
   const r = await fetch('/api/admin/requests/ban', {

@@ -1263,6 +1263,51 @@ async def _handle_announcement(request):
     return web.json_response(announcement)
 
 
+_LOG_SERVICES = {
+    "gateway":   "socialcredit-gateway",
+    "scheduler": "socialcredit-scheduler",
+    "web":       "socialcredit-web",
+    "redis":     "redis",
+    "postgres":  "postgresql",
+}
+
+
+async def _handle_admin_logs_stream(request):
+    service_key = request.rel_url.query.get("service", "")
+    unit = _LOG_SERVICES.get(service_key)
+    if not unit:
+        return web.json_response({"error": "Unknown service."}, status=400)
+
+    response = web.StreamResponse(headers={
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "X-Accel-Buffering": "no",
+        "Connection": "keep-alive",
+    })
+    await response.prepare(request)
+
+    proc = await asyncio.create_subprocess_exec(
+        "journalctl", "-f", "-n", "200", "-u", unit, "--no-pager",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.STDOUT,
+    )
+    try:
+        async for raw in proc.stdout:
+            line = raw.decode("utf-8", errors="replace").rstrip()
+            payload = json.dumps({"line": line})
+            await response.write(f"data: {payload}\n\n".encode())
+    except (ConnectionResetError, asyncio.CancelledError, BrokenPipeError):
+        pass
+    finally:
+        try:
+            proc.terminate()
+            await proc.wait()
+        except Exception:
+            pass
+
+    return response
+
+
 async def _handle_admin_announcement_set(request):
     try:
         body = await request.json()
@@ -2212,6 +2257,7 @@ async def start_web_server(db):
     app.router.add_post("/api/admin/requests/edit",       _require_admin(_handle_admin_requests_edit))
     app.router.add_get("/api/admin/submit-settings",      _require_admin(_handle_admin_get_submit_settings))
     app.router.add_post("/api/admin/submit-settings",     _require_admin(_handle_admin_set_submit_settings))
+    app.router.add_get("/api/admin/logs/stream",          _require_admin(_handle_admin_logs_stream))
     app.router.add_get("/social-credit/account",      _rate_limit_public(_handle_account_page))
     app.router.add_get("/api/account",  _rate_limit_public(_handle_account_api))
     app.router.add_get("/api/account/portfolio",                  _rate_limit_public(_handle_portfolio_data))

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Admin Console · Social Credit</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
-<link rel="stylesheet" href="/static/admin.css?v=7">
+<link rel="stylesheet" href="/static/admin.css?v=8">
 </head>
 <body>
 
@@ -27,6 +27,7 @@
     <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-users">Users</a></li>
     <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-broadcast">Broadcast</a></li>
     <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-system">System</a></li>
+    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-logs" id="tab-logs-link">Logs</a></li>
   </ul>
 
   <div class="tab-content">
@@ -316,12 +317,29 @@
       </div>
     </div>
 
+    <!-- ── Logs ──────────────────────────────────────────────────────────────── -->
+    <div class="tab-pane fade" id="tab-logs">
+
+      <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+        <button class="btn btn-run btn-sm px-3 log-svc-btn active" data-svc="gateway"   onclick="switchLogService('gateway')">Gateway</button>
+        <button class="btn btn-run btn-sm px-3 log-svc-btn"        data-svc="scheduler" onclick="switchLogService('scheduler')">Scheduler</button>
+        <button class="btn btn-run btn-sm px-3 log-svc-btn"        data-svc="web"       onclick="switchLogService('web')">Web</button>
+        <button class="btn btn-run btn-sm px-3 log-svc-btn"        data-svc="redis"     onclick="switchLogService('redis')">Redis</button>
+        <button class="btn btn-run btn-sm px-3 log-svc-btn"        data-svc="postgres"  onclick="switchLogService('postgres')">PostgreSQL</button>
+        <button class="btn btn-sm ms-auto log-clear-btn" onclick="clearLog()" title="Clear log panel">&#10005; Clear</button>
+      </div>
+
+      <div id="log-status" class="log-status-bar">Select a service above to stream logs.</div>
+      <div id="log-panel" class="log-panel"></div>
+
+    </div>
+
   </div><!-- /tab-content -->
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" crossorigin="anonymous"></script>
-<script src="/static/admin.js?v=7"></script>
+<script src="/static/admin.js?v=8"></script>
 <script>
   // Init on the active tab immediately, lazy-load the rest
   loadVoteChart('7D');
@@ -337,6 +355,21 @@
         renderEmbedFields();
         renderEmbedPreview();
         loadAnnouncement();
+      }
+      if (target === '#tab-logs') {
+        if (!_logSvc) switchLogService('gateway');
+      }
+    });
+  });
+
+  // Close log stream when leaving the logs tab
+  document.querySelectorAll('[data-bs-toggle="tab"]').forEach(tab => {
+    tab.addEventListener('hide.bs.tab', e => {
+      if (e.target.getAttribute('href') === '#tab-logs' && _logEs) {
+        _logEs.close();
+        _logEs = null;
+        const status = document.getElementById('log-status');
+        if (status) { status.textContent = 'Paused (tab inactive).'; status.className = 'log-status-bar'; }
       }
     });
   });
