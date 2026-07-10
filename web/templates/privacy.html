@@ -92,7 +92,7 @@
 
     <main class="container-fluid px-4">
       <div class="legal">
-        <div class="updated">Last updated: 2026-07-01</div>
+        <div class="updated">Last updated: 2026-07-10</div>
 
         <p>
           Social Credit Surveillant is an unofficial, satirical Discord bot and
@@ -141,14 +141,32 @@
             <code>/globalrank visibility on</code>, we store your Discord
             username and display it next to your rank on the cross-server
             leaderboard, in Discord and on the public dashboard, until you opt
-            back out. This is the only feature where your username is shown
-            publicly under your real identity rather than a pseudonym.
+            back out with <code>/globalrank visibility off</code>.
+          </li>
+          <li>
+            <strong>Server leaderboard visibility.</strong> If a server moderator
+            runs <code>/serverrank visibility on</code>, the server's Discord
+            name is stored and shown on the public guild leaderboard. Individual
+            members' real usernames are not exposed by this — only the server
+            name. Moderators can opt back out with
+            <code>/serverrank visibility off</code>.
           </li>
           <li>
             <strong>Top.gg votes.</strong> If you vote for the bot on top.gg, we
             receive your Discord user ID and the vote timestamp from top.gg's
             webhook so we can grant the in-bot reward and badge. No message
             content is involved.
+          </li>
+          <li>
+            <strong>Direct messages.</strong> The bot sends you DMs in certain
+            situations: a vote-reward confirmation after voting on top.gg (with
+            an optional reminder button), wishlist notifications when a
+            character you wishlisted is claimed by someone else, and achievement
+            announcements if your server's achievement channel is not configured.
+            No DM content is stored beyond the in-bot data (e.g. the vote
+            reminder timestamp) that triggered the message. The bot never
+            initiates unsolicited contact; all DMs are a direct result of an
+            action you or another member took.
           </li>
           <li>
             <strong>Technical/network data.</strong> The public dashboard's API
@@ -192,14 +210,9 @@
           All bot and dashboard data lives in a single database, accessed only
           by the bot process and the admin console described above - there is no
           separate analytics or third-party data warehouse. Our infrastructure
-          is currently located outside the European Economic Area (EEA) and the
-          UK. If you are in the EEA or UK, this means your data is transferred
-          internationally when you use the bot, relying on the standard privacy
-          and security safeguards already provided by our infrastructure and
-          database operators as part of their own service agreements. We are
-          evaluating a move to EEA-based hosting; if and when that happens, this
-          section will be updated to reflect the new location and the "Last
-          updated" date above will change accordingly.
+          is currently hosted in Warsaw, Poland, which is within the European
+          Economic Area (EEA). If you are outside the EEA, your data is
+          transferred to an EEA country when you use the bot.
         </p>
         <p>
           Portrait images for approved gacha characters are stored on
@@ -249,14 +262,16 @@
         <p>
           Data is collected solely to operate the bot's features: calculating
           and displaying your social credit score, running the yuan economy,
-          shop, lottery and stock market, tracking check-in streaks and
-          achievements, enforcing per-target cooldowns (e.g.
-          denounce/endorse/rebuke), running propaganda events, accepting and
-          reviewing community character submissions for the gacha pool, managing
-          votes on pending submissions, notifying submitters of decisions via
-          Discord DM, displaying community credit on approved character cards,
-          and showing aggregate, anonymized statistics on this dashboard. We do
-          not sell data, and we do not use it for advertising.
+          shop, lottery, yuan duels (<code>/battle</code>), and stock market,
+          tracking check-in streaks and achievements, enforcing per-target
+          cooldowns (e.g. denounce/endorse/rebuke), running propaganda events,
+          operating the gacha roll and claim system, accepting and reviewing
+          community character submissions for the gacha pool, managing votes on
+          pending submissions, notifying submitters of decisions via Discord DM,
+          displaying community credit on approved character cards, sending
+          wishlist and vote-reminder DMs, and showing aggregate, anonymized
+          statistics on this dashboard. We do not sell data, and we do not use
+          it for advertising.
         </p>
         <p>
           Our legal basis for this processing (relevant if you are in the EEA or
@@ -471,8 +486,9 @@
             allowlist of IP addresses.
           </li>
           <li>
-            Admin sessions use secure, HTTP-only cookies and are invalidated
-            every time the bot restarts.
+            Admin session tokens are stored in Redis with a 30-day TTL and use
+            secure, HTTP-only, SameSite=Strict cookies. Sessions survive service
+            restarts and expire automatically after 30 days of inactivity.
           </li>
           <li>
             Public API endpoints are rate-limited per IP to deter scraping and
@@ -505,13 +521,50 @@
           rather than posting it publicly.
         </p>
 
-        <h2>11. Changes to this policy</h2>
+        <h2>11. Discord privileged intents</h2>
+        <p>
+          To function correctly, this bot uses two of Discord's
+          <strong>privileged gateway intents</strong>, which require explicit
+          approval from Discord for bots in 100 or more servers.
+        </p>
+        <ul>
+          <li>
+            <strong>Message Content Intent.</strong> The bot reads the text of
+            messages sent in servers it is in, solely to run the automated
+            scoring system described in Section 1. Specifically: message text is
+            passed to a local sentiment-analysis model (VADER) and a
+            language-detection library, and checked against a list of
+            banned-topic patterns, in order to calculate a score delta for that
+            message. The raw text is <strong>never stored</strong> — only the
+            resulting numeric score change and a short category label (e.g.
+            "positive sentiment", "caps violation") are written to the database.
+            No message content is sent to any third party beyond Google Translate
+            for non-English messages (translated text only, not author identity),
+            and only when language detection determines translation is needed.
+            This intent is not used for moderation, logging, or any purpose
+            outside the fictional scoring mechanic.
+          </li>
+          <li>
+            <strong>Server Members Intent.</strong> The bot receives membership
+            events (joins, leaves, and the member list on startup) in order to
+            automatically create a starting score record for new members and
+            clean up execution-list roles when a user recovers above the
+            threshold. Without this intent the bot would only register users
+            after their first command, missing everyone who never interacts
+            directly. Member data accessed through this intent is limited to
+            Discord user ID and current role list — no profile content beyond
+            what is needed for the starting record and role management described
+            in Section 1.
+          </li>
+        </ul>
+
+        <h2>12. Changes to this policy</h2>
         <p>
           We may update this page as the bot's features change. Material changes
           will be reflected here with an updated "Last updated" date above.
         </p>
 
-        <h2>12. Contact</h2>
+        <h2>13. Contact</h2>
         <p>
           Questions about this policy or your data can be sent through our
           <a

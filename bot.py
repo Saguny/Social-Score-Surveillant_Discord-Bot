@@ -640,7 +640,8 @@ class SocialCreditBot(commands.AutoShardedBot):
             try:
                 await channel.send(
                     "The Bureau has been added. Run `/guide` to get started.\n"
-                    "Use `/serverrank visibility on` to display your server on the [global leaderboard](https://off-by-one.digital/social-credit/leaderboards)."
+                    "Use `/serverrank visibility on` to display your server on the [global leaderboard](https://off-by-one.digital/social-credit/leaderboards).\n"
+                    "Privacy policy: https://off-by-one.digital/social-credit/privacy"
                 )
             except discord.Forbidden:
                 pass
