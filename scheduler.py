@@ -31,6 +31,7 @@ class SchedulerBot(commands.Bot):
             shard_id=0 if SHARD_COUNT else None,
             shard_count=SHARD_COUNT,
             proxy=os.getenv("DISCORD_PROXY"),
+            chunk_guilds_at_startup=False,
         )
         self.db = Database()
         self.ec_users: set[int] = set()

@@ -412,6 +412,7 @@ class SocialCreditBot(commands.AutoShardedBot):
             shard_count=SHARD_COUNT,
             shard_ids=SHARD_IDS,
             proxy=os.getenv("DISCORD_PROXY"),
+            chunk_guilds_at_startup=False,
         )
         self.db = Database()
         self.ec_users: set[int] = set()
@@ -561,6 +562,9 @@ class SocialCreditBot(commands.AutoShardedBot):
     async def on_ready(self):
         if self.start_time is None:
             self.start_time = datetime.now(timezone.utc)
+        small_guilds = [g for g in self.guilds if (g.member_count or 0) <= 5000 and not g.chunked]
+        if small_guilds:
+            await asyncio.gather(*[g.chunk() for g in small_guilds], return_exceptions=True)
         rank_names = {r["name"] for r in RANKS}
         exec_role_name = "Execution Date: Tomorrow"
         opted_out = await self.db.get_all_optouts()
