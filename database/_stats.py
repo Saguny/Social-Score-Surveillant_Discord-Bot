@@ -180,8 +180,8 @@ class StatsMixin:
 
     async def get_leaderboard(self, guild_id):
         top, bottom = await asyncio.gather(
-            self._pool.fetch("SELECT user_id, score FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY score DESC LIMIT 3", guild_id),
-            self._pool.fetch("SELECT user_id, score FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY score ASC LIMIT 3", guild_id),
+            self._pool.fetch("SELECT user_id, score FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY score DESC LIMIT 10", guild_id),
+            self._pool.fetch("SELECT user_id, score FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY score ASC LIMIT 10", guild_id),
         )
         return {"top": top, "bottom": bottom}
 
@@ -233,14 +233,14 @@ class StatsMixin:
 
     async def get_extended_leaderboard(self, guild_id):
         top_score, bottom_score, richest, poorest, most_messages, most_endorsed, most_rebuked, top_snitches = await asyncio.gather(
-            self._pool.fetch("SELECT user_id, score FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY score DESC LIMIT 3", guild_id),
-            self._pool.fetch("SELECT user_id, score FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY score ASC LIMIT 3", guild_id),
-            self._pool.fetch("SELECT user_id, yuan FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY yuan DESC LIMIT 3", guild_id),
-            self._pool.fetch("SELECT user_id, yuan FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY yuan ASC LIMIT 3", guild_id),
-            self._pool.fetch("SELECT user_id, message_count FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY message_count DESC LIMIT 3", guild_id),
-            self._pool.fetch("SELECT user_id, times_endorsed FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY times_endorsed DESC LIMIT 3", guild_id),
-            self._pool.fetch("SELECT user_id, times_rebuked FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY times_rebuked DESC LIMIT 3", guild_id),
-            self._pool.fetch("SELECT user_id, times_filed_reports FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY times_filed_reports DESC LIMIT 3", guild_id),
+            self._pool.fetch("SELECT user_id, score FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY score DESC LIMIT 10", guild_id),
+            self._pool.fetch("SELECT user_id, score FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY score ASC LIMIT 10", guild_id),
+            self._pool.fetch("SELECT user_id, yuan FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY yuan DESC LIMIT 10", guild_id),
+            self._pool.fetch("SELECT user_id, yuan FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY yuan ASC LIMIT 10", guild_id),
+            self._pool.fetch("SELECT user_id, message_count FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY message_count DESC LIMIT 10", guild_id),
+            self._pool.fetch("SELECT user_id, times_endorsed FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY times_endorsed DESC LIMIT 10", guild_id),
+            self._pool.fetch("SELECT user_id, times_rebuked FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY times_rebuked DESC LIMIT 10", guild_id),
+            self._pool.fetch("SELECT user_id, times_filed_reports FROM users WHERE guild_id = $1 AND has_chatted = 1 ORDER BY times_filed_reports DESC LIMIT 10", guild_id),
         )
         return {
             "top_score": top_score, "bottom_score": bottom_score,
