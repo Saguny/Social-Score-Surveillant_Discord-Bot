@@ -1267,7 +1267,7 @@ _LOG_SERVICES = {
     "gateway":   "socialcredit-gateway",
     "scheduler": "socialcredit-scheduler",
     "web":       "socialcredit-web",
-    "redis":     "redis",
+    "redis":     "redis-server",
     "postgres":  "postgresql",
 }
 
