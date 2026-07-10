@@ -44,7 +44,8 @@ class Stats(commands.Cog):
 
         def rank_line(r: int) -> str:
             pct = round(100 * r / n, 1)
-            return f"#{r:,} of {n:,} · top {pct}%"
+            display_pct = 0.1 if pct < 0.1 else pct
+            return f"#{r:,} of {n:,} · top {display_pct:.1f}%"
 
         visible = await self.db.is_leaderboard_visible(interaction.user.id)
         if visible:
@@ -124,7 +125,9 @@ class Stats(commands.Cog):
             if user_rank:
                 total = user_rank["total_citizens"]
                 def _pct(r: int) -> str:
-                    return f"#{r:,} of {total:,} · top {round(100 * r / total, 1)}%"
+                    pct = round(100 * r / total, 1)
+                    display_pct = 0.1 if pct < 0.1 else pct
+                    return f"#{r:,} of {total:,} · top {display_pct:.1f}%"
                 if tab == "balance":
                     standing = f"{_pct(user_rank['balance_rank'])} · ¥{user_rank['total_yuan']:,}"
                 elif tab == "earned":
