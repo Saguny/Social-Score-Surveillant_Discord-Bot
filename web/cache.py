@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import time
 
@@ -6,6 +7,10 @@ import aiohttp
 
 from web.anonymize import pseudonym_user, redact_global_stats
 from infra.admin_rpc import call_admin_rpc
+from infra.redis_client import get_redis
+
+GLOBAL_STATS_CACHE_KEY = "global_stats_cache"
+GLOBAL_STATS_CACHE_TTL = 90
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +115,10 @@ class StatCache:
 
     async def _refresh_stats(self):
         stats = await self.db.get_global_stats()
+        try:
+            await get_redis().set(GLOBAL_STATS_CACHE_KEY, json.dumps(stats, default=str), ex=GLOBAL_STATS_CACHE_TTL)
+        except Exception:
+            pass
         redact_global_stats(stats)
         self.augment_live_fields(stats)
         self._data["stats"] = stats

@@ -13,7 +13,6 @@ venv/
 bench/
 tests/
 scripts/
-.github/workflows/deploy.yml
 Dockerfile
 docker-compose.yml
 frontend/.angular

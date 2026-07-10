@@ -1,3 +1,4 @@
+import json
 import re
 import random
 import time
@@ -10,6 +11,8 @@ from discord import app_commands
 from discord.ext import commands, tasks
 from config.ranks import RANKS
 from config.market_hours import all_exchange_status as _all_exchange_status, EXCHANGE_NAMES as _EXCHANGE_NAMES
+from infra.redis_client import get_redis
+from web.cache import GLOBAL_STATS_CACHE_KEY
 
 log = logging.getLogger(__name__)
 
@@ -633,9 +636,14 @@ class Guide(commands.Cog):
         member_count = sum(g.member_count or 0 for g in self.bot.guilds)
         discord_ms   = round(self.bot.latency * 1000)
 
-        t0 = time.time()
-        stats = await self.bot.db.get_global_stats()
-        db_ms = round((time.time() - t0) * 1000, 1)
+        cached = await get_redis().get(GLOBAL_STATS_CACHE_KEY)
+        if cached:
+            stats = json.loads(cached)
+            db_ms = "cached"
+        else:
+            t0 = time.time()
+            stats = await self.bot.db.get_global_stats()
+            db_ms = round((time.time() - t0) * 1000, 1)
 
         e = discord.Embed(
             color=0xCC0000,
