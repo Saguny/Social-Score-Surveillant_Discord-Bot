@@ -534,7 +534,7 @@ class Scoring(commands.Cog):
                 if log_ch:
                     try:
                         content_preview = message.content[:200] if message.content else ""
-                    await log_ch.send(
+                        await log_ch.send(
                             f"⚠️ {message.author.mention} `{delta:+.2f}` · **{new_score:.2f}** · {reason}\n> {content_preview}\n{message.jump_url}",
                             allowed_mentions=discord.AllowedMentions(users=False),
                         )
