@@ -287,7 +287,7 @@ class GuideView(discord.ui.View):
         e.add_field(name="CATEGORIES",        value="Score · Economy · Social · Markets · Propaganda · Joke", inline=False)
         e.add_field(name="WHAT YOU RECEIVE",  value="Most decorations carry a Yuan grant, a rating adjustment, or a cosmetic designation displayed in your profile header.", inline=False)
         e.add_field(name="RARITY",            value="Each decoration displays the percentage of citizens who have received it. Some are extremely rare. Some are secret.", inline=False)
-        e.add_field(name="MOD CONFIGURATION", value="`ccp achievementnotification [on|off]` · `ccp achievementchannel [#channel]`", inline=False)
+        e.add_field(name="MOD CONFIGURATION", value="`ccp achievementannounce [on|off]` · `ccp achievementchannel [#channel]`", inline=False)
         return e
 
     def _page_gacha(self) -> discord.Embed:
@@ -406,7 +406,7 @@ class GuideView(discord.ui.View):
         e.add_field(
             name="DECORATIONS & POSTERS",
             value=(
-                "`ccp achievementnotification [on|off]` · Toggle decoration announcements\n"
+                "`ccp achievementannounce [on|off]` · Toggle decoration announcements\n"
                 "`ccp achievementchannel [#channel]` · Dedicated decoration channel\n"
                 "`ccp posters [on|off]` · Toggle daily poster broadcast in this channel\n"
                 "`ccp posterschannel [#channel]` · Set dedicated poster channel"

@@ -68,7 +68,7 @@ class Admin(commands.Cog):
             embed.add_field(name="EXECUTION CHANNEL", value=msg, inline=False)
         await ctx.send(embed=embed)
 
-    @commands.command(name="achievementnotification")
+    @commands.command(name="achievementannounce")
     @commands.has_permissions(manage_guild=True)
     async def set_achievement_notifications(self, ctx, state: str = None):
         async with ctx.typing():
@@ -80,13 +80,13 @@ class Admin(commands.Cog):
             elif state.lower() in ("off", "disable", "false", "no"):
                 enabled = False
             else:
-                await ctx.send("Usage: `ccp achievementnotification [on|off]`")
+                await ctx.send("Usage: `ccp achievementannounce [on|off]`")
                 return
             await self.db.set_achievements_loud_enabled(ctx.guild.id, enabled)
             msg = "Achievement unlock announcements enabled." if enabled else "Achievement unlock announcements disabled · check `/achievements` to view unlocks."
             embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")
             embed.add_field(name="ACHIEVEMENT NOTIFICATIONS", value=msg, inline=False)
-            embed.set_footer(text="ccp achievementnotification [on|off] · ccp achievementchannel [#channel]")
+            embed.set_footer(text="ccp achievementannounce [on|off] · ccp achievementchannel [#channel]")
         await ctx.send(embed=embed)
 
     @commands.command(name="achievementchannel")
@@ -97,7 +97,7 @@ class Admin(commands.Cog):
             msg = f"Achievement unlocks will be announced in {channel.mention}." if channel else "Achievements channel cleared · unlocks will post in the triggering channel."
             embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")
             embed.add_field(name="ACHIEVEMENT CHANNEL", value=msg, inline=False)
-            embed.set_footer(text="ccp achievementnotification [on|off] · ccp achievementchannel [#channel]")
+            embed.set_footer(text="ccp achievementannounce [on|off] · ccp achievementchannel [#channel]")
         await ctx.send(embed=embed)
 
     @commands.command(name="roles")

@@ -148,7 +148,7 @@ Most items can optionally target another citizen. Several items are gift-able.
 - `ccp reset <@citizen>` - reset to 750
 - `ccp threshold <n>` - set fundraiser vote threshold
 - `ccp executions [#channel]` - set execution announcement channel
-- `ccp achievementnotification [on|off]` - toggle achievement announcements
+- `ccp achievementannounce [on|off]` - toggle achievement announcements
 - `ccp achievementchannel [#channel]` - set achievement announcement channel
 - `ccp poster` - display a random propaganda poster
 - `ccp posters [on|off]` - toggle daily poster broadcasts in this channel

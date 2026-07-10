@@ -205,7 +205,7 @@ def build_announce_embeds(ids: list[str], user: discord.abc.User) -> list[discor
         if parts:
             embed.add_field(name="REWARD", value=" · ".join(parts), inline=False)
         embed.set_thumbnail(url="attachment://achievements.png")
-        embed.set_footer(text="ccp achievementnotification [on|off] · ccp achievementchannel [#channel]")
+        embed.set_footer(text="ccp achievementannounce [on|off] · ccp achievementchannel [#channel]")
         embeds.append(embed)
     return embeds
 

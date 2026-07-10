@@ -513,6 +513,9 @@ class GachaCog(commands.Cog, name="Gacha"):
 
     # ── owner util ────────────────────────────────────────────────────────────
 
+    async def reload_chars(self) -> int:
+        return await self.service.reload_chars()
+
     @commands.command(name="reloadchars")
     @commands.is_owner()
     async def prefix_reload_chars(self, ctx: commands.Context):
