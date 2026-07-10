@@ -140,6 +140,34 @@ class RanksMixin:
                 guild_id, enabled,
             )
 
+    async def get_rank_announcements_enabled(self, guild_id: int) -> bool:
+        row = await self._pool.fetchrow(
+            "SELECT rank_announcements_enabled FROM guild_config WHERE guild_id = $1", guild_id,
+        )
+        return row["rank_announcements_enabled"] if row else True
+
+    async def set_rank_announcements_enabled(self, guild_id: int, enabled: bool):
+        async with self._pool.acquire() as conn:
+            await self._ensure_guild(conn, guild_id)
+            await conn.execute(
+                "UPDATE guild_config SET rank_announcements_enabled = $2 WHERE guild_id = $1",
+                guild_id, enabled,
+            )
+
+    async def get_execution_announcements_enabled(self, guild_id: int) -> bool:
+        row = await self._pool.fetchrow(
+            "SELECT execution_announcements_enabled FROM guild_config WHERE guild_id = $1", guild_id,
+        )
+        return row["execution_announcements_enabled"] if row else True
+
+    async def set_execution_announcements_enabled(self, guild_id: int, enabled: bool):
+        async with self._pool.acquire() as conn:
+            await self._ensure_guild(conn, guild_id)
+            await conn.execute(
+                "UPDATE guild_config SET execution_announcements_enabled = $2 WHERE guild_id = $1",
+                guild_id, enabled,
+            )
+
     async def get_score_log_channel(self, guild_id: int) -> int | None:
         row = await self._pool.fetchrow(
             "SELECT score_log_channel_id FROM guild_config WHERE guild_id = $1",

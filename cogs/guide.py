@@ -397,6 +397,8 @@ class GuideView(discord.ui.View):
                 "`ccp rankchannel [#channel]` · Dedicated rank-up announcement channel\n"
                 "`ccp executions [#channel]` · Dedicated execution notice channel\n"
                 "`ccp roles [on|off]` · Toggle rank role assignment\n"
+                "`ccp rankannounce [on|off]` · Toggle rank-up and demotion embeds\n"
+                "`ccp execannounce [on|off]` · Toggle detention and release embeds\n"
                 "`ccp scorelog [#channel|off]` · Log negative score events to a channel"
             ),
             inline=False,

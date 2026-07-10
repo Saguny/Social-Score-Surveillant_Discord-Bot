@@ -282,6 +282,8 @@ class Database(
             await conn.execute("ALTER TABLE guild_config ADD COLUMN IF NOT EXISTS rank_announcement_channel_id BIGINT")
             await conn.execute("ALTER TABLE guild_config ADD COLUMN IF NOT EXISTS assign_rank_roles BOOLEAN NOT NULL DEFAULT TRUE")
             await conn.execute("ALTER TABLE guild_config ADD COLUMN IF NOT EXISTS score_log_channel_id BIGINT")
+            await conn.execute("ALTER TABLE guild_config ADD COLUMN IF NOT EXISTS rank_announcements_enabled BOOLEAN NOT NULL DEFAULT TRUE")
+            await conn.execute("ALTER TABLE guild_config ADD COLUMN IF NOT EXISTS execution_announcements_enabled BOOLEAN NOT NULL DEFAULT TRUE")
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS daily_yuan_snapshots (
                     guild_id BIGINT,

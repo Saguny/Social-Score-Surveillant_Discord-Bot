@@ -278,7 +278,8 @@ class Scoring(commands.Cog):
             )
             return
 
-        await self._post_rank_embed(guild, member, channel, promoted, old_rank, new_rank, yuan_label, new)
+        if await self.db.get_rank_announcements_enabled(guild.id):
+            await self._post_rank_embed(guild, member, channel, promoted, old_rank, new_rank, yuan_label, new)
 
     async def _post_rank_embed(self, guild: discord.Guild, member: discord.Member, channel: discord.TextChannel, promoted: bool, old_rank: dict, new_rank: dict, yuan_label: str, score: float):
         rank_channel_id = await self.db.get_rank_announcement_channel(guild.id)
@@ -377,6 +378,8 @@ class Scoring(commands.Cog):
             exec_channel = guild.get_channel(exec_channel_id) if exec_channel_id else None
             target = exec_channel or channel
 
+            exec_announce = await self.db.get_execution_announcements_enabled(guild.id)
+
             if entered:
                 exec_role = await self._get_or_create_role(guild, exec_role_name)
                 rank_names = {r["name"] for r in RANKS}
@@ -386,15 +389,16 @@ class Scoring(commands.Cog):
                 await member.edit(roles=updated)
 
                 confiscated = await self.db.confiscate_yuan(guild.id, member.id)
-                citizen_str = await self.bot.format_user_full(member, guild.id)
 
-                embed = discord.Embed(color=0x111111, title="DETENTION ORDER ISSUED", description="中华人民共和国社会信用局")
-                embed.add_field(name="CITIZEN", value=f"{citizen_str} · {new:.2f}", inline=False)
-                if confiscated > 0:
-                    embed.add_field(name="ASSETS", value=f"¥{confiscated:,} confiscated.", inline=False)
-                embed.set_thumbnail(url="attachment://security.png")
-                embed.timestamp = discord.utils.utcnow()
-                await target.send(embed=embed, file=discord.File("images/security.png", filename="security.png"))
+                if exec_announce:
+                    citizen_str = await self.bot.format_user_full(member, guild.id)
+                    embed = discord.Embed(color=0x111111, title="DETENTION ORDER ISSUED", description="中华人民共和国社会信用局")
+                    embed.add_field(name="CITIZEN", value=f"{citizen_str} · {new:.2f}", inline=False)
+                    if confiscated > 0:
+                        embed.add_field(name="ASSETS", value=f"¥{confiscated:,} confiscated.", inline=False)
+                    embed.set_thumbnail(url="attachment://security.png")
+                    embed.timestamp = discord.utils.utcnow()
+                    await target.send(embed=embed, file=discord.File("images/security.png", filename="security.png"))
 
                 exec_count = await self.db.increment_execution_count(guild.id, member.id)
                 if exec_count >= 3:
@@ -403,19 +407,19 @@ class Scoring(commands.Cog):
             else:
                 if existing_exec_role and existing_exec_role in member.roles:
                     await member.remove_roles(existing_exec_role)
-                
+
                 correct_rank = get_rank(new)
                 if await self.db.get_assign_rank_roles(guild.id):
                     correct_role = await self._get_or_create_role(guild, correct_rank["name"])
                     await member.add_roles(correct_role)
-                
-                citizen_str = await self.bot.format_user_full(member, guild.id)
-                
-                embed = discord.Embed(color=0xCC0000, title="DETENTION ORDER RESCINDED", description="中华人民共和国社会信用局")
-                embed.add_field(name="CITIZEN", value=f"{citizen_str} · {new:.2f} · {correct_rank['name']}", inline=False)
-                embed.set_thumbnail(url="attachment://security.png")
-                embed.timestamp = discord.utils.utcnow()
-                await target.send(embed=embed, file=discord.File("images/security.png", filename="security.png"))
+
+                if exec_announce:
+                    citizen_str = await self.bot.format_user_full(member, guild.id)
+                    embed = discord.Embed(color=0xCC0000, title="DETENTION ORDER RESCINDED", description="中华人民共和国社会信用局")
+                    embed.add_field(name="CITIZEN", value=f"{citizen_str} · {new:.2f} · {correct_rank['name']}", inline=False)
+                    embed.set_thumbnail(url="attachment://security.png")
+                    embed.timestamp = discord.utils.utcnow()
+                    await target.send(embed=embed, file=discord.File("images/security.png", filename="security.png"))
                 await unlock_achievement(self.bot, guild, member, "survived_execution", channel=target)
 
         except discord.Forbidden:

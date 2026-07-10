@@ -131,13 +131,16 @@ class Admin(commands.Cog):
         async with ctx.typing():
             (
                 exec_ch_id, rank_ch_id, score_log_ch_id,
-                rank_roles, ach_loud, ach_ch_id,
+                rank_roles, rank_announce, exec_announce,
+                ach_loud, ach_ch_id,
                 threshold, leaderboard_visible, poster_rows,
             ) = await asyncio.gather(
                 self.db.get_execution_channel(ctx.guild.id),
                 self.db.get_rank_announcement_channel(ctx.guild.id),
                 self.db.get_score_log_channel(ctx.guild.id),
                 self.db.get_assign_rank_roles(ctx.guild.id),
+                self.db.get_rank_announcements_enabled(ctx.guild.id),
+                self.db.get_execution_announcements_enabled(ctx.guild.id),
                 self.db.get_achievements_loud_enabled(ctx.guild.id),
                 self.db.get_achievements_channel(ctx.guild.id),
                 self.db.get_confirm_threshold(ctx.guild.id),
@@ -163,12 +166,54 @@ class Admin(commands.Cog):
             ), inline=False)
             embed.add_field(name="TOGGLES", value=(
                 f"Rank roles · {'on' if rank_roles else 'off'}\n"
+                f"Rank announcements · {'on' if rank_announce else 'off'}\n"
+                f"Execution announcements · {'on' if exec_announce else 'off'}\n"
                 f"Achievement announcements · {'on' if ach_loud else 'off'}\n"
                 f"Server leaderboard visible · {'on' if leaderboard_visible else 'off'}"
             ), inline=False)
             embed.add_field(name="OTHER", value=(
                 f"Fundraiser vote threshold · {threshold or 3}"
             ), inline=False)
+        await ctx.send(embed=embed)
+
+    @commands.command(name="rankannounce")
+    @commands.has_permissions(manage_guild=True)
+    async def toggle_rank_announce(self, ctx, state: str = None):
+        async with ctx.typing():
+            current = await self.db.get_rank_announcements_enabled(ctx.guild.id)
+            if state is None:
+                enabled = not current
+            elif state.lower() in ("on", "enable", "true", "yes"):
+                enabled = True
+            elif state.lower() in ("off", "disable", "false", "no"):
+                enabled = False
+            else:
+                await ctx.send("Usage: `ccp rankannounce [on|off]`")
+                return
+            await self.db.set_rank_announcements_enabled(ctx.guild.id, enabled)
+            status = "ENABLED" if enabled else "DISABLED"
+            embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")
+            embed.add_field(name=f"RANK ANNOUNCEMENTS · {status}", value="Rank-up and demotion embeds will be posted." if enabled else "Rank changes are tracked silently. No embeds will be posted.", inline=False)
+        await ctx.send(embed=embed)
+
+    @commands.command(name="execannounce")
+    @commands.has_permissions(manage_guild=True)
+    async def toggle_exec_announce(self, ctx, state: str = None):
+        async with ctx.typing():
+            current = await self.db.get_execution_announcements_enabled(ctx.guild.id)
+            if state is None:
+                enabled = not current
+            elif state.lower() in ("on", "enable", "true", "yes"):
+                enabled = True
+            elif state.lower() in ("off", "disable", "false", "no"):
+                enabled = False
+            else:
+                await ctx.send("Usage: `ccp execannounce [on|off]`")
+                return
+            await self.db.set_execution_announcements_enabled(ctx.guild.id, enabled)
+            status = "ENABLED" if enabled else "DISABLED"
+            embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")
+            embed.add_field(name=f"EXECUTION ANNOUNCEMENTS · {status}", value="Detention and release embeds will be posted." if enabled else "Execution status changes happen silently. No embeds will be posted.", inline=False)
         await ctx.send(embed=embed)
 
     @commands.command(name="scorelog")
