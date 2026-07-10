@@ -373,6 +373,8 @@ function renderStats(d) {
 
   set('mc-ping', d.discord_ping_ms ? d.discord_ping_ms+'ms' : '-');
   _setStatusClass('mc-ping', pingClass(d.discord_ping_ms));
+  set('mc-rest', d.discord_rest_ms ? d.discord_rest_ms+'ms' : '-');
+  _setStatusClass('mc-rest', pingClass(d.discord_rest_ms));
 
   const dbCls = d.db_query_ms>600?'ping-bad':d.db_query_ms>350?'ping-warn':'ping-good';
   set('mc-db', typeof d.db_query_ms === 'number' ? d.db_query_ms+'ms' : '-');

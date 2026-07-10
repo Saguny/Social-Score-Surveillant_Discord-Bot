@@ -2,6 +2,8 @@ import asyncio
 import logging
 import time
 
+import aiohttp
+
 from web.anonymize import pseudonym_user, redact_global_stats
 from infra.admin_rpc import call_admin_rpc
 
@@ -47,11 +49,13 @@ class StatCache:
         self._data: dict[str, dict] = {}
         self._tasks: list[asyncio.Task] = []
         self._last_feed_ts = 0
+        self._http: aiohttp.ClientSession | None = None
 
     def get(self, key: str):
         return self._data.get(key)
 
     async def start(self):
+        self._http = aiohttp.ClientSession()
         await asyncio.gather(
             self._safe(self._refresh_bot_status),
             self._safe(self._refresh_stats),
@@ -82,6 +86,9 @@ class StatCache:
             except Exception:
                 logger.exception("StatCache task raised on shutdown")
         self._tasks = []
+        if self._http:
+            await self._http.close()
+            self._http = None
 
     async def _loop(self, fn, interval):
         while True:
@@ -114,6 +121,7 @@ class StatCache:
         bot_status = self._data.get("bot_status") or {}
         stats["db_query_ms"] = latency.get("db_query_ms")
         stats["discord_ping_ms"] = bot_status.get("discord_ping_ms")
+        stats["discord_rest_ms"] = latency.get("discord_rest_ms")
         stats["uptime_seconds"] = bot_status.get("uptime_seconds", 0)
         stats["total_guilds"] = bot_status.get("total_guilds", 0)
         stats["sentiment_workers_max"] = bot_status.get("sentiment_workers_max")
@@ -138,8 +146,24 @@ class StatCache:
     async def _refresh_latency(self):
         t0 = time.time()
         await self.db.ping()
+        db_ms = round((time.time() - t0) * 1000, 1)
+
+        discord_rest_ms = None
+        if self._http:
+            try:
+                t1 = time.time()
+                async with self._http.get(
+                    "https://discord.com/api/v10/gateway",
+                    timeout=aiohttp.ClientTimeout(total=5),
+                ) as resp:
+                    await resp.read()
+                discord_rest_ms = round((time.time() - t1) * 1000, 1)
+            except Exception:
+                pass
+
         payload = {
-            "db_query_ms": round((time.time() - t0) * 1000, 1),
+            "db_query_ms": db_ms,
+            "discord_rest_ms": discord_rest_ms,
         }
         self._data["latency"] = payload
         if self.hub:
