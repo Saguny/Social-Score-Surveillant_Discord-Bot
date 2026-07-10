@@ -1,3 +1,4 @@
+import asyncio
 import discord
 from discord.ext import commands
 from config.ranks import get_rank
@@ -122,6 +123,70 @@ class Admin(commands.Cog):
             )
             embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")
             embed.add_field(name=f"RANK ROLES · {status}", value=note, inline=False)
+        await ctx.send(embed=embed)
+
+    @commands.command(name="settings")
+    @commands.has_permissions(manage_guild=True)
+    async def show_settings(self, ctx):
+        async with ctx.typing():
+            (
+                exec_ch_id, rank_ch_id, score_log_ch_id,
+                rank_roles, ach_loud, ach_ch_id,
+                threshold, leaderboard_visible, poster_rows,
+            ) = await asyncio.gather(
+                self.db.get_execution_channel(ctx.guild.id),
+                self.db.get_rank_announcement_channel(ctx.guild.id),
+                self.db.get_score_log_channel(ctx.guild.id),
+                self.db.get_assign_rank_roles(ctx.guild.id),
+                self.db.get_achievements_loud_enabled(ctx.guild.id),
+                self.db.get_achievements_channel(ctx.guild.id),
+                self.db.get_confirm_threshold(ctx.guild.id),
+                self.db.is_leaderboard_visible(ctx.guild.id),
+                self.db._pool.fetch("SELECT channel_id FROM poster_config WHERE guild_id = $1", ctx.guild.id),
+            )
+
+            def ch(cid):
+                if not cid:
+                    return "not set"
+                c = ctx.guild.get_channel(cid)
+                return c.mention if c else f"<#{cid}> (deleted)"
+
+            poster_ch_id = poster_rows[0]["channel_id"] if poster_rows else None
+
+            embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")
+            embed.add_field(name="CHANNELS", value=(
+                f"Rank announcements · {ch(rank_ch_id)}\n"
+                f"Execution notices · {ch(exec_ch_id)}\n"
+                f"Score log · {ch(score_log_ch_id)}\n"
+                f"Achievement announcements · {ch(ach_ch_id)}\n"
+                f"Daily poster broadcast · {ch(poster_ch_id)}"
+            ), inline=False)
+            embed.add_field(name="TOGGLES", value=(
+                f"Rank roles · {'on' if rank_roles else 'off'}\n"
+                f"Achievement announcements · {'on' if ach_loud else 'off'}\n"
+                f"Server leaderboard visible · {'on' if leaderboard_visible else 'off'}"
+            ), inline=False)
+            embed.add_field(name="OTHER", value=(
+                f"Fundraiser vote threshold · {threshold or 3}"
+            ), inline=False)
+        await ctx.send(embed=embed)
+
+    @commands.command(name="scorelog")
+    @commands.has_permissions(manage_guild=True)
+    async def set_score_log(self, ctx, *, arg: str = None):
+        async with ctx.typing():
+            embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局")
+            if arg is None or arg.lower() in ("off", "disable", "none"):
+                await self.db.set_score_log_channel(ctx.guild.id, None)
+                embed.add_field(name="SCORE LOG · DISABLED", value="Negative score events will no longer be logged.", inline=False)
+            else:
+                try:
+                    channel = await commands.TextChannelConverter().convert(ctx, arg)
+                except commands.BadArgument:
+                    await ctx.send("Usage: `ccp scorelog #channel` or `ccp scorelog off`")
+                    return
+                await self.db.set_score_log_channel(ctx.guild.id, channel.id)
+                embed.add_field(name="SCORE LOG · ENABLED", value=f"Negative score events will be posted to {channel.mention}.", inline=False)
         await ctx.send(embed=embed)
 
     @commands.command(name="threshold")

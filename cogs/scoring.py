@@ -528,6 +528,18 @@ class Scoring(commands.Cog):
 
         if delta < 0:
             await self.db.record_negative_action(uid)
+            log_cid = await self.db.get_score_log_channel(gid)
+            if log_cid:
+                log_ch = message.guild.get_channel(log_cid)
+                if log_ch:
+                    try:
+                        content_preview = message.content[:200] if message.content else ""
+                    await log_ch.send(
+                            f"⚠️ {message.author.mention} `{delta:+.2f}` · **{new_score:.2f}** · {reason}\n> {content_preview}\n{message.jump_url}",
+                            allowed_mentions=discord.AllowedMentions(users=False),
+                        )
+                    except discord.Forbidden:
+                        pass
         else:
             clean_days = await self.db.get_clean_streak_days(uid)
             if clean_days is not None:

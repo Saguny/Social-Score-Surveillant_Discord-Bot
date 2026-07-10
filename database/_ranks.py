@@ -139,3 +139,18 @@ class RanksMixin:
                 "UPDATE guild_config SET assign_rank_roles = $2 WHERE guild_id = $1",
                 guild_id, enabled,
             )
+
+    async def get_score_log_channel(self, guild_id: int) -> int | None:
+        row = await self._pool.fetchrow(
+            "SELECT score_log_channel_id FROM guild_config WHERE guild_id = $1",
+            guild_id,
+        )
+        return row["score_log_channel_id"] if row else None
+
+    async def set_score_log_channel(self, guild_id: int, channel_id: int | None):
+        async with self._pool.acquire() as conn:
+            await self._ensure_guild(conn, guild_id)
+            await conn.execute(
+                "UPDATE guild_config SET score_log_channel_id = $2 WHERE guild_id = $1",
+                guild_id, channel_id,
+            )
