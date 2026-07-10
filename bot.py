@@ -301,6 +301,8 @@ async def console_loop(bot: commands.Bot):
             line = await loop.run_in_executor(None, sys.stdin.readline)
         except Exception:
             break
+        if not line:  # EOF stdin is /dev/null in systemd
+            break
         line = line.strip()
         if not line:
             continue
