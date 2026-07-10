@@ -19,7 +19,7 @@
   color: var(--text-muted);
   border: 1px solid var(--border);
   border-radius: 5px;
-  padding: .3rem .75rem;
+  padding: .5rem 1rem;
   text-decoration: none;
   white-space: nowrap;
   transition: color .15s, border-color .15s;
@@ -434,12 +434,15 @@
 }
 .port-subnav-btn:hover  { color: var(--cream); }
 .port-subnav-btn.active { color: var(--sage); border-bottom-color: var(--sage); }
+.port-subnav-btn:focus-visible { outline: 2px solid var(--sage); outline-offset: 2px; }
 
 /* Exchange status — inline in summary bar */
 .port-market-status {
   display: flex;
   align-items: center;
-  gap: .75rem;
+  gap: .5rem .75rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 .port-ex-pill {
   display: flex;
@@ -484,10 +487,12 @@
   color: var(--text-muted);
   font-size: .72rem;
   font-weight: 700;
-  padding: .2rem .5rem;
+  padding: .4rem .6rem;
+  min-height: 32px;
   cursor: pointer;
   transition: border-color .15s, color .15s, transform .1s, background .15s;
 }
+.port-period:focus-visible { outline: 2px solid var(--sage); outline-offset: 2px; }
 .port-period:hover   { border-color: var(--sage); color: var(--cream); }
 .port-period:active  { transform: scale(.92); }
 .port-period.active  { border-color: var(--sage); color: var(--sage); background: rgba(125,157,156,.08); }
@@ -690,6 +695,12 @@
   width: 136px;
   flex-shrink: 0;
 }
+@media (max-width: 600px) {
+  .hold-return-col, .hold-list-hdr-col-lg { display: none; }
+  .hold-price-col, .hold-list-hdr-col { width: 80px; }
+  .hold-list-hdr-act { width: auto; }
+  .hold-actions { width: auto; }
+}
 .hold-shares {
   font-size: .65rem;
   color: var(--text-muted);
@@ -712,6 +723,9 @@
   opacity: 0;
   pointer-events: none;
   transition: opacity .15s;
+}
+@media (hover: none) {
+  .hold-actions { opacity: 1; pointer-events: auto; }
 }
 .port-dimmed { color: var(--text-muted); }
 
@@ -833,6 +847,7 @@
 }
 .port-inner-tab:hover  { border-color: var(--sage); color: var(--cream); }
 .port-inner-tab.active { border-color: var(--sage); color: var(--sage); background: rgba(125,157,156,.08); }
+.port-inner-tab:focus-visible { outline: 2px solid var(--sage); outline-offset: 2px; }
 
 /* ── Turbo grouped view ──────────────────────────────────────────────────── */
 

@@ -297,16 +297,19 @@ function _setStatusClass(id, cls) {
   if (e) e.className = cls ? 'val ' + cls : 'val val-white';
 }
 
+function _esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 function _feedRow(ev) {
   const sign = ev.delta > 0 ? 'trend-up' : ev.delta < 0 ? 'trend-down' : 'trend-flat';
   const deltaStr = (ev.delta > 0 ? '+' : '') + ev.delta.toFixed(2);
   const t = new Date(ev.timestamp * 1000).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
   const countStr = ev._count > 1 ? ` <span class="feed-time">×${ev._count}</span>` : '';
-  const reasonStr = ev.reason ? ` <span class="feed-reason">· ${ev.reason}</span>` : '';
-  return `<div class="feed-row" data-user="${ev.user}" data-delta="${ev.delta}" data-count="${ev._count || 1}">
+  const reasonStr = ev.reason ? ` <span class="feed-reason">· ${_esc(ev.reason)}</span>` : '';
+  return `<div class="feed-row" data-user="${_esc(ev.user)}" data-delta="${ev.delta}" data-count="${ev._count || 1}">
     <span class="feed-time">${t}</span>
     <span class="feed-delta ${sign}">${deltaStr}</span>
-    <span class="feed-user">${ev.user}</span>${reasonStr}${countStr}
+    <span class="feed-user">${_esc(ev.user)}</span>${reasonStr}${countStr}
   </div>`;
 }
 

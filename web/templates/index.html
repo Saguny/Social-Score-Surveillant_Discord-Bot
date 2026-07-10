@@ -17,7 +17,7 @@
   <body>
     <nav class="navbar px-4 py-3 mb-3">
       <a class="navbar-brand" href="/social-credit">社会信用 Social Credit</a>
-      <div class="d-flex gap-3 align-items-center">
+      <div class="nav-links">
         <a class="nav-link" href="/social-credit" data-i18n="HOME">HOME</a>
         <a class="nav-link active" href="/social-credit/dashboard" data-i18n="DASHBOARD">DASHBOARD</a>
         <a class="nav-link" href="/social-credit/leaderboards" data-i18n="LEADERBOARDS">LEADERBOARDS</a>
@@ -35,7 +35,7 @@
 
     <div id="announce-wrap" class="announce-overlay"></div>
 
-    <div class="container-fluid px-4" id="main" style="display: none">
+    <main class="container-fluid px-4" id="main" style="display: none">
       <div id="anomaly-wrap"></div>
 
       <div class="row g-3 mb-2">
@@ -647,7 +647,7 @@
       </div>
 
       <div style="height: 2rem"></div>
-    </div>
+    </main>
 
     <footer class="site-footer">
       <span data-i18n="Made with ♥ by">Made with ♥ by</span> <a href="/">OFF-BY-ONE</a> ·
@@ -662,7 +662,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" crossorigin="anonymous"></script>
     <script src="/static/dashboard.js"></script>
   </body>
 </html>

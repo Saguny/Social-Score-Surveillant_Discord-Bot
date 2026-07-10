@@ -139,12 +139,9 @@
     document.getElementById('port-networth').textContent = _fmtYuan(Math.round(yuan + hv + tv));
     const $mkt = document.getElementById('port-mkt-status');
     if ($mkt && market) {
-      const nyse = market['NYSE'];
-      if (nyse) {
-        const open = nyse.open;
-        $mkt.textContent = open ? t('Market Open') : t('Market Closed');
-        $mkt.className   = 'port-mkt-status-pill ' + (open ? 'port-mkt-status-open' : 'port-mkt-status-closed');
-      }
+      const anyOpen = Object.values(market).some(m => m && m.open);
+      $mkt.textContent = anyOpen ? t('Market Open') : t('Market Closed');
+      $mkt.className   = 'port-mkt-status-pill ' + (anyOpen ? 'port-mkt-status-open' : 'port-mkt-status-closed');
     }
   }
 

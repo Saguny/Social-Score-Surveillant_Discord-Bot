@@ -17,7 +17,7 @@
   <body>
     <nav class="navbar px-4 py-3 mb-3">
       <a class="navbar-brand" href="/social-credit">社会信用 Social Credit</a>
-      <div class="d-flex gap-3 align-items-center">
+      <div class="nav-links">
         <a class="nav-link" href="/social-credit" data-i18n="HOME">HOME</a>
         <a class="nav-link" href="/social-credit/dashboard" data-i18n="DASHBOARD">DASHBOARD</a>
         <a class="nav-link active" href="/social-credit/leaderboards" data-i18n="LEADERBOARDS">LEADERBOARDS</a>
@@ -35,7 +35,7 @@
 
     <div id="announce-wrap" class="announce-overlay"></div>
 
-    <div class="container-fluid px-4">
+    <main class="container-fluid px-4">
       <div class="d-flex justify-content-center mb-3">
         <div class="btn-group" id="lb-view-toggle">
           <button class="btn btn-run active" data-view="citizens" onclick="_lbSetView('citizens')" data-i18n="Citizens">Citizens</button>
@@ -163,7 +163,7 @@
           <span data-i18n="Use /serverrank visibility on in Discord to show your server's name">Use <code>/serverrank visibility on</code> in Discord to show your server's name</span>
         </div>
       </div>
-    </div>
+    </main>
 
     <footer class="site-footer">
       <span data-i18n="Made with ♥ by">Made with ♥ by</span> <a href="/">OFF-BY-ONE</a> ·
@@ -181,6 +181,7 @@
       function _escAnnounce(s) {
         return (s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       }
+      const _esc = _escAnnounce;
 
       async function loadAnnouncement() {
         try {
@@ -201,7 +202,7 @@
       }
       function _lbRow(i, name, valHtml, subHtml) {
         const sub = subHtml ? ` <span class="lb-val-sub">${subHtml}</span>` : '';
-        return `<div class="lb-row"><span class="${_lbRankCls(i)}">#${i+1}</span><span class="lb-name">${name}</span><span class="lb-val">${valHtml}</span>${sub}</div>`;
+        return `<div class="lb-row"><span class="${_lbRankCls(i)}">#${i+1}</span><span class="lb-name">${_esc(name)}</span><span class="lb-val">${valHtml}</span>${sub}</div>`;
       }
 
       function _lbSetEarnedRange(range) {
