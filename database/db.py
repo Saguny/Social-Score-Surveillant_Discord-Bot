@@ -615,6 +615,7 @@ class Database(
             """)
             await conn.execute("ALTER TABLE gacha_characters ADD COLUMN IF NOT EXISTS submitted_by_discord_id BIGINT DEFAULT NULL")
             await conn.execute("ALTER TABLE gacha_characters ADD COLUMN IF NOT EXISTS submitted_by_username TEXT DEFAULT NULL")
+            await conn.execute("ALTER TABLE gacha_characters ADD COLUMN IF NOT EXISTS wiki_lang TEXT NOT NULL DEFAULT 'en'")
             await conn.execute("ALTER TABLE gacha_requests ADD COLUMN IF NOT EXISTS override_rarity TEXT DEFAULT NULL")
             await conn.execute("ALTER TABLE gacha_requests ADD COLUMN IF NOT EXISTS override_gender TEXT DEFAULT NULL")
             await conn.execute("ALTER TABLE gacha_requests ADD COLUMN IF NOT EXISTS override_image_urls TEXT[] DEFAULT ARRAY[]::TEXT[]")

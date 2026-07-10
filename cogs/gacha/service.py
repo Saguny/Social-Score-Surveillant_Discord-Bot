@@ -133,13 +133,14 @@ class GachaService:
             char = candidates[0]
 
         wiki      = char.get("wiki") or char.get("id", name)
+        wiki_lang = char.get("wiki_lang") or "en"
         faction   = FACTION_LABEL.get(char["faction"], char["faction"].upper())
         color     = FACTION_COLOR.get(char["faction"], 0xCC0000)
         image_url = pick_image(char)
 
         extract = None
         try:
-            url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{urllib.parse.quote(wiki)}"
+            url = f"https://{wiki_lang}.wikipedia.org/api/rest_v1/page/summary/{urllib.parse.quote(wiki)}"
             async with aiohttp.ClientSession() as session:
                 async with session.get(
                     url,
@@ -168,7 +169,7 @@ class GachaService:
         if wiki:
             embed.add_field(
                 name="WIKIPEDIA",
-                value=f"[{char['name']}](https://en.wikipedia.org/wiki/{urllib.parse.quote(wiki)})",
+                value=f"[{char['name']}](https://{wiki_lang}.wikipedia.org/wiki/{urllib.parse.quote(wiki)})",
                 inline=True,
             )
         if image_url:

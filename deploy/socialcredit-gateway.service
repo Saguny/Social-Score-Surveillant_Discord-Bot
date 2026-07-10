@@ -1,0 +1,19 @@
+[Unit]
+Description=Social Credit Bot - Gateway
+After=network.target postgresql.service redis.service
+Wants=postgresql.service redis.service
+
+[Service]
+Type=simple
+User=socialcredit
+WorkingDirectory=/opt/socialcredit
+EnvironmentFile=/opt/socialcredit/.env
+ExecStart=/opt/socialcredit/venv/bin/python run.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=socialcredit-gateway
+
+[Install]
+WantedBy=multi-user.target

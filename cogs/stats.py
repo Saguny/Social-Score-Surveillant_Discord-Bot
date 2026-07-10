@@ -381,8 +381,9 @@ class Stats(commands.Cog):
         def fmt_yuan(rows):
             return "\n".join(f"{i}. {name(r['user_id'])} · ¥{r['yuan']}" for i, r in enumerate(rows, 1)) or "No data."
 
-        def fmt_col(rows, col):
-            return "\n".join(f"{i}. {name(r['user_id'])} · {r[col]}" for i, r in enumerate(rows, 1)) or "No data."
+        def fmt_col(rows, col, unit=""):
+            suffix = f" {unit}" if unit else ""
+            return "\n".join(f"{i}. {name(r['user_id'])} · {r[col]}{suffix}" for i, r in enumerate(rows, 1)) or "No data."
 
         def fmt_portfolio(rows):
             return "\n".join(f"{i}. {name(r['user_id'])} · ¥{int(r['portfolio_value']):,}" for i, r in enumerate(rows, 1)) or "No data."
@@ -399,8 +400,8 @@ class Stats(commands.Cog):
         pages = {
             "score":    ("MOST COMPLIANT",  fmt_score(data["top_score"]),                         "GREATEST THREATS", fmt_score(data["bottom_score"])),
             "economy":  ("WEALTHIEST",       fmt_yuan(data["richest"]),                            "POOREST",          fmt_yuan(data["poorest"])),
-            "activity": ("MOST ACTIVE",      fmt_col(data["most_messages"], "message_count"),      "MOST ENDORSED",    fmt_col(data["most_endorsed"], "times_endorsed")),
-            "social":   ("MOST REBUKED",     fmt_col(data["most_rebuked"], "times_rebuked"),       "TOP INFORMANTS",   fmt_col(data["top_snitches"], "times_filed_reports")),
+            "activity": ("MOST ACTIVE",      fmt_col(data["most_messages"], "message_count", "msgs"),  "MOST ENDORSED",    fmt_col(data["most_endorsed"], "times_endorsed")),
+            "social":   ("MOST REBUKED",     fmt_col(data["most_rebuked"], "times_rebuked"),           "TOP INFORMANTS",   fmt_col(data["top_snitches"], "times_filed_reports")),
             "markets":  ("TOP INVESTORS",    fmt_portfolio(market_data["top_portfolio"]),           "TOP TRADERS",      fmt_pnl(market_data["top_realized"])),
             "voters":   ("TOP VOTERS",       fmt_voters(top_voters),                                "BEST VOTE STREAK", fmt_vote_streaks(top_vote_streaks)),
         }

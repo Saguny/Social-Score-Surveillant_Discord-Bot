@@ -77,8 +77,9 @@
       const when     = _timeAgo(item.submitted_at);
       const by       = item.submitted_by || '?';
       const wikiSlug = item.wiki_slug || '';
+      const wikiLang = item.wiki_lang || 'en';
       const wikiLink = wikiSlug
-        ? `<a class="wiki-link" href="https://en.wikipedia.org/wiki/${encodeURIComponent(wikiSlug)}" target="_blank" rel="noopener" style="font-size:.68rem;color:var(--sage);text-decoration:none;">↗ Wikipedia</a>`
+        ? `<a class="wiki-link" href="https://${wikiLang}.wikipedia.org/wiki/${encodeURIComponent(wikiSlug)}" target="_blank" rel="noopener" style="font-size:.68rem;color:var(--sage);text-decoration:none;">↗ Wikipedia</a>`
         : '';
       const portrait = item.thumbnail_url
         ? `<img src="${_esc(item.thumbnail_url)}" alt="" loading="lazy" onerror="this.style.display='none'">`

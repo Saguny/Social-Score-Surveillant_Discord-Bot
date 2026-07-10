@@ -1,0 +1,20 @@
+[Unit]
+Description=Social Credit Bot - Web Dashboard
+After=network.target postgresql.service redis.service
+Wants=postgresql.service redis.service
+
+[Service]
+Type=simple
+User=socialcredit
+WorkingDirectory=/opt/socialcredit
+EnvironmentFile=/opt/socialcredit/.env
+Environment=PORT=8080
+ExecStart=/opt/socialcredit/venv/bin/python run_web.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=socialcredit-web
+
+[Install]
+WantedBy=multi-user.target

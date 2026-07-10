@@ -203,7 +203,7 @@
     const btnCls    = voted ? 'support-btn voted' : 'support-btn';
     const btnDis    = !_user ? 'disabled title="Log in to support"' : '';
     // Build a minimal preview from whatever we have (no thumbnail in this response)
-    const previewD  = { wiki_title: d.wiki_title, wiki_slug: d.wiki_slug || '', thumbnail_url: d.thumbnail_url || '', description: d.description || '' };
+    const previewD  = { wiki_title: d.wiki_title, wiki_slug: d.wiki_slug || '', thumbnail_url: d.thumbnail_url || '', description: d.description || '', wiki_lang: d.wiki_lang || 'en' };
     $result.innerHTML = `
       ${_wikiPreviewHtml(previewD)}
       <div class="support-block">

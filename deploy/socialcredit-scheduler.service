@@ -1,0 +1,19 @@
+[Unit]
+Description=Social Credit Bot - Scheduler
+After=network.target postgresql.service redis.service
+Wants=postgresql.service redis.service
+
+[Service]
+Type=simple
+User=socialcredit
+WorkingDirectory=/opt/socialcredit
+EnvironmentFile=/opt/socialcredit/.env
+ExecStart=/opt/socialcredit/venv/bin/python run_scheduler.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=socialcredit-scheduler
+
+[Install]
+WantedBy=multi-user.target

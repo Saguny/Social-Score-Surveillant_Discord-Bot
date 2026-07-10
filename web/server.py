@@ -414,10 +414,11 @@ async def _handle_requests_check(request):
     if existing_req and existing_req.get("status") == "approved":
         return web.json_response({"state": "in_game"})
     if existing_req:
+        stored_lang = existing_req.get("wiki_lang") or "en"
         vote_count, recent_voters, wiki_preview, user_session = await asyncio.gather(
             db.get_vote_count(existing_req["id"]),
             db.get_recent_voters(existing_req["id"], limit=4),
-            _fetch_wikipedia_preview(slug),
+            _fetch_wikipedia_preview(slug, preferred_lang=stored_lang),
             _discord_session(request),
         )
         has_voted = False
@@ -428,6 +429,7 @@ async def _handle_requests_check(request):
             "request_id":    existing_req["id"],
             "wiki_title":    existing_req["wiki_title"],
             "wiki_slug":     slug,
+            "wiki_lang":     stored_lang,
             "thumbnail_url": (wiki_preview or {}).get("thumbnail_url", ""),
             "description":   (wiki_preview or {}).get("description", ""),
             "submitted_by":  existing_req["discord_username"],
@@ -625,6 +627,7 @@ async def _handle_requests_wishlist(request):
                     "id":           row["id"],
                     "wiki_slug":    row["wiki_slug"],
                     "wiki_title":   row["wiki_title"],
+                    "wiki_lang":    row.get("wiki_lang") or "en",
                     "submitted_by": row["discord_username"],
                     "submitted_at": row["submitted_at"],
                     "approved_at":  row.get("reviewed_at"),
@@ -656,6 +659,7 @@ async def _handle_requests_wishlist(request):
             "id":            row["id"],
             "wiki_slug":     row["wiki_slug"],
             "wiki_title":    row["wiki_title"],
+            "wiki_lang":     row.get("wiki_lang") or "en",
             "submitted_by":  row["discord_username"],
             "submitted_at":  row["submitted_at"],
             "thumbnail_url": row.get("thumbnail_url") or "",
@@ -1535,6 +1539,7 @@ async def _handle_admin_requests_approve(request):
             data                    = data_to_save,
             submitted_by_discord_id = req.get("discord_id"),
             submitted_by_username   = req.get("discord_username"),
+            wiki_lang               = wiki_lang,
         )
         await publish_guild_notify(0, "reload_gacha", {})
         first_approval = await db.set_request_approved_atomic(request_id)
