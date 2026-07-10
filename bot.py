@@ -411,6 +411,7 @@ class SocialCreditBot(commands.AutoShardedBot):
             help_command=None,
             shard_count=SHARD_COUNT,
             shard_ids=SHARD_IDS,
+            proxy=os.getenv("DISCORD_PROXY"),
         )
         self.db = Database()
         self.ec_users: set[int] = set()

@@ -30,6 +30,7 @@ class SchedulerBot(commands.Bot):
             help_command=None,
             shard_id=0 if SHARD_COUNT else None,
             shard_count=SHARD_COUNT,
+            proxy=os.getenv("DISCORD_PROXY"),
         )
         self.db = Database()
         self.ec_users: set[int] = set()
