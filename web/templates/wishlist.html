@@ -15,7 +15,7 @@
 
 <nav class="navbar px-4 py-3 mb-3">
   <a class="navbar-brand" href="/social-credit">社会信用 Social Credit</a>
-  <div class="d-flex gap-3 align-items-center flex-wrap">
+  <div class="nav-links">
     <a href="/social-credit" class="nav-link" data-i18n="HOME">HOME</a>
     <a href="/social-credit/dashboard" class="nav-link" data-i18n="DASHBOARD">DASHBOARD</a>
     <a href="/social-credit/leaderboards" class="nav-link" data-i18n="LEADERBOARDS">LEADERBOARDS</a>
@@ -26,7 +26,23 @@
     <a href="/social-credit/terms" class="nav-link" data-i18n="TERMS">TERMS</a>
     <select id="lang-select" class="lang-select" onchange="setLang(this.value)"></select>
   </div>
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open navigation menu" aria-expanded="false">☰</button>
 </nav>
+<div class="nav-backdrop" id="nav-backdrop"></div>
+<div class="nav-sidebar" id="nav-sidebar" aria-hidden="true">
+  <div class="sidebar-header">
+    <span class="sidebar-brand">社会信用 SOCIAL CREDIT</span>
+    <button class="sidebar-close" id="sidebar-close" aria-label="Close menu">✕</button>
+  </div>
+  <a href="/social-credit"              class="sidebar-nav-link" data-i18n="HOME">HOME</a>
+  <a href="/social-credit/dashboard"    class="sidebar-nav-link" data-i18n="DASHBOARD">DASHBOARD</a>
+  <a href="/social-credit/leaderboards" class="sidebar-nav-link" data-i18n="LEADERBOARDS">LEADERBOARDS</a>
+  <a href="/social-credit/wishlist"     class="sidebar-nav-link active" data-i18n="WISHLIST">WISHLIST</a>
+  <a href="/social-credit/submit"       class="sidebar-nav-link" data-i18n="SUBMIT">SUBMIT</a>
+  <a href="/social-credit/account"      class="sidebar-nav-link" data-i18n="MY ACCOUNT">MY ACCOUNT</a>
+  <a href="/social-credit/privacy"      class="sidebar-nav-link" data-i18n="PRIVACY">PRIVACY</a>
+  <a href="/social-credit/terms"        class="sidebar-nav-link" data-i18n="TERMS">TERMS</a>
+</div>
 
 <main class="container-fluid">
   <div class="page-wrap">
@@ -68,5 +84,6 @@
 
 <script src="/static/wishlist.js?v=2"></script>
 <script>document.addEventListener('click',async function(e){var l=e.target.closest('a.logout-link');if(!l)return;e.preventDefault();await fetch('/social-credit/auth/discord/logout',{method:'POST',credentials:'same-origin'});window.location.href='/social-credit/wishlist';});</script>
+<script src="/static/nav.js"></script>
 </body>
 </html>
