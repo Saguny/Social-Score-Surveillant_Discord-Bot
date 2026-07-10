@@ -48,18 +48,15 @@ class GachaCog(commands.Cog, name="Gacha"):
 
     @commands.command(name="roll", aliases=["r"])
     async def prefix_roll(self, ctx: commands.Context):
-        async with ctx.typing():
-            await self.service.roll(ctx.guild.id, ctx.author.id, ctx.author.display_name, ctx.send)
+        await self.service.roll(ctx.guild.id, ctx.author.id, ctx.author.display_name, ctx.send)
 
     @commands.command(name="rollwaifu", aliases=["rw"])
     async def prefix_rollwaifu(self, ctx: commands.Context):
-        async with ctx.typing():
-            await self.service.roll(ctx.guild.id, ctx.author.id, ctx.author.display_name, ctx.send, gender="female")
+        await self.service.roll(ctx.guild.id, ctx.author.id, ctx.author.display_name, ctx.send, gender="female")
 
     @commands.command(name="rollhusbando", aliases=["rh"])
     async def prefix_rollhusbando(self, ctx: commands.Context):
-        async with ctx.typing():
-            await self.service.roll(ctx.guild.id, ctx.author.id, ctx.author.display_name, ctx.send, gender="male")
+        await self.service.roll(ctx.guild.id, ctx.author.id, ctx.author.display_name, ctx.send, gender="male")
 
     # ── image / card ──────────────────────────────────────────────────────────
 
@@ -67,8 +64,7 @@ class GachaCog(commands.Cog, name="Gacha"):
     @app_commands.describe(name="Name of the historical waifu")
     @app_commands.autocomplete(name=figure_ac)
     async def slash_image(self, interaction: discord.Interaction, name: str):
-        await interaction.response.defer()
-        await self.service.show_card(name, interaction.followup.send, guild_id=interaction.guild.id)
+        await self.service.show_card(name, interaction.response.send_message, guild_id=interaction.guild.id)
 
     @commands.command(name="image", aliases=["im"])
     async def prefix_image(self, ctx: commands.Context, *, name: str = ""):
@@ -83,20 +79,19 @@ class GachaCog(commands.Cog, name="Gacha"):
     @app_commands.command(name="harem", description="View your harem")
     @app_commands.describe(user="View another member's harem")
     async def slash_collection(self, interaction: discord.Interaction, user: discord.Member | None = None):
-        await interaction.response.defer()
-        await self.service.show_collection(interaction.guild.id, user or interaction.user, interaction.followup.send)
+        await self.service.show_collection(interaction.guild.id, user or interaction.user, interaction.response.send_message)
 
     @app_commands.command(name="haremimage", description="Browse your harem images one by one")
     @app_commands.describe(user="Browse another member's harem")
     async def slash_harem_image(self, interaction: discord.Interaction, user: discord.Member | None = None):
-        await interaction.response.defer()
-        await self.service.do_harem_image(interaction.guild.id, user or interaction.user, interaction.followup.send)
+        await self.service.do_harem_image(interaction.guild.id, user or interaction.user, interaction.response.send_message)
 
     @app_commands.command(name="choose", description="Set your featured harem thumbnail")
     @app_commands.describe(name="Name of the waifu to feature")
     async def slash_choose(self, interaction: discord.Interaction, name: str):
-        await interaction.response.defer(ephemeral=True)
-        await self.service.do_choose(interaction.guild.id, interaction.user, name, interaction.followup.send)
+        async def _send(*a, **kw):
+            await interaction.response.send_message(*a, ephemeral=True, **kw)
+        await self.service.do_choose(interaction.guild.id, interaction.user, name, _send)
 
     @commands.command(name="harem", aliases=["collection", "h"])
     async def prefix_collection(self, ctx: commands.Context, user: discord.Member = None):
@@ -140,19 +135,17 @@ class GachaCog(commands.Cog, name="Gacha"):
         faction: str | None = None,
         rarity: str | None = None,
     ):
-        await interaction.response.defer()
         items = filtered_chars(faction, rarity)
         rows  = await self.bot.db.get_user_collection(interaction.guild.id, interaction.user.id)
         owned = {r["character_id"] for r in rows}
         view  = BrowseView(items, owned, faction, rarity)
-        await interaction.followup.send(embed=view.build_embed(), view=view)
+        await interaction.response.send_message(embed=view.build_embed(), view=view)
 
     # ── top ───────────────────────────────────────────────────────────────────
 
     @app_commands.command(name="top", description="Global leaderboard of most-claimed waifus")
     async def slash_top(self, interaction: discord.Interaction):
-        await interaction.response.defer()
-        await self.service.show_top(interaction.followup.send)
+        await self.service.show_top(interaction.response.send_message)
 
     @commands.command(name="top")
     async def prefix_top(self, ctx: commands.Context):
@@ -192,23 +185,21 @@ class GachaCog(commands.Cog, name="Gacha"):
         offer: str,
         request: str,
     ):
-        await interaction.response.defer()
-
         if user.id == interaction.user.id:
-            await interaction.followup.send("You can't trade with yourself.")
+            await interaction.response.send_message("You can't trade with yourself.")
             return
         if user.bot:
-            await interaction.followup.send("You can't trade with a bot.")
+            await interaction.response.send_message("You can't trade with a bot.")
             return
 
         offer_char   = characters.get(offer)   or find_one(offer)
         request_char = characters.get(request) or find_one(request)
 
         if not offer_char:
-            await interaction.followup.send(f"No waifu found matching **{offer}**.\nDon't see your favorite figure? Submit them for review: <{SUBMIT_URL}>")
+            await interaction.response.send_message(f"No waifu found matching **{offer}**.\nDon't see your favorite figure? Submit them for review: <{SUBMIT_URL}>")
             return
         if not request_char:
-            await interaction.followup.send(f"No waifu found matching **{request}**.\nDon't see your favorite figure? Submit them for review: <{SUBMIT_URL}>")
+            await interaction.response.send_message(f"No waifu found matching **{request}**.\nDon't see your favorite figure? Submit them for review: <{SUBMIT_URL}>")
             return
 
         if "id" not in offer_char:
@@ -221,10 +212,10 @@ class GachaCog(commands.Cog, name="Gacha"):
         guild_id   = interaction.guild.id
 
         if not await self.bot.db.has_character(guild_id, interaction.user.id, offer_id):
-            await interaction.followup.send(f"You don't own **{offer_char['name']}**.")
+            await interaction.response.send_message(f"You don't own **{offer_char['name']}**.")
             return
         if not await self.bot.db.has_character(guild_id, user.id, request_id):
-            await interaction.followup.send(f"{user.display_name} doesn't own **{request_char['name']}**.")
+            await interaction.response.send_message(f"{user.display_name} doesn't own **{request_char['name']}**.")
             return
 
         embed = discord.Embed(
@@ -239,7 +230,7 @@ class GachaCog(commands.Cog, name="Gacha"):
         if img := pick_image(offer_char):
             embed.set_thumbnail(url=img)
 
-        await interaction.followup.send(embed=embed, view=TradeView(interaction.user, user, offer_id, request_id))
+        await interaction.response.send_message(embed=embed, view=TradeView(interaction.user, user, offer_id, request_id))
 
     # ── gift ──────────────────────────────────────────────────────────────────
 
@@ -247,14 +238,13 @@ class GachaCog(commands.Cog, name="Gacha"):
     @app_commands.describe(waifu="The waifu you want to give", user="Who to give it to")
     @app_commands.autocomplete(waifu=owned_figure_ac)
     async def slash_gift(self, interaction: discord.Interaction, waifu: str, user: discord.Member):
-        await interaction.response.defer()
         if user.id == interaction.user.id:
-            await interaction.followup.send("You can't gift to yourself.")
+            await interaction.response.send_message("You can't gift to yourself.")
             return
         if user.bot:
-            await interaction.followup.send("You can't gift to a bot.")
+            await interaction.response.send_message("You can't gift to a bot.")
             return
-        await self.service.do_gift(interaction.guild.id, interaction.user, user, waifu, interaction.followup.send)
+        await self.service.do_gift(interaction.guild.id, interaction.user, user, waifu, interaction.response.send_message)
 
     @commands.command(name="gift")
     async def prefix_gift(self, ctx: commands.Context, *, name: str = ""):
@@ -283,42 +273,39 @@ class GachaCog(commands.Cog, name="Gacha"):
     @app_commands.describe(name="Waifu to wishlist")
     @app_commands.autocomplete(name=figure_ac)
     async def wishlist_add(self, interaction: discord.Interaction, name: str):
-        await interaction.response.defer()
         char = characters.get(name) or find_one(name)
         if not char:
-            await interaction.followup.send(f"No waifu found matching **{name}**.\nDon't see your favorite figure? Submit them for review: <{SUBMIT_URL}>")
+            await interaction.response.send_message(f"No waifu found matching **{name}**.\nDon't see your favorite figure? Submit them for review: <{SUBMIT_URL}>")
             return
         char_id   = char.get("id", name)
         max_slots = await self.service.wishlist_max_slots(interaction.guild.id, interaction.user.id)
         result    = await self.bot.db.add_wishlist(interaction.guild.id, interaction.user.id, char_id, max_size=max_slots)
         if result == "added":
-            await interaction.followup.send(f"Added **{char['name']}** {stars(char['rarity'])} to your wishlist.")
+            await interaction.response.send_message(f"Added **{char['name']}** {stars(char['rarity'])} to your wishlist.")
         elif result == "full":
-            await interaction.followup.send(f"Your wishlist is full ({max_slots} max). Remove one first or upgrade with `/buy gacha_slots`.")
+            await interaction.response.send_message(f"Your wishlist is full ({max_slots} max). Remove one first or upgrade with `/buy gacha_slots`.")
         else:
-            await interaction.followup.send(f"**{char['name']}** is already on your wishlist.")
+            await interaction.response.send_message(f"**{char['name']}** is already on your wishlist.")
 
     @wishlist_group.command(name="remove", description="Remove a waifu from your wishlist")
     @app_commands.describe(name="Waifu to remove")
     @app_commands.autocomplete(name=wishlist_figure_ac)
     async def wishlist_remove(self, interaction: discord.Interaction, name: str):
-        await interaction.response.defer()
         char = characters.get(name) or find_one(name)
         if not char:
-            await interaction.followup.send(f"No waifu found matching **{name}**.\nDon't see your favorite figure? Submit them for review: <{SUBMIT_URL}>")
+            await interaction.response.send_message(f"No waifu found matching **{name}**.\nDon't see your favorite figure? Submit them for review: <{SUBMIT_URL}>")
             return
         char_id = char.get("id", name)
         removed = await self.bot.db.remove_wishlist(interaction.guild.id, interaction.user.id, char_id)
         if removed:
-            await interaction.followup.send(f"Removed **{char['name']}** from your wishlist.")
+            await interaction.response.send_message(f"Removed **{char['name']}** from your wishlist.")
         else:
-            await interaction.followup.send(f"**{char['name']}** wasn't on your wishlist.")
+            await interaction.response.send_message(f"**{char['name']}** wasn't on your wishlist.")
 
     @wishlist_group.command(name="view", description="View a wishlist")
     @app_commands.describe(user="View another member's wishlist")
     async def wishlist_view(self, interaction: discord.Interaction, user: discord.Member | None = None):
-        await interaction.response.defer()
-        await self.service.view_wishlist(interaction.guild.id, user or interaction.user, interaction.followup.send)
+        await self.service.view_wishlist(interaction.guild.id, user or interaction.user, interaction.response.send_message)
 
     @commands.command(name="wish")
     async def prefix_wish(self, ctx: commands.Context, *, name: str = ""):
@@ -395,8 +382,7 @@ class GachaCog(commands.Cog, name="Gacha"):
     @app_commands.describe(name="Waifu to divorce")
     @app_commands.autocomplete(name=owned_figure_ac)
     async def slash_divorce(self, interaction: discord.Interaction, name: str):
-        await interaction.response.defer()
-        await self._do_divorce(interaction.guild.id, interaction.user.id, name, interaction.followup.send)
+        await self._do_divorce(interaction.guild.id, interaction.user.id, name, interaction.response.send_message)
 
     @commands.command(name="divorce")
     async def prefix_divorce(self, ctx: commands.Context, *, name: str):
@@ -471,7 +457,6 @@ class GachaCog(commands.Cog, name="Gacha"):
 
     @app_commands.command(name="suggestions", description="Suggest a new character for the gacha pool")
     async def slash_suggest(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
         embed = discord.Embed(
             title="Suggest a Character",
             description=(
@@ -487,7 +472,7 @@ class GachaCog(commands.Cog, name="Gacha"):
         view = discord.ui.View()
         view.add_item(discord.ui.Button(label="Suggest a Character", style=discord.ButtonStyle.link, url=f"{_DASHBOARD_URL}/submit"))
         view.add_item(discord.ui.Button(label="View Wishlist",       style=discord.ButtonStyle.link, url=f"{_DASHBOARD_URL}/wishlist"))
-        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
     @commands.command(name="suggestions")
     async def prefix_suggest(self, ctx: commands.Context):
