@@ -17,4 +17,4 @@ jobs:
           script: |
             cd /opt/socialcredit
             git pull
-            systemctl restart socialcredit-gateway socialcredit-scheduler socialcredit-web
+            sudo systemctl restart socialcredit-gateway socialcredit-scheduler socialcredit-web
