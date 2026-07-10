@@ -4,6 +4,7 @@ import random
 import time
 import asyncio
 import datetime
+import concurrent.futures
 import requests
 from zoneinfo import ZoneInfo
 
@@ -445,12 +446,14 @@ class StocksCog(commands.Cog, name="Stocks"):
         self._chart_cache: dict[tuple, tuple]   = {}  # key -> (png_bytes, timestamp)
         self._fx_rates: dict[str, float]        = dict(FX_FALLBACK_RATES)
         self._fx_last_refresh: float            = 0.0
+        self._yf_executor = concurrent.futures.ProcessPoolExecutor(max_workers=2)
         self._price_task.start()
         self._interpolation_task.start()
 
     def cog_unload(self):
         self._price_task.cancel()
         self._interpolation_task.cancel()
+        self._yf_executor.shutdown(wait=False)
 
     def _make_bse_file(self) -> discord.File | None:
         try:
@@ -464,7 +467,7 @@ class StocksCog(commands.Cog, name="Stocks"):
             return
         loop = asyncio.get_running_loop()
         results = await asyncio.gather(
-            *[loop.run_in_executor(None, _yf_price_info, sym) for sym in FX_TICKERS.values()],
+            *[loop.run_in_executor(self._yf_executor, _yf_price_info, sym) for sym in FX_TICKERS.values()],
             return_exceptions=True,
         )
         for currency, res in zip(FX_TICKERS.keys(), results):
@@ -530,7 +533,7 @@ class StocksCog(commands.Cog, name="Stocks"):
         await self._refresh_fx_rates(force=True)
 
         results = await asyncio.gather(
-            *[loop.run_in_executor(None, _yf_price_info, t) for t in REAL_TICKERS],
+            *[loop.run_in_executor(self._yf_executor, _yf_price_info, t) for t in REAL_TICKERS],
             return_exceptions=True,
         )
         price_updates = []
@@ -600,7 +603,7 @@ class StocksCog(commands.Cog, name="Stocks"):
         fetched: dict = {}
         if active_tickers:
             fetch_results = await asyncio.gather(
-                *[loop.run_in_executor(None, _yf_price_info, t) for t in active_tickers],
+                *[loop.run_in_executor(self._yf_executor, _yf_price_info, t) for t in active_tickers],
                 return_exceptions=True,
             )
             fetched = dict(zip(active_tickers, fetch_results))
