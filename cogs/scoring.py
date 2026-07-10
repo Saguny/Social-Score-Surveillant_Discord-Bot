@@ -64,7 +64,7 @@ class Scoring(commands.Cog):
     async def cog_load(self):
         self._session = aiohttp.ClientSession()
         self._executor = concurrent.futures.ProcessPoolExecutor(
-            max_workers=2,
+            max_workers=min(4, max(2, os.cpu_count() or 2)),
             initializer=_init_worker,
         )
         from infra.redis_cache import cache_set
