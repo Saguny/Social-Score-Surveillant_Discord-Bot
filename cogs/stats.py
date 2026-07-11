@@ -367,7 +367,7 @@ class Stats(commands.Cog):
 
         def name(uid):
             m = interaction.guild.get_member(uid)
-            return m.display_name if m else "Unknown"
+            return m.display_name if m else None
 
         def in_guild(rows, limit=5):
             return [r for r in rows if interaction.guild.get_member(r["user_id"])][:limit]
@@ -376,20 +376,25 @@ class Stats(commands.Cog):
         top_vote_streaks = in_guild(top_vote_streaks_global)
 
         def fmt_score(rows):
-            return "\n".join(f"{i}. {name(r['user_id'])} · {r['score']:.2f}" for i, r in enumerate(rows, 1)) or "No data."
+            lines = [f"{i}. {name(r['user_id'])} · {r['score']:.2f}" for i, r in enumerate(in_guild(rows), 1)]
+            return "\n".join(lines) or "No data."
 
         def fmt_yuan(rows):
-            return "\n".join(f"{i}. {name(r['user_id'])} · ¥{r['yuan']}" for i, r in enumerate(rows, 1)) or "No data."
+            lines = [f"{i}. {name(r['user_id'])} · ¥{r['yuan']}" for i, r in enumerate(in_guild(rows), 1)]
+            return "\n".join(lines) or "No data."
 
         def fmt_col(rows, col, unit=""):
             suffix = f" {unit}" if unit else ""
-            return "\n".join(f"{i}. {name(r['user_id'])} · {r[col]}{suffix}" for i, r in enumerate(rows, 1)) or "No data."
+            lines = [f"{i}. {name(r['user_id'])} · {r[col]}{suffix}" for i, r in enumerate(in_guild(rows), 1)]
+            return "\n".join(lines) or "No data."
 
         def fmt_portfolio(rows):
-            return "\n".join(f"{i}. {name(r['user_id'])} · ¥{int(r['portfolio_value']):,}" for i, r in enumerate(rows, 1)) or "No data."
+            lines = [f"{i}. {name(r['user_id'])} · ¥{int(r['portfolio_value']):,}" for i, r in enumerate(in_guild(rows), 1)]
+            return "\n".join(lines) or "No data."
 
         def fmt_pnl(rows):
-            return "\n".join(f"{i}. {name(r['user_id'])} · ¥{int(r['total_pnl']):,}" for i, r in enumerate(rows, 1)) or "No data."
+            lines = [f"{i}. {name(r['user_id'])} · ¥{int(r['total_pnl']):,}" for i, r in enumerate(in_guild(rows), 1)]
+            return "\n".join(lines) or "No data."
 
         def fmt_voters(rows):
             return "\n".join(f"{i}. {name(r['user_id'])} · {r['value']} votes" for i, r in enumerate(rows, 1)) or "No data."
@@ -398,12 +403,12 @@ class Stats(commands.Cog):
             return "\n".join(f"{i}. {name(r['user_id'])} · {r['value']}d" for i, r in enumerate(rows, 1)) or "No data."
 
         pages = {
-            "score":    ("MOST COMPLIANT",  fmt_score(data["top_score"]),                         "GREATEST THREATS", fmt_score(data["bottom_score"])),
-            "economy":  ("WEALTHIEST",       fmt_yuan(data["richest"]),                            "POOREST",          fmt_yuan(data["poorest"])),
-            "activity": ("MOST ACTIVE",      fmt_col(data["most_messages"], "message_count", "msgs"),  "MOST ENDORSED",    fmt_col(data["most_endorsed"], "times_endorsed")),
-            "social":   ("MOST REBUKED",     fmt_col(data["most_rebuked"], "times_rebuked"),           "TOP INFORMANTS",   fmt_col(data["top_snitches"], "times_filed_reports")),
-            "markets":  ("TOP INVESTORS",    fmt_portfolio(market_data["top_portfolio"]),           "TOP TRADERS",      fmt_pnl(market_data["top_realized"])),
-            "voters":   ("TOP VOTERS",       fmt_voters(top_voters),                                "BEST VOTE STREAK", fmt_vote_streaks(top_vote_streaks)),
+            "score":    ("MOST COMPLIANT",  fmt_score(data["top_score"]),                              "GREATEST THREATS", fmt_score(data["bottom_score"])),
+            "economy":  ("WEALTHIEST",       fmt_yuan(data["richest"]),                                 "POOREST",          fmt_yuan(data["poorest"])),
+            "activity": ("MOST ACTIVE",      fmt_col(data["most_messages"], "message_count", "msgs"),   "MOST ENDORSED",    fmt_col(data["most_endorsed"], "times_endorsed")),
+            "social":   ("MOST REBUKED",     fmt_col(data["most_rebuked"], "times_rebuked"),            "TOP INFORMANTS",   fmt_col(data["top_snitches"], "times_filed_reports")),
+            "markets":  ("TOP INVESTORS",    fmt_portfolio(market_data["top_portfolio"]),                "TOP TRADERS",      fmt_pnl(market_data["top_realized"])),
+            "voters":   ("TOP VOTERS",       fmt_voters(top_voters),                                    "BEST VOTE STREAK", fmt_vote_streaks(top_vote_streaks)),
         }
 
         def build_embed(page: str) -> discord.Embed:
