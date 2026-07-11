@@ -622,6 +622,7 @@ class SocialCreditBot(commands.AutoShardedBot):
         await self.change_presence(activity=_PRESENCE_CYCLE[self._presence_index])
         print(f"Online: {self.user}  |  Guilds: {len(self.guilds)}  |  Slash commands synced: {self._synced_once}")
         print("Type 'help' for console commands.")
+        asyncio.create_task(self._warm_member_names())
 
     async def on_guild_join(self, guild: discord.Guild):
         member_ids = [m.id for m in guild.members if not m.bot]
@@ -757,6 +758,24 @@ class SocialCreditBot(commands.AutoShardedBot):
             pass
         elif not isinstance(error, commands.CommandNotFound):
             raise error
+
+    async def _warm_member_names(self):
+        r = get_redis()
+        for guild in self.guilds:
+            try:
+                warm_key = f"membernames_warmed:{guild.id}"
+                if await r.exists(warm_key):
+                    continue
+                active_ids = await self.db.get_chatted_user_ids(guild.id)
+                pipe = r.pipeline()
+                for uid in active_ids:
+                    m = guild.get_member(uid)
+                    if m:
+                        pipe.set(f"membername:{guild.id}:{uid}", m.display_name, ex=86400 * 7)
+                pipe.set(warm_key, "1", ex=3600 * 6)
+                await pipe.execute()
+            except Exception:
+                pass
 
     async def on_member_join(self, member: discord.Member):
         if not member.bot and not await self.db.is_opted_out(member.id):

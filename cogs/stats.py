@@ -392,24 +392,8 @@ class Stats(commands.Cog):
         redis_names = {uid: n.decode() if isinstance(n, bytes) else n for uid, n in zip(all_uids, name_vals) if n}
         departed = {uid for uid, left in zip(all_uids, left_vals) if left}
 
-        # Fetch uncached guild-scoped users (we know they belong here)
-        uncached_guild = [uid for uid in guild_uids
-                          if not interaction.guild.get_member(uid) and uid not in redis_names and uid not in departed]
-        if uncached_guild:
-            for i in range(0, len(uncached_guild), 100):
-                await interaction.guild.query_members(user_ids=uncached_guild[i:i+100], cache=True)
-
-        # Fetch uncached voter UIDs so we can tell which are actually in this guild
-        uncached_voters = [uid for uid in voter_uids if not interaction.guild.get_member(uid)]
-        if uncached_voters:
-            for i in range(0, len(uncached_voters), 100):
-                await interaction.guild.query_members(user_ids=uncached_voters[i:i+100], cache=True)
-
         async def _warm_redis():
             active_ids = await self.db.get_chatted_user_ids(gid)
-            needs_fetch = [uid for uid in active_ids if not interaction.guild.get_member(uid)]
-            for i in range(0, len(needs_fetch), 100):
-                await interaction.guild.query_members(user_ids=needs_fetch[i:i+100], cache=True)
             r = get_redis()
             pipe = r.pipeline()
             for uid in active_ids:
@@ -423,15 +407,15 @@ class Stats(commands.Cog):
             m = interaction.guild.get_member(uid)
             if m:
                 return m.display_name
-            return redis_names.get(uid, "Unknown")
+            return redis_names.get(uid)
 
-        # Guild-scoped rows: filter departed and anyone whose name we can't resolve
+        # Guild-scoped rows: skip departed and unresolved names
         def in_guild(rows, limit=10):
-            return [r for r in rows if r["user_id"] not in departed and name(r["user_id"]) != "Unknown"][:limit]
+            return [r for r in rows if r["user_id"] not in departed and name(r["user_id"])][:limit]
 
-        # Global rows (voters): filter to confirmed members of this guild
+        # Global rows (voters): must have a guild-scoped Redis name to confirm they're in this guild
         def in_guild_members(rows, limit=10):
-            return [r for r in rows if interaction.guild.get_member(r["user_id"])][:limit]
+            return [r for r in rows if r["user_id"] in redis_names and r["user_id"] not in departed][:limit]
 
         top_voters = in_guild_members(top_voters_global)
         top_vote_streaks = in_guild_members(top_vote_streaks_global)
