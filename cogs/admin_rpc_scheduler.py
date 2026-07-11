@@ -57,6 +57,7 @@ class AdminRpcScheduler(commands.Cog):
         try:
             result = await self._dispatch(action, args)
         except Exception as e:
+            print(f"[admin_rpc] error handling action={action!r}: {e!r}")
             result = {"error": str(e)}
         await publish_admin_rpc_response(request_id, result)
 

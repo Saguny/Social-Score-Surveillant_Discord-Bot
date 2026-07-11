@@ -87,7 +87,7 @@ async def _apply_vote_reward_db(db, guild_id: int, user_id: int, yuan_reward: in
     if user_row:
         now = int(time.time())
         today_start = now - (now % 86400)
-        if user_row["last_checkin"] >= today_start:
+        if user_row["last_checkin"] is not None and user_row["last_checkin"] >= today_start:
             combo = True
     final_yuan = yuan_reward + (VOTE_CHECKIN_COMBO_YUAN if combo else 0)
     final_score = round(score_delta + (VOTE_CHECKIN_COMBO_SCORE if combo else 0), 2)
@@ -130,7 +130,7 @@ async def _reward_guild(
     yuan_reward: int, score_delta: float,
 ) -> tuple[str, bool] | None:
     guild = bot.get_guild(guild_id)
-    if guild is not None:
+    if guild is not None and guild.get_member(user_id) is not None:
         return await _reward_guild_local(bot, db, guild, user_id, total_votes, vote_streak, yuan_reward, score_delta)
     return await _reward_guild_remote(db, guild_id, user_id, total_votes, vote_streak, yuan_reward, score_delta)
 
