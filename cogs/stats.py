@@ -373,24 +373,38 @@ class Stats(commands.Cog):
             list(market_data["top_portfolio"]) + list(market_data["top_realized"]) +
             list(top_voters_global) + list(top_vote_streaks_global)
         )
-        uncached_ids = [r["user_id"] for r in all_rows if not interaction.guild.get_member(r["user_id"])]
-        uncached_ids = list(dict.fromkeys(uncached_ids))
-        fetched: dict[int, discord.Member] = {}
+        uncached_ids = list(dict.fromkeys(
+            r["user_id"] for r in all_rows if not interaction.guild.get_member(r["user_id"])
+        ))
+        fetched: dict[int, str] = {}
         departed: set[int] = set()
         if uncached_ids:
-            results = await asyncio.gather(
+            member_results = await asyncio.gather(
                 *[interaction.guild.fetch_member(uid) for uid in uncached_ids],
                 return_exceptions=True,
             )
-            for uid, result in zip(uncached_ids, results):
+            still_unknown = []
+            for uid, result in zip(uncached_ids, member_results):
                 if isinstance(result, discord.Member):
-                    fetched[uid] = result
+                    fetched[uid] = result.display_name
                 elif isinstance(result, discord.NotFound):
                     departed.add(uid)
+                else:
+                    still_unknown.append(uid)
+            if still_unknown:
+                user_results = await asyncio.gather(
+                    *[self.bot.fetch_user(uid) for uid in still_unknown],
+                    return_exceptions=True,
+                )
+                for uid, result in zip(still_unknown, user_results):
+                    if isinstance(result, discord.User):
+                        fetched[uid] = result.display_name
 
         def name(uid):
-            m = interaction.guild.get_member(uid) or fetched.get(uid)
-            return m.display_name if m else "Unknown"
+            m = interaction.guild.get_member(uid)
+            if m:
+                return m.display_name
+            return fetched.get(uid, "Unknown")
 
         def in_guild(rows, limit=5):
             return [r for r in rows if r["user_id"] not in departed][:limit]
