@@ -376,37 +376,17 @@ class Stats(commands.Cog):
         uncached_ids = list(dict.fromkeys(
             r["user_id"] for r in all_rows if not interaction.guild.get_member(r["user_id"])
         ))
-        fetched: dict[int, str] = {}
-        departed: set[int] = set()
         if uncached_ids:
-            member_results = await asyncio.gather(
-                *[interaction.guild.fetch_member(uid) for uid in uncached_ids],
-                return_exceptions=True,
-            )
-            still_unknown = []
-            for uid, result in zip(uncached_ids, member_results):
-                if isinstance(result, discord.Member):
-                    fetched[uid] = result.display_name
-                elif isinstance(result, discord.NotFound):
-                    departed.add(uid)
-                else:
-                    still_unknown.append(uid)
-            if still_unknown:
-                user_results = await asyncio.gather(
-                    *[self.bot.fetch_user(uid) for uid in still_unknown],
-                    return_exceptions=True,
-                )
-                for uid, result in zip(still_unknown, user_results):
-                    if isinstance(result, discord.User):
-                        fetched[uid] = result.display_name
+            for i in range(0, len(uncached_ids), 100):
+                await interaction.guild.query_members(user_ids=uncached_ids[i:i+100], cache=True)
+
+        departed = {uid for uid in uncached_ids if not interaction.guild.get_member(uid)}
 
         def name(uid):
             m = interaction.guild.get_member(uid)
-            if m:
-                return m.display_name
-            return fetched.get(uid, "Unknown")
+            return m.display_name if m else "Unknown"
 
-        def in_guild(rows, limit=5):
+        def in_guild(rows, limit=10):
             return [r for r in rows if r["user_id"] not in departed][:limit]
 
         top_voters = in_guild(top_voters_global)
