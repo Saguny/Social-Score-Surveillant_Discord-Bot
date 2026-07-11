@@ -343,7 +343,7 @@ class StocksMixin:
             WHERE p.guild_id = $1
             GROUP BY p.user_id
             ORDER BY portfolio_value DESC
-            LIMIT 10
+            LIMIT 25
             """,
             guild_id,
         )
@@ -353,7 +353,7 @@ class StocksMixin:
             FROM users
             WHERE guild_id = $1 AND has_chatted = 1 AND (stock_profit + turbo_profit) > 0
             ORDER BY total_pnl DESC
-            LIMIT 10
+            LIMIT 25
             """,
             guild_id,
         )

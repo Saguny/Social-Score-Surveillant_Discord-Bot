@@ -125,6 +125,13 @@ class CoreMixin:
         )
         return [r["guild_id"] for r in rows]
 
+    async def get_chatted_user_ids(self, guild_id: int) -> list[int]:
+        rows = await self._pool.fetch(
+            "SELECT user_id FROM users WHERE guild_id = $1 AND has_chatted = 1",
+            guild_id,
+        )
+        return [r["user_id"] for r in rows]
+
     async def get_user_all_guilds(self, user_id: int) -> list[dict]:
         from config.ranks import get_rank
         rows = await self._pool.fetch(

@@ -443,6 +443,7 @@ class Scoring(commands.Cog):
         is_flagged = bool(reasons)
         is_support = self._is_support_member(uid)
 
+        await cache_set(f"membername:{gid}:{uid}", message.author.display_name, ex=86400 * 7)
         vote_boost = bool(await cache_get(f"voteboost:{uid}"))
         yuan_gain = 0 if is_flagged else YUAN_PER_MESSAGE
         if yuan_gain > 0:

@@ -13,6 +13,7 @@ from database.db import Database
 from config.ranks import RANKS
 from infra.run_mode import IS_SCHEDULER, SHARD_COUNT, SHARD_IDS
 from infra.redis_client import get_redis
+from infra.redis_cache import cache_set, cache_delete
 from infra.guild_notify import GUILD_NOTIFY_CHANNEL
 from config.privacy import (
     OPTOUT_ALLOWED_SLASH_COMMANDS,
@@ -760,6 +761,11 @@ class SocialCreditBot(commands.AutoShardedBot):
     async def on_member_join(self, member: discord.Member):
         if not member.bot and not await self.db.is_opted_out(member.id):
             await self.db.register_user(member.guild.id, member.id)
+        await cache_delete(f"memberleft:{member.guild.id}:{member.id}")
+
+    async def on_member_remove(self, member: discord.Member):
+        if not member.bot:
+            await cache_set(f"memberleft:{member.guild.id}:{member.id}", "1", ex=86400 * 90)
 
 
 if __name__ == "__main__":

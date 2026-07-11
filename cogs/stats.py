@@ -12,6 +12,8 @@ from matplotlib.patches import Rectangle
 from discord import app_commands
 from discord.ext import commands
 from config.ranks import get_rank, RANKS, EXECUTION_THRESHOLD
+from infra.redis_cache import cache_mget
+from infra.redis_client import get_redis
 from cogs.achievements import unlock as unlock_achievement
 
 STATS_THUMBNAIL = "attachment://ccpstats.png"
@@ -365,26 +367,52 @@ class Stats(commands.Cog):
             self.db.get_top_voters_by_streak(50),
         )
 
-        all_rows = (
-            list(data["top_score"]) + list(data["bottom_score"]) +
-            list(data["richest"]) + list(data["poorest"]) +
-            list(data["most_messages"]) + list(data["most_endorsed"]) +
-            list(data["most_rebuked"]) + list(data["top_snitches"]) +
-            list(market_data["top_portfolio"]) + list(market_data["top_realized"]) +
-            list(top_voters_global) + list(top_vote_streaks_global)
-        )
-        uncached_ids = list(dict.fromkeys(
-            r["user_id"] for r in all_rows if not interaction.guild.get_member(r["user_id"])
-        ))
-        if uncached_ids:
-            for i in range(0, len(uncached_ids), 100):
-                await interaction.guild.query_members(user_ids=uncached_ids[i:i+100], cache=True)
+        gid = interaction.guild.id
 
-        departed = {uid for uid in uncached_ids if not interaction.guild.get_member(uid)}
+        all_uids = list(dict.fromkeys(
+            r["user_id"] for r in (
+                list(data["top_score"]) + list(data["bottom_score"]) +
+                list(data["richest"]) + list(data["poorest"]) +
+                list(data["most_messages"]) + list(data["most_endorsed"]) +
+                list(data["most_rebuked"]) + list(data["top_snitches"]) +
+                list(market_data["top_portfolio"]) + list(market_data["top_realized"]) +
+                list(top_voters_global) + list(top_vote_streaks_global)
+            )
+        ))
+
+        name_vals, left_vals = await asyncio.gather(
+            cache_mget([f"membername:{gid}:{uid}" for uid in all_uids]),
+            cache_mget([f"memberleft:{gid}:{uid}" for uid in all_uids]),
+        )
+        redis_names = {uid: n.decode() if isinstance(n, bytes) else n for uid, n in zip(all_uids, name_vals) if n}
+        departed = {uid for uid, left in zip(all_uids, left_vals) if left}
+
+        uncached = [uid for uid in all_uids if uid not in redis_names and uid not in departed
+                    and not interaction.guild.get_member(uid)]
+        if uncached:
+            for i in range(0, len(uncached), 100):
+                await interaction.guild.query_members(user_ids=uncached[i:i+100], cache=True)
+
+        async def _warm_redis():
+            active_ids = await self.db.get_chatted_user_ids(gid)
+            uncached_active = [uid for uid in active_ids if not interaction.guild.get_member(uid)
+                               and f"membername:{gid}:{uid}" not in redis_names]
+            for i in range(0, len(uncached_active), 100):
+                await interaction.guild.query_members(user_ids=uncached_active[i:i+100], cache=True)
+            r = get_redis()
+            pipe = r.pipeline()
+            for uid in active_ids:
+                m = interaction.guild.get_member(uid)
+                if m:
+                    pipe.set(f"membername:{gid}:{uid}", m.display_name, ex=86400 * 7)
+            await pipe.execute()
+        asyncio.create_task(_warm_redis())
 
         def name(uid):
             m = interaction.guild.get_member(uid)
-            return m.display_name if m else "Unknown"
+            if m:
+                return m.display_name
+            return redis_names.get(uid, "Unknown")
 
         def in_guild(rows, limit=10):
             return [r for r in rows if r["user_id"] not in departed][:limit]

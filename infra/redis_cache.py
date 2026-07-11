@@ -28,3 +28,10 @@ async def cache_incr(key: str, ex: int | None = None) -> int:
     if ex is not None:
         await r.expire(key, ex)
     return val
+
+
+async def cache_mget(keys: list[str]) -> list[str | None]:
+    if not keys:
+        return []
+    r = get_redis()
+    return await r.mget(*keys)
