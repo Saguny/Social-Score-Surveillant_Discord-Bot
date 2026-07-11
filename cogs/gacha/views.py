@@ -325,12 +325,13 @@ class DupeYuanView(discord.ui.View):
 
 
 class DivorceConfirmView(discord.ui.View):
-    def __init__(self, bot, guild_id: int, user_id: int, char: dict, yuan: int):
+    def __init__(self, bot, guild_id: int, user_id: int, char: dict, char_id: str, yuan: int):
         super().__init__(timeout=60)
         self._bot      = bot
         self._guild_id = guild_id
         self._user_id  = user_id
         self._char     = char
+        self._char_id  = char_id
         self._yuan     = yuan
 
     def _disable_all(self):
@@ -343,11 +344,10 @@ class DivorceConfirmView(discord.ui.View):
             await interaction.response.send_message("This isn't your divorce.", ephemeral=True)
             return
         self.stop()
-        char_id = self._char.get("id")
         from . import cache as _cache
         ok, _ = await asyncio.gather(
-            self._bot.db.divorce_character(self._guild_id, self._user_id, char_id),
-            _cache.set_owner(self._guild_id, char_id, None),
+            self._bot.db.divorce_character(self._guild_id, self._user_id, self._char_id),
+            _cache.set_owner(self._guild_id, self._char_id, None),
         )
         self._disable_all()
         if not ok:

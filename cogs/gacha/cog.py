@@ -406,7 +406,7 @@ class GachaCog(commands.Cog, name="Gacha"):
             return
         lo, hi = DIVORCE_YUAN.get(char["rarity"], (25, 125))
         yuan   = random.randint(lo, hi)
-        view   = DivorceConfirmView(self.bot, guild_id, user_id, char, yuan)
+        view   = DivorceConfirmView(self.bot, guild_id, user_id, char, char_id, yuan)
         await send_fn(
             f"Divorce **{char['name']}** {stars(char['rarity'])}?\n"
             f"You'll receive **¥{yuan:,}** · this cannot be undone.",
