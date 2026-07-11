@@ -369,16 +369,21 @@ class Stats(commands.Cog):
 
         gid = interaction.guild.id
 
-        all_uids = list(dict.fromkeys(
+        # Guild-scoped UIDs (already filtered to this guild by DB queries)
+        guild_uids = list(dict.fromkeys(
             r["user_id"] for r in (
                 list(data["top_score"]) + list(data["bottom_score"]) +
                 list(data["richest"]) + list(data["poorest"]) +
                 list(data["most_messages"]) + list(data["most_endorsed"]) +
                 list(data["most_rebuked"]) + list(data["top_snitches"]) +
-                list(market_data["top_portfolio"]) + list(market_data["top_realized"]) +
-                list(top_voters_global) + list(top_vote_streaks_global)
+                list(market_data["top_portfolio"]) + list(market_data["top_realized"])
             )
         ))
+        # Voter UIDs are global — need membership check, not just departed check
+        voter_uids = list(dict.fromkeys(
+            r["user_id"] for r in list(top_voters_global) + list(top_vote_streaks_global)
+        ))
+        all_uids = list(dict.fromkeys(guild_uids + voter_uids))
 
         name_vals, left_vals = await asyncio.gather(
             cache_mget([f"membername:{gid}:{uid}" for uid in all_uids]),
@@ -387,18 +392,24 @@ class Stats(commands.Cog):
         redis_names = {uid: n.decode() if isinstance(n, bytes) else n for uid, n in zip(all_uids, name_vals) if n}
         departed = {uid for uid, left in zip(all_uids, left_vals) if left}
 
-        uncached = [uid for uid in all_uids if uid not in redis_names and uid not in departed
-                    and not interaction.guild.get_member(uid)]
-        if uncached:
-            for i in range(0, len(uncached), 100):
-                await interaction.guild.query_members(user_ids=uncached[i:i+100], cache=True)
+        # Fetch uncached guild-scoped users (we know they belong here)
+        uncached_guild = [uid for uid in guild_uids
+                          if not interaction.guild.get_member(uid) and uid not in redis_names and uid not in departed]
+        if uncached_guild:
+            for i in range(0, len(uncached_guild), 100):
+                await interaction.guild.query_members(user_ids=uncached_guild[i:i+100], cache=True)
+
+        # Fetch uncached voter UIDs so we can tell which are actually in this guild
+        uncached_voters = [uid for uid in voter_uids if not interaction.guild.get_member(uid)]
+        if uncached_voters:
+            for i in range(0, len(uncached_voters), 100):
+                await interaction.guild.query_members(user_ids=uncached_voters[i:i+100], cache=True)
 
         async def _warm_redis():
             active_ids = await self.db.get_chatted_user_ids(gid)
-            uncached_active = [uid for uid in active_ids if not interaction.guild.get_member(uid)
-                               and f"membername:{gid}:{uid}" not in redis_names]
-            for i in range(0, len(uncached_active), 100):
-                await interaction.guild.query_members(user_ids=uncached_active[i:i+100], cache=True)
+            needs_fetch = [uid for uid in active_ids if not interaction.guild.get_member(uid)]
+            for i in range(0, len(needs_fetch), 100):
+                await interaction.guild.query_members(user_ids=needs_fetch[i:i+100], cache=True)
             r = get_redis()
             pipe = r.pipeline()
             for uid in active_ids:
@@ -414,11 +425,16 @@ class Stats(commands.Cog):
                 return m.display_name
             return redis_names.get(uid, "Unknown")
 
+        # Guild-scoped rows: filter departed and anyone whose name we can't resolve
         def in_guild(rows, limit=10):
-            return [r for r in rows if r["user_id"] not in departed][:limit]
+            return [r for r in rows if r["user_id"] not in departed and name(r["user_id"]) != "Unknown"][:limit]
 
-        top_voters = in_guild(top_voters_global)
-        top_vote_streaks = in_guild(top_vote_streaks_global)
+        # Global rows (voters): filter to confirmed members of this guild
+        def in_guild_members(rows, limit=10):
+            return [r for r in rows if interaction.guild.get_member(r["user_id"])][:limit]
+
+        top_voters = in_guild_members(top_voters_global)
+        top_vote_streaks = in_guild_members(top_vote_streaks_global)
 
         def fmt_score(rows):
             lines = [f"{i}. {name(r['user_id'])} · {r['score']:.2f}" for i, r in enumerate(in_guild(rows), 1)]
