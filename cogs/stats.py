@@ -365,12 +365,31 @@ class Stats(commands.Cog):
             self.db.get_top_voters_by_streak(50),
         )
 
+        all_rows = (
+            list(data["top_score"]) + list(data["bottom_score"]) +
+            list(data["richest"]) + list(data["poorest"]) +
+            list(data["most_messages"]) + list(data["most_endorsed"]) +
+            list(data["most_rebuked"]) + list(data["top_snitches"]) +
+            list(market_data["top_portfolio"]) + list(market_data["top_realized"]) +
+            list(top_voters_global) + list(top_vote_streaks_global)
+        )
+        uncached_ids = {r["user_id"] for r in all_rows if not interaction.guild.get_member(r["user_id"])}
+        departed: set[int] = set()
+        if uncached_ids:
+            results = await asyncio.gather(
+                *[interaction.guild.fetch_member(uid) for uid in uncached_ids],
+                return_exceptions=True,
+            )
+            for uid, result in zip(uncached_ids, results):
+                if isinstance(result, discord.NotFound):
+                    departed.add(uid)
+
         def name(uid):
             m = interaction.guild.get_member(uid)
-            return m.display_name if m else None
+            return m.display_name if m else "Unknown"
 
         def in_guild(rows, limit=5):
-            return [r for r in rows if interaction.guild.get_member(r["user_id"])][:limit]
+            return [r for r in rows if r["user_id"] not in departed][:limit]
 
         top_voters = in_guild(top_voters_global)
         top_vote_streaks = in_guild(top_vote_streaks_global)
