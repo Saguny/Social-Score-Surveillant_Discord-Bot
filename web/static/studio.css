@@ -419,6 +419,21 @@ p strong { color: #fff; }
 }
 .project-stack {
   color: var(--text-faint);
+.project-pills {
+  display: flex;
+  gap: .35rem;
+  flex-wrap: wrap;
+}
+.pill-meta {
+  font-size: .75rem;
+  color: var(--text-p);
+  background: var(--surface-mid);
+  border: 1px solid var(--border-ui);
+  border-radius: 4px;
+  padding: .15rem .45rem;
+  letter-spacing: .02em;
+}
+.pill {
   font-size: .75rem;
   letter-spacing: .04em;
 }
@@ -503,4 +518,5 @@ p strong { color: #fff; }
   .site          { animation: none; }
   .site::before  { animation: none; }
   h1             { animation: none; }
+}
 }
