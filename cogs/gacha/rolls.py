@@ -145,6 +145,7 @@ async def do_roll(
         "guild_id":  guild_id,
         "image_url": image_url or "",
         "dupe":      dupe,
+        "roller_id": user_id,
     })
 
     if buy_view is not None:

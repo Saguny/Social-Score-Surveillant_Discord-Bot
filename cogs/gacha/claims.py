@@ -22,6 +22,21 @@ async def process_claim(bot, payload: discord.RawReactionActionEvent) -> None:
     image_url = data.get("image_url") or None
     is_dupe   = data.get("dupe", False)
 
+    roller_id = data.get("roller_id")
+    if roller_id and payload.user_id != roller_id:
+        roller_only = await bot.db.get_gacha_roller_only(guild_id)
+        if roller_only:
+            await cache.store_pending(payload.message_id, data)
+            try:
+                channel = bot.get_channel(payload.channel_id) or await bot.fetch_channel(payload.channel_id)
+                await channel.send(
+                    f"<@{payload.user_id}> Only the person who rolled this card can claim it.",
+                    delete_after=8,
+                )
+            except (discord.NotFound, discord.HTTPException):
+                pass
+            return
+
     claims_used = await cache.increment_claims(guild_id, payload.user_id)
     if claims_used > MAX_CLAIMS_PER_HOUR:
         await cache.decrement_claims(guild_id, payload.user_id)

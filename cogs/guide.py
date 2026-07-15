@@ -378,6 +378,14 @@ class GuideView(discord.ui.View):
             ),
             inline=False,
         )
+        e.add_field(
+            name="MOD SETTINGS",
+            value=(
+                "`ccp gachaclaimmode [on|off]` · `ccp gcm` — When enabled, only the citizen who rolled a card can claim it. "
+                "Omit the argument to toggle."
+            ),
+            inline=False,
+        )
         return e
 
     def _page_mod(self) -> discord.Embed:

@@ -370,6 +370,21 @@ class GachaMixin:
         )
         return result.split()[-1] != "0"
 
+    async def get_gacha_roller_only(self, guild_id: int) -> bool:
+        row = await self._pool.fetchrow(
+            "SELECT gacha_roller_only FROM guild_config WHERE guild_id = $1",
+            guild_id,
+        )
+        return bool(row["gacha_roller_only"]) if row else False
+
+    async def set_gacha_roller_only(self, guild_id: int, enabled: bool) -> None:
+        async with self._pool.acquire() as conn:
+            await self._ensure_guild(conn, guild_id)
+            await conn.execute(
+                "UPDATE guild_config SET gacha_roller_only = $2 WHERE guild_id = $1",
+                guild_id, enabled,
+            )
+
     async def find_gacha_character_id(self, name_or_id: str) -> str | None:
         """Resolve a character name or id to its character_id."""
         async with self._pool.acquire() as conn:

@@ -627,3 +627,4 @@ class Database(
             await conn.execute("ALTER TABLE users ALTER COLUMN yuan               TYPE BIGINT USING yuan::BIGINT")
             await conn.execute("ALTER TABLE users ALTER COLUMN total_yuan_earned  TYPE BIGINT USING total_yuan_earned::BIGINT")
             await conn.execute("ALTER TABLE users ALTER COLUMN total_yuan_spent   TYPE BIGINT USING total_yuan_spent::BIGINT")
+            await conn.execute("ALTER TABLE guild_config ADD COLUMN IF NOT EXISTS gacha_roller_only BOOLEAN NOT NULL DEFAULT FALSE")

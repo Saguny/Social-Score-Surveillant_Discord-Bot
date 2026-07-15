@@ -453,6 +453,33 @@ class GachaCog(commands.Cog, name="Gacha"):
 
             await ctx.send(f"{claim_line}\n{roll_line}\n{vote_line}")
 
+    # ── mod settings ─────────────────────────────────────────────────────────
+
+    @commands.command(name="gachaclaimmode", aliases=["gcm"])
+    @commands.has_permissions(manage_guild=True)
+    async def prefix_gacha_claim_mode(self, ctx: commands.Context, toggle: str = ""):
+        async with ctx.typing():
+            guild_id = ctx.guild.id
+            current  = await self.bot.db.get_gacha_roller_only(guild_id)
+            if toggle.lower() == "on":
+                if current:
+                    await ctx.send("Roller-only claim mode is already **enabled**.")
+                    return
+                enabled = True
+            elif toggle.lower() == "off":
+                if not current:
+                    await ctx.send("Roller-only claim mode is already **disabled**.")
+                    return
+                enabled = False
+            else:
+                enabled = not current
+            await self.bot.db.set_gacha_roller_only(guild_id, enabled)
+            state = "enabled" if enabled else "disabled"
+            await ctx.send(
+                f"Roller-only claim mode **{state}**. "
+                + ("Only the person who rolled a card can claim it." if enabled else "Anyone can claim rolls.")
+            )
+
     # ── suggestions ───────────────────────────────────────────────────────────
 
     @app_commands.command(name="suggestions", description="Suggest a new character for the gacha pool")
