@@ -15,7 +15,9 @@ async def do_gift(
     db,
 ) -> None:
     char = characters.get(name)
-    if not char:
+    if char:
+        char = {"id": name, **char}
+    else:
         candidates = find_all(name)
         if not candidates:
             await send_fn(
@@ -36,8 +38,7 @@ async def do_gift(
 
 async def _start_gift(guild_id, giver, target, char, send_fn, db) -> None:
     char_id = char.get("id", "")
-    owned = await db.get_character_owner(guild_id, char_id)
-    if owned != giver.id:
+    if not char_id or not await db.has_character(guild_id, giver.id, char_id):
         await send_fn(f"You don't own **{char['name']}**.")
         return
 

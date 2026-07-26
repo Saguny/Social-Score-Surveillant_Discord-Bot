@@ -244,7 +244,16 @@ class GachaCog(commands.Cog, name="Gacha"):
         if user.bot:
             await interaction.response.send_message("You can't gift to a bot.")
             return
-        await self.service.do_gift(interaction.guild.id, interaction.user, user, waifu, interaction.response.send_message)
+        async def _send(*args, **kwargs):
+            if interaction.response.is_done():
+                return await interaction.followup.send(*args, **kwargs)
+            await interaction.response.send_message(*args, **kwargs)
+            try:
+                return await interaction.original_response()
+            except discord.HTTPException:
+                return None
+
+        await self.service.do_gift(interaction.guild.id, interaction.user, user, waifu, _send)
 
     @commands.command(name="gift")
     async def prefix_gift(self, ctx: commands.Context, *, name: str = ""):
