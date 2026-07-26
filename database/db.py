@@ -624,6 +624,8 @@ class Database(
             await conn.execute("ALTER TABLE gacha_requests ADD COLUMN IF NOT EXISTS wiki_extract TEXT NOT NULL DEFAULT ''")
             await conn.execute("ALTER TABLE gacha_requests ADD COLUMN IF NOT EXISTS wiki_lang TEXT NOT NULL DEFAULT 'en'")
             await conn.execute("ALTER TABLE gacha_requests ADD COLUMN IF NOT EXISTS override_title TEXT DEFAULT NULL")
+            await conn.execute("ALTER TABLE gacha_requests ADD COLUMN IF NOT EXISTS reviewed_by_discord_id BIGINT DEFAULT NULL")
+            await conn.execute("ALTER TABLE gacha_requests ADD COLUMN IF NOT EXISTS reviewed_by_username TEXT DEFAULT NULL")
             await conn.execute("ALTER TABLE users ALTER COLUMN yuan               TYPE BIGINT USING yuan::BIGINT")
             await conn.execute("ALTER TABLE users ALTER COLUMN total_yuan_earned  TYPE BIGINT USING total_yuan_earned::BIGINT")
             await conn.execute("ALTER TABLE users ALTER COLUMN total_yuan_spent   TYPE BIGINT USING total_yuan_spent::BIGINT")

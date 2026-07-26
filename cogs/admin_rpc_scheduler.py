@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import time
 
 import discord
@@ -7,6 +8,8 @@ from discord.ext import commands
 
 from infra.redis_client import get_redis
 from infra.admin_rpc import ADMIN_RPC_CHANNEL, publish_admin_rpc_response
+
+SUBMISSION_LOG_CHANNEL_ID = int(os.getenv("SUBMISSION_LOG_CHANNEL_ID", "1531034640012279948"))
 
 
 def _find_writable_channel(guild: discord.Guild) -> discord.TextChannel | None:
@@ -127,6 +130,9 @@ class AdminRpcScheduler(commands.Cog):
         if action == "broadcast_embed":
             return await self._broadcast_embed(args)
 
+        if action == "submission_log":
+            return await self._submission_log(args)
+
         if action == "process_vote":
             from cogs.voting import process_vote
             user_id = args.get("user_id")
@@ -228,6 +234,59 @@ class AdminRpcScheduler(commands.Cog):
         await self.db.adjust_yuan(guild_id, user_id, amount)
         row = await self.db.get_user(guild_id, user_id)
         return {"yuan": row["yuan"]}
+
+    async def _submission_log(self, args: dict) -> dict:
+        if not SUBMISSION_LOG_CHANNEL_ID:
+            return {"output": "disabled"}
+
+        channel = self.bot.get_channel(SUBMISSION_LOG_CHANNEL_ID)
+        if channel is None:
+            try:
+                channel = await self.bot.fetch_channel(SUBMISSION_LOG_CHANNEL_ID)
+            except Exception as exc:
+                return {"error": f"Submission log channel unreachable: {exc}"}
+
+        approved   = bool(args.get("approved"))
+        name       = str(args.get("name") or "Unknown")[:200]
+        submitter  = str(args.get("submitted_by") or "")[:100]
+        moderator  = str(args.get("moderator") or "")[:100]
+        thumbnail  = str(args.get("thumbnail_url") or "")
+        wiki_url   = str(args.get("wiki_url") or "")
+        reason     = str(args.get("reason") or "")[:1000]
+
+        embed = discord.Embed(
+            title       = f"{'APPROVED' if approved else 'DECLINED'} · {name}",
+            description = f"[{args.get('wiki_title') or name}]({wiki_url})" if wiki_url else None,
+            color       = 0x4FBE84 if approved else 0xF2646A,
+        )
+        if thumbnail.startswith(("http://", "https://")):
+            embed.set_thumbnail(url=thumbnail)
+
+        embed.add_field(name="Suggested by", value=f"@{submitter}" if submitter else "unknown", inline=True)
+        embed.add_field(name="Reviewed by",  value=f"@{moderator}" if moderator else "unknown", inline=True)
+
+        if approved:
+            char_id = str(args.get("character_id") or "")
+            rarity  = str(args.get("rarity") or "")
+            faction = str(args.get("faction") or "")
+            if rarity:
+                embed.add_field(name="Rarity", value=rarity.title(), inline=True)
+            if faction:
+                embed.add_field(name="Faction", value=faction.replace("_", " ").title(), inline=True)
+            if char_id:
+                embed.add_field(name="Character ID", value=f"`{char_id}`", inline=True)
+        elif reason:
+            embed.add_field(name="Reason", value=reason, inline=False)
+
+        embed.set_footer(text="Gacha submission review · GLORY TO THE CCP!")
+
+        try:
+            await channel.send(embed=embed)
+        except discord.Forbidden:
+            return {"error": "Missing permission to post in the submission log channel."}
+        except Exception as exc:
+            return {"error": f"Submission log send failed: {exc}"}
+        return {"output": "ok"}
 
     async def _broadcast_embed(self, args: dict) -> dict:
         bot = self.bot

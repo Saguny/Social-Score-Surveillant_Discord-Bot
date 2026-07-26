@@ -357,6 +357,51 @@ function setReqSort(sort) {
   loadPendingRequests();
 }
 
+// ── Reviewer identity ─────────────────────────────────────────────────────────
+// ADMIN_TOKEN is shared, so review actions are attributed to whichever Discord
+// account is linked in this browser. Surface that before anyone clicks.
+let _reviewer = null;
+
+async function loadReviewerIdentity() {
+  const bar = document.getElementById('reviewer-bar');
+  if (!bar) return;
+  try {
+    const r = await fetch('/api/admin/whoami');
+    if (!r.ok) return;
+    _reviewer = await r.json();
+  } catch (_) { return; }
+
+  const esc = s => String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+  bar.hidden = false;
+  if (_reviewer.can_review) {
+    const av = _reviewer.avatar
+      ? `<img class="rv-avatar" src="https://cdn.discordapp.com/avatars/${esc(_reviewer.discord_id)}/${esc(_reviewer.avatar)}.png?size=64" alt="">`
+      : '<div class="rv-avatar"></div>';
+    bar.className = 'reviewer-bar rv-ok';
+    bar.innerHTML = `${av}<div class="rv-text">Reviewing as <b>@${esc(_reviewer.username)}</b> · recorded on every approval and decline</div>`;
+  } else if (_reviewer.linked) {
+    bar.className = 'reviewer-bar rv-deny';
+    bar.innerHTML = `<div class="rv-text"><b>@${esc(_reviewer.username)}</b> is not on the reviewer allowlist. Add this Discord ID (<b>${esc(_reviewer.discord_id)}</b>) to ADMIN_DISCORD_IDS to grant review permission.</div>`;
+  } else {
+    bar.className = 'reviewer-bar rv-warn';
+    bar.innerHTML = `<div class="rv-text">Not linked to Discord. Approve and decline are disabled until you sign in, so every review can be attributed.</div>
+                     <a class="rv-btn" href="${esc(_reviewer.login_url)}">Link Discord</a>`;
+  }
+}
+
+// Returns true when the failure was handled as a missing-reviewer error.
+function _handleReviewerError(body) {
+  if (!body || !body.needs_discord_login) return false;
+  if (confirm(body.error + '\n\nSign in with Discord now?')) {
+    window.location.href = body.login_url || '/social-credit/auth/discord?next=/social-credit/admin';
+  }
+  loadReviewerIdentity();
+  return true;
+}
+
 async function loadPendingRequests() {
   const $list = document.getElementById('req-list');
   if (!$list) return;
@@ -492,7 +537,7 @@ async function _doReject(requestId, reason) {
   if (r.ok) {
     const row = document.getElementById('req-' + requestId);
     if (row) row.remove();
-  } else {
+  } else if (!_handleReviewerError(body)) {
     alert('Error: ' + (body.error || r.status));
   }
 }
@@ -581,6 +626,7 @@ async function approveRequest(requestId, title) {
   } else {
     const body = await res.json().catch(() => ({}));
     addLine('Error: ' + (body.error || res.status), false);
+    _handleReviewerError(body);
   }
 }
 
@@ -655,6 +701,6 @@ async function banSubmitter(requestId, discordId) {
     alert('Submitter banned.');
   } else {
     const body = await r.json().catch(() => ({}));
-    alert('Error: ' + (body.error || r.status));
+    if (!_handleReviewerError(body)) alert('Error: ' + (body.error || r.status));
   }
 }

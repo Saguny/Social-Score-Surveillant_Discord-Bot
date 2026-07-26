@@ -133,21 +133,36 @@ class GachaRequestsMixin:
         request_id: int,
         status: str,
         rejection_reason: str | None = None,
+        reviewer_id: int | None = None,
+        reviewer_name: str | None = None,
     ) -> None:
         await self._pool.execute(
             """
             UPDATE gacha_requests
-            SET status = $2, reviewed_at = $3, rejection_reason = $4
+            SET status = $2, reviewed_at = $3, rejection_reason = $4,
+                reviewed_by_discord_id = $5, reviewed_by_username = $6
             WHERE id = $1
             """,
             request_id, status, int(time.time()), rejection_reason,
+            reviewer_id, reviewer_name,
         )
 
-    async def set_request_approved_atomic(self, request_id: int) -> bool:
+    async def set_request_approved_atomic(
+        self,
+        request_id: int,
+        reviewer_id: int | None = None,
+        reviewer_name: str | None = None,
+    ) -> bool:
         """Atomically transition status pending -> approved. Returns True only on first approval."""
         row = await self._pool.fetchrow(
-            "UPDATE gacha_requests SET status = 'approved', reviewed_at = $2 WHERE id = $1 AND status = 'pending' RETURNING 1",
-            request_id, int(time.time()),
+            """
+            UPDATE gacha_requests
+            SET status = 'approved', reviewed_at = $2,
+                reviewed_by_discord_id = $3, reviewed_by_username = $4
+            WHERE id = $1 AND status = 'pending'
+            RETURNING 1
+            """,
+            request_id, int(time.time()), reviewer_id, reviewer_name,
         )
         return row is not None
 

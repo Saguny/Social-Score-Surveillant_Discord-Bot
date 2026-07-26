@@ -72,6 +72,35 @@
 .admin-tabs .nav-link:hover { color:var(--text)!important; border-bottom-color:var(--border-strong); }
 .admin-tabs .nav-link.active { color:var(--cream)!important; background:transparent; border-bottom-color:var(--sage); }
 
+/* ── Reviewer identity bar ───────────────────────────────────────────────── */
+.reviewer-bar {
+  display:flex; align-items:center; gap:var(--sp-3); flex-wrap:wrap;
+  margin-bottom:var(--sp-4);
+  padding:var(--sp-3) var(--sp-4);
+  border-radius:var(--r-md);
+  font-size:var(--fs-sm);
+}
+.reviewer-bar[hidden] { display:none; }
+.reviewer-bar .rv-avatar {
+  width:28px; height:28px; flex:0 0 auto;
+  border-radius:50%; object-fit:cover;
+  background:var(--surface-recessed);
+  border:1px solid var(--border-strong);
+}
+.reviewer-bar .rv-text { flex:1; min-width:160px; }
+.reviewer-bar b { color:var(--cream); }
+.reviewer-bar .rv-btn {
+  display:inline-flex; align-items:center;
+  min-height:36px; padding:var(--sp-2) var(--sp-4);
+  border:none; border-radius:var(--r-md);
+  background:#5865F2; color:#fff;
+  font-size:var(--fs-tiny); font-weight:700; white-space:nowrap;
+}
+.reviewer-bar .rv-btn:hover { background:#4752C4; color:#fff; }
+.rv-ok   { background:rgba(79,190,132,.10);  border:1px solid rgba(79,190,132,.32);  color:var(--text-muted); }
+.rv-warn { background:rgba(245,168,85,.10);  border:1px solid rgba(245,168,85,.35);  color:var(--orange); }
+.rv-deny { background:rgba(242,100,106,.10); border:1px solid rgba(242,100,106,.35); color:var(--red); }
+
 .req-count-badge {
   display:inline-block;
   margin-inline-start:var(--sp-1);

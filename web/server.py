@@ -192,6 +192,58 @@ async def _discord_session(request) -> dict | None:
         return None
 
 
+def _reviewer_allowlist() -> set[int]:
+    raw = os.getenv("ADMIN_DISCORD_IDS", "")
+    ids = set()
+    for part in raw.split(","):
+        part = part.strip()
+        if part.isdigit():
+            ids.add(int(part))
+    return ids
+
+
+async def _reviewer(request) -> dict | None:
+    """The Discord identity acting on a gacha review, or None.
+
+    ADMIN_TOKEN gates access to the panel but is shared, so it can't attribute
+    an action to a person. Review routes additionally require a Discord login
+    and record who acted. An empty ADMIN_DISCORD_IDS means any linked account
+    may review; a populated one restricts it to those IDs.
+    """
+    session = await _discord_session(request)
+    if not session:
+        return None
+    allow = _reviewer_allowlist()
+    if allow and int(session.get("discord_id", 0)) not in allow:
+        return None
+    return session
+
+
+def _require_reviewer(handler):
+    """Layers a Discord-identity check on top of _require_admin."""
+    async def middleware(request):
+        reviewer = await _reviewer(request)
+        if not reviewer:
+            return web.json_response({
+                "error": "Link a Discord account with review permission before "
+                         "approving or rejecting submissions.",
+                "needs_discord_login": True,
+                "login_url": "/social-credit/auth/discord?next=/social-credit/admin",
+            }, status=403)
+        request["reviewer"] = reviewer
+        return await handler(request)
+    return middleware
+
+
+def _moderator_name(request) -> str:
+    return (request.get("reviewer") or {}).get("username", "") or ""
+
+
+def _moderator_id(request) -> int | None:
+    rid = (request.get("reviewer") or {}).get("discord_id")
+    return int(rid) if rid else None
+
+
 def _require_discord(handler):
     async def middleware(request):
         if not await _discord_session(request):
@@ -1369,7 +1421,12 @@ async def _handle_admin_requests_reject(request):
     if not req:
         return web.json_response({"error": "Not found"}, status=404)
 
-    await db.set_request_status(request_id, "rejected", rejection_reason=reason or None)
+    await db.set_request_status(
+        request_id, "rejected",
+        rejection_reason = reason or None,
+        reviewer_id      = _moderator_id(request),
+        reviewer_name    = _moderator_name(request),
+    )
 
     if req.get("discord_id"):
         asyncio.create_task(fire_admin_rpc("dm_user", {
@@ -1378,7 +1435,36 @@ async def _handle_admin_requests_reject(request):
                        + (f"\n\nReason: {reason}" if reason else ""),
         }))
 
+    wiki_slug = req.get("wiki_slug") or ""
+    wiki_lang = req.get("wiki_lang") or "en"
+    wiki = await _fetch_wikipedia_preview(wiki_slug, preferred_lang=wiki_lang) if wiki_slug else None
+    asyncio.create_task(fire_admin_rpc("submission_log", {
+        "approved":      False,
+        "name":          req.get("wiki_title") or "",
+        "wiki_title":    req.get("wiki_title") or "",
+        "wiki_url":      f"https://{wiki_lang}.wikipedia.org/wiki/{urllib.parse.quote(wiki_slug)}" if wiki_slug else "",
+        "thumbnail_url": (wiki or {}).get("thumbnail_url", ""),
+        "submitted_by":  req.get("discord_username") or "",
+        "moderator":     _moderator_name(request),
+        "reason":        reason,
+    }))
+
     return web.json_response({"ok": True})
+
+
+async def _handle_admin_whoami(request):
+    """Lets the panel show who review actions will be attributed to."""
+    session  = await _discord_session(request)
+    reviewer = await _reviewer(request)
+    return web.json_response({
+        "linked":       bool(session),
+        "can_review":   bool(reviewer),
+        "username":     (session or {}).get("username", ""),
+        "discord_id":   str((session or {}).get("discord_id", "")) if session else "",
+        "avatar":       (session or {}).get("avatar", ""),
+        "allowlist_on": bool(_reviewer_allowlist()),
+        "login_url":    "/social-credit/auth/discord?next=/social-credit/admin",
+    })
 
 
 async def _handle_admin_requests_ban(request):
@@ -1605,7 +1691,11 @@ async def _handle_admin_requests_approve(request):
             wiki_lang               = wiki_lang,
         )
         await publish_guild_notify(0, "reload_gacha", {})
-        first_approval = await db.set_request_approved_atomic(request_id)
+        first_approval = await db.set_request_approved_atomic(
+            request_id,
+            reviewer_id   = _moderator_id(request),
+            reviewer_name = _moderator_name(request),
+        )
         await emit("db", f"Saved as `{char_id}`.")
 
         submitter_discord_id = req.get("discord_id")
@@ -1637,6 +1727,32 @@ async def _handle_admin_requests_approve(request):
         else:
             await emit("notify", "Already approved — skipping notifications.")
         await emit("notify", "Notifications dispatched.")
+
+        # Stage 5 — post to the review log. Uses the blocking RPC rather than
+        # fire-and-forget so a misconfigured channel surfaces in the panel
+        # instead of failing silently on an audit trail.
+        if first_approval:
+            images = data_to_save.get("image_urls") or []
+            await emit("log", "Posting to the review log…")
+            try:
+                log_res = await call_admin_rpc("submission_log", {
+                    "approved":      True,
+                    "name":          data_to_save.get("name") or wiki_title,
+                    "wiki_title":    wiki_title,
+                    "wiki_url":      f"https://{wiki_lang}.wikipedia.org/wiki/{urllib.parse.quote(wiki_slug)}" if wiki_slug else "",
+                    "thumbnail_url": images[0] if images else "",
+                    "submitted_by":  req.get("discord_username") or "",
+                    "moderator":     _moderator_name(request),
+                    "character_id":  char_id,
+                    "rarity":        data_to_save.get("rarity") or "",
+                    "faction":       data_to_save.get("faction") or "",
+                }, timeout=5.0)
+            except Exception as exc:
+                log_res = {"error": str(exc)}
+            if log_res.get("error"):
+                await emit("log", f"Review log: {log_res['error']}", ok=False)
+            else:
+                await emit("log", "Posted to the review log.")
 
         # Stage 5 — done
         await emit("done", f"✓ {wiki_title} is now in the gacha pool.", ok=True)
@@ -2269,10 +2385,11 @@ async def start_web_server(db):
     app.router.add_get("/api/announcement", _rate_limit_public(_handle_announcement))
     app.router.add_post("/api/admin/announcement",        _require_admin(_handle_admin_announcement_set))
     app.router.add_get("/api/admin/requests",             _require_admin(_handle_admin_requests))
-    app.router.add_post("/api/admin/requests/approve",    _require_admin(_handle_admin_requests_approve))
-    app.router.add_post("/api/admin/requests/reject",     _require_admin(_handle_admin_requests_reject))
-    app.router.add_post("/api/admin/requests/ban",        _require_admin(_handle_admin_requests_ban))
-    app.router.add_post("/api/admin/requests/edit",       _require_admin(_handle_admin_requests_edit))
+    app.router.add_post("/api/admin/requests/approve",    _require_admin(_require_reviewer(_handle_admin_requests_approve)))
+    app.router.add_post("/api/admin/requests/reject",     _require_admin(_require_reviewer(_handle_admin_requests_reject)))
+    app.router.add_post("/api/admin/requests/ban",        _require_admin(_require_reviewer(_handle_admin_requests_ban)))
+    app.router.add_post("/api/admin/requests/edit",       _require_admin(_require_reviewer(_handle_admin_requests_edit)))
+    app.router.add_get("/api/admin/whoami",               _require_admin(_handle_admin_whoami))
     app.router.add_get("/api/admin/submit-settings",      _require_admin(_handle_admin_get_submit_settings))
     app.router.add_post("/api/admin/submit-settings",     _require_admin(_handle_admin_set_submit_settings))
     app.router.add_get("/api/admin/logs/stream",          _require_admin(_handle_admin_logs_stream))
