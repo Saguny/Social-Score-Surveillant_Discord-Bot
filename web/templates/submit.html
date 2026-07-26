@@ -1,93 +1,112 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!--#include head-->
   <meta name="robots" content="noindex, nofollow">
   <title>Submit Character · Social Credit</title>
-  <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
-  <link rel="stylesheet" href="/static/dashboard.css">
-  <link rel="stylesheet" href="/static/submit.css">
-  <script src="/static/i18n.js"></script>
+  <link rel="stylesheet" href="/static/dashboard.css?v=3">
+  <link rel="stylesheet" href="/static/submit.css?v=3">
 </head>
 <body>
 
-<nav class="navbar px-4 py-3 mb-3">
-  <a class="navbar-brand" href="/social-credit">社会信用 Social Credit</a>
-  <div class="nav-links">
-    <a href="/social-credit" class="nav-link" data-i18n="HOME">HOME</a>
-    <a href="/social-credit/dashboard" class="nav-link" data-i18n="DASHBOARD">DASHBOARD</a>
-    <a href="/social-credit/leaderboards" class="nav-link" data-i18n="LEADERBOARDS">LEADERBOARDS</a>
-    <a href="/social-credit/wishlist" class="nav-link" data-i18n="WISHLIST">WISHLIST</a>
-    <a href="/social-credit/submit" class="nav-link active" data-i18n="SUBMIT">SUBMIT</a>
-    <a href="/social-credit/account" class="nav-link" data-i18n="MY ACCOUNT">MY ACCOUNT</a>
-    <a href="/social-credit/privacy" class="nav-link" data-i18n="PRIVACY">PRIVACY</a>
-    <a href="/social-credit/terms" class="nav-link" data-i18n="TERMS">TERMS</a>
-    <select id="lang-select" class="lang-select" onchange="setLang(this.value)"></select>
+<div class="app">
+  <!--#include shell-->
+
+  <div class="app-main">
+    <header class="topbar">
+      <button class="icon-btn" id="nav-hamburger" data-i18n-aria="Open navigation menu" aria-label="Open navigation menu" aria-expanded="false" aria-controls="nav-sidebar">
+        <svg width="20" height="20" aria-hidden="true"><use href="#i-menu"/></svg>
+      </button>
+      <div class="topbar-title">
+        <h1 data-i18n="SUBMIT">SUBMIT</h1>
+        <span class="topbar-sub" data-i18n="Suggest a Character">Suggest a Character</span>
+      </div>
+    </header>
+
+    <main class="app-content" id="main">
+      <div class="page-wrap">
+
+        <div class="page-title" data-i18n="Suggest a Character">Suggest a Character</div>
+        <p class="page-sub" data-i18n="submit_intro">Know a real historical or public figure who belongs in the gacha pool? Search for them below. If they're already in the game you'll see it instantly, otherwise submit them for community upvote and admin review.</p>
+
+        <ol class="steps" id="steps">
+          <li class="step is-active" data-step="1">
+            <span class="step-num">1</span>
+            <span class="step-label" data-i18n="Find them">Find them</span>
+          </li>
+          <li class="step" data-step="2">
+            <span class="step-num">2</span>
+            <span class="step-label" data-i18n="Confirm">Confirm</span>
+          </li>
+          <li class="step" data-step="3">
+            <span class="step-num">3</span>
+            <span class="step-label" data-i18n="Community review">Community review</span>
+          </li>
+        </ol>
+
+        <div class="discord-bar" id="discord-bar">
+          <div class="avatar-placeholder" id="db-placeholder"></div>
+          <span class="text-muted" id="db-status" style="font-size:.82rem" data-i18n="Checking login…">Checking login…</span>
+        </div>
+
+        <div class="search-block">
+          <label class="input-label" for="wiki-input" data-i18n="Search for a person">Search for a person</label>
+          <div class="search-field" role="combobox" aria-haspopup="listbox" aria-owns="wiki-suggest" aria-expanded="false" id="search-combo">
+            <svg class="search-ico" aria-hidden="true"><use href="#i-search"/></svg>
+            <input
+              id="wiki-input"
+              class="wiki-input"
+              type="text"
+              placeholder="Start typing a name…"
+              data-i18n-placeholder="Start typing a name…"
+              autocomplete="off"
+              spellcheck="false"
+              maxlength="200"
+              aria-autocomplete="list"
+              aria-controls="wiki-suggest"
+            >
+            <button type="button" class="search-clear" id="search-clear" hidden data-i18n-aria="Clear" aria-label="Clear">
+              <svg width="15" height="15" aria-hidden="true"><use href="#i-close"/></svg>
+            </button>
+            <ul class="suggest" id="wiki-suggest" role="listbox" hidden></ul>
+          </div>
+          <div class="input-hint" data-i18n="We search Wikipedia. Pick the right person from the list.">We search Wikipedia. Pick the right person from the list.</div>
+        </div>
+
+        <div id="result-area"></div>
+
+        <details class="url-fallback-details" id="url-fallback-wrap">
+          <summary data-i18n="Can't find them?">Can't find them?</summary>
+          <div class="fallback-body">
+            <label class="input-label" for="url-fallback" data-i18n="Paste their Wikipedia URL">Paste their Wikipedia URL</label>
+            <input
+              id="url-fallback"
+              class="wiki-input"
+              type="url"
+              inputmode="url"
+              placeholder="https://en.wikipedia.org/wiki/Xi_Jinping"
+              data-i18n-placeholder="https://en.wikipedia.org/wiki/Xi_Jinping"
+              autocomplete="off"
+              spellcheck="false"
+            >
+            <div class="input-hint" id="url-fallback-hint" data-i18n="We'll pull the article title out of the link automatically.">We'll pull the article title out of the link automatically.</div>
+            <div class="input-hint" style="margin-top:.4rem">
+              <span data-i18n="No Wikipedia article at all?">No Wikipedia article at all?</span>
+              <a href="https://discord.gg/invite/k4W6YAPYhC" target="_blank" rel="noopener" data-i18n="Ask us in the support server">Ask us in the support server</a>
+            </div>
+          </div>
+        </details>
+
+      </div>
+    </main>
+
+    <!--#include footer-->
   </div>
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open navigation menu" aria-expanded="false">☰</button>
-</nav>
-<div class="nav-backdrop" id="nav-backdrop"></div>
-<div class="nav-sidebar" id="nav-sidebar" aria-hidden="true">
-  <div class="sidebar-header">
-    <span class="sidebar-brand">社会信用 SOCIAL CREDIT</span>
-    <button class="sidebar-close" id="sidebar-close" aria-label="Close menu">✕</button>
-  </div>
-  <a href="/social-credit"              class="sidebar-nav-link" data-i18n="HOME">HOME</a>
-  <a href="/social-credit/dashboard"    class="sidebar-nav-link" data-i18n="DASHBOARD">DASHBOARD</a>
-  <a href="/social-credit/leaderboards" class="sidebar-nav-link" data-i18n="LEADERBOARDS">LEADERBOARDS</a>
-  <a href="/social-credit/wishlist"     class="sidebar-nav-link" data-i18n="WISHLIST">WISHLIST</a>
-  <a href="/social-credit/submit"       class="sidebar-nav-link active" data-i18n="SUBMIT">SUBMIT</a>
-  <a href="/social-credit/account"      class="sidebar-nav-link" data-i18n="MY ACCOUNT">MY ACCOUNT</a>
-  <a href="/social-credit/privacy"      class="sidebar-nav-link" data-i18n="PRIVACY">PRIVACY</a>
-  <a href="/social-credit/terms"        class="sidebar-nav-link" data-i18n="TERMS">TERMS</a>
 </div>
-
-<main class="container-fluid">
-  <div class="page-wrap">
-
-    <!-- Discord login bar -->
-    <div class="discord-bar" id="discord-bar">
-      <div class="avatar-placeholder" id="db-placeholder"></div>
-      <span class="text-muted" id="db-status" style="font-size:.82rem" data-i18n="Checking login…">Checking login…</span>
-    </div>
-
-    <!-- Page header -->
-    <div class="page-title" data-i18n="Suggest a Character">Suggest a Character</div>
-    <p class="page-sub" data-i18n="submit_intro">Know a real historical or public figure who belongs in the gacha pool? Search their Wikipedia article below. If they're already in the game you'll see it instantly, otherwise submit them for community upvote and admin review.</p>
-
-    <!-- Search input -->
-    <div class="input-label" data-i18n="Wikipedia Article Title">Wikipedia Article Title</div>
-    <input
-      id="wiki-input"
-      class="wiki-input"
-      type="text"
-      placeholder="e.g. Xi Jinping, Mao Zedong, Park Geun-hye"
-      autocomplete="off"
-      spellcheck="false"
-      maxlength="200"
-    >
-    <div class="input-hint" data-i18n="Enter the exact Wikipedia article title. Use the title as it appears on Wikipedia.">Enter the exact Wikipedia article title. Use the title as it appears on Wikipedia.</div>
-
-    <!-- Dynamic result area -->
-    <div id="result-area"></div>
-
-  </div>
-</main>
-
-<footer class="site-footer">
-  <span data-i18n="Made with ♥ by">Made with ♥ by</span> <a href="/">OFF-BY-ONE</a> ·
-  <a href="https://discord.gg/invite/k4W6YAPYhC" target="_blank" rel="noopener" data-i18n="Support Server">Support Server</a> ·
-  <a href="https://top.gg/bot/856163780265902151" target="_blank" rel="noopener" data-i18n="Invite Bot">Invite Bot</a> ·
-  <a href="/social-credit/privacy" data-i18n="PRIVACY">Privacy</a> ·
-  <a href="/social-credit/terms" data-i18n="TERMS">Terms</a>
-</footer>
 
 <div class="toast-wrap"><div class="toast-msg" id="toast"></div></div>
 
-<script src="/static/submit.js?v=2"></script>
-<script>document.addEventListener('click',async function(e){var l=e.target.closest('a.logout-link');if(!l)return;e.preventDefault();await fetch('/social-credit/auth/discord/logout',{method:'POST',credentials:'same-origin'});window.location.href='/social-credit/submit';});</script>
-<script src="/static/nav.js"></script>
+<script src="/static/submit.js?v=3"></script>
+<!--#include scripts-->
 </body>
 </html>

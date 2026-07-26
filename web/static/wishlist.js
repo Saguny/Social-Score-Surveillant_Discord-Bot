@@ -50,7 +50,7 @@
       $bar.innerHTML = `
         <div class="avatar-placeholder"></div>
         <span style="font-size:.82rem;color:var(--text-muted)">${t('Log in to vote on character requests')}</span>
-        <a href="/social-credit/auth/discord?next=/social-credit/wishlist" class="login-link">🔗 ${t('Login with Discord')}</a>`;
+        <a href="/social-credit/auth/discord?next=/social-credit/wishlist" class="login-link">${t('Login with Discord')}</a>`;
     }
   }
 
@@ -83,7 +83,7 @@
         : '';
       const portrait = item.thumbnail_url
         ? `<img src="${_esc(item.thumbnail_url)}" alt="" loading="lazy" onerror="this.style.display='none'">`
-        : '';
+        : `<svg class="portrait-ico" aria-hidden="true"><use href="#i-user"/></svg>`;
       const extract  = item.wiki_extract
         ? `<div class="wl-extract">${_esc(item.wiki_extract)}</div>`
         : '';

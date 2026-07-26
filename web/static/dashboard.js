@@ -1,8 +1,26 @@
 if (window.Chart) {
-  Chart.defaults.color = '#D8D9DA';
-  Chart.defaults.borderColor = 'rgba(97,103,122,.25)';
-  Chart.defaults.font.family = "'Segoe UI',sans-serif";
+  const _css = getComputedStyle(document.documentElement);
+  const _tok = (name, fallback) => (_css.getPropertyValue(name) || '').trim() || fallback;
+
+  Chart.defaults.color = _tok('--text-muted', '#AEB4BF');
+  Chart.defaults.borderColor = 'rgba(255,255,255,.10)';
+  Chart.defaults.font.family = _tok('--font-sans', "'Inter',system-ui,sans-serif");
+  Chart.defaults.font.size = 11;
+  Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(16,19,23,.94)';
+  Chart.defaults.plugins.tooltip.borderColor = 'rgba(255,255,255,.16)';
+  Chart.defaults.plugins.tooltip.borderWidth = 1;
+  Chart.defaults.plugins.tooltip.titleColor = _tok('--cream', '#FFF6E0');
+  Chart.defaults.plugins.tooltip.bodyColor = _tok('--text-muted', '#AEB4BF');
+  Chart.defaults.plugins.tooltip.padding = 10;
+  Chart.defaults.plugins.tooltip.cornerRadius = 8;
+  Chart.defaults.plugins.tooltip.displayColors = false;
+  Chart.defaults.elements.point.radius = 0;
+  Chart.defaults.elements.point.hoverRadius = 4;
+  Chart.defaults.elements.line.borderWidth = 2;
 }
+
+const _GRID = 'rgba(255,255,255,.06)';
+const _AXIS = '#7A8194';
 
 const _charts = {};
 let _activityRange = '7d';
@@ -24,7 +42,7 @@ function _sparkChart(canvasId, labels, data, color, minPoints = 3, yFormat = v =
     el.style.display = 'none';
     const msg = document.createElement('div');
     msg.className = 'spark-empty';
-    msg.textContent = labels.length ? 'Collecting data…' : 'No data yet';
+    msg.textContent = t(labels.length ? 'Collecting data…' : 'No data yet');
     wrap.appendChild(msg);
     return;
   }
@@ -42,9 +60,9 @@ function _sparkChart(canvasId, labels, data, color, minPoints = 3, yFormat = v =
       },
       scales: {
         x: { display: true, offset: false, grid: { display: false }, border: { display: false },
-             ticks: { autoSkip: true, maxTicksLimit: 3, font: { size: 9 }, color: '#61677A' } },
-        y: { display: true, grid: { color: 'rgba(97,103,122,.15)' }, border: { display: false },
-             ticks: { maxTicksLimit: 3, font: { size: 9 }, color: '#61677A', callback: yFormat } },
+             ticks: { autoSkip: true, maxTicksLimit: 3, font: { size: 9 }, color: _AXIS } },
+        y: { display: true, grid: { color: _GRID }, border: { display: false },
+             ticks: { maxTicksLimit: 3, font: { size: 9 }, color: _AXIS, callback: yFormat } },
       },
       elements: { point: { radius: 0, hoverRadius: 3 }, line: { borderWidth: 2 } },
       interaction: { intersect: false, mode: 'index' },
@@ -73,14 +91,14 @@ function _multiLineChart(canvasId, labels, datasets) {
     el.style.display = 'none';
     const msg = document.createElement('div');
     msg.className = 'chart-empty';
-    msg.textContent = 'Collecting data…';
+    msg.textContent = t('Collecting data…');
     wrap.appendChild(msg);
     return;
   }
   el.style.display = 'block';
   const scales = {
-    x: { grid: { color: 'rgba(97,103,122,.15)' } },
-    y: { grid: { color: 'rgba(97,103,122,.15)' } },
+    x: { grid: { color: _GRID } },
+    y: { grid: { color: _GRID } },
   };
   _charts[canvasId] = new Chart(el.getContext('2d'), {
     type: 'line',
@@ -120,21 +138,21 @@ async function loadActivity(range) {
   const ciVals = eng.map(r => r.checkins);
 
   _multiLineChart('chart-activity-msgs', labels, [
-    { label: t('Messages'),    data: msgVals,   borderColor: '#7D9D9C', backgroundColor: '#7D9D9C22', fill: false, tension: .3 },
+    { label: t('Messages'),    data: msgVals,   borderColor: '#8FB3B1', backgroundColor: '#8FB3B133', fill: false, tension: .3 },
   ]);
 
   _multiLineChart('chart-activity-score', labels, [
-    { label: t('Score Delta'), data: scoreVals, borderColor: '#3DAA6E', backgroundColor: '#3DAA6E22', fill: false, tension: .3 },
+    { label: t('Score Delta'), data: scoreVals, borderColor: '#4FBE84', backgroundColor: '#4FBE8433', fill: false, tension: .3 },
   ]);
 
   _multiLineChart('chart-activity-dau', labels, [
-    { label: t('DAU'),         data: dauVals,   borderColor: '#F5A855', backgroundColor: '#F5A85522', fill: false, tension: .3 },
-    { label: t('Check-ins'),   data: ciVals,    borderColor: '#F4E557', backgroundColor: '#F4E55722', fill: false, tension: .3 },
+    { label: t('DAU'),         data: dauVals,   borderColor: '#F5A855', backgroundColor: '#F5A85533', fill: false, tension: .3 },
+    { label: t('Check-ins'),   data: ciVals,    borderColor: '#F0DC63', backgroundColor: '#F0DC6333', fill: false, tension: .3 },
   ]);
 
   const socVals = eng.map(r => r.endorsements + r.rebukes);
   set('tl-social-val', socVals.length ? fmt(socVals.reduce((a, b) => a + b, 0)) : '-');
-  _sparkChart('chart-social', labels, socVals, '#7D9D9C', 3, v => v);
+  _sparkChart('chart-social', labels, socVals, '#8FB3B1', 3, v => v);
   _hideIfEmpty('chart-social', socVals.length);
 
   const port = d.portfolio || [];
@@ -148,7 +166,7 @@ async function loadActivity(range) {
   const joinLabels = joins.map(r => labelFn(r[0]));
   const joinVals = joins.map(r => r[1]);
   set('tl-joins-val', joinVals.length ? fmt(joinVals.reduce((a, b) => a + b, 0)) : '-');
-  _sparkChart('chart-joins', joinLabels, joinVals, '#7D9D9C', 3, v => v);
+  _sparkChart('chart-joins', joinLabels, joinVals, '#8FB3B1', 3, v => v);
   _hideIfEmpty('chart-joins', joinVals.length);
 }
 
@@ -160,7 +178,7 @@ async function loadYuanCirculation() {
   const yuanLabels = yuan.map(r => _dayLabel(r[0]));
   const yuanVals = yuan.map(r => r[1]);
   set('tl-yuan-val', yuanVals.length ? '¥' + fmt(yuanVals[yuanVals.length - 1]) : '-');
-  _sparkChart('chart-yuan', yuanLabels, yuanVals, '#F4E557', 3, v => '¥' + fmt(v));
+  _sparkChart('chart-yuan', yuanLabels, yuanVals, '#F0DC63', 3, v => '¥' + fmt(v));
   _hideIfEmpty('chart-yuan', yuanVals.length);
 }
 
@@ -176,18 +194,18 @@ function _pushLatencySample(dbMs, pingMs) {
   if (_dbLatencyBuf.length > _LATENCY_BUF_MAX) _dbLatencyBuf.shift();
   if (_pingBuf.length > _LATENCY_BUF_MAX) _pingBuf.shift();
   set('tl-dblatency-val', dbMs + 'ms');
-  _sparkChart('chart-dblatency', _dbLatencyBuf.map(r => r[0]), _dbLatencyBuf.map(r => r[1]), '#7D9D9C', 2, v => v + 'ms');
+  _sparkChart('chart-dblatency', _dbLatencyBuf.map(r => r[0]), _dbLatencyBuf.map(r => r[1]), '#8FB3B1', 2, v => v + 'ms');
 }
 
 const TIERS = [
-  {label:'Enemy of the State',   key:'t1', min:600,  max:700,  color:'#E85454'},
+  {label:'Enemy of the State',   key:'t1', min:600,  max:700,  color:'#F2646A'},
   {label:'Person of Interest',   key:'t2', min:700,  max:775,  color:'#D47030'},
   {label:'Unremarkable Citizen', key:'t3', min:775,  max:850,  color:'#C49030'},
-  {label:'Compliant Citizen',    key:'t4', min:850,  max:925,  color:'#7D9D9C'},
+  {label:'Compliant Citizen',    key:'t4', min:850,  max:925,  color:'#8FB3B1'},
   {label:'Model Citizen',        key:'t5', min:925,  max:1000, color:'#3A9A60'},
-  {label:'Party Loyalist',       key:'t6', min:1000, max:1100, color:'#3DAA6E'},
+  {label:'Party Loyalist',       key:'t6', min:1000, max:1100, color:'#4FBE84'},
   {label:'Cadre Member',         key:'t7', min:1100, max:1200, color:'#45C07A'},
-  {label:'General Secretary',    key:'t8', min:1200, max:1301, color:'#F4E557'},
+  {label:'General Secretary',    key:'t8', min:1200, max:1301, color:'#F0DC63'},
 ];
 function _tierLabel(tier) { return t(tier.label); }
 
@@ -581,8 +599,8 @@ function _barChart(canvasId, labels, datasets, opts = {}) {
   const horiz = !!opts.horizontal;
   // For the category axis (labels), don't set a callback - Chart.js handles it.
   // Only apply a format callback to the value axis.
-  const xTicks = { font: { size: 9 }, color: '#61677A', ...(horiz && opts.xFmt ? { callback: opts.xFmt } : {}) };
-  const yTicks = { font: { size: 9 }, color: '#61677A', ...(!horiz && opts.yFmt ? { callback: opts.yFmt } : {}) };
+  const xTicks = { font: { size: 9 }, color: _AXIS, ...(horiz && opts.xFmt ? { callback: opts.xFmt } : {}) };
+  const yTicks = { font: { size: 9 }, color: _AXIS, ...(!horiz && opts.yFmt ? { callback: opts.yFmt } : {}) };
   _charts[canvasId] = new Chart(el.getContext('2d'), {
     type: 'bar',
     data: { labels, datasets },
@@ -595,8 +613,8 @@ function _barChart(canvasId, labels, datasets, opts = {}) {
         tooltip: { mode: 'nearest', axis: horiz ? 'y' : 'x', intersect: true },
       },
       scales: {
-        x: { grid: { color: 'rgba(97,103,122,.15)' }, ticks: xTicks, ...(opts.xMax != null ? { max: opts.xMax } : {}) },
-        y: { grid: { color: 'rgba(97,103,122,.15)' }, ticks: yTicks },
+        x: { grid: { color: _GRID }, ticks: xTicks, ...(opts.xMax != null ? { max: opts.xMax } : {}) },
+        y: { grid: { color: _GRID }, ticks: yTicks },
       },
     },
   });
@@ -631,7 +649,7 @@ async function loadCommandAnalytics(range) {
   const dayLabels = days.map(r => _dayLabel(r.day));
   const dayUses   = days.map(r => r.uses);
   _multiLineChart('chart-cmd-timeline', dayLabels, [
-    { label: t('Executions'), data: dayUses, borderColor: '#F5A855', backgroundColor: '#F5A85522', fill: true, tension: .3 },
+    { label: t('Executions'), data: dayUses, borderColor: '#F5A855', backgroundColor: '#F5A85533', fill: true, tension: .3 },
   ]);
 
   // Usage by hour bar chart
@@ -648,7 +666,7 @@ async function loadCommandAnalytics(range) {
   const execLabels  = execRows.map(r => r.command);
   const execValues  = execRows.map(r => r.avg_ms);
   _barChart('chart-cmd-exectime', execLabels, [
-    { label: 'Avg ms', data: execValues, backgroundColor: '#F4E557', borderRadius: 3 },
+    { label: 'Avg ms', data: execValues, backgroundColor: '#F0DC63', borderRadius: 3 },
   ], { horizontal: true, yFmt: v => v, xFmt: v => v + 'ms' });
 
   // Success vs error rate (stacked bar per command, top 8)
@@ -657,8 +675,8 @@ async function loadCommandAnalytics(range) {
   const successPcts = rateRows.map(r => r.success_pct);
   const errorPcts   = rateRows.map(r => r.error_pct);
   _barChart('chart-cmd-rates', rateLabels, [
-    { label: t('Success %'), data: successPcts, backgroundColor: '#3DAA6E', borderRadius: 2, stack: 'r' },
-    { label: t('Error %'),   data: errorPcts,   backgroundColor: '#E85454', borderRadius: 2, stack: 'r' },
+    { label: t('Success %'), data: successPcts, backgroundColor: '#4FBE84', borderRadius: 2, stack: 'r' },
+    { label: t('Error %'),   data: errorPcts,   backgroundColor: '#F2646A', borderRadius: 2, stack: 'r' },
   ], { legend: true, horizontal: true, xFmt: v => v + '%', xMax: 100 });
 
   // Build unique-users and avg-exec-time maps for the top-commands table

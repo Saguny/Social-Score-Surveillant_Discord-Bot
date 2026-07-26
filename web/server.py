@@ -48,10 +48,28 @@ _PUBLIC_RATE_LIMIT  = 120
 _public_hits: dict[str, list[float]] = {}
 
 _TEMPLATE_DIR = Path(__file__).parent / 'templates'
+_PARTIAL_DIR = _TEMPLATE_DIR / 'partials'
+_INCLUDE_RE = re.compile(r'<!--#include\s+([a-zA-Z0-9_-]+)\s*-->')
+_INCLUDE_MAX_DEPTH = 4
+
+
+def _read_template_sync(name: str, depth: int = 0) -> str:
+    text = (_TEMPLATE_DIR / name).read_text(encoding='utf-8')
+    if depth >= _INCLUDE_MAX_DEPTH:
+        return text
+
+    def _sub(match: re.Match) -> str:
+        partial = _PARTIAL_DIR / f'{match.group(1)}.html'
+        resolved = partial.resolve()
+        if not str(resolved).startswith(str(_PARTIAL_DIR.resolve())) or not resolved.is_file():
+            return ''
+        return _read_template_sync(str(resolved.relative_to(_TEMPLATE_DIR)), depth + 1)
+
+    return _INCLUDE_RE.sub(_sub, text)
 
 
 async def _load_template(name: str) -> str:
-    return await asyncio.to_thread((_TEMPLATE_DIR / name).read_text, encoding='utf-8')
+    return await asyncio.to_thread(_read_template_sync, name)
 
 
 async def _is_authed(request) -> bool:
