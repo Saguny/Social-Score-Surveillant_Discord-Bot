@@ -144,7 +144,6 @@ Most items can optionally target another citizen. Several items are gift-able.
 **Moderator (prefix)**
 
 - `ccp initialize` - register all current members
-- `ccp adjust <@citizen> <delta> <reason>` - manual score adjustment
 - `ccp reset <@citizen>` - reset to 750
 - `ccp threshold <n>` - set fundraiser vote threshold
 - `ccp executions [#channel]` - set execution announcement channel

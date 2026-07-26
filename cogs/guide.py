@@ -395,7 +395,6 @@ class GuideView(discord.ui.View):
             name="CITIZEN MANAGEMENT",
             value=(
                 "`ccp initialize` · Register all current members\n"
-                "`ccp adjust <@citizen> <delta> <reason>` · Manual rating adjustment\n"
                 "`ccp reset <@citizen>` · Reset rating to 750"
             ),
             inline=False,

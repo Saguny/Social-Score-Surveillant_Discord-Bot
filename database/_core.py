@@ -252,7 +252,9 @@ class CoreMixin:
                         RETURNING score
                     ), history AS (
                         INSERT INTO score_history (guild_id, user_id, delta, reason, timestamp)
-                        SELECT $1, $2, ROUND($3::numeric, 2), $4, $5
+                        SELECT $1, $2,
+                               ROUND((updated.score - COALESCE((SELECT score FROM old), 750.0))::numeric, 2),
+                               $4, $5
                         FROM updated
                     )
                     SELECT

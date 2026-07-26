@@ -18,23 +18,6 @@ class Admin(commands.Cog):
             await self.db.register_guild_members(ctx.guild.id, member_ids)
         await ctx.send(f"{len(member_ids)} citizens registered.")
 
-    @commands.command(name="adjust")
-    @commands.has_permissions(manage_guild=True)
-    async def adjust_score(self, ctx, citizen: discord.Member, delta: float, *, reason: str):
-        async with ctx.typing():
-            gid = ctx.guild.id
-            old, new = await self.db.update_score(gid, citizen.id, delta, f"manual adjustment: {reason}")
-            old_rank, new_rank = get_rank(old), get_rank(new)
-            embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 手动调整")
-            embed.add_field(name="CITIZEN",    value=str(citizen),             inline=False)
-            embed.add_field(name="ADJUSTMENT", value=f"{delta:+.2f}",          inline=True)
-            embed.add_field(name="SCORE",      value=f"{old:.2f} -> {new:.2f}", inline=True)
-            if old_rank["name"] != new_rank["name"]:
-                embed.add_field(name="RANK CHANGE", value=f"{old_rank['name']} -> {new_rank['name']}", inline=False)
-            embed.add_field(name="REASON", value=reason, inline=False)
-        await ctx.send(embed=embed)
-        self.bot.dispatch("score_change", ctx.guild, citizen, ctx.channel, old, new)
-
     @commands.command(name="reset")
     @commands.has_permissions(manage_guild=True)
     async def reset_citizen(self, ctx, citizen: discord.Member):
