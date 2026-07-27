@@ -9,130 +9,175 @@
 <title>Admin Console · Social Credit</title>
 <link rel="icon" href="/static/logo.png">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
-<link rel="stylesheet" href="/static/theme.css?v=1">
-<link rel="stylesheet" href="/static/admin.css?v=10">
+<link rel="stylesheet" href="/static/theme.css?v=3">
+<link rel="stylesheet" href="/static/admin.css?v=11">
 </head>
 <body>
 
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+  <symbol id="i-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m6 6 12 12"/><path d="m18 6-12 12"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 4 4"/></symbol>
+</svg>
+
 <header class="topbar">
+  <button class="icon-btn" id="admin-nav-toggle" aria-label="Toggle sections">
+    <svg width="20" height="20" aria-hidden="true"><use href="#i-menu"/></svg>
+  </button>
   <a class="rail-brand" href="/social-credit" style="padding:0">
     <img class="rail-mark" src="/static/logo.png" alt="" width="32" height="32">
-    <span class="rail-brand-text d-none d-sm-inline">CCP Surveillant</span>
+    <span class="rail-brand-text d-none d-md-inline">CCP Surveillant</span>
   </a>
   <div class="topbar-actions">
-    <a class="btn-run" href="/social-credit">HOME</a>
-    <a class="btn-run" href="/social-credit/dashboard">DASHBOARD</a>
-    <a class="btn-run active" href="/social-credit/admin">ADMIN</a>
+    <div class="whoami" id="whoami"></div>
+    <a class="btn-run d-none d-sm-inline-flex" href="/social-credit/dashboard">DASHBOARD</a>
   </div>
 </header>
 
-<div class="app-content" style="max-width:960px">
+<div class="admin-shell">
 
-  <!-- Tab nav -->
-  <ul class="nav nav-tabs admin-tabs mb-4" id="adminTabs">
-    <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tab-overview">Overview</a></li>
-    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-requests">Requests <span id="req-badge" class="req-count-badge" style="display:none"></span></a></li>
-    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-users">Users</a></li>
-    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-broadcast">Broadcast</a></li>
-    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-system">System</a></li>
-    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-logs" id="tab-logs-link">Logs</a></li>
-  </ul>
+  <aside class="admin-nav" id="admin-nav">
+    <button class="anav-item active" data-section="overview" data-cap="">Overview</button>
+    <div class="anav-group" data-cap="gacha">Gacha</div>
+    <button class="anav-item" data-section="requests"   data-cap="gacha">
+      Submissions <span id="req-badge" class="req-count-badge" style="display:none"></span>
+    </button>
+    <button class="anav-item" data-section="characters" data-cap="gacha">Characters</button>
+    <div class="anav-group" data-cap="users">Operations</div>
+    <button class="anav-item" data-section="users"     data-cap="users">Users</button>
+    <button class="anav-item" data-section="broadcast" data-cap="broadcast">Broadcast</button>
+    <div class="anav-group" data-cap="team">Administration</div>
+    <button class="anav-item" data-section="team"   data-cap="team">Team</button>
+    <button class="anav-item" data-section="audit"  data-cap="team">Audit log</button>
+    <button class="anav-item" data-section="system" data-cap="system">System</button>
+    <button class="anav-item" data-section="logs"   data-cap="logs">Live logs</button>
+  </aside>
 
-  <div class="tab-content">
+  <main class="admin-main">
 
-    <!-- ── Overview ─────────────────────────────────────────────────────────── -->
-    <div class="tab-pane fade show active" id="tab-overview">
-
-      <div class="shdr d-flex justify-content-between align-items-center">
-        <span>Output</span>
+    <!-- ── Overview ───────────────────────────────────────────────────────── -->
+    <section class="asec active" data-section="overview">
+      <div class="asec-head">
+        <h1>Overview</h1>
+        <p>Console output and vote traffic.</p>
       </div>
-      <div class="mb-4">
-        <div id="terminal"><span class="t-prompt">Ready.</span></div>
-      </div>
+
+      <div class="stat-row" id="overview-stats"></div>
 
       <div class="shdr d-flex justify-content-between align-items-center">
         <span>Top.gg Votes</span>
         <div class="btn-group" role="group">
-          <button class="btn btn-run btn-sm px-3" data-period="1D"    onclick="loadVoteChart('1D')">1D</button>
-          <button class="btn btn-run btn-sm px-3" data-period="7D"    onclick="loadVoteChart('7D')">7D</button>
-          <button class="btn btn-run btn-sm px-3" data-period="1M"    onclick="loadVoteChart('1M')">1M</button>
-          <button class="btn btn-run btn-sm px-3" data-period="TOTAL" onclick="loadVoteChart('TOTAL')">TOTAL</button>
+          <button class="btn-run" data-period="1D"    onclick="loadVoteChart('1D')">1D</button>
+          <button class="btn-run" data-period="7D"    onclick="loadVoteChart('7D')">7D</button>
+          <button class="btn-run" data-period="1M"    onclick="loadVoteChart('1M')">1M</button>
+          <button class="btn-run" data-period="TOTAL" onclick="loadVoteChart('TOTAL')">TOTAL</button>
         </div>
       </div>
-      <div class="card-panel p-4 mb-3 chart-card">
+      <div class="card-panel p-4 mb-4 chart-card">
         <div id="vote-total" class="lbl" style="margin-bottom:8px"></div>
         <canvas id="vote-chart" height="90"></canvas>
       </div>
 
-    </div>
+      <div class="shdr">Console output</div>
+      <div id="terminal"><span class="t-prompt">Ready.</span></div>
+    </section>
 
-    <!-- ── Requests ──────────────────────────────────────────────────────────── -->
-    <div class="tab-pane fade" id="tab-requests">
+    <!-- ── Submissions ────────────────────────────────────────────────────── -->
+    <section class="asec" data-section="requests">
+      <div class="asec-head">
+        <h1>Character Submissions</h1>
+        <p>Community suggestions awaiting review.</p>
+      </div>
 
       <div class="reviewer-bar" id="reviewer-bar" hidden></div>
 
-      <div class="shdr d-flex justify-content-between align-items-center">
-        <span>Character Submissions</span>
-        <div class="d-flex gap-2 align-items-center">
-          <div class="btn-group" role="group">
-            <button class="btn btn-run btn-sm px-3 active" id="sort-votes"   onclick="setReqSort('votes')">Most Votes</button>
-            <button class="btn btn-run btn-sm px-3"        id="sort-newest"  onclick="setReqSort('newest')">Newest</button>
-          </div>
-          <button class="btn btn-run btn-sm px-3" onclick="loadPendingRequests()">↺</button>
+      <div class="toolbar">
+        <div class="btn-group" role="group">
+          <button class="btn-run active" id="sort-votes"  onclick="setReqSort('votes')">Most votes</button>
+          <button class="btn-run"        id="sort-newest" onclick="setReqSort('newest')">Newest</button>
         </div>
+        <div class="toolbar-spacer"></div>
+        <label class="inline-field">
+          <span>Daily submit limit</span>
+          <input type="number" id="submit-limit-val" class="form-control form-control-sm" min="1" max="1000" style="width:88px" placeholder="25">
+        </label>
+        <button class="btn-run" onclick="saveSubmitLimit()">Save</button>
+        <button class="btn-run" onclick="loadPendingRequests()">Refresh</button>
+      </div>
+      <div id="submit-limit-result" class="hint-line"></div>
+
+      <div id="req-list"><div class="empty-state">Loading…</div></div>
+
+      <div id="req-pipeline" class="pipeline-panel" style="display:none">
+        <div class="pipeline-title">Pipeline · <span id="req-pipeline-title"></span></div>
+        <div id="req-pipeline-log" class="pipeline-log"></div>
+      </div>
+    </section>
+
+    <!-- ── Characters ─────────────────────────────────────────────────────── -->
+    <section class="asec" data-section="characters">
+      <div class="asec-head">
+        <h1>Character Editor</h1>
+        <p>Search the roster, fix metadata, manage art.</p>
       </div>
 
-      <div class="card-panel px-3 py-2 mb-3 d-flex align-items-center gap-3" style="font-size:.82rem">
-        <span style="color:var(--text-muted);white-space:nowrap">Daily submit limit</span>
-        <input type="number" id="submit-limit-val" class="form-control form-control-sm" min="1" max="1000" style="width:90px" placeholder="25">
-        <button class="btn btn-run btn-sm px-3" onclick="saveSubmitLimit()">SAVE</button>
-        <span id="submit-limit-result" style="color:var(--text-muted)"></span>
-      </div>
+      <div class="stat-row" id="char-stats"></div>
 
-      <div id="req-list" class="mb-3">
-        <div style="color:var(--text-muted);font-size:.82rem;padding:.5rem 0">Loading…</div>
-      </div>
-
-      <!-- SSE pipeline panel -->
-      <div id="req-pipeline" style="display:none;background:var(--bg-recessed);border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:1rem">
-        <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--text-muted);margin-bottom:.5rem">
-          Pipeline · <span id="req-pipeline-title"></span>
+      <div class="toolbar">
+        <div class="search-field admin-search">
+          <svg class="search-ico" aria-hidden="true"><use href="#i-search"/></svg>
+          <input type="search" id="char-search" class="form-control" placeholder="Search name or ID…  (press /)">
         </div>
-        <div id="req-pipeline-log" style="font-size:.8rem;max-height:200px;overflow-y:auto;line-height:1.7"></div>
+        <select id="char-faction" class="form-select form-select-sm"><option value="">All factions</option></select>
+        <select id="char-rarity"  class="form-select form-select-sm"><option value="">All rarities</option></select>
+        <select id="char-enabled" class="form-select form-select-sm">
+          <option value="">Any state</option>
+          <option value="true">Enabled</option>
+          <option value="false">Disabled</option>
+        </select>
+        <label class="inline-check">
+          <input type="checkbox" id="char-missing"> <span>Missing art</span>
+        </label>
       </div>
 
-    </div>
+      <div class="result-meta" id="char-count"></div>
+      <div id="char-list"><div class="empty-state">Loading…</div></div>
+      <div class="pager" id="char-pager"></div>
+    </section>
 
-    <!-- ── Users ─────────────────────────────────────────────────────────────── -->
-    <div class="tab-pane fade" id="tab-users">
-
-      <div class="shdr">User Lookup &amp; Yuan Adjustment</div>
-      <div class="card-panel p-4 mb-3">
-        <div class="row g-2 align-items-end mb-3">
-          <div class="col-auto">
-            <label class="form-label">User ID</label>
-            <input type="text" id="ul-user-id" class="form-control" placeholder="123456789012345678" style="width:240px">
+    <!-- ── Users ──────────────────────────────────────────────────────────── -->
+    <section class="asec" data-section="users">
+      <div class="asec-head">
+        <h1>Users</h1>
+        <p>Look up a citizen and adjust their balance per server.</p>
+      </div>
+      <div class="card-panel p-4">
+        <div class="toolbar" style="margin-bottom:0">
+          <div class="search-field admin-search">
+            <svg class="search-ico" aria-hidden="true"><use href="#i-search"/></svg>
+            <input type="text" id="ul-user-id" class="form-control" placeholder="Discord user ID">
           </div>
-          <div class="col-auto">
-            <button class="btn btn-run px-4" onclick="lookupUser()">LOOKUP</button>
-          </div>
+          <button class="btn-run btn-primary-soft" onclick="lookupUser()">Look up</button>
         </div>
-        <div id="ul-result" style="font-size:.85rem"></div>
+        <div id="ul-result" class="mt-3"></div>
+      </div>
+    </section>
+
+    <!-- ── Broadcast ──────────────────────────────────────────────────────── -->
+    <section class="asec" data-section="broadcast">
+      <div class="asec-head">
+        <h1>Broadcast</h1>
+        <p>Dashboard banner and one-off embeds.</p>
       </div>
 
-    </div>
-
-    <!-- ── Broadcast ─────────────────────────────────────────────────────────── -->
-    <div class="tab-pane fade" id="tab-broadcast">
-
-      <div class="shdr">Dashboard Announcement</div>
-      <div class="card-panel p-4 mb-3">
+      <div class="shdr">Dashboard announcement</div>
+      <div class="card-panel p-4 mb-4">
         <div class="row g-2 align-items-end mb-2">
           <div class="col-auto form-check pt-4">
             <input class="form-check-input" type="checkbox" id="an-enabled" onchange="renderAnnouncementPreview()">
             <label class="form-check-label" for="an-enabled">Show on public dashboard</label>
           </div>
-          <div class="col-3">
+          <div class="col-sm-4">
             <label class="form-label">Severity</label>
             <select id="an-severity" class="form-select" onchange="renderAnnouncementPreview()">
               <option value="info">Info</option>
@@ -146,14 +191,14 @@
           <textarea id="an-message" class="form-control" rows="2" maxlength="500" placeholder="Scheduled maintenance tonight at 22:00 UTC." oninput="renderAnnouncementPreview()"></textarea>
         </div>
         <div id="an-preview" class="mb-2"></div>
-        <button class="btn btn-run px-4" onclick="saveAnnouncement()">SAVE</button>
-        <div id="an-result" class="mt-2" style="font-size:.8rem"></div>
+        <button class="btn-run btn-primary-soft" onclick="saveAnnouncement()">Save</button>
+        <div id="an-result" class="hint-line"></div>
       </div>
 
-      <div class="shdr">Embed Broadcaster</div>
+      <div class="shdr">Embed broadcaster</div>
       <div class="card-panel p-4 mb-3">
         <div class="row g-3">
-          <div class="col-md-7">
+          <div class="col-lg-7">
             <div class="mb-2">
               <label class="form-label">Title</label>
               <input type="text" id="eb-title" class="form-control" placeholder="Official Decree" maxlength="256" oninput="renderEmbedPreview()">
@@ -165,7 +210,7 @@
             <div class="row g-2 mb-2">
               <div class="col-4">
                 <label class="form-label">Color</label>
-                <input type="color" id="eb-color" class="form-control" value="#cc0000" oninput="renderEmbedPreview()" style="height:38px">
+                <input type="color" id="eb-color" class="form-control" value="#cc0000" oninput="renderEmbedPreview()" style="height:44px">
               </div>
               <div class="col-4">
                 <label class="form-label">Image URL</label>
@@ -179,11 +224,11 @@
             <div class="mb-2">
               <label class="form-label">Fields</label>
               <div id="eb-fields"></div>
-              <button class="btn btn-run btn-sm px-3 mt-1" onclick="addEmbedField()">+ ADD FIELD</button>
+              <button class="btn-run" onclick="addEmbedField()">+ Add field</button>
             </div>
             <div class="row g-2 mb-2">
               <div class="col-5">
-                <label class="form-label">Button Label</label>
+                <label class="form-label">Button label</label>
                 <input type="text" id="eb-btn-label" class="form-control" placeholder="Join Server" maxlength="80" oninput="renderEmbedPreview()">
               </div>
               <div class="col-7">
@@ -192,44 +237,82 @@
               </div>
             </div>
             <div class="row g-2 align-items-end mt-3">
-              <div class="col-7">
+              <div class="col-sm-7">
                 <label class="form-label">Send to</label>
-                <select id="eb-target" class="form-select">
-                  <option value="all">All servers</option>
-                </select>
+                <select id="eb-target" class="form-select"><option value="all">All servers</option></select>
               </div>
               <div class="col-auto">
-                <button class="btn btn-danger-soft px-4" onclick="sendBroadcastEmbed()">SEND EMBED</button>
+                <button class="btn-run btn-danger-soft" onclick="sendBroadcastEmbed()">Send embed</button>
               </div>
             </div>
-            <div id="eb-result" class="mt-2" style="font-size:.8rem;white-space:pre-wrap"></div>
+            <div id="eb-result" class="hint-line" style="white-space:pre-wrap"></div>
           </div>
-          <div class="col-md-5">
+          <div class="col-lg-5">
             <label class="form-label">Preview</label>
             <div id="eb-preview" class="embed-preview"></div>
-            <div style="color:var(--text-faint);font-size:.7rem;margin-top:8px">
-              Sends once to a channel @everyone can write in. The bot's standard footer is appended automatically.
-            </div>
+            <div class="hint-line">Sends once to a channel @everyone can write in. The bot's standard footer is appended automatically.</div>
           </div>
         </div>
       </div>
+    </section>
 
-    </div>
+    <!-- ── Team ───────────────────────────────────────────────────────────── -->
+    <section class="asec" data-section="team">
+      <div class="asec-head">
+        <h1>Team</h1>
+        <p>Grant panel access by Discord account. Reviewers sign in with Discord and never need the admin token.</p>
+      </div>
 
-    <!-- ── System ─────────────────────────────────────────────────────────────── -->
-    <div class="tab-pane fade" id="tab-system">
+      <div class="card-panel p-4 mb-4">
+        <div class="row g-2 align-items-end">
+          <div class="col-sm-4">
+            <label class="form-label">Discord user ID</label>
+            <input type="text" id="team-id" class="form-control" placeholder="123456789012345678">
+          </div>
+          <div class="col-sm-3">
+            <label class="form-label">Role</label>
+            <select id="team-role" class="form-select"></select>
+          </div>
+          <div class="col-sm-3">
+            <label class="form-label">Note (optional)</label>
+            <input type="text" id="team-note" class="form-control" placeholder="who they are" maxlength="200">
+          </div>
+          <div class="col-auto">
+            <button class="btn-run btn-primary-soft" onclick="saveTeamMember()">Add / update</button>
+          </div>
+        </div>
+        <div id="team-result" class="hint-line"></div>
+        <div id="role-legend" class="role-legend"></div>
+      </div>
 
-      <div class="shdr">Commands</div>
+      <div class="shdr">Current team</div>
+      <div id="team-list"><div class="empty-state">Loading…</div></div>
+    </section>
+
+    <!-- ── Audit ──────────────────────────────────────────────────────────── -->
+    <section class="asec" data-section="audit">
+      <div class="asec-head">
+        <h1>Audit log</h1>
+        <p>Recent privileged actions and who performed them.</p>
+      </div>
+      <div class="toolbar">
+        <button class="btn-run" onclick="loadAudit()">Refresh</button>
+      </div>
+      <div id="audit-list"><div class="empty-state">Loading…</div></div>
+    </section>
+
+    <!-- ── System ─────────────────────────────────────────────────────────── -->
+    <section class="asec" data-section="system">
+      <div class="asec-head">
+        <h1>System</h1>
+        <p>Process control and direct data overrides. Output appears on Overview.</p>
+      </div>
+
       <div class="card-panel p-4">
-
         <div class="cmd-section">
           <div class="row g-2 align-items-end">
-            <div class="col-auto">
-              <button class="btn btn-run px-4" onclick="run('sync')">SYNC SLASH COMMANDS</button>
-            </div>
-            <div class="col-auto">
-              <button class="btn btn-run px-4" onclick="run('guilds')">LIST GUILDS</button>
-            </div>
+            <div class="col-auto"><button class="btn-run" onclick="run('sync')">Sync slash commands</button></div>
+            <div class="col-auto"><button class="btn-run" onclick="run('guilds')">List guilds</button></div>
           </div>
         </div>
 
@@ -237,153 +320,80 @@
           <div class="row g-2 align-items-end">
             <div class="col-auto">
               <label class="form-label">Cog name</label>
-              <input type="text" id="arg-cog" class="form-control" placeholder="cogs.scoring" style="width:200px">
+              <input type="text" id="arg-cog" class="form-control" placeholder="cogs.scoring" style="width:220px">
             </div>
-            <div class="col-auto">
-              <button class="btn btn-run px-4" onclick="run('reload', [v('arg-cog')])">RELOAD COG</button>
-            </div>
+            <div class="col-auto"><button class="btn-run" onclick="run('reload', [v('arg-cog')])">Reload cog</button></div>
           </div>
         </div>
 
         <div class="cmd-section">
           <div class="row g-2 align-items-end">
-            <div class="col-3">
-              <label class="form-label">Guild ID</label>
-              <input type="text" id="arg-fr-gid" class="form-control" placeholder="guild_id">
-            </div>
-            <div class="col-3">
-              <label class="form-label">User ID</label>
-              <input type="text" id="arg-fr-uid" class="form-control" placeholder="user_id">
-            </div>
-            <div class="col-auto">
-              <button class="btn btn-run px-4" onclick="run('force_reset', [v('arg-fr-gid'), v('arg-fr-uid')])">FORCE RESET SCORE</button>
-            </div>
+            <div class="col-sm-3"><label class="form-label">Guild ID</label><input type="text" id="arg-fr-gid" class="form-control" placeholder="guild_id"></div>
+            <div class="col-sm-3"><label class="form-label">User ID</label><input type="text" id="arg-fr-uid" class="form-control" placeholder="user_id"></div>
+            <div class="col-auto"><button class="btn-run" onclick="run('force_reset', [v('arg-fr-gid'), v('arg-fr-uid')])">Force reset score</button></div>
           </div>
         </div>
 
         <div class="cmd-section">
           <div class="row g-2 align-items-end">
-            <div class="col-3">
-              <label class="form-label">Guild ID</label>
-              <input type="text" id="arg-fy-gid" class="form-control" placeholder="guild_id">
-            </div>
-            <div class="col-3">
-              <label class="form-label">User ID</label>
-              <input type="text" id="arg-fy-uid" class="form-control" placeholder="user_id">
-            </div>
-            <div class="col-2">
-              <label class="form-label">Amount</label>
-              <input type="number" id="arg-fy-amt" class="form-control" placeholder="0" min="0">
-            </div>
-            <div class="col-auto">
-              <button class="btn btn-run px-4" onclick="run('force_yuan', [v('arg-fy-gid'), v('arg-fy-uid'), v('arg-fy-amt')])">SET YUAN</button>
-            </div>
+            <div class="col-sm-3"><label class="form-label">Guild ID</label><input type="text" id="arg-fy-gid" class="form-control" placeholder="guild_id"></div>
+            <div class="col-sm-3"><label class="form-label">User ID</label><input type="text" id="arg-fy-uid" class="form-control" placeholder="user_id"></div>
+            <div class="col-sm-2"><label class="form-label">Amount</label><input type="number" id="arg-fy-amt" class="form-control" placeholder="0" min="0"></div>
+            <div class="col-auto"><button class="btn-run" onclick="run('force_yuan', [v('arg-fy-gid'), v('arg-fy-uid'), v('arg-fy-amt')])">Set yuan</button></div>
           </div>
         </div>
 
         <div class="cmd-section">
           <div class="row g-2 align-items-end">
-            <div class="col-3">
-              <label class="form-label">Guild ID</label>
-              <input type="text" id="arg-fs-gid" class="form-control" placeholder="guild_id">
-            </div>
-            <div class="col-3">
-              <label class="form-label">User ID</label>
-              <input type="text" id="arg-fs-uid" class="form-control" placeholder="user_id">
-            </div>
-            <div class="col-2">
-              <label class="form-label">Score</label>
-              <input type="number" id="arg-fs-score" class="form-control" placeholder="750" min="600" max="1300" step="0.01">
-            </div>
-            <div class="col-auto">
-              <button class="btn btn-run px-4" onclick="run('force_score', [v('arg-fs-gid'), v('arg-fs-uid'), v('arg-fs-score')])">SET SCORE</button>
-            </div>
+            <div class="col-sm-3"><label class="form-label">Guild ID</label><input type="text" id="arg-fs-gid" class="form-control" placeholder="guild_id"></div>
+            <div class="col-sm-3"><label class="form-label">User ID</label><input type="text" id="arg-fs-uid" class="form-control" placeholder="user_id"></div>
+            <div class="col-sm-2"><label class="form-label">Score</label><input type="number" id="arg-fs-score" class="form-control" placeholder="750" min="600" max="1300" step="0.01"></div>
+            <div class="col-auto"><button class="btn-run" onclick="run('force_score', [v('arg-fs-gid'), v('arg-fs-uid'), v('arg-fs-score')])">Set score</button></div>
           </div>
         </div>
 
-        <div class="cmd-section">
+        <div class="cmd-section danger-zone">
+          <div class="dz-title">Destructive</div>
           <div class="row g-2 align-items-end">
-            <div class="col-3">
-              <label class="form-label">Guild ID</label>
-              <input type="text" id="arg-db-gid" class="form-control" placeholder="guild_id">
-            </div>
-            <div class="col-auto">
-              <button class="btn btn-run btn-danger-soft px-4" onclick="run('db_reset', [v('arg-db-gid')])">DB RESET GUILD</button>
-            </div>
+            <div class="col-sm-3"><label class="form-label">Guild ID</label><input type="text" id="arg-db-gid" class="form-control" placeholder="guild_id"></div>
+            <div class="col-auto"><button class="btn-run btn-danger-soft" onclick="confirmRun('db_reset', [v('arg-db-gid')], 'Wipe ALL data for this guild? This cannot be undone.')">DB reset guild</button></div>
+            <div class="col-auto"><button class="btn-run btn-danger-soft" onclick="confirmRun('restart', [], 'Restart the bot?')">Restart</button></div>
+            <div class="col-auto"><button class="btn-run btn-danger-soft" onclick="confirmRun('shutdown', [], 'Shut down the bot? It will not come back on its own.')">Shutdown</button></div>
           </div>
         </div>
-
-        <div class="cmd-section">
-          <div class="row g-2 align-items-end">
-            <div class="col-auto">
-              <button class="btn btn-danger-soft px-4" onclick="confirmRun('restart', [], 'Restart the bot?')">RESTART</button>
-            </div>
-            <div class="col-auto">
-              <button class="btn btn-danger-soft px-4" onclick="confirmRun('shutdown', [], 'Shut down the bot?')">SHUTDOWN</button>
-            </div>
-          </div>
-        </div>
-
       </div>
-    </div>
+    </section>
 
-    <!-- ── Logs ──────────────────────────────────────────────────────────────── -->
-    <div class="tab-pane fade" id="tab-logs">
-
-      <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
-        <button class="btn btn-run btn-sm px-3 log-svc-btn active" data-svc="gateway"   onclick="switchLogService('gateway')">Gateway</button>
-        <button class="btn btn-run btn-sm px-3 log-svc-btn"        data-svc="scheduler" onclick="switchLogService('scheduler')">Scheduler</button>
-        <button class="btn btn-run btn-sm px-3 log-svc-btn"        data-svc="web"       onclick="switchLogService('web')">Web</button>
-        <button class="btn btn-run btn-sm px-3 log-svc-btn"        data-svc="redis"     onclick="switchLogService('redis')">Redis</button>
-        <button class="btn btn-run btn-sm px-3 log-svc-btn"        data-svc="postgres"  onclick="switchLogService('postgres')">PostgreSQL</button>
-        <button class="btn btn-sm ms-auto log-clear-btn" onclick="clearLog()" title="Clear log panel">&#10005; Clear</button>
+    <!-- ── Logs ───────────────────────────────────────────────────────────── -->
+    <section class="asec" data-section="logs">
+      <div class="asec-head">
+        <h1>Live logs</h1>
+        <p>Streamed from the host. Newest at the bottom.</p>
       </div>
-
+      <div class="toolbar">
+        <button class="btn-run log-svc-btn active" data-svc="gateway"   onclick="switchLogService('gateway')">Gateway</button>
+        <button class="btn-run log-svc-btn" data-svc="scheduler" onclick="switchLogService('scheduler')">Scheduler</button>
+        <button class="btn-run log-svc-btn" data-svc="web"       onclick="switchLogService('web')">Web</button>
+        <button class="btn-run log-svc-btn" data-svc="redis"     onclick="switchLogService('redis')">Redis</button>
+        <button class="btn-run log-svc-btn" data-svc="postgres"  onclick="switchLogService('postgres')">PostgreSQL</button>
+        <div class="toolbar-spacer"></div>
+        <button class="btn-run log-clear-btn" onclick="clearLog()">Clear</button>
+      </div>
       <div id="log-status" class="log-status-bar">Select a service above to stream logs.</div>
       <div id="log-panel" class="log-panel"></div>
+    </section>
 
-    </div>
-
-  </div><!-- /tab-content -->
+  </main>
 </div>
+
+<!-- Character editor drawer -->
+<div class="drawer-backdrop" id="char-backdrop" hidden></div>
+<aside class="drawer" id="char-editor" hidden aria-label="Character editor"></aside>
+
+<div class="toast-stack" id="toasts"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" crossorigin="anonymous"></script>
-<script src="/static/admin.js?v=10"></script>
-<script>
-  // Init on the active tab immediately, lazy-load the rest
-  loadVoteChart('7D');
-  loadPendingRequests();
-  loadReviewerIdentity();
-  loadSubmitSettings();
-
-  // Lazy per-tab init
-  document.querySelectorAll('[data-bs-toggle="tab"]').forEach(tab => {
-    tab.addEventListener('shown.bs.tab', e => {
-      const target = e.target.getAttribute('href');
-      if (target === '#tab-broadcast') {
-        loadGuildListForBroadcast();
-        renderEmbedFields();
-        renderEmbedPreview();
-        loadAnnouncement();
-      }
-      if (target === '#tab-logs') {
-        switchLogService(_logSvc || 'gateway');
-      }
-    });
-  });
-
-  // Close log stream when leaving the logs tab
-  document.querySelectorAll('[data-bs-toggle="tab"]').forEach(tab => {
-    tab.addEventListener('hide.bs.tab', e => {
-      if (e.target.getAttribute('href') === '#tab-logs' && _logEs) {
-        _logEs.close();
-        _logEs = null;
-        const status = document.getElementById('log-status');
-        if (status) { status.textContent = 'Paused (tab inactive).'; status.className = 'log-status-bar'; }
-      }
-    });
-  });
-</script>
+<script src="/static/admin.js?v=11"></script>
 </body>
 </html>

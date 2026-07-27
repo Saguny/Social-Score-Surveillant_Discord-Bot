@@ -106,15 +106,122 @@ def _require_admin_ip(handler):
     return middleware
 
 
+# ── Admin roles / capabilities ───────────────────────────────────────────────
+# ADMIN_TOKEN is one shared secret: it can authorise, but it cannot attribute an
+# action or restrict it. Roles are keyed to a Discord account instead, so a
+# gacha reviewer signs in with Discord and never needs the token at all.
+ROLE_CAPS: dict[str, set[str]] = {
+    "owner":          {"gacha", "users", "broadcast", "system", "logs", "team"},
+    "admin":          {"gacha", "users", "broadcast", "system", "logs"},
+    "gacha_reviewer": {"gacha"},
+}
+ROLE_LABELS = {
+    "owner":          "Owner",
+    "admin":          "Admin",
+    "gacha_reviewer": "Gacha Reviewer",
+}
+
+
+def _env_owner_ids() -> set[int]:
+    """Bootstrap owners from env so a fresh deploy is never locked out."""
+    ids = set()
+    for part in os.getenv("ADMIN_DISCORD_IDS", "").split(","):
+        part = part.strip()
+        if part.isdigit():
+            ids.add(int(part))
+    return ids
+
+
+async def _admin_identity(request) -> dict | None:
+    """Resolve who is acting, and what they may do.
+
+    Two ways in:
+      * a Discord account carrying a role (the normal path for the team)
+      * the ADMIN_TOKEN session (owner-level break-glass for the operator)
+    """
+    cached = request.get("_identity")
+    if cached is not None:
+        return cached or None
+
+    session = await _discord_session(request)
+    identity = None
+
+    if session:
+        did = int(session.get("discord_id", 0))
+        role = None
+        if did in _env_owner_ids():
+            role = "owner"
+        else:
+            db = request.app.get("db")
+            if db is not None:
+                try:
+                    role = await db.get_admin_role(did)
+                except Exception:
+                    role = None
+        if role in ROLE_CAPS:
+            if role != "owner" or did not in _env_owner_ids():
+                db = request.app.get("db")
+                if db is not None:
+                    try:
+                        await db.touch_admin_username(did, session.get("username", ""))
+                    except Exception:
+                        pass
+            identity = {
+                "via":        "discord",
+                "discord_id": did,
+                "username":   session.get("username", ""),
+                "avatar":     session.get("avatar", ""),
+                "role":       role,
+                "caps":       ROLE_CAPS[role],
+            }
+
+    if identity is None and await _is_authed(request):
+        # Token holder. Keeps full access, but carries the linked Discord name
+        # when there is one so review actions stay attributable.
+        identity = {
+            "via":        "token",
+            "discord_id": int(session["discord_id"]) if session else None,
+            "username":   (session or {}).get("username", ""),
+            "avatar":     (session or {}).get("avatar", ""),
+            "role":       "owner",
+            "caps":       ROLE_CAPS["owner"],
+        }
+
+    request["_identity"] = identity or False
+    return identity
+
+
 def _require_admin(handler):
     async def middleware(request):
         if not _admin_ip_allowed(request):
             raise web.HTTPForbidden(text="Access denied.")
-        if not await _is_authed(request):
-            next_url = urllib.parse.quote(str(request.rel_url), safe='')
-            raise web.HTTPFound(f"/social-credit/login?next={next_url}")
-        return await handler(request)
+        if await _admin_identity(request):
+            return await handler(request)
+        next_url = urllib.parse.quote(str(request.rel_url), safe='')
+        raise web.HTTPFound(f"/social-credit/login?next={next_url}")
     return middleware
+
+
+def _require_cap(cap: str):
+    """Gate a route on a capability. JSON 403 so the panel can explain itself."""
+    def decorator(handler):
+        async def middleware(request):
+            identity = await _admin_identity(request)
+            if not identity:
+                return web.json_response({
+                    "error": "Not signed in.",
+                    "needs_login": True,
+                    "login_url": "/social-credit/auth/discord?next=/social-credit/admin",
+                }, status=401)
+            if cap not in identity["caps"]:
+                return web.json_response({
+                    "error": f"Your role ({ROLE_LABELS.get(identity['role'], identity['role'])}) "
+                             f"cannot perform this action.",
+                    "missing_cap": cap,
+                }, status=403)
+            return await handler(request)
+        return middleware
+    return decorator
 
 
 def _is_public_rate_limited(request) -> bool:
@@ -192,55 +299,36 @@ async def _discord_session(request) -> dict | None:
         return None
 
 
-def _reviewer_allowlist() -> set[int]:
-    raw = os.getenv("ADMIN_DISCORD_IDS", "")
-    ids = set()
-    for part in raw.split(","):
-        part = part.strip()
-        if part.isdigit():
-            ids.add(int(part))
-    return ids
-
-
-async def _reviewer(request) -> dict | None:
-    """The Discord identity acting on a gacha review, or None.
-
-    ADMIN_TOKEN gates access to the panel but is shared, so it can't attribute
-    an action to a person. Review routes additionally require a Discord login
-    and record who acted. An empty ADMIN_DISCORD_IDS means any linked account
-    may review; a populated one restricts it to those IDs.
-    """
-    session = await _discord_session(request)
-    if not session:
-        return None
-    allow = _reviewer_allowlist()
-    if allow and int(session.get("discord_id", 0)) not in allow:
-        return None
-    return session
-
-
 def _require_reviewer(handler):
-    """Layers a Discord-identity check on top of _require_admin."""
+    """Gacha review actions must be attributable to a Discord account.
+
+    The token path can reach these routes, but only if a Discord account is
+    also linked in the same browser — otherwise there is nobody to record.
+    """
     async def middleware(request):
-        reviewer = await _reviewer(request)
-        if not reviewer:
+        identity = await _admin_identity(request)
+        if not identity or "gacha" not in identity["caps"]:
             return web.json_response({
-                "error": "Link a Discord account with review permission before "
-                         "approving or rejecting submissions.",
+                "error": "You do not have gacha review permission.",
+                "missing_cap": "gacha",
+            }, status=403)
+        if not identity.get("discord_id"):
+            return web.json_response({
+                "error": "Link a Discord account before approving or rejecting "
+                         "submissions, so the decision can be attributed.",
                 "needs_discord_login": True,
                 "login_url": "/social-credit/auth/discord?next=/social-credit/admin",
             }, status=403)
-        request["reviewer"] = reviewer
         return await handler(request)
     return middleware
 
 
 def _moderator_name(request) -> str:
-    return (request.get("reviewer") or {}).get("username", "") or ""
+    return (request.get("_identity") or {}).get("username", "") or ""
 
 
 def _moderator_id(request) -> int | None:
-    rid = (request.get("reviewer") or {}).get("discord_id")
+    rid = (request.get("_identity") or {}).get("discord_id")
     return int(rid) if rid else None
 
 
@@ -1453,18 +1541,318 @@ async def _handle_admin_requests_reject(request):
 
 
 async def _handle_admin_whoami(request):
-    """Lets the panel show who review actions will be attributed to."""
+    """Drives the panel's nav: which sections to show, and who is acting."""
+    identity = await _admin_identity(request)
     session  = await _discord_session(request)
-    reviewer = await _reviewer(request)
+    if not identity:
+        return web.json_response({"signed_in": False}, status=401)
     return web.json_response({
-        "linked":       bool(session),
-        "can_review":   bool(reviewer),
-        "username":     (session or {}).get("username", ""),
-        "discord_id":   str((session or {}).get("discord_id", "")) if session else "",
-        "avatar":       (session or {}).get("avatar", ""),
-        "allowlist_on": bool(_reviewer_allowlist()),
-        "login_url":    "/social-credit/auth/discord?next=/social-credit/admin",
+        "signed_in":  True,
+        "via":        identity["via"],
+        "role":       identity["role"],
+        "role_label": ROLE_LABELS.get(identity["role"], identity["role"]),
+        "caps":       sorted(identity["caps"]),
+        "username":   identity["username"],
+        "discord_id": str(identity["discord_id"]) if identity["discord_id"] else "",
+        "avatar":     identity["avatar"],
+        "linked":     bool(session),
+        "can_review": "gacha" in identity["caps"] and bool(identity["discord_id"]),
+        "login_url":  "/social-credit/auth/discord?next=/social-credit/admin",
     })
+
+
+# ── Team management ──────────────────────────────────────────────────────────
+async def _handle_admin_team_list(request):
+    rows = await request.app["db"].list_admin_roles()
+    return web.json_response({
+        "roles": [
+            {
+                "discord_id":        str(r["discord_id"]),
+                "username":          r["username"],
+                "role":              r["role"],
+                "role_label":        ROLE_LABELS.get(r["role"], r["role"]),
+                "note":              r["note"],
+                "added_by_username": r["added_by_username"],
+                "added_at":          r["added_at"],
+                "from_env":          False,
+            }
+            for r in rows
+        ],
+        "env_owners":    [str(i) for i in sorted(_env_owner_ids())],
+        "assignable":    [{"value": k, "label": v} for k, v in ROLE_LABELS.items()],
+        "role_caps":     {k: sorted(v) for k, v in ROLE_CAPS.items()},
+    })
+
+
+async def _handle_admin_team_set(request):
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "Invalid JSON"}, status=400)
+
+    raw_id = str(body.get("discord_id", "")).strip()
+    role   = str(body.get("role", "")).strip()
+    note   = str(body.get("note", ""))[:200]
+
+    if not raw_id.isdigit():
+        return web.json_response({"error": "Discord ID must be numeric."}, status=400)
+    if role not in ROLE_CAPS:
+        return web.json_response({"error": "Unknown role."}, status=400)
+
+    discord_id = int(raw_id)
+    identity   = await _admin_identity(request)
+    db         = request.app["db"]
+
+    if discord_id in _env_owner_ids():
+        return web.json_response(
+            {"error": "This account is an owner via ADMIN_DISCORD_IDS and cannot be changed here."},
+            status=400,
+        )
+
+    username = ""
+    rpc = await call_admin_rpc("user_lookup", {"user_id": discord_id}, timeout=5.0)
+    if isinstance(rpc, dict) and rpc.get("username"):
+        username = rpc["username"]
+
+    await db.set_admin_role(
+        discord_id, role,
+        username          = username,
+        note              = note,
+        added_by          = identity.get("discord_id"),
+        added_by_username = identity.get("username", ""),
+    )
+    await db.log_admin_action(
+        identity.get("discord_id"), identity.get("username", ""),
+        "team.set", str(discord_id), f"role={role}",
+    )
+    return web.json_response({"ok": True, "username": username})
+
+
+async def _handle_admin_team_remove(request):
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "Invalid JSON"}, status=400)
+
+    raw_id = str(body.get("discord_id", "")).strip()
+    if not raw_id.isdigit():
+        return web.json_response({"error": "Discord ID must be numeric."}, status=400)
+
+    discord_id = int(raw_id)
+    identity   = await _admin_identity(request)
+    db         = request.app["db"]
+
+    if discord_id in _env_owner_ids():
+        return web.json_response(
+            {"error": "This account is an owner via ADMIN_DISCORD_IDS. Remove it from the env var instead."},
+            status=400,
+        )
+    # Never let the last DB owner delete themselves out of the panel.
+    role = await db.get_admin_role(discord_id)
+    if role == "owner" and await db.count_admin_owners() <= 1 and not _env_owner_ids():
+        return web.json_response(
+            {"error": "This is the only owner. Promote someone else first."},
+            status=400,
+        )
+
+    removed = await db.remove_admin_role(discord_id)
+    await db.log_admin_action(
+        identity.get("discord_id"), identity.get("username", ""),
+        "team.remove", str(discord_id), "",
+    )
+    return web.json_response({"ok": removed})
+
+
+async def _handle_admin_audit(request):
+    rows = await request.app["db"].get_admin_audit(limit=100)
+    return web.json_response({
+        "entries": [
+            {
+                "actor_id":       str(r["actor_id"]) if r["actor_id"] else "",
+                "actor_username": r["actor_username"],
+                "action":         r["action"],
+                "target":         r["target"],
+                "detail":         r["detail"],
+                "created_at":     r["created_at"],
+            }
+            for r in rows
+        ]
+    })
+
+
+# ── Character editor ─────────────────────────────────────────────────────────
+_CHAR_FACTIONS = ["reds", "capitalists", "conquerors", "strongmen", "philosophers", "icons", "wildcards"]
+_CHAR_RARITIES = ["legendary", "epic", "rare", "uncommon", "common"]
+
+
+async def _handle_admin_characters(request):
+    q = request.query
+    try:
+        page = max(1, int(q.get("page", "1")))
+    except ValueError:
+        page = 1
+    limit = 40
+    data = await request.app["db"].admin_search_characters(
+        q              = (q.get("q") or "").strip()[:100],
+        faction        = q.get("faction", "") if q.get("faction") in _CHAR_FACTIONS else "",
+        rarity         = q.get("rarity", "")  if q.get("rarity")  in _CHAR_RARITIES else "",
+        enabled        = q.get("enabled", ""),
+        missing_images = q.get("missing_images") == "1",
+        limit          = limit,
+        offset         = (page - 1) * limit,
+    )
+    data["page"]  = page
+    data["pages"] = max(1, -(-data["total"] // limit))
+    return web.json_response(data)
+
+
+async def _handle_admin_character_meta(request):
+    stats = await request.app["db"].admin_character_stats()
+    return web.json_response({
+        "factions": _CHAR_FACTIONS,
+        "rarities": _CHAR_RARITIES,
+        "genders":  ["male", "female", "other"],
+        "stats":    stats,
+    })
+
+
+async def _handle_admin_character_get(request):
+    cid  = request.match_info["cid"]
+    char = await request.app["db"].admin_get_character(cid)
+    if not char:
+        return web.json_response({"error": "Character not found."}, status=404)
+    return web.json_response(char)
+
+
+async def _handle_admin_character_save(request):
+    cid = request.match_info["cid"]
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "Invalid JSON"}, status=400)
+
+    db   = request.app["db"]
+    char = await db.admin_get_character(cid)
+    if not char:
+        return web.json_response({"error": "Character not found."}, status=404)
+
+    fields: dict = {}
+
+    if "name" in body:
+        name = str(body["name"]).strip()
+        if not name or len(name) > 120:
+            return web.json_response({"error": "Name must be 1-120 characters."}, status=400)
+        fields["name"] = name
+    if "title" in body:
+        fields["title"] = str(body["title"]).strip()[:120]
+    if "quote" in body:
+        fields["quote"] = str(body["quote"]).strip()[:300]
+    if "wiki" in body:
+        fields["wiki"] = str(body["wiki"]).strip()[:200]
+    if "wiki_lang" in body:
+        lang = str(body["wiki_lang"]).strip().lower()[:8]
+        fields["wiki_lang"] = lang or "en"
+    if "faction" in body:
+        if body["faction"] not in _CHAR_FACTIONS:
+            return web.json_response({"error": "Unknown faction."}, status=400)
+        fields["faction"] = body["faction"]
+    if "rarity" in body:
+        if body["rarity"] not in _CHAR_RARITIES:
+            return web.json_response({"error": "Unknown rarity."}, status=400)
+        fields["rarity"] = body["rarity"]
+    if "gender" in body:
+        g = body["gender"]
+        fields["gender"] = g if g in ("male", "female", "other") else None
+    if "enabled" in body:
+        fields["enabled"] = bool(body["enabled"])
+    if "vn_exclusive" in body:
+        fields["vn_exclusive"] = bool(body["vn_exclusive"])
+
+    for key in ("authority", "military", "charisma"):
+        if key in body:
+            try:
+                val = int(body[key])
+            except (TypeError, ValueError):
+                return web.json_response({"error": f"{key} must be a number."}, status=400)
+            fields[key] = max(0, min(100, val))
+
+    if "image_urls" in body:
+        urls = body["image_urls"]
+        if not isinstance(urls, list):
+            return web.json_response({"error": "image_urls must be a list."}, status=400)
+        clean = [str(u).strip() for u in urls if str(u).strip()]
+        if any(not u.startswith(("http://", "https://")) for u in clean):
+            return web.json_response({"error": "Every image URL must start with http:// or https://"}, status=400)
+        fields["image_urls"] = clean[:12]
+
+    if not fields:
+        return web.json_response({"error": "Nothing to update."}, status=400)
+
+    await db.admin_update_character(cid, fields)
+    await publish_guild_notify(0, "reload_gacha", {})
+
+    identity = await _admin_identity(request)
+    await db.log_admin_action(
+        identity.get("discord_id"), identity.get("username", ""),
+        "character.save", cid, ", ".join(sorted(fields.keys()))[:400],
+    )
+    return web.json_response({"ok": True, "character": await db.admin_get_character(cid)})
+
+
+async def _handle_admin_character_delete(request):
+    cid      = request.match_info["cid"]
+    db       = request.app["db"]
+    identity = await _admin_identity(request)
+
+    # Deleting drops claims people already own, so keep it owner/admin only.
+    if "users" not in identity["caps"]:
+        return web.json_response(
+            {"error": "Only an owner or admin can delete a character. Disable it instead."},
+            status=403,
+        )
+    char = await db.admin_get_character(cid)
+    if not char:
+        return web.json_response({"error": "Character not found."}, status=404)
+
+    await db.admin_delete_character(cid)
+    await publish_guild_notify(0, "reload_gacha", {})
+    await db.log_admin_action(
+        identity.get("discord_id"), identity.get("username", ""),
+        "character.delete", cid, char.get("name", ""),
+    )
+    return web.json_response({"ok": True})
+
+
+async def _handle_admin_character_upload(request):
+    """Mirror external image URLs into R2 so cards never hotlink."""
+    cid = request.match_info["cid"]
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "Invalid JSON"}, status=400)
+
+    urls = [str(u).strip() for u in (body.get("urls") or []) if str(u).strip()]
+    if not urls:
+        return web.json_response({"error": "No URLs supplied."}, status=400)
+    if any(not u.startswith(("http://", "https://")) for u in urls):
+        return web.json_response({"error": "Every URL must start with http:// or https://"}, status=400)
+
+    db   = request.app["db"]
+    char = await db.admin_get_character(cid)
+    if not char:
+        return web.json_response({"error": "Character not found."}, status=404)
+
+    from cogs.gacha.pipeline import upload_r2_multi
+    sem = asyncio.Semaphore(4)
+    async with aiohttp.ClientSession() as session:
+        hosted, errors = await upload_r2_multi(session, cid, urls, sem)
+
+    if hosted:
+        merged = (char.get("image_urls") or []) + hosted
+        await db.admin_update_character(cid, {"image_urls": merged[:12]})
+        await publish_guild_notify(0, "reload_gacha", {})
+
+    return web.json_response({"ok": bool(hosted), "uploaded": hosted, "errors": errors})
 
 
 async def _handle_admin_requests_ban(request):
@@ -2366,7 +2754,7 @@ async def start_web_server(db):
     app.router.add_get("/social-credit/terms",   _rate_limit_public(_handle_terms))
     app.router.add_get("/social-credit/leaderboards", _rate_limit_public(_handle_leaderboards_page))
     app.router.add_get("/social-credit/admin", _require_admin(_handle_admin))
-    app.router.add_post("/api/admin/command", _require_admin(_handle_admin_command))
+    app.router.add_post("/api/admin/command", _require_admin(_require_cap("system")(_handle_admin_command)))
     app.router.add_get("/api/routes", _rate_limit_public(_handle_routes))
     app.router.add_get("/social-credit/docs",       _rate_limit_public(_handle_docs))
     app.router.add_get("/api/stats", _rate_limit_public(_handle_stats))
@@ -2377,22 +2765,36 @@ async def start_web_server(db):
     app.router.add_get("/api/leaderboard", _rate_limit_public(_handle_leaderboard))
     app.router.add_get("/api/leaderboards/guilds", _rate_limit_public(_handle_guild_leaderboard))
     app.router.add_get("/api/stream", _rate_limit_public(_handle_sse))
-    app.router.add_get("/api/admin/topgg-votes", _require_admin(_handle_topgg_votes))
-    app.router.add_get("/api/admin/guild-list", _require_admin(_handle_guild_list))
-    app.router.add_get("/api/admin/user-lookup", _require_admin(_handle_user_lookup))
-    app.router.add_post("/api/admin/user-yuan-adjust", _require_admin(_handle_user_yuan_adjust))
-    app.router.add_post("/api/admin/broadcast-embed", _require_admin(_handle_broadcast_embed))
+    app.router.add_get("/api/admin/topgg-votes", _require_admin(_require_cap("system")(_handle_topgg_votes)))
+    app.router.add_get("/api/admin/guild-list", _require_admin(_require_cap("broadcast")(_handle_guild_list)))
+    app.router.add_get("/api/admin/user-lookup", _require_admin(_require_cap("users")(_handle_user_lookup)))
+    app.router.add_post("/api/admin/user-yuan-adjust", _require_admin(_require_cap("users")(_handle_user_yuan_adjust)))
+    app.router.add_post("/api/admin/broadcast-embed", _require_admin(_require_cap("broadcast")(_handle_broadcast_embed)))
     app.router.add_get("/api/announcement", _rate_limit_public(_handle_announcement))
-    app.router.add_post("/api/admin/announcement",        _require_admin(_handle_admin_announcement_set))
-    app.router.add_get("/api/admin/requests",             _require_admin(_handle_admin_requests))
+    app.router.add_post("/api/admin/announcement",        _require_admin(_require_cap("broadcast")(_handle_admin_announcement_set)))
+    app.router.add_get("/api/admin/requests",             _require_admin(_require_cap("gacha")(_handle_admin_requests)))
     app.router.add_post("/api/admin/requests/approve",    _require_admin(_require_reviewer(_handle_admin_requests_approve)))
     app.router.add_post("/api/admin/requests/reject",     _require_admin(_require_reviewer(_handle_admin_requests_reject)))
     app.router.add_post("/api/admin/requests/ban",        _require_admin(_require_reviewer(_handle_admin_requests_ban)))
     app.router.add_post("/api/admin/requests/edit",       _require_admin(_require_reviewer(_handle_admin_requests_edit)))
     app.router.add_get("/api/admin/whoami",               _require_admin(_handle_admin_whoami))
-    app.router.add_get("/api/admin/submit-settings",      _require_admin(_handle_admin_get_submit_settings))
-    app.router.add_post("/api/admin/submit-settings",     _require_admin(_handle_admin_set_submit_settings))
-    app.router.add_get("/api/admin/logs/stream",          _require_admin(_handle_admin_logs_stream))
+    app.router.add_get("/api/admin/submit-settings",      _require_admin(_require_cap("gacha")(_handle_admin_get_submit_settings)))
+    app.router.add_post("/api/admin/submit-settings",     _require_admin(_require_cap("gacha")(_handle_admin_set_submit_settings)))
+    app.router.add_get("/api/admin/logs/stream",          _require_admin(_require_cap("logs")(_handle_admin_logs_stream)))
+
+    # Team management (owner only)
+    app.router.add_get("/api/admin/team",                 _require_admin(_require_cap("team")(_handle_admin_team_list)))
+    app.router.add_post("/api/admin/team/set",            _require_admin(_require_cap("team")(_handle_admin_team_set)))
+    app.router.add_post("/api/admin/team/remove",         _require_admin(_require_cap("team")(_handle_admin_team_remove)))
+    app.router.add_get("/api/admin/audit",                _require_admin(_require_cap("team")(_handle_admin_audit)))
+
+    # Character editor (gacha capability)
+    app.router.add_get("/api/admin/characters",              _require_admin(_require_cap("gacha")(_handle_admin_characters)))
+    app.router.add_get("/api/admin/characters/meta",         _require_admin(_require_cap("gacha")(_handle_admin_character_meta)))
+    app.router.add_get("/api/admin/characters/{cid}",        _require_admin(_require_cap("gacha")(_handle_admin_character_get)))
+    app.router.add_post("/api/admin/characters/{cid}",       _require_admin(_require_cap("gacha")(_handle_admin_character_save)))
+    app.router.add_post("/api/admin/characters/{cid}/images",_require_admin(_require_cap("gacha")(_handle_admin_character_upload)))
+    app.router.add_post("/api/admin/characters/{cid}/delete",_require_admin(_require_cap("gacha")(_handle_admin_character_delete)))
     app.router.add_get("/social-credit/account",      _rate_limit_public(_handle_account_page))
     app.router.add_get("/api/account",  _rate_limit_public(_handle_account_api))
     app.router.add_get("/api/account/portfolio",                  _rate_limit_public(_handle_portfolio_data))

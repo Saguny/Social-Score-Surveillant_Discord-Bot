@@ -21,6 +21,7 @@ from database._guilds       import GuildRankMixin
 from database._analytics    import AnalyticsMixin
 from database._gacha        import GachaMixin
 from database._requests     import GachaRequestsMixin
+from database._admin_roles  import AdminRolesMixin
 
 
 TABLES = [
@@ -227,6 +228,7 @@ class Database(
     AnalyticsMixin,
     GachaMixin,
     GachaRequestsMixin,
+    AdminRolesMixin,
 ):
     def __init__(self):
         self._dsn = os.getenv("DATABASE_URL", "")
@@ -584,6 +586,29 @@ class Database(
                     gender         TEXT DEFAULT NULL
                 )
             """)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS admin_roles (
+                    discord_id        BIGINT PRIMARY KEY,
+                    username          TEXT NOT NULL DEFAULT '',
+                    role              TEXT NOT NULL DEFAULT 'gacha_reviewer',
+                    note              TEXT NOT NULL DEFAULT '',
+                    added_by          BIGINT,
+                    added_by_username TEXT NOT NULL DEFAULT '',
+                    added_at          BIGINT NOT NULL DEFAULT 0
+                )
+            """)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS admin_audit (
+                    id             SERIAL PRIMARY KEY,
+                    actor_id       BIGINT,
+                    actor_username TEXT NOT NULL DEFAULT '',
+                    action         TEXT NOT NULL,
+                    target         TEXT NOT NULL DEFAULT '',
+                    detail         TEXT NOT NULL DEFAULT '',
+                    created_at     BIGINT NOT NULL
+                )
+            """)
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_admin_audit_time ON admin_audit(created_at DESC)")
             await conn.execute("ALTER TABLE gacha_characters ADD COLUMN IF NOT EXISTS gender TEXT DEFAULT NULL")
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS gacha_requests (

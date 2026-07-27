@@ -56,6 +56,25 @@ body {
   letter-spacing:var(--tracking-label);
 }
 
+.btn-discord {
+  display:flex; align-items:center; justify-content:center;
+  width:100%; min-height:var(--tap);
+  background:#5865F2; border-radius:var(--r-md);
+  color:#fff; font-size:var(--fs-sm); font-weight:700;
+  letter-spacing:.04em;
+  transition:background var(--dur-fast) var(--ease);
+}
+.btn-discord:hover { background:#4752C4; color:#fff; }
+.login-note { margin:var(--sp-2) 0 0; text-align:center; color:var(--text-faint); font-size:var(--fs-micro); line-height:1.5; }
+
+.login-sep {
+  display:flex; align-items:center; gap:var(--sp-3);
+  margin:var(--sp-5) 0 var(--sp-4);
+  color:var(--text-faint); font-size:var(--fs-micro);
+  text-transform:uppercase; letter-spacing:var(--tracking-label);
+}
+.login-sep::before,.login-sep::after { content:''; flex:1; height:1px; background:var(--border); }
+
 .btn-login {
   width:100%;
   min-height:var(--tap);
