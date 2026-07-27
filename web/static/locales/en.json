@@ -484,5 +484,13 @@
   "supporter": "supporter",
   "supporters": "supporters",
   "tos_single": "This is a real historical or public figure, appropriate for a gacha card, and I have not submitted them in the last 24 hours.",
-  "was submitted for review. Thank you!": "was submitted for review. Thank you!"
+  "was submitted for review. Thank you!": "was submitted for review. Thank you!",
+  "Character Submission Guidelines": "Character Submission Guidelines",
+  "guideline_1": "Must comply with the <a href=\"https://discord.com/terms\" target=\"_blank\" rel=\"noopener\">Discord Terms of Service</a>.",
+  "guideline_2": "Real people only — no fictional characters.",
+  "guideline_3": "Private individuals whose main notability is a murder or similarly violent crime are not accepted, unless the crime occurred more than 40 years ago. Political leaders and public figures satirised for their exercise of power are a separate category and are unaffected by this rule.",
+  "Submissions that do not meet these bars will be rejected without further discussion.": "Submissions that do not meet these bars will be rejected without further discussion.",
+  "Got it": "Got it",
+
+  "tos_confirm_html": "I confirm this suggestion does not violate the <a href=\"https://discord.com/terms\" target=\"_blank\" rel=\"noopener\">Discord Terms of Service</a> or our <button type=\"button\" class=\"js-guidelines\">Character Submission Guidelines</button>."
 }

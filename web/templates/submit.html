@@ -5,7 +5,7 @@
   <meta name="robots" content="noindex, nofollow">
   <title>Submit Character · Social Credit</title>
   <link rel="stylesheet" href="/static/dashboard.css?v=3">
-  <link rel="stylesheet" href="/static/submit.css?v=3">
+  <link rel="stylesheet" href="/static/submit.css?v=5">
 </head>
 <body>
 
@@ -104,9 +104,27 @@
   </div>
 </div>
 
+<dialog class="gl-dialog" id="guidelines-dialog" data-i18n-aria="Character Submission Guidelines" aria-label="Character Submission Guidelines">
+  <div class="gl-head">
+    <h2 class="gl-title" data-i18n="Character Submission Guidelines">Character Submission Guidelines</h2>
+    <button class="sidebar-close" id="guidelines-close" data-i18n-aria="Close" aria-label="Close">
+      <svg width="18" height="18" aria-hidden="true"><use href="#i-close"/></svg>
+    </button>
+  </div>
+  <ol class="gl-list">
+    <li data-i18n-html="guideline_1">Must comply with the <a href="https://discord.com/terms" target="_blank" rel="noopener">Discord Terms of Service</a>.</li>
+    <li data-i18n="guideline_2">Real people only — no fictional characters.</li>
+    <li data-i18n="guideline_3">Private individuals whose main notability is a murder or similarly violent crime are not accepted, unless the crime occurred more than 40 years ago. Political leaders and public figures satirised for their exercise of power are a separate category and are unaffected by this rule.</li>
+  </ol>
+  <p class="gl-note" data-i18n="Submissions that do not meet these bars will be rejected without further discussion.">Submissions that do not meet these bars will be rejected without further discussion.</p>
+  <div class="gl-actions">
+    <button class="btn-run btn-primary-soft" id="guidelines-ok" data-i18n="Got it">Got it</button>
+  </div>
+</dialog>
+
 <div class="toast-wrap"><div class="toast-msg" id="toast"></div></div>
 
-<script src="/static/submit.js?v=3"></script>
+<script src="/static/submit.js?v=5"></script>
 <!--#include scripts-->
 </body>
 </html>

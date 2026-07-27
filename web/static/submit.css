@@ -305,8 +305,7 @@
 .wrong-person-hint a { color:var(--sage); }
 
 /* ── Sections ────────────────────────────────────────────────────────────── */
-.fallback-section,
-.tos-section {
+.fallback-section {
   margin-top:var(--sp-4);
   padding:var(--sp-4);
   background:var(--surface);
@@ -315,24 +314,6 @@
   -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-saturate));
   backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-saturate));
 }
-.tos-section .tos-title {
-  margin-bottom:var(--sp-3);
-  color:var(--text-muted);
-  font-size:var(--fs-micro);
-  text-transform:uppercase;
-  letter-spacing:var(--tracking-label);
-  font-weight:600;
-}
-.tos-row {
-  display:flex; align-items:flex-start; gap:var(--sp-3);
-  margin-bottom:var(--sp-3);
-  color:var(--text-muted);
-  font-size:var(--fs-sm);
-  line-height:1.5;
-  cursor:pointer;
-}
-.tos-row input[type=checkbox] { margin-top:3px; flex-shrink:0; width:16px; height:16px; }
-.tos-row:last-child { margin-bottom:0; }
 
 .submit-btn {
   width:100%;
@@ -353,6 +334,108 @@
 .submit-btn:not(:disabled):hover { background:var(--accent-hover); color:var(--black); }
 .submit-btn:disabled { opacity:.4; cursor:not-allowed; }
 .submit-hint { margin-top:var(--sp-2); text-align:center; color:var(--text-faint); font-size:var(--fs-tiny); }
+
+/* ── Consent row ─────────────────────────────────────────────────────────── */
+.tos-section {
+  margin-top:var(--sp-4);
+  padding:var(--sp-4);
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--r-lg);
+  -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-saturate));
+}
+/* A div, not a label: the text contains a link and a dialog trigger, and label
+   activation would toggle the box when either is clicked. */
+.tos-row {
+  display:flex; align-items:flex-start; gap:var(--sp-3);
+  cursor:pointer;
+}
+.tos-row .tos-chk {
+  flex-shrink:0;
+  width:18px; height:18px;
+  margin-top:2px;
+  cursor:pointer;
+}
+.tos-text {
+  min-width:0;
+  color:var(--text-muted);
+  font-size:var(--fs-sm);
+  line-height:1.6;
+}
+.tos-text a,
+.tos-text .js-guidelines {
+  color:var(--sage);
+  text-decoration:underline;
+  text-underline-offset:3px;
+}
+.tos-text a:hover,
+.tos-text .js-guidelines:hover { color:var(--cream); }
+.tos-text .js-guidelines {
+  padding:0; background:none; border:none; font:inherit; cursor:pointer;
+}
+.tos-text a:focus-visible,
+.tos-text .js-guidelines:focus-visible { outline:2px solid var(--sage); outline-offset:2px; border-radius:3px; }
+
+/* ── Guidelines overlay ──────────────────────────────────────────────────── */
+.gl-dialog {
+  width:min(560px,calc(100vw - 2rem));
+  max-height:min(86dvh,720px);
+  padding:var(--sp-5);
+  border:1px solid var(--border-strong);
+  border-radius:var(--r-xl);
+  background:var(--solid-raised);
+  color:var(--text);
+  box-shadow:var(--shadow-lg);
+  overflow-y:auto;
+}
+.gl-dialog::backdrop {
+  background:rgba(0,0,0,.62);
+  -webkit-backdrop-filter:blur(4px);
+  backdrop-filter:blur(4px);
+}
+.gl-dialog:not([open]) { display:none; }
+
+.gl-head { display:flex; align-items:flex-start; gap:var(--sp-3); margin-bottom:var(--sp-4); }
+.gl-title {
+  flex:1; min-width:0; margin:0;
+  font-size:var(--fs-base);
+  font-weight:700;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  color:var(--cream);
+}
+
+.gl-list { margin:0; padding-inline-start:var(--sp-5); }
+.gl-list li {
+  margin-bottom:var(--sp-3);
+  color:var(--text-muted);
+  font-size:var(--fs-sm);
+  line-height:1.65;
+}
+.gl-list li:last-child { margin-bottom:0; }
+.gl-list li::marker { color:var(--sage); font-weight:700; }
+.gl-list a { color:var(--sage); text-decoration:underline; text-underline-offset:3px; }
+.gl-list a:hover { color:var(--cream); }
+
+.gl-note {
+  margin:var(--sp-4) 0 0;
+  padding:var(--sp-3) var(--sp-4);
+  border-radius:var(--r-md);
+  background:rgba(242,100,106,.10);
+  border:1px solid rgba(242,100,106,.32);
+  color:var(--red);
+  font-size:var(--fs-tiny);
+  line-height:1.6;
+}
+
+.gl-actions { display:flex; justify-content:flex-end; margin-top:var(--sp-4); }
+.gl-actions .btn-run { min-height:var(--tap); padding-inline:var(--sp-5); }
+
+@media (max-width:575.98px) {
+  .gl-dialog { padding:var(--sp-4); border-radius:var(--r-lg); }
+  .gl-actions .btn-run { width:100%; }
+}
 
 /* ── Wishlist ────────────────────────────────────────────────────────────── */
 .wl-sort-bar { display:flex; gap:var(--sp-2); flex-wrap:wrap; margin-bottom:var(--sp-4); }

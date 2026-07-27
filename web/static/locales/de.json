@@ -484,5 +484,13 @@
   "supporter": "Unterstützer",
   "supporters": "Unterstützer",
   "tos_single": "Ich bestätige: eine reale historische oder öffentliche Person, geeignet für eine Gacha-Karte, und ich habe sie in den letzten 24 Stunden nicht bereits eingereicht.",
-  "was submitted for review. Thank you!": "wurde zur Prüfung eingereicht. Danke!"
+  "was submitted for review. Thank you!": "wurde zur Prüfung eingereicht. Danke!",
+  "Character Submission Guidelines": "Richtlinien für Charaktervorschläge",
+  "guideline_1": "Muss den <a href=\"https://discord.com/terms\" target=\"_blank\" rel=\"noopener\">Discord-Nutzungsbedingungen</a> entsprechen.",
+  "guideline_2": "Nur reale Personen — keine fiktiven Charaktere.",
+  "guideline_3": "Privatpersonen, deren Bekanntheit hauptsächlich auf einem Mord oder einer vergleichbar schweren Gewalttat beruht, werden nicht akzeptiert, sofern die Tat nicht mehr als 40 Jahre zurückliegt. Politische Führungspersonen und öffentliche Figuren, die für ihre Machtausübung satirisch dargestellt werden, bilden eine eigene Kategorie und sind von dieser Regel ausgenommen.",
+  "Submissions that do not meet these bars will be rejected without further discussion.": "Vorschläge, die diese Anforderungen nicht erfüllen, werden ohne weitere Diskussion abgelehnt.",
+  "Got it": "Verstanden",
+
+  "tos_confirm_html": "Ich bestätige, dass dieser Vorschlag weder gegen die <a href=\"https://discord.com/terms\" target=\"_blank\" rel=\"noopener\">Discord-Nutzungsbedingungen</a> noch gegen unsere <button type=\"button\" class=\"js-guidelines\">Richtlinien für Charaktervorschläge</button> verstößt."
 }

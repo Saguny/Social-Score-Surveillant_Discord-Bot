@@ -484,5 +484,13 @@
   "supporter": "位支持者",
   "supporters": "位支持者",
   "tos_single": "我确认：这是真实的历史或公众人物，适合作为抽卡角色，且我在过去 24 小时内未提交过此人。",
-  "was submitted for review. Thank you!": "已提交审核，谢谢！"
+  "was submitted for review. Thank you!": "已提交审核，谢谢！",
+  "Character Submission Guidelines": "角色提交准则",
+  "guideline_1": "必须符合 <a href=\"https://discord.com/terms\" target=\"_blank\" rel=\"noopener\">Discord 服务条款</a>。",
+  "guideline_2": "仅限真实人物，不接受虚构角色。",
+  "guideline_3": "主要因谋杀或类似严重暴力犯罪而为人所知的私人，不予接受，除非该罪行发生在 40 年以前。因行使权力而被讽刺的政治领导人与公众人物属于另一类别，不受此规则限制。",
+  "Submissions that do not meet these bars will be rejected without further discussion.": "不符合上述标准的提交将被直接拒绝，不另行讨论。",
+  "Got it": "知道了",
+
+  "tos_confirm_html": "我确认此推荐不违反 <a href=\"https://discord.com/terms\" target=\"_blank\" rel=\"noopener\">Discord 服务条款</a> 或我们的 <button type=\"button\" class=\"js-guidelines\">角色提交准则</button>。"
 }

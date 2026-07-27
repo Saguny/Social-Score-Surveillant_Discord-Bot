@@ -311,11 +311,11 @@
     }
     $result.innerHTML = `
       ${_wikiPreviewHtml(d)}
-      <div class="tos-section" id="tos-box">
-        <label class="tos-row">
-          <input type="checkbox" class="tos-chk" id="tos-confirm">
-          <span>${_esc(t('tos_single'))}</span>
-        </label>
+      <div class="tos-section">
+        <div class="tos-row" id="tos-row">
+          <input type="checkbox" class="tos-chk" id="tos-confirm" aria-labelledby="tos-text">
+          <span class="tos-text" id="tos-text">${t('tos_confirm_html')}</span>
+        </div>
       </div>
       <button class="submit-btn" id="submit-btn" disabled>${_esc(t('SUBMIT FOR REVIEW'))}</button>
       <div class="submit-hint" id="submit-hint">${_esc(t('Tick the box to submit.'))}</div>
@@ -324,6 +324,18 @@
     document.querySelectorAll('.tos-chk').forEach(c => c.addEventListener('change', updateSubmitBtn));
     document.getElementById('submit-btn').addEventListener('click', onSubmitClick);
     updateSubmitBtn();
+  }
+
+  function updateSubmitBtn() {
+    const boxes = Array.prototype.slice.call(document.querySelectorAll('.tos-chk'));
+    const btn   = document.getElementById('submit-btn');
+    if (!btn) return;
+    const ok = boxes.length > 0 && boxes.every(c => c.checked);
+    btn.disabled = !ok;
+    const hint = document.getElementById('submit-hint');
+    if (hint) hint.textContent = ok
+      ? t('Your username will be credited on the card if approved.')
+      : t('Tick the box to submit.');
   }
 
   function renderSubmitted(d) {
@@ -337,16 +349,50 @@
       ${_nextStepsHtml()}`;
   }
 
-  function updateSubmitBtn() {
-    const all = Array.prototype.slice.call(document.querySelectorAll('.tos-chk'));
-    const btn = document.getElementById('submit-btn');
-    if (!btn) return;
-    const ok = all.length > 0 && all.every(c => c.checked);
-    btn.disabled = !ok;
-    const hint = document.getElementById('submit-hint');
-    if (hint) hint.textContent = ok
-      ? t('Your username will be credited on the card if approved.')
-      : t('Tick the box to submit.');
+  /* ── guidelines overlay ──────────────────────────────────────────────────── */
+  const $guidelines = document.getElementById('guidelines-dialog');
+
+  function openGuidelines() {
+    if (!$guidelines) return;
+    if (typeof $guidelines.showModal === 'function') $guidelines.showModal();
+    else $guidelines.setAttribute('open', '');
+  }
+
+  function closeGuidelines() {
+    if (!$guidelines) return;
+    if (typeof $guidelines.close === 'function') $guidelines.close();
+    else $guidelines.removeAttribute('open');
+  }
+
+  /* The consent text carries a link and a dialog trigger. A <label> would
+     toggle the checkbox when either is clicked, so the row is a plain div and
+     the toggle is wired here, ignoring clicks on interactive children. */
+  document.addEventListener('click', (e) => {
+    const row = e.target.closest('#tos-row');
+    if (!row) return;
+    if (e.target.closest('a, button, input')) return;
+    const box = document.getElementById('tos-confirm');
+    if (!box) return;
+    box.checked = !box.checked;
+    updateSubmitBtn();
+  });
+
+  if ($guidelines) {
+    // Delegated: the trigger lives inside re-rendered result markup.
+    document.addEventListener('click', (e) => {
+      if (e.target.closest('.js-guidelines')) {
+        e.preventDefault();
+        openGuidelines();
+        return;
+      }
+      if (e.target.closest('#guidelines-close') || e.target.closest('#guidelines-ok')) {
+        closeGuidelines();
+      }
+    });
+    // Clicking the ::backdrop reports the <dialog> itself as the target.
+    $guidelines.addEventListener('click', (e) => {
+      if (e.target === $guidelines) closeGuidelines();
+    });
   }
 
   /* ── API calls ───────────────────────────────────────────────────────────── */
