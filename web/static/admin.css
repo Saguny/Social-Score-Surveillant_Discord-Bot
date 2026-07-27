@@ -84,8 +84,12 @@
 .empty-state { padding:var(--sp-5); text-align:center; color:var(--text-faint); font-size:var(--fs-sm); }
 .empty-state.err { color:var(--red); }
 .mono-input { font-family:var(--font-mono); font-size:var(--fs-tiny); }
-.admin-search { flex:1 1 240px; min-width:0; }
-.admin-search .form-control { padding-inline-start:calc(var(--sp-3) + 26px); }
+.admin-search { flex:1 1 260px; min-width:0; }
+/* Bootstrap sets .form-select/.form-control to width:100%, which in a flex
+   toolbar forces every filter onto its own row. Constrain them here. */
+.toolbar .form-select,
+.toolbar .form-select-sm { flex:0 0 auto; width:auto; min-width:140px; max-width:200px; }
+.toolbar .form-control-sm { flex:0 0 auto; }
 .pager { display:flex; align-items:center; justify-content:center; gap:var(--sp-3); margin-top:var(--sp-4); }
 .pager .hint-line { margin:0; }
 
@@ -459,4 +463,12 @@
   .admin-tabs .nav-link { padding:var(--sp-2) var(--sp-3); font-size:var(--fs-micro); }
   .req-actions { width:100%; }
   .log-panel { height:360px; }
+}
+
+/* ── Appearance controls ─────────────────────────────────────────────────── */
+.ap-range { width:100%; accent-color:var(--sage); min-height:28px; }
+.card-panel code {
+  padding:1px 5px; border-radius:3px;
+  background:var(--surface-recessed); border:1px solid var(--border);
+  color:var(--sage); font-family:var(--font-mono); font-size:.85em;
 }

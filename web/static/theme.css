@@ -601,6 +601,37 @@ table,input,.mono,[data-num] {
 textarea.form-control { min-height:auto; }
 input[type=checkbox],input[type=radio] { accent-color:var(--sage); }
 
+/* ── Search field ────────────────────────────────────────────────────────────
+   Shared by the submit page and the admin console. Lives here, not in a page
+   stylesheet: an unstyled .search-ico falls back to the SVG default 300x150. */
+.search-field { position:relative; }
+.search-field .search-ico {
+  position:absolute;
+  inset-inline-start:var(--sp-3);
+  top:50%;
+  width:17px; height:17px;
+  margin-top:-8px;
+  color:var(--text-faint);
+  pointer-events:none;
+}
+.search-field > input,
+.search-field .form-control,
+.search-field .wiki-input {
+  padding-inline:calc(var(--sp-3) + 26px) calc(var(--sp-3) + 26px);
+}
+.search-clear {
+  position:absolute;
+  inset-inline-end:var(--sp-2);
+  top:50%;
+  transform:translateY(-50%);
+  display:grid; place-items:center;
+  width:28px; height:28px;
+  background:transparent; border:none; border-radius:50%;
+  color:var(--text-faint); cursor:pointer;
+}
+.search-clear:hover { color:var(--cream); background:rgba(255,255,255,.06); }
+.search-clear[hidden] { display:none; }
+
 .lang-select {
   min-height:36px;
   padding:var(--sp-1) var(--sp-3);

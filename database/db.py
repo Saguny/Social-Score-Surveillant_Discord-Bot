@@ -22,6 +22,7 @@ from database._analytics    import AnalyticsMixin
 from database._gacha        import GachaMixin
 from database._requests     import GachaRequestsMixin
 from database._admin_roles  import AdminRolesMixin
+from database._appearance   import AppearanceMixin
 
 
 TABLES = [
@@ -229,6 +230,7 @@ class Database(
     GachaMixin,
     GachaRequestsMixin,
     AdminRolesMixin,
+    AppearanceMixin,
 ):
     def __init__(self):
         self._dsn = os.getenv("DATABASE_URL", "")
@@ -584,6 +586,19 @@ class Database(
                     image_urls     TEXT[] NOT NULL DEFAULT '{}',
                     enabled        BOOLEAN NOT NULL DEFAULT TRUE,
                     gender         TEXT DEFAULT NULL
+                )
+            """)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS site_appearance (
+                    id           INTEGER PRIMARY KEY DEFAULT 1,
+                    bg_image_url TEXT    NOT NULL DEFAULT '',
+                    bg_position  TEXT    NOT NULL DEFAULT 'center top',
+                    bg_scrim     INTEGER NOT NULL DEFAULT 86,
+                    bg_blur      INTEGER NOT NULL DEFAULT 0,
+                    credit_name  TEXT    NOT NULL DEFAULT '',
+                    credit_url   TEXT    NOT NULL DEFAULT '',
+                    updated_at   BIGINT  NOT NULL DEFAULT 0,
+                    CONSTRAINT single_appearance CHECK (id = 1)
                 )
             """)
             await conn.execute("""

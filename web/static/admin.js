@@ -151,6 +151,7 @@ const _sectionLoaders = {
   requests:   _once('requests',   () => { loadPendingRequests(); loadSubmitSettings(); }),
   characters: _once('characters', () => { loadCharacterMeta().then(loadCharacters); }),
   broadcast:  _once('broadcast',  () => { loadGuildListForBroadcast(); renderEmbedFields(); renderEmbedPreview(); loadAnnouncement(); }),
+  appearance: _once('appearance', () => { loadAppearance(); }),
   team:       _once('team',       () => { loadTeam(); }),
   audit:      _once('audit',      () => { loadAudit(); }),
 };
@@ -924,6 +925,76 @@ function closeCharacter() {
   document.getElementById('char-backdrop').hidden = true;
 }
 
+/* ── Appearance ──────────────────────────────────────────────────────────── */
+function _apFields() {
+  return {
+    bg_image_url: v('ap-url'),
+    bg_position:  document.getElementById('ap-position').value,
+    bg_scrim:     +document.getElementById('ap-scrim').value,
+    bg_blur:      +document.getElementById('ap-blur').value,
+    credit_name:  v('ap-credit-name'),
+    credit_url:   v('ap-credit-url'),
+  };
+}
+
+/* Paints the current form values onto this page only, so the owner can judge
+   contrast before publishing to everyone. */
+function previewAppearance() {
+  const f = _apFields();
+  const root = document.documentElement;
+  const url = f.bg_image_url.replace(/["'()\\]/g, '');
+  root.style.setProperty('--bg-image', /^https?:\/\//i.test(url) ? `url('${url}')` : 'none');
+  root.style.setProperty('--bg-image-position', f.bg_position);
+  root.style.setProperty('--bg-scrim', (f.bg_scrim / 100).toFixed(2));
+  root.style.setProperty('--bg-image-blur', f.bg_blur + 'px');
+}
+
+function _apSyncOutputs() {
+  document.getElementById('ap-scrim-val').textContent = document.getElementById('ap-scrim').value;
+  document.getElementById('ap-blur-val').textContent  = document.getElementById('ap-blur').value;
+}
+
+async function loadAppearance(silent) {
+  const r = await api('/api/appearance');
+  if (!r.ok) return;
+  const a = r.data;
+  document.getElementById('ap-url').value         = a.bg_image_url || '';
+  document.getElementById('ap-position').value    = a.bg_position || 'center top';
+  document.getElementById('ap-scrim').value       = a.bg_scrim ?? 86;
+  document.getElementById('ap-blur').value        = a.bg_blur ?? 0;
+  document.getElementById('ap-credit-name').value = a.credit_name || '';
+  document.getElementById('ap-credit-url').value  = a.credit_url || '';
+  _apSyncOutputs();
+  previewAppearance();
+  if (silent) toast('Reverted to the saved background.', 'ok');
+}
+
+async function saveAppearance() {
+  const out = document.getElementById('ap-result');
+  out.textContent = 'Publishing…';
+  const r = await api('/api/admin/appearance', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(_apFields()),
+  });
+  if (!r.ok) { out.textContent = ''; apiError(r); return; }
+  out.textContent = 'Published. Live across the site within 30 seconds (cache TTL).';
+  previewAppearance();
+  toast('Background published site-wide.', 'ok');
+}
+
+async function resetAppearance() {
+  if (!confirm('Reset the background, dim, blur and credit to the built-in default?')) return;
+  const r = await api('/api/admin/appearance', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reset: true }),
+  });
+  if (!r.ok) { apiError(r); return; }
+  toast('Reset to default.', 'ok');
+  loadAppearance();
+}
+
 /* ── Team ────────────────────────────────────────────────────────────────── */
 async function loadTeam() {
   const list = document.getElementById('team-list');
@@ -1085,6 +1156,12 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('char-search')?.addEventListener('input', () => {
     clearTimeout(_charDebounce);
     _charDebounce = setTimeout(_charFilterChanged, 300);
+  });
+  ['ap-scrim', 'ap-blur'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', () => { _apSyncOutputs(); previewAppearance(); });
+  });
+  ['ap-url', 'ap-position'].forEach(id => {
+    document.getElementById(id)?.addEventListener('change', previewAppearance);
   });
   document.getElementById('ul-user-id')?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') lookupUser();

@@ -4,8 +4,28 @@
   <a href="https://top.gg/bot/856163780265902151" target="_blank" rel="noopener" data-i18n="Invite Bot">Invite Bot</a> ·
   <a href="/social-credit/privacy" data-i18n="PRIVACY">PRIVACY</a> ·
   <a href="/social-credit/terms" data-i18n="TERMS">TERMS</a>
-  <div class="footer-credit">
-    <span data-i18n="Background art by">Background art by</span>
-    <a href="https://x.com/Talz_ruwa72/status/2081338816431009800" target="_blank" rel="noopener">Talz_ruwa72</a>
-  </div>
+  <div class="footer-credit" id="footer-credit" hidden></div>
 </footer>
+<script>
+  (function () {
+    var wrap = document.getElementById('footer-credit');
+    if (!wrap) return;
+    fetch('/api/appearance').then(function (r) { return r.ok ? r.json() : null; }).then(function (a) {
+      if (!a || !a.credit_name) return;
+      var label = (typeof t === 'function' ? t('Background art by') : 'Background art by');
+      var name = document.createTextNode(a.credit_name);
+      wrap.textContent = label + ' ';
+      if (/^https?:\/\//i.test(a.credit_url || '')) {
+        var link = document.createElement('a');
+        link.href = a.credit_url;
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.appendChild(name);
+        wrap.appendChild(link);
+      } else {
+        wrap.appendChild(name);
+      }
+      wrap.hidden = false;
+    }).catch(function () {});
+  })();
+</script>

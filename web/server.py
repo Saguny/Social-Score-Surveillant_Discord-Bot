@@ -111,7 +111,7 @@ def _require_admin_ip(handler):
 # action or restrict it. Roles are keyed to a Discord account instead, so a
 # gacha reviewer signs in with Discord and never needs the token at all.
 ROLE_CAPS: dict[str, set[str]] = {
-    "owner":          {"gacha", "users", "broadcast", "system", "logs", "team"},
+    "owner":          {"gacha", "users", "broadcast", "system", "logs", "team", "appearance"},
     "admin":          {"gacha", "users", "broadcast", "system", "logs"},
     "gacha_reviewer": {"gacha"},
 }
@@ -1680,6 +1680,93 @@ async def _handle_admin_audit(request):
     })
 
 
+# ── Site appearance ──────────────────────────────────────────────────────────
+_BG_POSITIONS = ["center top", "center center", "center bottom", "left center", "right center"]
+
+
+async def _handle_appearance(request):
+    """Public JSON — drives the footer credit."""
+    data = await request.app["db"].get_appearance()
+    return web.json_response(data, headers={"Cache-Control": "public, max-age=30"})
+
+
+async def _handle_appearance_css(request):
+    """Public CSS override for theme.css's background tokens.
+
+    Served as a stylesheet rather than applied by JS so the background is
+    correct on first paint — no flash of the previous wallpaper.
+    """
+    a = await request.app["db"].get_appearance()
+    url = (a.get("bg_image_url") or "").strip()
+    # url() is the one place a stray quote or paren could break out of the
+    # declaration, so strip those rather than trusting the stored value.
+    safe = re.sub(r"""["'()\\\s]""", "", url)
+    image = f"url('{safe}')" if safe.startswith(("http://", "https://")) else "none"
+    scrim = max(0, min(100, int(a.get("bg_scrim", 86)))) / 100
+    blur  = max(0, min(40, int(a.get("bg_blur", 0))))
+    pos   = a.get("bg_position") if a.get("bg_position") in _BG_POSITIONS else "center top"
+
+    css = (
+        ":root{"
+        f"--bg-image:{image};"
+        f"--bg-image-position:{pos};"
+        f"--bg-scrim:{scrim:.2f};"
+        f"--bg-image-blur:{blur}px;"
+        "}"
+    )
+    return web.Response(
+        text=css,
+        content_type="text/css",
+        headers={"Cache-Control": "public, max-age=30"},
+    )
+
+
+async def _handle_admin_appearance_set(request):
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "Invalid JSON"}, status=400)
+
+    db = request.app["db"]
+
+    if body.get("reset"):
+        await db.reset_appearance()
+        return web.json_response({"ok": True, "appearance": await db.get_appearance()})
+
+    url = str(body.get("bg_image_url", "")).strip()[:500]
+    if url and not url.startswith(("http://", "https://")):
+        return web.json_response({"error": "Image URL must start with http:// or https://"}, status=400)
+
+    credit_url = str(body.get("credit_url", "")).strip()[:500]
+    if credit_url and not credit_url.startswith(("http://", "https://")):
+        return web.json_response({"error": "Credit link must start with http:// or https://"}, status=400)
+
+    try:
+        scrim = int(body.get("bg_scrim", 86))
+        blur  = int(body.get("bg_blur", 0))
+    except (TypeError, ValueError):
+        return web.json_response({"error": "Dim and blur must be numbers."}, status=400)
+
+    pos = body.get("bg_position")
+    if pos not in _BG_POSITIONS:
+        pos = "center top"
+
+    await db.set_appearance(
+        bg_image_url = url,
+        bg_position  = pos,
+        bg_scrim     = max(0, min(100, scrim)),
+        bg_blur      = max(0, min(40, blur)),
+        credit_name  = str(body.get("credit_name", "")).strip()[:120],
+        credit_url   = credit_url,
+    )
+    identity = await _admin_identity(request)
+    await db.log_admin_action(
+        identity.get("discord_id"), identity.get("username", ""),
+        "appearance.set", url[:120], f"scrim={scrim} blur={blur}",
+    )
+    return web.json_response({"ok": True, "appearance": await db.get_appearance()})
+
+
 # ── Character editor ─────────────────────────────────────────────────────────
 _CHAR_FACTIONS = ["reds", "capitalists", "conquerors", "strongmen", "philosophers", "icons", "wildcards"]
 _CHAR_RARITIES = ["legendary", "epic", "rare", "uncommon", "common"]
@@ -2787,6 +2874,7 @@ async def start_web_server(db):
     app.router.add_post("/api/admin/team/set",            _require_admin(_require_cap("team")(_handle_admin_team_set)))
     app.router.add_post("/api/admin/team/remove",         _require_admin(_require_cap("team")(_handle_admin_team_remove)))
     app.router.add_get("/api/admin/audit",                _require_admin(_require_cap("team")(_handle_admin_audit)))
+    app.router.add_post("/api/admin/appearance",          _require_admin(_require_cap("appearance")(_handle_admin_appearance_set)))
 
     # Character editor (gacha capability)
     app.router.add_get("/api/admin/characters",              _require_admin(_require_cap("gacha")(_handle_admin_characters)))
@@ -2806,6 +2894,8 @@ async def start_web_server(db):
     app.router.add_post("/api/account/portfolio/turbo/open",      _rate_limit_public(_handle_portfolio_turbo_open))
     app.router.add_post("/api/account/portfolio/turbo/close",     _rate_limit_public(_handle_portfolio_turbo_close))
     app.router.add_post("/webhooks/topgg", _handle_topgg_webhook)
+    app.router.add_get("/api/appearance",     _rate_limit_public(_handle_appearance))
+    app.router.add_get("/api/appearance.css", _handle_appearance_css)
     app.router.add_get("/robots.txt", _handle_robots)
     _STATIC_DIR = Path(__file__).parent / 'static'
     async def _handle_static(request: web.Request) -> web.Response:
