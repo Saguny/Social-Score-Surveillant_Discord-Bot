@@ -113,11 +113,12 @@ async function loadWhoami() {
     chip.innerHTML = `${av}<span class="whoami-text"><b>${who}</b><span>${_esc(_me.role_label)}</span></span>`;
   }
 
-  // Hide anything this role cannot use.
+  // Hide anything this role cannot use. Fails closed: an element carrying an
+  // empty or unknown data-cap is hidden rather than shown to everyone, which
+  // is how Overview leaked to gacha reviewers.
   const caps = new Set(_me.caps || []);
   document.querySelectorAll('[data-cap]').forEach(el => {
-    const need = el.getAttribute('data-cap');
-    el.hidden = !!need && !caps.has(need);
+    el.hidden = !caps.has(el.getAttribute('data-cap'));
   });
 
   const wanted = (location.hash || '').replace('#', '');
