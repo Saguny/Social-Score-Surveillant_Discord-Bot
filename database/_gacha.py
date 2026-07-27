@@ -385,6 +385,163 @@ class GachaMixin:
                 guild_id, enabled,
             )
 
+    async def admin_search_characters(
+        self,
+        q: str = "",
+        faction: str = "",
+        rarity: str = "",
+        enabled: str = "",
+        missing_images: bool = False,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> dict:
+        """Paginated character search for the admin editor."""
+        where: list[str] = []
+        args: list = []
+
+        if q:
+            args.append(f"%{q.lower()}%")
+            where.append(f"(LOWER(name) LIKE ${len(args)} OR LOWER(character_id) LIKE ${len(args)})")
+        if faction:
+            args.append(faction)
+            where.append(f"faction = ${len(args)}")
+        if rarity:
+            args.append(rarity)
+            where.append(f"rarity = ${len(args)}")
+        if enabled in ("true", "false"):
+            args.append(enabled == "true")
+            where.append(f"enabled = ${len(args)}")
+        if missing_images:
+            where.append("(image_urls IS NULL OR cardinality(image_urls) = 0)")
+
+        clause = ("WHERE " + " AND ".join(where)) if where else ""
+
+        total_row = await self._pool.fetchrow(
+            f"SELECT COUNT(*) AS n FROM gacha_characters {clause}", *args
+        )
+        args.extend([limit, offset])
+        rows = await self._pool.fetch(
+            f"""
+            SELECT character_id, name, title, faction, rarity, gender, enabled,
+                   vn_exclusive, image_urls, wiki, wiki_lang,
+                   stat_authority, stat_military, stat_charisma,
+                   submitted_by_username
+            FROM gacha_characters
+            {clause}
+            ORDER BY name ASC
+            LIMIT ${len(args) - 1} OFFSET ${len(args)}
+            """,
+            *args,
+        )
+        return {
+            "total": int(total_row["n"]) if total_row else 0,
+            "characters": [
+                {
+                    "character_id": r["character_id"],
+                    "name":         r["name"],
+                    "title":        r["title"],
+                    "faction":      r["faction"],
+                    "rarity":       r["rarity"],
+                    "gender":       r["gender"],
+                    "enabled":      r["enabled"],
+                    "vn_exclusive": r["vn_exclusive"],
+                    "image_urls":   list(r["image_urls"] or []),
+                    "wiki":         r["wiki"],
+                    "wiki_lang":    r["wiki_lang"],
+                    "stats": {
+                        "authority": r["stat_authority"],
+                        "military":  r["stat_military"],
+                        "charisma":  r["stat_charisma"],
+                    },
+                    "submitted_by_username": r["submitted_by_username"],
+                }
+                for r in rows
+            ],
+        }
+
+    async def admin_get_character(self, character_id: str) -> dict | None:
+        row = await self._pool.fetchrow(
+            "SELECT * FROM gacha_characters WHERE character_id = $1", character_id
+        )
+        if not row:
+            return None
+        char = _row_to_char(row)
+        char["character_id"] = row["character_id"]
+        char["enabled"]      = row["enabled"]
+        char["vn_exclusive"] = row["vn_exclusive"] if "vn_exclusive" in row.keys() else False
+        return char
+
+    async def admin_update_character(self, character_id: str, fields: dict) -> bool:
+        """Partial update. Only whitelisted columns are writable."""
+        cols = {
+            "name":         "name",
+            "title":        "title",
+            "faction":      "faction",
+            "rarity":       "rarity",
+            "quote":        "quote",
+            "wiki":         "wiki",
+            "wiki_lang":    "wiki_lang",
+            "gender":       "gender",
+            "enabled":      "enabled",
+            "vn_exclusive": "vn_exclusive",
+            "image_urls":   "image_urls",
+            "authority":    "stat_authority",
+            "military":     "stat_military",
+            "charisma":     "stat_charisma",
+        }
+        sets: list[str] = []
+        args: list = []
+        for key, col in cols.items():
+            if key in fields:
+                args.append(fields[key])
+                sets.append(f"{col} = ${len(args)}")
+        if not sets:
+            return False
+        args.append(character_id)
+        row = await self._pool.fetchrow(
+            f"UPDATE gacha_characters SET {', '.join(sets)} WHERE character_id = ${len(args)} RETURNING 1",
+            *args,
+        )
+        return row is not None
+
+    async def admin_delete_character(self, character_id: str) -> bool:
+        """Removes the character and every claim/wishlist row pointing at it."""
+        async with self._pool.acquire() as conn:
+            async with conn.transaction():
+                await conn.execute("DELETE FROM gacha_claims         WHERE character_id = $1", character_id)
+                await conn.execute("DELETE FROM gacha_wishlists      WHERE character_id = $1", character_id)
+                await conn.execute("DELETE FROM gacha_character_stats WHERE character_id = $1", character_id)
+                row = await conn.fetchrow(
+                    "DELETE FROM gacha_characters WHERE character_id = $1 RETURNING 1",
+                    character_id,
+                )
+        return row is not None
+
+    async def admin_character_stats(self) -> dict:
+        row = await self._pool.fetchrow(
+            """
+            SELECT COUNT(*) AS total,
+                   COUNT(*) FILTER (WHERE enabled)                                        AS enabled,
+                   COUNT(*) FILTER (WHERE vn_exclusive)                                   AS vn_exclusive,
+                   COUNT(*) FILTER (WHERE image_urls IS NULL OR cardinality(image_urls)=0) AS no_images
+            FROM gacha_characters
+            """
+        )
+        by_rarity = await self._pool.fetch(
+            "SELECT rarity, COUNT(*) AS n FROM gacha_characters GROUP BY rarity"
+        )
+        by_faction = await self._pool.fetch(
+            "SELECT faction, COUNT(*) AS n FROM gacha_characters GROUP BY faction"
+        )
+        return {
+            "total":        int(row["total"]),
+            "enabled":      int(row["enabled"]),
+            "vn_exclusive": int(row["vn_exclusive"]),
+            "no_images":    int(row["no_images"]),
+            "by_rarity":    {r["rarity"]: int(r["n"]) for r in by_rarity},
+            "by_faction":   {r["faction"]: int(r["n"]) for r in by_faction},
+        }
+
     async def find_gacha_character_id(self, name_or_id: str) -> str | None:
         """Resolve a character name or id to its character_id."""
         async with self._pool.acquire() as conn:
