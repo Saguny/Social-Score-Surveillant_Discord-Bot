@@ -492,5 +492,8 @@
   "Submissions that do not meet these bars will be rejected without further discussion.": "不符合上述标准的提交将被直接拒绝，不另行讨论。",
   "Got it": "知道了",
 
-  "tos_confirm_html": "我确认此推荐不违反 <a href=\"https://discord.com/terms\" target=\"_blank\" rel=\"noopener\">Discord 服务条款</a> 或我们的 <button type=\"button\" class=\"js-guidelines\">角色提交准则</button>。"
+  "tos_confirm_html": "我确认此推荐不违反 <a href=\"https://discord.com/terms\" target=\"_blank\" rel=\"noopener\">Discord 服务条款</a> 或我们的 <button type=\"button\" class=\"js-guidelines\">角色提交准则</button>。",
+
+  "views": "浏览量",
+  "Views since": "统计始于"
 }

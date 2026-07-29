@@ -492,5 +492,8 @@
   "Submissions that do not meet these bars will be rejected without further discussion.": "Vorschläge, die diese Anforderungen nicht erfüllen, werden ohne weitere Diskussion abgelehnt.",
   "Got it": "Verstanden",
 
-  "tos_confirm_html": "Ich bestätige, dass dieser Vorschlag weder gegen die <a href=\"https://discord.com/terms\" target=\"_blank\" rel=\"noopener\">Discord-Nutzungsbedingungen</a> noch gegen unsere <button type=\"button\" class=\"js-guidelines\">Richtlinien für Charaktervorschläge</button> verstößt."
+  "tos_confirm_html": "Ich bestätige, dass dieser Vorschlag weder gegen die <a href=\"https://discord.com/terms\" target=\"_blank\" rel=\"noopener\">Discord-Nutzungsbedingungen</a> noch gegen unsere <button type=\"button\" class=\"js-guidelines\">Richtlinien für Charaktervorschläge</button> verstößt.",
+
+  "views": "Aufrufe",
+  "Views since": "Aufrufe seit"
 }

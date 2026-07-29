@@ -14,7 +14,7 @@ import aiohttp
 from web.cache import StatCache, format_event
 from web.sse import SSEHub
 from web.anonymize import redact_global_stats, pseudonym_user, pseudonym_guild, using_fallback_salt
-from infra.redis_cache import cache_get, cache_set, cache_delete
+from infra.redis_cache import cache_get, cache_set, cache_delete, cache_set_nx
 from infra.admin_rpc import call_admin_rpc, fire_admin_rpc
 from infra.guild_notify import publish_guild_notify
 from config.achievements import ACHIEVEMENTS
@@ -1680,6 +1680,43 @@ async def _handle_admin_audit(request):
     })
 
 
+# ── Page views ───────────────────────────────────────────────────────────────
+_VIEW_PAGES = {"home"}
+_VIEW_DEDUP_TTL = 60 * 60 * 12
+
+
+async def _handle_page_views(request):
+    """Count a visit, once per visitor per 12h, and return the running total.
+
+    The dedup key is a salted hash of the IP held only in Redis with a TTL —
+    the raw address is never written anywhere, and nothing links it to a
+    Discord identity.
+    """
+    page = (request.query.get("page") or "home").strip().lower()
+    if page not in _VIEW_PAGES:
+        return web.json_response({"error": "Unknown page."}, status=400)
+
+    db = request.app["db"]
+    ip = _client_ip(request)
+    fresh = True
+    if ip:
+        digest = hashlib.sha256(f"{_view_salt()}:{page}:{ip}".encode()).hexdigest()[:32]
+        try:
+            fresh = await cache_set_nx(f"pv:{digest}", "1", ex=_VIEW_DEDUP_TTL)
+        except Exception:
+            fresh = False   # Redis down: show the count, do not double-count
+
+    data = await (db.bump_page_view(page) if fresh else db.get_page_views(page))
+    return web.json_response(
+        {"page": page, **data},
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+def _view_salt() -> str:
+    return os.getenv("PSEUDONYM_SALT") or "sc-views-fallback"
+
+
 # ── Site appearance ──────────────────────────────────────────────────────────
 _BG_POSITIONS = ["center top", "center center", "center bottom", "left center", "right center"]
 
@@ -2894,6 +2931,7 @@ async def start_web_server(db):
     app.router.add_post("/api/account/portfolio/turbo/open",      _rate_limit_public(_handle_portfolio_turbo_open))
     app.router.add_post("/api/account/portfolio/turbo/close",     _rate_limit_public(_handle_portfolio_turbo_close))
     app.router.add_post("/webhooks/topgg", _handle_topgg_webhook)
+    app.router.add_get("/api/views",          _rate_limit_public(_handle_page_views))
     app.router.add_get("/api/appearance",     _rate_limit_public(_handle_appearance))
     app.router.add_get("/api/appearance.css", _handle_appearance_css)
     app.router.add_get("/robots.txt", _handle_robots)
