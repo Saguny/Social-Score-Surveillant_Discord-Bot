@@ -228,14 +228,14 @@ class Scoring(commands.Cog):
 
     _RANK_HYSTERESIS = 3.0
 
-    async def _handle_rank_change(self, guild: discord.Guild, member: discord.Member, channel: discord.TextChannel, old: float, new: float, from_message: bool = False):
+    async def _handle_rank_change(self, guild: discord.Guild, member: discord.Member, channel: discord.TextChannel, old: float, new: float, from_message: bool = False, reset: bool = False):
         old_rank = get_rank(old)
         new_rank = get_rank(new)
         if old_rank["name"] == new_rank["name"]:
             return
 
         promoted = new > old
-        if not promoted and new > old_rank["min"] - self._RANK_HYSTERESIS:
+        if not promoted and not reset and new > old_rank["min"] - self._RANK_HYSTERESIS:
             return
         old_idx = get_rank_index(old_rank["name"])
         new_idx = get_rank_index(new_rank["name"])
@@ -247,6 +247,9 @@ class Scoring(commands.Cog):
                 guild.id, member.id, new_idx, RANK_YUAN[new_idx]
             )
             yuan_label = f"+¥{yuan_earned:,}" if yuan_earned > 0 else "¥0 · reward already claimed"
+        elif reset:
+            await self.db.set_rank_entered_at(guild.id, member.id)
+            yuan_label = "¥0"
         else:
             penalty = RANK_YUAN[old_idx]
             await self.db.adjust_yuan(guild.id, member.id, -penalty)
@@ -262,6 +265,9 @@ class Scoring(commands.Cog):
                 await member.edit(roles=updated)
             except discord.Forbidden:
                 pass
+
+        if reset:
+            return
 
         if promoted:
             await unlock_achievement(self.bot, guild, member, "first_promotion", channel=channel)
@@ -555,8 +561,8 @@ class Scoring(commands.Cog):
         await self.db.clean_expired_effects()
 
     @commands.Cog.listener()
-    async def on_score_change(self, guild: discord.Guild, member: discord.Member, channel, old: float, new: float, from_message: bool = False):
-        await self._handle_rank_change(guild, member, channel, old, new, from_message)
+    async def on_score_change(self, guild: discord.Guild, member: discord.Member, channel, old: float, new: float, from_message: bool = False, reset: bool = False):
+        await self._handle_rank_change(guild, member, channel, old, new, from_message, reset)
         await self._handle_execution_status(guild, member, channel, old, new)
 
 

@@ -58,7 +58,7 @@ class PrestigeView(discord.ui.View):
         embed.add_field(name="YUAN", value=f"¥{old_yuan:,} -> ¥0", inline=True)
         embed.timestamp = discord.utils.utcnow()
         await interaction.edit_original_response(embed=embed, view=self)
-        self.bot.dispatch("score_change", interaction.guild, self.member, interaction.channel, old_score, new_score)
+        self.bot.dispatch("score_change", interaction.guild, self.member, interaction.channel, old_score, new_score, False, True)
 
     @discord.ui.button(label="Confirm", style=discord.ButtonStyle.success)
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
