@@ -1681,18 +1681,19 @@ async def _handle_admin_audit(request):
 
 
 # ── Page views ───────────────────────────────────────────────────────────────
-_VIEW_PAGES = {"home"}
+_VIEW_PAGES = {"site"}
 _VIEW_DEDUP_TTL = 60 * 60 * 12
 
 
 async def _handle_page_views(request):
-    """Count a visit, once per visitor per 12h, and return the running total.
+    """Count a visitor once per 12h, whichever page they landed on.
 
-    The dedup key is a salted hash of the IP held only in Redis with a TTL —
-    the raw address is never written anywhere, and nothing links it to a
-    Discord identity.
+    Deliberately not keyed by page: someone browsing Home then Dashboard is one
+    visitor, not two. The dedup key is a salted hash of the IP held only in
+    Redis with a TTL — the raw address is never written anywhere and nothing
+    links it to a Discord identity.
     """
-    page = (request.query.get("page") or "home").strip().lower()
+    page = (request.query.get("page") or "site").strip().lower()
     if page not in _VIEW_PAGES:
         return web.json_response({"error": "Unknown page."}, status=400)
 
@@ -1700,17 +1701,22 @@ async def _handle_page_views(request):
     ip = _client_ip(request)
     fresh = True
     if ip:
-        digest = hashlib.sha256(f"{_view_salt()}:{page}:{ip}".encode()).hexdigest()[:32]
+        digest = hashlib.sha256(f"{_view_salt()}:{ip}".encode()).hexdigest()[:32]
         try:
             fresh = await cache_set_nx(f"pv:{digest}", "1", ex=_VIEW_DEDUP_TTL)
         except Exception:
-            fresh = False   # Redis down: show the count, do not double-count
+            fresh = False   # Redis down: report the count, do not double-count
 
     data = await (db.bump_page_view(page) if fresh else db.get_page_views(page))
     return web.json_response(
         {"page": page, **data},
         headers={"Cache-Control": "no-store"},
     )
+
+
+async def _handle_admin_views(request):
+    """Read-only — never increments, so opening the panel does not skew it."""
+    return web.json_response(await request.app["db"].get_page_views("site"))
 
 
 def _view_salt() -> str:
@@ -2911,6 +2917,7 @@ async def start_web_server(db):
     app.router.add_post("/api/admin/team/set",            _require_admin(_require_cap("team")(_handle_admin_team_set)))
     app.router.add_post("/api/admin/team/remove",         _require_admin(_require_cap("team")(_handle_admin_team_remove)))
     app.router.add_get("/api/admin/audit",                _require_admin(_require_cap("team")(_handle_admin_audit)))
+    app.router.add_get("/api/admin/views",                _require_admin(_require_cap("system")(_handle_admin_views)))
     app.router.add_post("/api/admin/appearance",          _require_admin(_require_cap("appearance")(_handle_admin_appearance_set)))
 
     # Character editor (gacha capability)

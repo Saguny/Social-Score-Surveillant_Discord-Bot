@@ -805,6 +805,25 @@ details[open] summary::before { transform:rotate(90deg); }
 .footer-heart { color:var(--red); }
 .footer-credit { margin-top:var(--sp-2); font-size:var(--fs-micro); color:var(--text-faint); opacity:.75; }
 
+/* Hidden off Home, but still in the layout tree so the image loads and the
+   count stays site-wide. */
+.moe-counter { display:none; margin-top:var(--sp-5); }
+.moe-counter.is-home { display:block; }
+.moe-label {
+  margin-bottom:var(--sp-2);
+  color:var(--text-faint);
+  font-size:var(--fs-micro);
+  font-weight:600;
+  text-transform:uppercase;
+  letter-spacing:var(--tracking-label);
+}
+.moe-counter img {
+  max-width:100%;
+  height:auto;
+  image-rendering:pixelated;
+  border-radius:var(--r-sm);
+}
+
 .skeleton {
   background:linear-gradient(90deg,rgba(255,255,255,.04),rgba(255,255,255,.09),rgba(255,255,255,.04));
   background-size:200% 100%;

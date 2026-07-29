@@ -24,7 +24,7 @@
 
     <main class="app-content" id="main">
       <div class="legal">
-        <div class="updated">Last updated: 2026-07-10</div>
+        <div class="updated">Last updated: 2026-07-27</div>
 
         <p>
           Social Credit Surveillant is an unofficial, satirical Discord bot and
@@ -105,6 +105,29 @@
             endpoints log IP addresses transiently, in memory only, to enforce
             rate limiting. IP addresses are not stored in the database and are
             not linked to your Discord identity.
+          </li>
+          <li>
+            <strong>Visitor counting.</strong> We keep a count of how many
+            people have visited this site. To avoid counting the same person
+            repeatedly, your IP address is hashed together with a secret salt
+            and the resulting hash is held in our cache for 12 hours, then
+            discarded. The hash cannot be reversed to recover your IP address,
+            your raw IP is never written to the database, and neither is linked
+            to your Discord identity. Only the running total is stored.
+          </li>
+          <li>
+            <strong>Third-party visitor counter.</strong> The home page displays
+            a visit counter served as an image by
+            <a href="https://count.getloli.com" target="_blank" rel="noopener">count.getloli.com</a>,
+            an external service we do not operate. That image is requested on
+            every page of this site, so your browser contacts them on each page
+            load and they will receive your IP address and user agent as part of
+            that request, subject to their own privacy practices rather than
+            ours. We send no referrer information with the request and pass them
+            nothing else about you: not your Discord identity, not your in-bot
+            data, and not which page you were on. Blocking
+            <code>count.getloli.com</code> in your browser or an ad blocker
+            disables it with no effect on the rest of the site.
           </li>
           <li>
             <strong>Admin console access.</strong> The password-protected
@@ -251,9 +274,11 @@
             >
             for how they handle your account data, separately from anything
             covered here), top.gg (vote webhooks), Cloudflare R2 (gacha image
-            hosting - see Section 2), and our hosting/database provider. We do
-            not share your data with anyone beyond what is needed to operate
-            the bot through these services.
+            hosting - see Section 2), count.getloli.com (the visit counter image
+            on the home page, which receives your IP address and user agent
+            when your browser loads it - see Section 1), and our
+            hosting/database provider. We do not share your data with anyone
+            beyond what is needed to operate the bot through these services.
           </li>
         </ul>
 

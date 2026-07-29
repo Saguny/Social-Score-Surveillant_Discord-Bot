@@ -5,6 +5,16 @@
   <a href="/social-credit/privacy" data-i18n="PRIVACY">PRIVACY</a> ·
   <a href="/social-credit/terms" data-i18n="TERMS">TERMS</a>
   <div class="footer-credit" id="footer-credit" hidden></div>
+
+  <!-- Moe Counter does its own counting: one increment per image load. The
+       image is fetched on every page (so the total is site-wide) but only
+       revealed on Home. Images inside a display:none container still load. -->
+  <div class="moe-counter" id="moe-counter">
+    <div class="moe-label" data-i18n="views">views</div>
+    <img src="https://count.getloli.com/@ccp-surveillant?theme=moebooru&padding=6&darkmode=auto"
+         alt="" width="330" height="80" loading="eager" referrerpolicy="no-referrer"
+         onerror="this.closest('.moe-counter').remove()">
+  </div>
 </footer>
 <script>
   (function () {
@@ -27,5 +37,16 @@
       }
       wrap.hidden = false;
     }).catch(function () {});
+  })();
+
+  // Our own count: site-wide, deduped per visitor per 12h, surfaced in the
+  // admin panel. Independent of Moe Counter, which counts raw image loads.
+  (function () {
+    var box = document.getElementById('moe-counter');
+    if (box) {
+      var path = location.pathname.replace(/\/+$/, '');
+      if (path === '/social-credit' || path === '') box.classList.add('is-home');
+    }
+    fetch('/api/views?page=site', { credentials: 'same-origin' }).catch(function () {});
   })();
 </script>

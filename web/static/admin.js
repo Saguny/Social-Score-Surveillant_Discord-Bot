@@ -170,6 +170,17 @@ async function loadOverviewStats() {
     ['Messages rated', (d.total_messages || 0).toLocaleString()],
     ['Yuan in circulation', '¥' + (d.total_yuan || 0).toLocaleString()],
   ];
+
+  // Our own deduped visitor count, distinct from the public Moe Counter which
+  // tallies raw image loads.
+  const vr = await api('/api/admin/views');
+  if (vr.ok && typeof vr.data.views === 'number') {
+    const since = vr.data.since
+      ? ' since ' + new Date(vr.data.since * 1000).toLocaleDateString()
+      : '';
+    tiles.push(['Site visitors' + since, vr.data.views.toLocaleString()]);
+  }
+
   wrap.innerHTML = tiles.map(([k, val]) =>
     `<div class="stat-tile"><div class="lbl">${_esc(k)}</div><div class="stat-val">${_esc(val)}</div></div>`
   ).join('');

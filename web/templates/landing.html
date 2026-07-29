@@ -78,56 +78,6 @@
     .nav-tile .t-name { margin-top: 1px; font-size: var(--fs-sm); font-weight: 700; color: var(--cream); }
     .nav-tile .t-arr { flex: 0 0 auto; color: var(--text-faint); font-size: var(--fs-sm); }
 
-    /* ── View counter ──────────────────────────────────────────────────────
-       Odometer-style digit tiles. Each tile can take its own artwork by
-       setting --vc-art on .vc-digit, e.g. from a sprite sheet. */
-    .viewcounter {
-      margin-top: var(--sp-6);
-      padding: var(--sp-4);
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--r-lg);
-      -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-      backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-      text-align: center;
-    }
-    .viewcounter[hidden] { display: none; }
-    .vc-label {
-      color: var(--text-muted);
-      font-size: var(--fs-micro);
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: var(--tracking-label);
-      padding-bottom: var(--sp-3);
-      border-bottom: 1px solid var(--border);
-      margin-bottom: var(--sp-4);
-    }
-    .vc-digits { display: flex; justify-content: center; gap: var(--sp-2); flex-wrap: wrap; }
-    .vc-digit {
-      display: grid;
-      place-items: center;
-      width: 38px;
-      height: 54px;
-      border-radius: var(--r-sm);
-      background: var(--vc-art, linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.02)));
-      background-size: cover;
-      background-position: center;
-      border: 1px solid var(--border-strong);
-      box-shadow: inset 0 1px 0 var(--hairline), var(--shadow-sm);
-      color: var(--cream);
-      font-family: var(--font-mono);
-      font-size: 1.5rem;
-      font-weight: 700;
-      font-variant-numeric: tabular-nums;
-      line-height: 1;
-    }
-    /* The leading zeros are padding, not information — mute them. */
-    .vc-digit.is-pad { color: var(--text-faint); opacity: .45; }
-    .vc-since { margin-top: var(--sp-3); color: var(--text-faint); font-size: var(--fs-tiny); }
-
-    @media (max-width: 480px) {
-      .vc-digit { width: 30px; height: 44px; font-size: 1.2rem; }
-    }
   </style>
 </head>
 <body>
@@ -211,11 +161,6 @@
             <div class="t-arr" aria-hidden="true">↗</div>
           </a>
         </div>
-        <section class="viewcounter" id="viewcounter" hidden>
-          <div class="vc-label" data-i18n="views">views</div>
-          <div class="vc-digits" id="vc-digits" aria-live="polite"></div>
-          <div class="vc-since" id="vc-since"></div>
-        </section>
       </div>
     </main>
 
@@ -224,44 +169,5 @@
 </div>
 
 <!--#include scripts-->
-<script>
-  (function () {
-    var wrap = document.getElementById('viewcounter');
-    if (!wrap) return;
-
-    function render(count, since) {
-      var digits = String(Math.max(0, count));
-      var padded = digits.padStart(6, '0');
-      var padLen = padded.length - digits.length;
-
-      var box = document.getElementById('vc-digits');
-      box.innerHTML = '';
-      padded.split('').forEach(function (d, i) {
-        var el = document.createElement('span');
-        el.className = 'vc-digit' + (i < padLen ? ' is-pad' : '');
-        el.textContent = d;
-        box.appendChild(el);
-      });
-      box.setAttribute('aria-label', digits + ' views');
-
-      if (since) {
-        var d = new Date(since * 1000);
-        var iso = d.getFullYear() + '/' +
-                  String(d.getMonth() + 1).padStart(2, '0') + '/' +
-                  String(d.getDate()).padStart(2, '0');
-        var label = (typeof t === 'function' ? t('Views since') : 'Views since');
-        document.getElementById('vc-since').textContent = label + ' (' + iso + ')';
-      }
-      wrap.hidden = false;
-    }
-
-    // Counted from the browser rather than at render time, so crawlers and
-    // uptime probes do not inflate it.
-    fetch('/api/views?page=home', { credentials: 'same-origin' })
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (d) { if (d && typeof d.views === 'number') render(d.views, d.since); })
-      .catch(function () {});
-  })();
-</script>
 </body>
 </html>
