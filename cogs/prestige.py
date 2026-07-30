@@ -1,7 +1,7 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-from config.ranks import PRESTIGE_THRESHOLD, STARTING_SCORE
+from config.ranks import PRESTIGE_THRESHOLD, STARTING_SCORE, prestige_stars
 
 
 class PrestigeView(discord.ui.View):
@@ -50,12 +50,13 @@ class PrestigeView(discord.ui.View):
         old_yuan = user["yuan"]
         old_score, new_score = await self.db.update_score(gid, uid, STARTING_SCORE - user["score"], "prestige reset")
         await self.db.set_yuan(gid, uid, 0)
-        level = await self.db.increment_counter(uid, "prestige_level")
+        guild_level, level = await self.db.record_prestige(uid, gid)
 
         embed = discord.Embed(color=0xFFD700, title="中华人民共和国社会信用局 · 晋升")
-        embed.add_field(name="PRESTIGE ACHIEVED", value=f"{self.member.mention} has prestiged to level {level}.", inline=False)
+        embed.add_field(name="PRESTIGE ACHIEVED", value=f"{self.member.mention} has prestiged to level {guild_level} in this server.", inline=False)
         embed.add_field(name="SCORE", value=f"{old_score:.2f} -> {new_score:.2f}", inline=True)
         embed.add_field(name="YUAN", value=f"¥{old_yuan:,} -> ¥0", inline=True)
+        embed.add_field(name="STANDING", value=f"{prestige_stars(level)} · level {level}", inline=False)
         embed.timestamp = discord.utils.utcnow()
         await interaction.edit_original_response(embed=embed, view=self)
         self.bot.dispatch("score_change", interaction.guild, self.member, interaction.channel, old_score, new_score, False, True)
@@ -104,6 +105,8 @@ class Prestige(commands.Cog):
             )
             return
 
+        guild_level = await self.db.get_guild_prestige(uid, gid)
+
         expiry = int(discord.utils.utcnow().timestamp()) + 60
         embed = discord.Embed(color=0xCC0000, title="中华人民共和国社会信用局 · 晋升")
         embed.add_field(
@@ -111,7 +114,8 @@ class Prestige(commands.Cog):
             value=(
                 f"Your score ({user['score']:.2f}) has reached the threshold for prestige.\n"
                 f"Confirming will reset your score to {STARTING_SCORE:.2f} and your yuan to ¥0 in this server, "
-                "and permanently raise your prestige level everywhere."
+                f"raising your prestige here to level {guild_level + 1}.\n"
+                "Your displayed stars are the highest prestige level you have reached in any single server."
             ),
             inline=False,
         )

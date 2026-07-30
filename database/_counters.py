@@ -42,6 +42,36 @@ class CountersMixin:
         )
         return int(row["value"])
 
+    async def record_prestige(self, user_id: int, guild_id: int) -> tuple[int, int]:
+        async with self._pool.acquire() as conn:
+            async with conn.transaction():
+                row = await conn.fetchrow(
+                    """
+                    INSERT INTO user_counters (user_id, counter_key, value)
+                    VALUES ($1, $2, 1)
+                    ON CONFLICT (user_id, counter_key) DO UPDATE SET value = user_counters.value + 1
+                    RETURNING value
+                    """,
+                    user_id, f"prestige:guild:{guild_id}",
+                )
+                guild_level = int(row["value"])
+                best = int(await conn.fetchval(
+                    "SELECT COALESCE(MAX(value), 0) FROM user_counters WHERE user_id = $1 AND counter_key LIKE 'prestige:guild:%'",
+                    user_id,
+                ))
+                await conn.execute(
+                    """
+                    INSERT INTO user_counters (user_id, counter_key, value)
+                    VALUES ($1, 'prestige_level', $2)
+                    ON CONFLICT (user_id, counter_key) DO UPDATE SET value = EXCLUDED.value
+                    """,
+                    user_id, best,
+                )
+        return guild_level, best
+
+    async def get_guild_prestige(self, user_id: int, guild_id: int) -> int:
+        return await self.get_counter(user_id, f"prestige:guild:{guild_id}")
+
     async def bump_daily_streak(self, user_id: int, streak_key: str) -> tuple[int, int]:
         today        = int(time.time()) // 86400
         last_day_key = f"{streak_key}:last_day"

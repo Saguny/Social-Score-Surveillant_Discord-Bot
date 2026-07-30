@@ -460,6 +460,36 @@ class Database(
                 )
             """)
             await conn.execute("""
+                CREATE TABLE IF NOT EXISTS schema_migrations (
+                    name       TEXT PRIMARY KEY,
+                    applied_at BIGINT NOT NULL
+                )
+            """)
+            already = await conn.fetchval(
+                "SELECT 1 FROM schema_migrations WHERE name = $1", "prestige_per_guild"
+            )
+            if not already:
+                await conn.execute("""
+                    INSERT INTO user_counters (user_id, counter_key, value)
+                    SELECT user_id, 'prestige:guild:' || guild_id, COUNT(*)
+                    FROM score_history
+                    WHERE reason = 'prestige reset'
+                    GROUP BY user_id, guild_id
+                    ON CONFLICT (user_id, counter_key) DO NOTHING
+                """)
+                await conn.execute("""
+                    INSERT INTO user_counters (user_id, counter_key, value)
+                    SELECT user_id, 'prestige_level', MAX(value)
+                    FROM user_counters
+                    WHERE counter_key LIKE 'prestige:guild:%'
+                    GROUP BY user_id
+                    ON CONFLICT (user_id, counter_key) DO UPDATE SET value = EXCLUDED.value
+                """)
+                await conn.execute(
+                    "INSERT INTO schema_migrations (name, applied_at) VALUES ($1, $2)",
+                    "prestige_per_guild", int(time.time()),
+                )
+            await conn.execute("""
                 CREATE TABLE IF NOT EXISTS optouts (
                     user_id      BIGINT PRIMARY KEY,
                     opted_out_at BIGINT NOT NULL
