@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VN Editor</title>
+  <link rel="stylesheet" href="/vn/static/style.css" />
+</head>
+<body>
+<div id="app">
+
+  <!-- Topbar -->
+  <div id="topbar">
+    <div class="topbar-logo">
+      <div class="topbar-logo-dot"></div>
+      VN Editor
+    </div>
+    <div class="topbar-breadcrumb" id="topbar-breadcrumb">
+      <span>Stories</span>
+    </div>
+    <div class="topbar-gap"></div>
+    <div class="topbar-actions">
+      <button class="btn btn-ghost btn-sm" id="btn-config">⚙ Config</button>
+      <button class="btn btn-ghost btn-sm" id="btn-assets">Assets</button>
+    </div>
+  </div>
+
+  <div id="workspace">
+
+    <!-- Sidebar -->
+    <div id="sidebar">
+      <div class="sidebar-section-header">
+        <div class="sidebar-section-title">Stories</div>
+        <div class="sidebar-actions">
+          <button class="btn-xs" id="btn-new-arc">Arc</button>
+          <button class="btn-xs" id="btn-import-story">Import</button>
+          <button class="btn btn-primary btn-sm" id="btn-new-story">+ New</button>
+        </div>
+      </div>
+      <div id="story-list"></div>
+    </div>
+
+    <!-- Center panels -->
+    <div id="center">
+
+      <!-- Splash -->
+      <div class="tab-panel active" id="tab-stories">
+        <div class="splash">
+          <div class="splash-icon">⬡</div>
+          <div class="splash-text">Select a story to begin<br>or create a new one.</div>
+        </div>
+      </div>
+
+      <!-- Scene tree -->
+      <div class="tab-panel" id="tab-tree">
+        <div id="tree-toolbar">
+          <button class="btn btn-ghost btn-sm" id="btn-back-stories">← Stories</button>
+          <div id="tree-story-title"></div>
+          <button class="btn btn-secondary btn-sm" id="btn-story-settings">Settings</button>
+          <button class="btn btn-ghost btn-sm" id="btn-fit-tree" title="Fit all nodes in view">⊞ Fit</button>
+          <button class="btn btn-play btn-sm" id="btn-play">▶ Play</button>
+          <button class="btn btn-primary btn-sm" id="btn-new-scene">+ Scene</button>
+        </div>
+        <div id="tree-canvas"></div>
+      </div>
+
+    </div>
+
+    <!-- Inspector -->
+    <div id="inspector">
+      <div id="inspector-scroll">
+        <div id="inspector-panel"></div>
+      </div>
+      <div id="preview-wrap">
+        <div id="preview-label">Preview</div>
+        <canvas id="preview-canvas"></canvas>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Modal -->
+<div id="modal-overlay">
+  <div id="modal">
+    <div id="modal-header">
+      <div id="modal-title"></div>
+    </div>
+    <div id="modal-body"></div>
+    <div id="modal-footer">
+      <button class="btn btn-secondary" id="modal-cancel">Cancel</button>
+      <button class="btn btn-primary" id="modal-ok">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- Play mode overlay -->
+<div id="play-overlay">
+  <div id="play-container">
+    <canvas id="play-canvas"></canvas>
+    <div id="play-choices"></div>
+    <button id="play-close">✕</button>
+    <div id="play-hint">Click to advance</div>
+  </div>
+</div>
+
+<script src="/vn/static/api.js"></script>
+<script src="/vn/static/preview.js"></script>
+<script src="/vn/static/tree.js"></script>
+<script src="/vn/static/stories.js"></script>
+<script src="/vn/static/editor.js"></script>
+<script src="/vn/static/app.js"></script>
+</body>
+</html>

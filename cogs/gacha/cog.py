@@ -58,6 +58,30 @@ class GachaCog(commands.Cog, name="Gacha"):
     async def prefix_rollhusbando(self, ctx: commands.Context):
         await self.service.roll(ctx.guild.id, ctx.author.id, ctx.author.display_name, ctx.send, gender="male")
 
+    @commands.command(name="givevntickets", aliases=["gvnt"])
+    @commands.is_owner()
+    async def prefix_give_vn_tickets(self, ctx: commands.Context, amount: int = 10):
+        await self.bot.db.increment_counter(ctx.author.id, "vn:tickets", amount)
+        total = await self.bot.db.get_counter(ctx.author.id, "vn:tickets") or 0
+        await ctx.send(f"Added {amount} VN tickets. You now have **{total}** total.")
+
+    @commands.command(name="rollresets", aliases=["rr"])
+    async def prefix_rollresets(self, ctx: commands.Context):
+        count = await self.bot.db.get_counter(ctx.author.id, "vn:roll_resets") or 0
+        await ctx.send(f"You have **{count}** roll reset ticket{'s' if count != 1 else ''} remaining.")
+
+    @commands.command(name="rolls")
+    async def prefix_rolls(self, ctx: commands.Context):
+        spent = await self.bot.db.spend_user_counter(ctx.author.id, "vn:roll_resets")
+        if spent < 0:
+            await ctx.send(
+                "You don't have any roll reset tickets. "
+                "Complete VN episodes to earn them — use `ccp rr` to check your balance."
+            )
+            return
+        await cache.reset_rolls(ctx.guild.id, ctx.author.id)
+        await ctx.message.add_reaction("✅")
+
     # ── image / card ──────────────────────────────────────────────────────────
 
     @app_commands.command(name="image", description="View a personality's card")
@@ -246,6 +270,7 @@ class GachaCog(commands.Cog, name="Gacha"):
             return
         async def _send(*args, **kwargs):
             if interaction.response.is_done():
+                kwargs.setdefault("wait", True)
                 return await interaction.followup.send(*args, **kwargs)
             await interaction.response.send_message(*args, **kwargs)
             try:

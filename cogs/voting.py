@@ -153,6 +153,7 @@ async def process_vote(bot: commands.Bot, user_id: int):
         return
     await db.log_topgg_vote(user_id)
     total_votes = await db.increment_counter(user_id, "topgg_votes_total")
+    await db.increment_counter(user_id, "vn:tickets")
     vote_streak, _ = await db.bump_daily_streak(user_id, "topgg_vote_streak")
     expires_at = int(time.time()) + VOTE_COOLDOWN
 

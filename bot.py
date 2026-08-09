@@ -529,6 +529,8 @@ class SocialCreditBot(commands.AutoShardedBot):
                 )
 
     async def close(self):
+        from cogs.gacha.vn.render_scene import shutdown_pool
+        await shutdown_pool()
         await super().close()
 
     async def setup_hook(self):
@@ -552,6 +554,7 @@ class SocialCreditBot(commands.AutoShardedBot):
         await self.load_extension("cogs.prestige")
         await self.load_extension("cogs.serverrank")
         await self.load_extension("cogs.gacha")
+        await self.load_extension("cogs.gacha.vn")
         if IS_SCHEDULER:
             asyncio.create_task(_decay_task(self))
             asyncio.create_task(_rotate_presence_task(self))

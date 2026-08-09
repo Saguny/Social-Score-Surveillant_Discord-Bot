@@ -21,6 +21,7 @@ from database._guilds       import GuildRankMixin
 from database._analytics    import AnalyticsMixin
 from database._gacha        import GachaMixin
 from database._requests     import GachaRequestsMixin
+from database._vn           import VNMixin
 from database._admin_roles  import AdminRolesMixin
 from database._appearance   import AppearanceMixin
 from database._views        import PageViewsMixin
@@ -230,6 +231,7 @@ class Database(
     AnalyticsMixin,
     GachaMixin,
     GachaRequestsMixin,
+    VNMixin,
     AdminRolesMixin,
     AppearanceMixin,
     PageViewsMixin,
@@ -709,3 +711,132 @@ class Database(
             await conn.execute("ALTER TABLE users ALTER COLUMN total_yuan_earned  TYPE BIGINT USING total_yuan_earned::BIGINT")
             await conn.execute("ALTER TABLE users ALTER COLUMN total_yuan_spent   TYPE BIGINT USING total_yuan_spent::BIGINT")
             await conn.execute("ALTER TABLE guild_config ADD COLUMN IF NOT EXISTS gacha_roller_only BOOLEAN NOT NULL DEFAULT FALSE")
+            await conn.execute("ALTER TABLE vn_stories ADD COLUMN IF NOT EXISTS episode_number INT NOT NULL DEFAULT 1")
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS vn_stories (
+                    id          TEXT PRIMARY KEY,
+                    arc_id      INTEGER,
+                    title       TEXT NOT NULL DEFAULT '',
+                    description TEXT NOT NULL DEFAULT '',
+                    status      TEXT NOT NULL DEFAULT 'draft',
+                    party_size  INTEGER NOT NULL DEFAULT 3,
+                    entry_scene TEXT NOT NULL DEFAULT 's1',
+                    test_party  JSONB NOT NULL DEFAULT '[]',
+                    created_at  BIGINT NOT NULL DEFAULT 0
+                )
+            """)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS vn_scenes (
+                    id            TEXT NOT NULL,
+                    story_id      TEXT NOT NULL REFERENCES vn_stories(id) ON DELETE CASCADE,
+                    label         TEXT NOT NULL DEFAULT 'New Scene',
+                    scene_type    TEXT NOT NULL DEFAULT 'story',
+                    bg_key        TEXT,
+                    chars         JSONB NOT NULL DEFAULT '[]',
+                    speaker       TEXT NOT NULL DEFAULT 'narrator',
+                    dialogue_text TEXT NOT NULL DEFAULT '',
+                    next_scene    TEXT,
+                    choices       JSONB NOT NULL DEFAULT '[]',
+                    ending_type   TEXT,
+                    node_x        INTEGER NOT NULL DEFAULT 80,
+                    node_y        INTEGER NOT NULL DEFAULT 60,
+                    ui_asset_id   INTEGER,
+                    ui_scale      REAL NOT NULL DEFAULT 1.0,
+                    text_color    TEXT NOT NULL DEFAULT 'black',
+                    bg_blur       REAL NOT NULL DEFAULT 0,
+                    PRIMARY KEY (id, story_id)
+                )
+            """)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS vn_backgrounds (
+                    id         SERIAL PRIMARY KEY,
+                    name       TEXT NOT NULL DEFAULT '',
+                    r2_key     TEXT NOT NULL DEFAULT '',
+                    public_url TEXT NOT NULL DEFAULT '',
+                    category   TEXT NOT NULL DEFAULT 'misc',
+                    z_layer    INTEGER NOT NULL DEFAULT 0,
+                    created_at BIGINT NOT NULL DEFAULT 0
+                )
+            """)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS vn_party (
+                    guild_id BIGINT NOT NULL,
+                    user_id  BIGINT NOT NULL,
+                    party    JSONB  NOT NULL DEFAULT '[]',
+                    PRIMARY KEY (guild_id, user_id)
+                )
+            """)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS vn_progress (
+                    guild_id   BIGINT NOT NULL,
+                    user_id    BIGINT NOT NULL,
+                    story_id   TEXT   NOT NULL,
+                    scene_id   TEXT   NOT NULL,
+                    party      JSONB  NOT NULL DEFAULT '[]',
+                    started_at BIGINT NOT NULL DEFAULT 0,
+                    updated_at BIGINT NOT NULL DEFAULT 0,
+                    PRIMARY KEY (guild_id, user_id, story_id)
+                )
+            """)
+            await conn.execute("ALTER TABLE vn_progress ADD COLUMN IF NOT EXISTS completed_at BIGINT")
+            await conn.execute("ALTER TABLE vn_progress ADD COLUMN IF NOT EXISTS ending_type TEXT")
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS vn_endings (
+                    guild_id    BIGINT NOT NULL,
+                    user_id     BIGINT NOT NULL,
+                    story_id    TEXT   NOT NULL,
+                    scene_id    TEXT   NOT NULL,
+                    ending_type TEXT,
+                    seen_at     BIGINT NOT NULL,
+                    PRIMARY KEY (guild_id, user_id, story_id, scene_id)
+                )
+            """)
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_vn_endings_user ON vn_endings (guild_id, user_id, story_id)")
+            await conn.execute("""
+                INSERT INTO vn_endings (guild_id, user_id, story_id, scene_id, ending_type, seen_at)
+                SELECT guild_id, user_id, story_id, scene_id, ending_type, completed_at
+                FROM vn_progress
+                WHERE completed_at IS NOT NULL AND scene_id <> ''
+                ON CONFLICT (guild_id, user_id, story_id, scene_id) DO NOTHING
+            """)
+            await conn.execute("ALTER TABLE vn_scenes ADD COLUMN IF NOT EXISTS reward_yuan INTEGER")
+            await conn.execute("ALTER TABLE vn_scenes ADD COLUMN IF NOT EXISTS reward_roll_resets INTEGER")
+            await conn.execute("ALTER TABLE vn_scenes ADD COLUMN IF NOT EXISTS conditions JSONB NOT NULL DEFAULT '[]'")
+            await conn.execute("ALTER TABLE vn_stories ADD COLUMN IF NOT EXISTS featured_char_id TEXT")
+            await conn.execute("ALTER TABLE vn_stories ADD COLUMN IF NOT EXISTS faction TEXT")
+            await conn.execute("ALTER TABLE vn_progress ADD COLUMN IF NOT EXISTS vars JSONB NOT NULL DEFAULT '{}'")
+            await conn.execute("ALTER TABLE vn_progress ADD COLUMN IF NOT EXISTS run_active BOOLEAN NOT NULL DEFAULT FALSE")
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS vn_arcs (
+                    id          SERIAL PRIMARY KEY,
+                    title       TEXT NOT NULL DEFAULT '',
+                    description TEXT NOT NULL DEFAULT '',
+                    created_at  BIGINT NOT NULL DEFAULT 0
+                )
+            """)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS vn_ui_assets (
+                    id         SERIAL PRIMARY KEY,
+                    name       TEXT NOT NULL DEFAULT '',
+                    public_url TEXT NOT NULL DEFAULT '',
+                    created_at BIGINT NOT NULL DEFAULT 0
+                )
+            """)
+            await conn.execute("ALTER TABLE gacha_characters ADD COLUMN IF NOT EXISTS vn_exclusive BOOLEAN NOT NULL DEFAULT FALSE")
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS vn_config (
+                    id                INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+                    speaker_dx        INTEGER NOT NULL DEFAULT 0,
+                    speaker_dy        INTEGER NOT NULL DEFAULT 0,
+                    text_dx           INTEGER NOT NULL DEFAULT 0,
+                    text_dy           INTEGER NOT NULL DEFAULT 0,
+                    speaker_box       BOOLEAN NOT NULL DEFAULT TRUE,
+                    speaker_box_color TEXT    NOT NULL DEFAULT '#c0392b',
+                    speaker_font_size INTEGER NOT NULL DEFAULT 13,
+                    text_font_size    INTEGER NOT NULL DEFAULT 13,
+                    ui_scale          REAL    NOT NULL DEFAULT 1.0,
+                    char_pad_top      INTEGER NOT NULL DEFAULT 0,
+                    char_scale        REAL    NOT NULL DEFAULT 1.0,
+                    text_area_w       INTEGER NOT NULL DEFAULT 0
+                )
+            """)

@@ -85,3 +85,8 @@ async def pop_pending(message_id: int) -> tuple[dict | None, int]:
 async def set_rate_limit_warned(guild_id: int, user_id: int) -> bool:
     """Atomically set a 15s dedupe flag. Returns True if this is the first warning."""
     return bool(await get_redis().set(f"gacha:rl_warn:{guild_id}:{user_id}", "1", nx=True, ex=15))
+
+
+async def reset_rolls(guild_id: int, user_id: int) -> None:
+    """Delete the roll-counter key so the user gets a fresh hourly allotment."""
+    await get_redis().delete(f"gacha:rolls:{guild_id}:{user_id}")

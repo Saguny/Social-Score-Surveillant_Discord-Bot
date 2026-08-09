@@ -72,6 +72,33 @@ async def _load_template(name: str) -> str:
     return await asyncio.to_thread(_read_template_sync, name)
 
 
+@web.middleware
+async def _not_found_middleware(request, handler):
+    """Serve the branded 404 for page requests, anywhere on the domain.
+
+    Only for navigations: API callers keep their JSON/empty 404 so client code
+    that checks res.ok still behaves, and a missing static asset stays a plain
+    404 rather than an HTML body pretending to be a stylesheet.
+    """
+    try:
+        return await handler(request)
+    except web.HTTPNotFound:
+        path = request.path
+        accepts_html = "text/html" in request.headers.get("Accept", "")
+        if path.startswith(("/api/", "/static/", "/webhooks/")) or not accepts_html:
+            raise
+        try:
+            body = await _load_template("404.html")
+        except Exception:
+            raise
+        return web.Response(
+            text=body,
+            content_type="text/html",
+            status=404,
+            headers={"Cache-Control": "no-store"},
+        )
+
+
 async def _is_authed(request) -> bool:
     admin_token = os.getenv("ADMIN_TOKEN", "")
     if not admin_token:
@@ -222,6 +249,60 @@ def _require_cap(cap: str):
             return await handler(request)
         return middleware
     return decorator
+
+
+def _mount_vn_editor(app) -> None:
+    """
+    Serve the VN scene editor from the main web service, gated on the same
+    Discord login as /admin plus the "gacha" capability, so gacha reviewers can
+    author episodes without a local checkout or an SSH tunnel.
+
+    The editor lives in scripts/, which is not version controlled, so a deploy
+    built from git legitimately may not have it. Its absence is logged and
+    skipped rather than taking the whole web service down.
+    """
+    try:
+        from scripts.vn_editor.db import close_pool
+        from scripts.vn_editor.routes import (
+            backgrounds, characters, portability, scenes, stories, upload,
+        )
+        from scripts.vn_editor.routes import config as vn_config
+    except Exception as exc:
+        print(f"[web] VN editor not mounted ({exc.__class__.__name__}: {exc})")
+        return
+
+    def _guard(handler):
+        return _require_admin(_require_cap("gacha")(handler))
+
+    mounted = 0
+    for module in (stories, scenes, portability, backgrounds, characters, upload, vn_config):
+        for route in module.routes:
+            app.router.add_route(route.method, route.path, _guard(route.handler))
+            mounted += 1
+
+    static_dir = Path(__file__).parent.parent / "scripts" / "vn_editor" / "static"
+    index_file = static_dir / "index.html"
+
+    async def _vn_index(request):
+        return web.FileResponse(index_file)
+
+    async def _vn_static(request):
+        target = (static_dir / request.match_info["filename"]).resolve()
+        if not str(target).startswith(str(static_dir.resolve())) or not target.is_file():
+            raise web.HTTPNotFound()
+        return web.FileResponse(target, headers={"Cache-Control": "no-store"})
+
+    app.router.add_get("/social-credit/vn", _require_admin(_require_cap("gacha")(_vn_index)))
+    app.router.add_get("/vn/static/{filename:.+}", _vn_static)
+
+    async def _close_vn_pool(_app):
+        try:
+            await close_pool()
+        except Exception:
+            pass
+
+    app.on_cleanup.append(_close_vn_pool)
+    print(f"[web] VN editor mounted at /social-credit/vn ({mounted} API routes, gacha capability)")
 
 
 def _is_public_rate_limited(request) -> bool:
@@ -2859,7 +2940,7 @@ async def start_web_server(db):
     await cache.start()
     _cache = cache
 
-    app = web.Application()
+    app = web.Application(middlewares=[_not_found_middleware])
     app["db"] = db
     app["cache"] = cache
     app["sse_hub"] = hub
@@ -2950,6 +3031,8 @@ async def start_web_server(db):
             raise web.HTTPNotFound()
         return web.FileResponse(filepath, headers={'Cache-Control': 'no-store'})
     app.router.add_get('/static/{filename:.+}', _handle_static)
+
+    _mount_vn_editor(app)
 
     if using_fallback_salt():
         print("[web] WARNING: PSEUDONYM_SALT is not set - public stats are using a default, predictable salt. Set PSEUDONYM_SALT to a random secret.")

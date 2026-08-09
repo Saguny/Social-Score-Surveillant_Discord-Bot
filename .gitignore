@@ -12,7 +12,11 @@ build/
 venv/
 bench/
 tests/
-scripts/
+scripts/*
+!scripts/vn_editor/
+scripts/vn_editor/node_modules/
+scripts/vn_editor/examples/
+VN_BRAINSTORM.md
 Dockerfile
 docker-compose.yml
 frontend/.angular
@@ -20,3 +24,4 @@ frontend/node_modules
 frontend/.vscode
 .claude/*
 design/BUREAU_STYLE_GUIDE.md
+graphify-out/

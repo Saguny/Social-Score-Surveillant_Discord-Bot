@@ -282,9 +282,16 @@ class GachaMixin:
     async def get_all_characters(self) -> dict[str, dict]:
         async with self._pool.acquire() as conn:
             rows = await conn.fetch(
-                "SELECT * FROM gacha_characters WHERE enabled = TRUE ORDER BY character_id"
+                "SELECT * FROM gacha_characters WHERE enabled = TRUE AND vn_exclusive = FALSE ORDER BY character_id"
             )
         return {row["character_id"]: _row_to_char(row) for row in rows}
+
+    async def set_gacha_character_vn_exclusive(self, character_id: str, exclusive: bool) -> bool:
+        result = await self._pool.execute(
+            "UPDATE gacha_characters SET vn_exclusive = $2 WHERE character_id = $1",
+            character_id, exclusive,
+        )
+        return result == "UPDATE 1"
 
     async def get_gacha_character(self, character_id: str) -> dict | None:
         async with self._pool.acquire() as conn:
