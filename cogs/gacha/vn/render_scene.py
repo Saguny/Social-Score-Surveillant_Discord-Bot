@@ -15,7 +15,16 @@ from pathlib import Path
 from typing import Optional
 
 _NODE_SCRIPT = Path(__file__).parent / "render_node.js"
+_NODE_MODULES = Path(__file__).parent / "node_modules"
 _POOL_SIZE   = int(os.environ.get("VN_RENDER_WORKERS", str(min((os.cpu_count() or 2) * 2, 16))))
+
+# systemd hands a service a minimal PATH, so a node installed via nvm/fnm under
+# a home directory is invisible to it. VN_NODE_BIN takes an absolute path.
+_NODE_BIN = os.environ.get("VN_NODE_BIN", "node")
+
+
+class RendererUnavailable(RuntimeError):
+    """Node or its native canvas binding is not usable in this environment."""
 
 _VN_CONFIG_DEFAULTS = dict(
     speaker_dx=0, speaker_dy=0, text_dx=0, text_dy=0,
@@ -56,23 +65,55 @@ class _NodeWorker:
 
     async def _ensure(self) -> asyncio.subprocess.Process:
         if self._proc is None or self._proc.returncode is not None:
-            self._proc = await asyncio.create_subprocess_exec(
-                "node", str(_NODE_SCRIPT),
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
+            if not _NODE_MODULES.is_dir():
+                raise RendererUnavailable(
+                    f"VN renderer dependencies are missing. Run `npm install` in "
+                    f"{_NODE_SCRIPT.parent}. The native canvas binding is platform "
+                    f"specific, so it must be installed on this machine rather than "
+                    f"copied from another one."
+                )
+            try:
+                self._proc = await asyncio.create_subprocess_exec(
+                    _NODE_BIN, str(_NODE_SCRIPT),
+                    stdin=asyncio.subprocess.PIPE,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+            except FileNotFoundError as exc:
+                raise RendererUnavailable(
+                    f"VN renderer could not start: {_NODE_BIN!r} was not found on PATH. "
+                    f"Install Node.js, or set VN_NODE_BIN to its absolute path — a "
+                    f"systemd service does not inherit a login shell's PATH, so an "
+                    f"nvm/fnm install is invisible to it."
+                ) from exc
         return self._proc
 
     async def render(self, payload: dict) -> bytes:
         async with self._lock:
             proc = await self._ensure()
             line = json.dumps(payload, ensure_ascii=False) + "\n"
-            proc.stdin.write(line.encode())
-            await proc.stdin.drain()
+            try:
+                proc.stdin.write(line.encode())
+                await proc.stdin.drain()
 
-            # read 4-byte length header
-            hdr = await proc.stdout.readexactly(4)
+                # read 4-byte length header
+                hdr = await proc.stdout.readexactly(4)
+            except (asyncio.IncompleteReadError, BrokenPipeError, ConnectionResetError) as exc:
+                # The worker died before answering — almost always a failed
+                # require() of the native canvas binding, whose message is on
+                # stderr and would otherwise be lost.
+                err = b""
+                try:
+                    err = await asyncio.wait_for(proc.stderr.read(2048), timeout=2)
+                except Exception:
+                    pass
+                detail = err.decode(errors="replace").strip() or repr(exc)
+                raise RendererUnavailable(
+                    f"VN renderer worker exited without rendering. This is usually a "
+                    f"platform mismatch in node_modules — run `npm install` in "
+                    f"{_NODE_SCRIPT.parent} on this machine.\n{detail}"
+                ) from exc
+
             length = struct.unpack(">I", hdr)[0]
             if length == 0:
                 err = await proc.stderr.read(256)

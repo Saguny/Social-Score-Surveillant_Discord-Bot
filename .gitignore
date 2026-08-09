@@ -21,6 +21,7 @@ Dockerfile
 docker-compose.yml
 frontend/.angular
 frontend/node_modules
+cogs/gacha/vn/node_modules/
 frontend/.vscode
 .claude/*
 design/BUREAU_STYLE_GUIDE.md
