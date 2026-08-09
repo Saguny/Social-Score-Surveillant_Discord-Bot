@@ -8,8 +8,13 @@ from discord.ext import commands
 from cogs.achievements import unlock as unlock_achievement, check_milestone
 from database._vn import PARTY_SIZE
 from .render   import build_scene_render
-from .runstate import apply_effects, choice_effects, party_bonuses, resolve_scene
-from .views    import VNView, VNPartyView, build_party_embed, _roll_choice
+from .runstate import (
+    FACTION_BONUS, FACTION_MIN_MEMBERS, FEATURED_BONUS,
+    apply_effects, choice_effects, party_bonuses, resolve_scene,
+)
+from .views    import (
+    DC_TIERS, VNView, VNPartyView, _MOD_MAX, build_party_embed, _roll_choice,
+)
 
 _VN_TICKET_KEY      = "vn:tickets"
 _VN_ROLL_RESET_KEY  = "vn:roll_resets"
@@ -365,7 +370,11 @@ class VNCog(commands.Cog, name="VN"):
                 )
 
         except Exception:
-            traceback.print_exc()
+            import sys
+            print(f"[error] vn component {cid!r} (user {interaction.user.id})",
+                  file=sys.stderr, flush=True)
+            traceback.print_exc(file=sys.stderr)
+            sys.stderr.flush()
             try:
                 if not interaction.response.is_done():
                     await interaction.response.send_message("An error occurred.", ephemeral=True)
@@ -378,7 +387,7 @@ class VNCog(commands.Cog, name="VN"):
 
     @app_commands.command(name="party", description="View and edit your VN party")
     async def slash_party(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer()
 
         guild_id = interaction.guild.id
         user_id  = interaction.user.id
@@ -386,8 +395,7 @@ class VNCog(commands.Cog, name="VN"):
         harem = await self.bot.db.get_harem_for_party(guild_id, user_id)
         if not harem:
             await interaction.followup.send(
-                "You don't have any characters yet! Use `/roll` to get some.",
-                ephemeral=True,
+                "You don't have any characters yet! Use `/roll` to get some."
             )
             return
 
@@ -395,7 +403,6 @@ class VNCog(commands.Cog, name="VN"):
         await interaction.followup.send(
             embed=build_party_embed(party, harem),
             view=VNPartyView(guild_id, user_id, party, harem),
-            ephemeral=True,
         )
 
     # ── /vn ───────────────────────────────────────────────────────────────────
@@ -411,7 +418,7 @@ class VNCog(commands.Cog, name="VN"):
             arcs = await self.bot.db.get_vn_arcs_progress(interaction.guild.id, interaction.user.id)
             if not arcs:
                 await interaction.followup.send(
-                    "No arcs are available yet. Check back soon!", ephemeral=True
+                    "No arcs are available yet. Check back soon!"
                 )
                 return
             tickets = await self.bot.db.get_counter(interaction.user.id, _VN_TICKET_KEY) or 0
@@ -432,7 +439,7 @@ class VNCog(commands.Cog, name="VN"):
                 color=0xc0392b,
             )
             embed.set_footer(text=f"🎫 {tickets} VN ticket{'s' if tickets != 1 else ''} · /vn play <arc> to start · /vn progress for detail")
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            await interaction.followup.send(embed=embed)
             return
 
         await self.start_arc(interaction, int(arc_id))
@@ -446,14 +453,101 @@ class VNCog(commands.Cog, name="VN"):
             if current.lower() in a["title"].lower()
         ][:25]
 
+    @vn.command(name="help", description="What the visual novel is and how to play it")
+    async def vn_help(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+
+        tickets = await self.bot.db.get_counter(interaction.user.id, _VN_TICKET_KEY) or 0
+
+        embed = discord.Embed(
+            title="中华人民共和国社会信用局 · 故事",
+            description=(
+                "Playable stories starring **your own gacha characters**. Each episode is a "
+                "few minutes of dialogue with decisions in it. Your party's stats decide how "
+                "those decisions go, and where they go changes which ending you reach."
+            ),
+            color=0xc0392b,
+        )
+        embed.add_field(
+            name="1 · BUILD A PARTY",
+            value=(
+                f"`/party` picks {PARTY_SIZE} characters from your collection. They appear in "
+                "the scenes by name and portrait, and their stats are what you roll with. "
+                "Your party is saved and used for every episode."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="2 · SPEND A TICKET",
+            value=(
+                "`/vn play` lists the arcs. Starting an episode costs **1 ticket**.\n"
+                "Earn 1 from `/checkin` daily and 1 from every `/vote`."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="3 · MAKE CHOICES",
+            value=(
+                "Choices marked with ⚔️ 👑 💬 are checks against your party's Military, "
+                f"Authority or Charisma. The roll is **d20 + up to {_MOD_MAX}** from party "
+                "stats, against a difficulty you're shown after the fact.\n"
+                f"A stronger party genuinely helps · a hard check (difficulty "
+                f"{DC_TIERS['hard']}) is roughly a coin flip for an average party and "
+                "comfortable for a good one."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="4 · STACK THE ODDS",
+            value=(
+                f"Some episodes have a **featured character** · having them in your party is "
+                f"**+{FEATURED_BONUS}** to every roll.\n"
+                f"Some favour a **faction** · {FACTION_MIN_MEMBERS}+ party members of it is "
+                f"another **+{FACTION_BONUS}**. They stack."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="5 · COLLECT ENDINGS",
+            value=(
+                "Episodes have several endings and only one of them happens per run. Finding "
+                f"a new one pays **¥{_REWARD_YUAN_NEW_ENDING:,}**; one you've already seen "
+                f"pays ¥{_REWARD_YUAN_REPLAY:,}. Finding every ending in an episode is worth "
+                "a bonus roll reset.\n"
+                "`/vn endings` is your collection · `/vn progress` is how far you've gotten."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="IF YOU HAVE TO STOP",
+            value=(
+                "Quit any time. Running `/vn play` on an episode you're partway through "
+                "picks it back up **without charging another ticket**. Play Again starts it "
+                "fresh."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="COMMANDS",
+            value=(
+                "`/party` · `/vn play` · `/vn progress` · `/vn endings` · `/vn help`"
+            ),
+            inline=False,
+        )
+        embed.set_footer(
+            text=f"🎫 {tickets} ticket{'s' if tickets != 1 else ''} · "
+                 "VN Assets by Noraneko · GLORY TO THE CCP!"
+        )
+        await interaction.followup.send(embed=embed)
+
     @vn.command(name="endings", description="Your ending collection and how rare each one is")
     async def vn_endings(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer()
 
         rows = await self.bot.db.get_vn_ending_catalog(interaction.guild.id, interaction.user.id)
         if not rows:
             await interaction.followup.send(
-                "No episodes with endings are published yet.", ephemeral=True
+                "No episodes with endings are published yet."
             )
             return
 
@@ -486,18 +580,18 @@ class VNCog(commands.Cog, name="VN"):
             embed.add_field(name=title[:256], value="\n".join(lines)[:1024], inline=False)
 
         embed.set_footer(text=f"{found_mine}/{found_total} endings discovered · /vn play to hunt the rest")
-        await interaction.followup.send(embed=embed, ephemeral=True)
+        await interaction.followup.send(embed=embed)
 
     @vn.command(name="progress", description="See how far you've gotten and which endings you've found")
     async def vn_progress(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer()
 
         guild_id = interaction.guild.id
         user_id  = interaction.user.id
 
         arcs = await self.bot.db.get_vn_arcs_progress(guild_id, user_id)
         if not arcs:
-            await interaction.followup.send("No arcs are available yet.", ephemeral=True)
+            await interaction.followup.send("No arcs are available yet.")
             return
 
         tickets, by_arc = await asyncio.gather(
@@ -532,7 +626,7 @@ class VNCog(commands.Cog, name="VN"):
         if total_endings:
             summary += f" · {total_seen}/{total_endings} endings found overall"
         embed.set_footer(text=f"{summary} · replay for endings you haven't seen")
-        await interaction.followup.send(embed=embed, ephemeral=True)
+        await interaction.followup.send(embed=embed)
 
     # ── internal flow ─────────────────────────────────────────────────────────
 
@@ -542,7 +636,7 @@ class VNCog(commands.Cog, name="VN"):
 
         stories = await self.bot.db.get_vn_arc_stories(arc_id)
         if not stories:
-            await interaction.followup.send("This arc has no published episodes yet.", ephemeral=True)
+            await interaction.followup.send("This arc has no published episodes yet.")
             return
 
         completions  = await asyncio.gather(
@@ -568,7 +662,7 @@ class VNCog(commands.Cog, name="VN"):
 
         story = await self.bot.db.get_vn_story(story_id)
         if not story:
-            await interaction.followup.send(f"Story `{story_id}` not found.", ephemeral=True)
+            await interaction.followup.send(f"Story `{story_id}` not found.")
             return
 
         run = None if force_restart else await self.bot.db.get_active_vn_run(guild_id, user_id, story_id)
@@ -584,8 +678,7 @@ class VNCog(commands.Cog, name="VN"):
             if spent < 0:
                 await interaction.followup.send(
                     "You don't have any VN tickets.\n"
-                    "Earn 1 from `/checkin` each day and 1 from each `/vote`.",
-                    ephemeral=True,
+                    "Earn 1 from `/checkin` each day and 1 from each `/vote`."
                 )
                 return
             guild_party = await self.bot.db.get_vn_party(guild_id, user_id)
@@ -598,8 +691,7 @@ class VNCog(commands.Cog, name="VN"):
         if not scene:
             await interaction.followup.send(
                 "This story has no scenes yet." if not resumed
-                else "Your saved scene no longer exists · starting over.",
-                ephemeral=True,
+                else "Your saved scene no longer exists · starting over."
             )
             if resumed:
                 await self.bot.db.end_vn_run(guild_id, user_id, story_id)

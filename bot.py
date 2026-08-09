@@ -4,6 +4,22 @@ import json
 import asyncio
 import random
 import time
+import traceback
+
+
+def _log_exception(where: str, error: BaseException, cause: BaseException | None = None) -> None:
+    """
+    Print a command failure with its traceback, flushed immediately.
+
+    stdout is block-buffered whenever it is a pipe rather than a terminal, which
+    is exactly what systemd gives a service, so an unflushed one-line error can
+    sit invisible in the buffer for hours. Everything here goes to stderr (which
+    is line-buffered) and is flushed explicitly.
+    """
+    exc = cause or error
+    print(f"[error] {where}: {type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
+    traceback.print_exception(type(exc), exc, exc.__traceback__, file=sys.stderr)
+    sys.stderr.flush()
 from contextvars import ContextVar
 from datetime import datetime, timezone
 import discord
@@ -138,7 +154,7 @@ class CreditCommandTree(discord.app_commands.CommandTree):
                 msg = "The bot lacks a required permission for this action."
         else:
             qualified_name = interaction.command.qualified_name if interaction.command else None
-            print(f"[error] /{qualified_name}: {type(error).__name__}: {cause!r}")
+            _log_exception(f"/{qualified_name}", error, cause)
             msg = "An internal error occurred. Please notify us at https://discord.gg/invite/k4W6YAPYhC"
         try:
             if interaction.response.is_done():
@@ -760,6 +776,7 @@ class SocialCreditBot(commands.AutoShardedBot):
         elif isinstance(cause, discord.DiscordServerError):
             pass
         elif not isinstance(error, commands.CommandNotFound):
+            _log_exception(f"ccp {ctx.command}" if ctx.command else "prefix command", error, cause)
             raise error
 
     async def _warm_member_names(self):
