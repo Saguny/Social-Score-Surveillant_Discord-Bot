@@ -261,6 +261,16 @@ class VNMixin:
             guild_id, user_id, story_id, scene_id, json.dumps(run_vars or {}), int(time.time()),
         )
 
+    async def set_vn_run_party(
+        self, guild_id: int, user_id: int, story_id: str, party: list
+    ) -> None:
+        """Repair the frozen party of an in-flight run. Only used when it was empty."""
+        await self._pool.execute(
+            "UPDATE vn_progress SET party = $4::jsonb, updated_at = $5 "
+            "WHERE guild_id=$1 AND user_id=$2 AND story_id=$3 AND run_active = TRUE",
+            guild_id, user_id, story_id, json.dumps(party), int(time.time()),
+        )
+
     async def end_vn_run(self, guild_id: int, user_id: int, story_id: str) -> None:
         await self._pool.execute(
             "UPDATE vn_progress SET run_active = FALSE, updated_at = $4 "

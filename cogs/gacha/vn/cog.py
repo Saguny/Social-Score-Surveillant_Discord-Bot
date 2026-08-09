@@ -665,14 +665,37 @@ class VNCog(commands.Cog, name="VN"):
             await interaction.followup.send(f"Story `{story_id}` not found.")
             return
 
+        # A full party is required to play at all. The cast is written into the
+        # dialogue via {party:N}, so an empty slot narrates as "Party Member 2"
+        # and contributes nothing to any roll.
+        needed      = story["party_size"]
+        guild_party = await self.bot.db.get_vn_party(guild_id, user_id)
+        empty       = [i + 1 for i in range(needed) if not (guild_party[i] if i < len(guild_party) else None)]
+        if empty:
+            slots = ", ".join(str(i) for i in empty)
+            await interaction.followup.send(
+                f"You need all {needed} party slots filled before starting a story · "
+                f"slot{'s' if len(empty) != 1 else ''} {slots} {'are' if len(empty) != 1 else 'is'} empty.\n"
+                "Use `/party` to pick your cast. They appear in the story by name, and "
+                "their stats decide how your choices go."
+            )
+            return
+
         run = None if force_restart else await self.bot.db.get_active_vn_run(guild_id, user_id, story_id)
 
         if run:
             # Resuming a run you already paid for — no second ticket.
             scene_id  = run["scene_id"]
             run_vars  = run.get("vars") or {}
-            party_ids = (run.get("party") or [])[:story["party_size"]]
+            party_ids = (run.get("party") or [])[:needed]
             resumed   = True
+            # Runs started before the full-party rule could have frozen an empty
+            # or partial cast. An empty party serialises as [None, None, None],
+            # which is truthy, so this has to count filled slots rather than test
+            # the list itself.
+            if len([c for c in party_ids if c]) < needed:
+                party_ids = guild_party[:needed]
+                await self.bot.db.set_vn_run_party(guild_id, user_id, story_id, party_ids)
         else:
             spent = await self.bot.db.spend_user_counter(user_id, _VN_TICKET_KEY)
             if spent < 0:
@@ -681,11 +704,10 @@ class VNCog(commands.Cog, name="VN"):
                     "Earn 1 from `/checkin` each day and 1 from each `/vote`."
                 )
                 return
-            guild_party = await self.bot.db.get_vn_party(guild_id, user_id)
-            party_ids   = guild_party[:story["party_size"]]
-            scene_id    = story["entry_scene"]
-            run_vars    = {}
-            resumed     = False
+            party_ids = guild_party[:needed]
+            scene_id  = story["entry_scene"]
+            run_vars  = {}
+            resumed   = False
 
         scene = await self._resolve(story_id, scene_id, run_vars)
         if not scene:
@@ -739,7 +761,7 @@ class VNCog(commands.Cog, name="VN"):
             return
 
         party_ids = (run or {}).get("party") or []
-        if not party_ids:
+        if not any(party_ids):
             party_ids = await self.bot.db.get_vn_party(guild_id, user_id)
         party_ids = party_ids[:story["party_size"]]
 
