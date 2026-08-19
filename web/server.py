@@ -72,6 +72,43 @@ async def _load_template(name: str) -> str:
     return await asyncio.to_thread(_read_template_sync, name)
 
 
+_SUSPENDED_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Site Suspended</title>
+<meta name="robots" content="noindex, nofollow">
+<style>
+  html,body{height:100%;margin:0;display:flex;align-items:center;justify-content:center;background:#0b0b0c;color:#e6e6e6;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
+  p{font-size:1.15rem;text-align:center;padding:0 1.5rem;}
+</style>
+</head>
+<body>
+<p>This website has been temporarily suspended by the owner.</p>
+</body>
+</html>
+"""
+
+
+def _site_suspended() -> bool:
+    return os.getenv("SITE_SUSPENDED", "").strip().lower() in ("1", "true", "yes", "on")
+
+
+@web.middleware
+async def _suspended_middleware(request, handler):
+    """When SITE_SUSPENDED is set, short-circuit every request with a static
+    suspension notice, ahead of auth/rate-limit/routing so it applies to
+    every endpoint (pages, API, webhooks, static) with no other code path."""
+    if _site_suspended():
+        return web.Response(
+            text=_SUSPENDED_HTML,
+            content_type="text/html",
+            status=503,
+            headers={"Cache-Control": "no-store"},
+        )
+    return await handler(request)
+
+
 @web.middleware
 async def _not_found_middleware(request, handler):
     """Serve the branded 404 for page requests, anywhere on the domain.
@@ -2940,7 +2977,7 @@ async def start_web_server(db):
     await cache.start()
     _cache = cache
 
-    app = web.Application(middlewares=[_not_found_middleware])
+    app = web.Application(middlewares=[_suspended_middleware, _not_found_middleware])
     app["db"] = db
     app["cache"] = cache
     app["sse_hub"] = hub
