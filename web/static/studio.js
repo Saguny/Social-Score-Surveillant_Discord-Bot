@@ -50,6 +50,8 @@
   var ix = ic.getContext('2d');
   var iw = 0, ih = 0, idpr = 1, introGone = false, introFrame = -1;
   var snap = document.createElement('canvas'), snapX = snap.getContext('2d');
+  var exit = null, exitFrame = -1, EXIT_IN = .4, EXIT_OUT = .33;
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var LOGO = [], LOGO_W = 60, LOGO_H = 6;
 
 
@@ -528,6 +530,47 @@
     drawIntroB(f / STEP);
   }
 
+  function drawExit(t) {
+    var e = t - exit.at;
+    if (e >= EXIT_IN && !exit.done) {
+      exit.done = true;
+      if (exit.blank) window.open(exit.href, '_blank', 'noopener,noreferrer');
+      else location.href = exit.href;
+    }
+    if (e >= EXIT_IN + (exit.blank ? EXIT_OUT : 5)) {
+      exit = null;
+      ic.style.display = 'none';
+      return;
+    }
+    if (window.innerWidth !== iw || window.innerHeight !== ih) { fitIntro(); exitFrame = -1; }
+    var f = Math.floor(t * STEP + 1e-6);
+    if (f === exitFrame) return;
+    exitFrame = f;
+    var cover = e < EXIT_IN ? seg(e, 0, EXIT_IN) : exit.blank ? 1 - seg(e, EXIT_IN, EXIT_IN + EXIT_OUT) : 1;
+    var bk = Math.max(28, Math.round(Math.min(iw, ih) / 14));
+    ix.setTransform(idpr, 0, 0, idpr, 0, 0);
+    ix.clearRect(0, 0, iw, ih);
+    for (var bi = 0; bi * bk < iw; bi++) for (var bj = 0; bj * bk < ih; bj++) {
+      var th = hash(bi * 7 + 1, bj * 13 + 2) * .85;
+      if (th >= cover) continue;
+      ix.fillStyle = cover < 1 && cover - th < .15 ? (hash(bi, bj + 31) < .5 ? ACID : BLUE) : INK;
+      ix.fillRect(bi * bk, bj * bk, bk, bk);
+    }
+  }
+
+  function leave(href, blank) {
+    if (exit) return;
+    if (reduceMotion || now < INTRO_END) {
+      if (blank) window.open(href, '_blank', 'noopener,noreferrer');
+      else location.href = href;
+      return;
+    }
+    fitIntro();
+    exitFrame = -1;
+    exit = { at: now, href: href, blank: blank, done: false };
+    ic.style.display = 'block';
+  }
+
 
   /* ── Page boot ─────────────────────────────────── */
 
@@ -786,11 +829,26 @@
   document.querySelectorAll('.project[data-href]').forEach(function (card) {
     card.addEventListener('click', function (e) {
       if (e.target.closest('a')) return;
-      location.href = card.dataset.href;
+      leave(card.dataset.href, false);
     });
     card.addEventListener('keydown', function (e) {
-      if (e.target === card && e.key === 'Enter') location.href = card.dataset.href;
+      if (e.target === card && e.key === 'Enter') leave(card.dataset.href, false);
     });
+  });
+
+  document.addEventListener('click', function (e) {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    var a = e.target.closest && e.target.closest('a[href]');
+    if (!a || a.hasAttribute('download')) return;
+    var url = new URL(a.href, location.href);
+    if (!/^https?:$/.test(url.protocol)) return;
+    if (url.origin === location.origin && url.pathname === location.pathname && url.search === location.search) return;
+    e.preventDefault();
+    leave(url.href, a.target === '_blank');
+  });
+
+  window.addEventListener('pageshow', function (e) {
+    if (e.persisted && exit) { exit = null; ic.style.display = 'none'; }
   });
 
   /* ── Clock ─────────────────────────────────────── */
@@ -800,6 +858,7 @@
   function tick(t) {
     now = t;
     drawIntro(t);
+    if (exit) drawExit(t);
     if (t < PAGE_FROM) return;
     var vh = window.innerHeight, sy = window.scrollY;
     var rRadar = rectOf(radar), rFx = rectOf(fxShapes), rWaves = Array.prototype.map.call(waves, rectOf);
@@ -814,7 +873,7 @@
 
   var start = 0, skip = 0, seen = false;
   try { seen = sessionStorage.getItem('ob1-intro') === '1'; sessionStorage.setItem('ob1-intro', '1'); } catch (e) {}
-  if (seen || window.matchMedia('(prefers-reduced-motion: reduce)').matches) skip = INTRO_END;
+  if (seen || reduceMotion) skip = INTRO_END;
   function skipIntro() {
     var t = (performance.now() - start) / 1000 + skip;
     if (t < INTRO_END) skip += INTRO_END - t;

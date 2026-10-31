@@ -160,6 +160,10 @@ html { background-image: linear-gradient(#e4e4e0 1px, transparent 1px), linear-g
 .term b, .prompt { color: #b4ff1f; text-shadow: none; }
 .cursor { background: #b4ff1f; }
 .btn-ghost { border: 2px solid #121212; }
+.src { display: inline-block; align-self: flex-start; padding: 7px 12px; border: 2px solid #121212; color: #121212; font-weight: 700; letter-spacing: .12em; transition: background .12s, color .12s; }
+.src:hover { background: #121212; color: #b4ff1f; }
+.foot a { color: #121212; font-weight: 700; text-decoration: underline 2px #2b0bff; text-underline-offset: 3px; }
+.foot a:hover { color: #2b0bff; }
 .btn-green:hover { background: #121212; color: #b4ff1f; }
 .status.on { background: #b4ff1f; color: #121212; box-shadow: inset 0 0 0 2px #121212; }
 .stack li { background: #121212; color: #b4ff1f; }
