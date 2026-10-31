@@ -132,7 +132,8 @@ class StatCache:
         stats["discord_ping_ms"] = bot_status.get("discord_ping_ms")
         stats["discord_rest_ms"] = latency.get("discord_rest_ms")
         stats["uptime_seconds"] = bot_status.get("uptime_seconds", 0)
-        stats["total_guilds"] = bot_status.get("total_guilds", 0)
+        if isinstance(bot_status.get("total_guilds"), int):
+            stats["total_guilds"] = bot_status["total_guilds"]
         stats["sentiment_workers_max"] = bot_status.get("sentiment_workers_max")
         stats["sentiment_workers_active"] = bot_status.get("sentiment_workers_active")
 

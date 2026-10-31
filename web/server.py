@@ -1134,7 +1134,8 @@ async def _handle_stats(request):
         bot_status = await call_admin_rpc("get_status")
         stats["uptime_seconds"] = bot_status.get("uptime_seconds", 0)
         stats["discord_ping_ms"] = bot_status.get("discord_ping_ms")
-        stats["total_guilds"] = bot_status.get("total_guilds", 0)
+        if isinstance(bot_status.get("total_guilds"), int):
+            stats["total_guilds"] = bot_status["total_guilds"]
         stats["sentiment_workers_max"] = bot_status.get("sentiment_workers_max")
         stats["sentiment_workers_active"] = bot_status.get("sentiment_workers_active")
 
@@ -1290,7 +1291,8 @@ async def _handle_stats_all(request):
             bot_status = await call_admin_rpc("get_status")
             s["uptime_seconds"] = bot_status.get("uptime_seconds", 0)
             s["discord_ping_ms"] = bot_status.get("discord_ping_ms")
-            s["total_guilds"] = bot_status.get("total_guilds", 0)
+            if isinstance(bot_status.get("total_guilds"), int):
+                s["total_guilds"] = bot_status["total_guilds"]
             s["sentiment_workers_max"] = bot_status.get("sentiment_workers_max")
             s["sentiment_workers_active"] = bot_status.get("sentiment_workers_active")
         return s
