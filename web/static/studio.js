@@ -737,7 +737,7 @@
     var step = Math.floor(t * 4);
     gens.forEach(function (el) {
       var k = el.dataset.gen, v;
-      if (k === 'coords') v = (-33.5 - hash(step, 1) * .1).toFixed(4) + ' · ' + (-18.3 - hash(step, 2) * .1).toFixed(4);
+      if (k === 'coords') v = (51.2227 + hash(step, 1) * .01).toFixed(4) + ' N - ' + (6.7685 + hash(step, 2) * .01).toFixed(4) + ' E';
       else if (k === 'hex') v = '0x' + code(step, 4) + ' · CH ' + pad(Math.floor(hash(step, 3) * 99));
       else if (k === 'ping') v = String(32 + Math.floor(hash(step, 4) * 24));
       else if (k === 'rcv') v = (.9 + hash(step, 5) * .09).toFixed(2) + ' RCV';
