@@ -175,6 +175,7 @@ h3, .sec-head h2 { font-weight: 700; letter-spacing: -.01em; }
 .contact > .panel { box-shadow: none; }
 .contact .micro { color: rgba(255, 255, 255, .7); }
 .btn-dark { background: #b4ff1f; color: #121212; }
+.btn-dark:hover { background: #121212; color: #b4ff1f; }
 .foot .code { color: #2b0bff; }
 @media (max-width: 1024px) {
   .topbar-mid { display: none; }
