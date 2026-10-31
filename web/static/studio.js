@@ -5,6 +5,9 @@
   var GLYPHS = 'ABCDEFGHJKLNOPRSVXYZ0123456789';
   var DATA = { servers: null, citizens: null };
   var now = 0, dataAt = null;
+  var MAX_DPR = 2, INTRO_PX = 1.2e6, PAGE_FROM = 4.9;
+  function cdpr() { return Math.min(window.devicePixelRatio || 1, MAX_DPR); }
+  function unit() { return Math.min(ih / 1080, iw / 720); }
 
 
   function clamp(v, a, b) { return Math.min(b === undefined ? 1 : b, Math.max(a === undefined ? 0 : a, v)); }
@@ -12,51 +15,6 @@
   function lerp(a, b, x) { return a + (b - a) * x; }
   function easeOut(x) { return 1 - Math.pow(1 - x, 3); }
   function easeInOut(x) { return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; }
-  function hash(a, b) {
-    var h = Math.imul((a | 0) ^ 0x9e3779b9, 374761393) ^ Math.imul(((b | 0) + 0x632be5ab) | 0, 668265263);
-    h = Math.imul(h ^ (h >>> 13), 1274126177);
-    h ^= h >>> 16;
-    return (h >>> 0) / 4294967296;
-  }
-
-  function seg(t, a, b) { return clamp((t - a) / (b - a)); }
-  function lerp(a, b, x) { return a + (b - a) * x; }
-  function easeOut(x) { return 1 - Math.pow(1 - x, 3); }
-  function easeInOut(x) { return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; }
-  function hash(a, b) {
-    var h = Math.imul((a | 0) ^ 0x9e3779b9, 374761393) ^ Math.imul(((b | 0) + 0x632be5ab) | 0, 668265263);
-    h = Math.imul(h ^ (h >>> 13), 1274126177);
-    h ^= h >>> 16;
-    return (h >>> 0) / 4294967296;
-  }
-
-  function lerp(a, b, x) { return a + (b - a) * x; }
-  function easeOut(x) { return 1 - Math.pow(1 - x, 3); }
-  function easeInOut(x) { return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; }
-  function hash(a, b) {
-    var h = Math.imul((a | 0) ^ 0x9e3779b9, 374761393) ^ Math.imul(((b | 0) + 0x632be5ab) | 0, 668265263);
-    h = Math.imul(h ^ (h >>> 13), 1274126177);
-    h ^= h >>> 16;
-    return (h >>> 0) / 4294967296;
-  }
-
-  function easeOut(x) { return 1 - Math.pow(1 - x, 3); }
-  function easeInOut(x) { return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; }
-  function hash(a, b) {
-    var h = Math.imul((a | 0) ^ 0x9e3779b9, 374761393) ^ Math.imul(((b | 0) + 0x632be5ab) | 0, 668265263);
-    h = Math.imul(h ^ (h >>> 13), 1274126177);
-    h ^= h >>> 16;
-    return (h >>> 0) / 4294967296;
-  }
-
-  function easeInOut(x) { return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; }
-  function hash(a, b) {
-    var h = Math.imul((a | 0) ^ 0x9e3779b9, 374761393) ^ Math.imul(((b | 0) + 0x632be5ab) | 0, 668265263);
-    h = Math.imul(h ^ (h >>> 13), 1274126177);
-    h ^= h >>> 16;
-    return (h >>> 0) / 4294967296;
-  }
-
   function hash(a, b) {
     var h = Math.imul((a | 0) ^ 0x9e3779b9, 374761393) ^ Math.imul(((b | 0) + 0x632be5ab) | 0, 668265263);
     h = Math.imul(h ^ (h >>> 13), 1274126177);
@@ -90,7 +48,8 @@
 
   var ic = document.getElementById('intro');
   var ix = ic.getContext('2d');
-  var iw = 0, ih = 0, idpr = 1, introGone = false;
+  var iw = 0, ih = 0, idpr = 1, introGone = false, introFrame = -1;
+  var snap = document.createElement('canvas'), snapX = snap.getContext('2d');
   var LOGO = [], LOGO_W = 60, LOGO_H = 6;
 
 
@@ -124,13 +83,23 @@
   }
 
 
-  var SUBJECTS = [{ img: genObject('orb') }, { img: genObject('shard') }];
+  function bake(src) {
+    var c = document.createElement('canvas');
+    c.width = src.width; c.height = src.height;
+    var g = c.getContext('2d');
+    g.filter = 'grayscale(1) contrast(1.4)';
+    g.drawImage(src, 0, 0);
+    return c;
+  }
+
+  var SUBJECTS = [{ img: bake(genObject('orb')) }, { img: bake(genObject('shard')) }];
 
 
   function fitIntro() {
-    idpr = window.devicePixelRatio || 1;
     iw = window.innerWidth; ih = window.innerHeight;
+    idpr = Math.min(cdpr(), Math.sqrt(INTRO_PX / (iw * ih)));
     ic.width = Math.round(iw * idpr); ic.height = Math.round(ih * idpr);
+    introFrame = -1;
   }
 
   function itext(s, x, y, size, color, font, align) {
@@ -139,45 +108,6 @@
     ix.textAlign = align || 'left';
     ix.textBaseline = 'alphabetic';
     ix.fillText(s, x, y);
-  }
-
-  function iglow(c, b) { ix.shadowColor = c; ix.shadowBlur = b; }
-  function inoglow() { ix.shadowBlur = 0; ix.shadowColor = 'transparent'; }
-  function islice(amount, seed) {
-    ix.save();
-    ix.setTransform(1, 0, 0, 1, 0, 0);
-    for (var k = 0; k < 7; k++) {
-      var y = Math.floor(hash(seed, k) * ic.height);
-      var h = Math.floor((6 + hash(seed, k + 20) * 40) * idpr);
-      var dx = Math.round((hash(seed, k + 40) - .5) * 160 * amount * idpr);
-      ix.drawImage(ic, 0, y, ic.width, h, dx, y, ic.width, h);
-    }
-    ix.restore();
-  }
-
-  function inoglow() { ix.shadowBlur = 0; ix.shadowColor = 'transparent'; }
-  function islice(amount, seed) {
-    ix.save();
-    ix.setTransform(1, 0, 0, 1, 0, 0);
-    for (var k = 0; k < 7; k++) {
-      var y = Math.floor(hash(seed, k) * ic.height);
-      var h = Math.floor((6 + hash(seed, k + 20) * 40) * idpr);
-      var dx = Math.round((hash(seed, k + 40) - .5) * 160 * amount * idpr);
-      ix.drawImage(ic, 0, y, ic.width, h, dx, y, ic.width, h);
-    }
-    ix.restore();
-  }
-
-  function islice(amount, seed) {
-    ix.save();
-    ix.setTransform(1, 0, 0, 1, 0, 0);
-    for (var k = 0; k < 7; k++) {
-      var y = Math.floor(hash(seed, k) * ic.height);
-      var h = Math.floor((6 + hash(seed, k + 20) * 40) * idpr);
-      var dx = Math.round((hash(seed, k + 40) - .5) * 160 * amount * idpr);
-      ix.drawImage(ic, 0, y, ic.width, h, dx, y, ic.width, h);
-    }
-    ix.restore();
   }
 
   function buildLogo() {
@@ -271,22 +201,8 @@
 
   function wrapIn(v, m, p) { var L = m + 2 * p; return ((v + p) % L + L) % L - p; }
 
-  function shapeField(t, t0, n, seed, sc0, speed) {
-    var s = ih / 1080;
-    speed = speed || 1;
-    for (var k = 0; k < n; k++) {
-      var at = t0 + k * .022;
-      if (t < at) continue;
-      var pop = easeOut(seg(t, at, at + .1));
-      var vx = (hash(k, seed + 6) - .5) * 1100 * speed * s, vy = (hash(k, seed + 7) - .5) * 600 * speed * s;
-      var x = wrapIn(hash(k, seed) * iw + vx * (t - t0), iw, 200 * s), y = wrapIn(hash(k, seed + 1) * ih + vy * (t - t0), ih, 200 * s);
-      var r = (28 + hash(k, seed + 2) * 130) * s * sc0 * pop * (1 + .12 * Math.sin(t * 10 + k));
-      chromeShape(Math.floor(hash(k, seed + 3) * 8), x, y, r, hash(k, seed + 4) * 6 + t * (hash(k, seed + 5) - .5) * 14 * speed);
-    }
-  }
-
   function circuit(seed, color, alpha) {
-    var s = ih / 1080;
+    var s = unit();
     ix.globalAlpha = alpha;
     ix.strokeStyle = color;
     ix.lineWidth = 1.2;
@@ -302,28 +218,26 @@
   }
 
   function smear(n, seed) {
+    if (snap.width !== ic.width || snap.height !== ic.height) { snap.width = ic.width; snap.height = ic.height; }
+    snapX.clearRect(0, 0, snap.width, snap.height);
+    snapX.drawImage(ic, 0, 0);
     ix.save();
     ix.setTransform(1, 0, 0, 1, 0, 0);
     for (var k = 0; k < n; k++) {
       var y = Math.floor(hash(seed, k) * ic.height), h = Math.floor((4 + hash(seed, k + 30) * 60) * idpr);
       var x = Math.floor(hash(seed, k + 60) * ic.width * .8);
-      ix.drawImage(ic, x, y, Math.max(1, Math.round(2 * idpr)), h, x, y, ic.width - x, h);
+      ix.drawImage(snap, x, y, Math.max(1, Math.round(2 * idpr)), h, x, y, ic.width - x, h);
     }
     for (var b = 0; b < n; b++) {
       var bw = Math.floor((40 + hash(seed, b + 90) * 160) * idpr), bh = Math.floor((20 + hash(seed, b + 120) * 70) * idpr);
       var sx0 = Math.floor(hash(seed, b + 150) * (ic.width - bw)), sy0 = Math.floor(hash(seed, b + 180) * (ic.height - bh));
-      ix.drawImage(ic, sx0, sy0, bw, bh, sx0 + Math.round((hash(seed, b + 210) - .5) * 200 * idpr), sy0, bw, bh);
+      ix.drawImage(snap, sx0, sy0, bw, bh, sx0 + Math.round((hash(seed, b + 210) - .5) * 200 * idpr), sy0, bw, bh);
     }
     ix.restore();
   }
 
-  function avatarBox(s, x, y, size, filt) {
-    if (!s.img) return;
-    ix.save();
-    ix.filter = filt || 'grayscale(1) contrast(1.4)';
-    ix.drawImage(s.img, x, y, size, size);
-    ix.filter = 'none';
-    ix.restore();
+  function avatarBox(s, x, y, size) {
+    if (s.img) ix.drawImage(s.img, x, y, size, size);
   }
 
   function qr(x, y, size, seed, color) {
@@ -368,28 +282,8 @@
     else { ix.beginPath(); ix.moveTo(x - r * 1.6, y); ix.lineTo(x, y); ix.lineTo(x, y + r); ix.stroke(); }
   }
 
-  function gauss(a, b) { return (hash(a, b) + hash(a, b + 1) + hash(a, b + 2)) / 1.5 - 1; }
-
-  function lineShape(kind, x, y, r, color) {
-    ix.strokeStyle = color; ix.fillStyle = color; ix.lineWidth = 1.5;
-    if (kind === 0) ix.strokeRect(x - r, y - r, r * 2, r * 2);
-    else if (kind === 1) { ix.beginPath(); ix.arc(x, y, r, 0, Math.PI * 2); ix.stroke(); }
-    else if (kind === 2) { ix.beginPath(); ix.arc(x, y, r * .2, 0, Math.PI * 2); ix.fill(); }
-    else if (kind === 3) ix.fillRect(x - r * .22, y - r * .22, r * .44, r * .44);
-    else { ix.beginPath(); ix.moveTo(x - r * 1.6, y); ix.lineTo(x, y); ix.lineTo(x, y + r); ix.stroke(); }
-  }
-
-  function lineShape(kind, x, y, r, color) {
-    ix.strokeStyle = color; ix.fillStyle = color; ix.lineWidth = 1.5;
-    if (kind === 0) ix.strokeRect(x - r, y - r, r * 2, r * 2);
-    else if (kind === 1) { ix.beginPath(); ix.arc(x, y, r, 0, Math.PI * 2); ix.stroke(); }
-    else if (kind === 2) { ix.beginPath(); ix.arc(x, y, r * .2, 0, Math.PI * 2); ix.fill(); }
-    else if (kind === 3) ix.fillRect(x - r * .22, y - r * .22, r * .44, r * .44);
-    else { ix.beginPath(); ix.moveTo(x - r * 1.6, y); ix.lineTo(x, y); ix.lineTo(x, y + r); ix.stroke(); }
-  }
-
   function build(tq, o) {
-    var s = ih / 1080;
+    var s = unit();
     for (var k = 0; k < o.n; k++) {
       var tk = o.t0 + (o.t1 - o.t0) * Math.pow(k / o.n, o.acc || .55);
       if (tq < tk) break;
@@ -450,7 +344,7 @@
   }
 
   function drawIntroB(t) {
-    var s = ih / 1080, cx = iw / 2, cy = ih / 2, tq = tqOf(t), fstep = Math.floor(t * STEP);
+    var s = unit(), cx = iw / 2, cy = ih / 2, tq = tqOf(t), fstep = Math.floor(t * STEP);
 
     if (t < .4) {
       ix.fillStyle = PAPER; ix.fillRect(0, 0, iw, ih);
@@ -624,12 +518,14 @@
       }
       return;
     }
-    if (ic.width !== Math.round(window.innerWidth * (window.devicePixelRatio || 1))) fitIntro();
+    if (window.innerWidth !== iw || window.innerHeight !== ih) fitIntro();
+    var f = Math.floor(t * STEP + 1e-6);
+    if (f === introFrame) return;
+    introFrame = f;
     ix.setTransform(idpr, 0, 0, idpr, 0, 0);
     ix.globalAlpha = 1; ix.globalCompositeOperation = 'source-over'; ix.filter = 'none';
     ix.clearRect(0, 0, iw, ih);
-    inoglow();
-    drawIntroB(t);
+    drawIntroB(f / STEP);
   }
 
 
@@ -646,15 +542,15 @@
   }
   function bootStart(b) { return b && b.seen !== null ? b.seen + b.delay : null; }
 
-  function bootTick(t) {
-    var vh = window.innerHeight;
-    for (var i = 0; i < boots.length; i++) {
-      var b = boots[i];
-      if (b.seen === null) {
-        if (t < BOOT_FROM) continue;
-        if (b.el.getBoundingClientRect().top < vh * .92) b.seen = Math.max(t, BOOT_FROM);
-        else continue;
-      }
+  function bootTick(t, vh) {
+    var i, b;
+    if (t >= BOOT_FROM) for (i = 0; i < boots.length; i++) {
+      b = boots[i];
+      if (b.seen === null && b.el.getBoundingClientRect().top < vh * .92) b.seen = Math.max(t, BOOT_FROM);
+    }
+    for (i = 0; i < boots.length; i++) {
+      b = boots[i];
+      if (b.seen === null || b.state === 2) continue;
       var p = easeOut(seg(t, b.seen + b.delay, b.seen + b.delay + .55));
       if (p >= 1) {
         if (b.state !== 2) {
@@ -723,7 +619,7 @@
   var ticker = document.querySelector('.ticker');
   var track = document.querySelector('.ticker-track');
   var glyphBox = document.querySelector('.glyphs');
-  var glyphCells = [];
+  var glyphCells = [], trackUnit = 0;
   for (var g = 0; g < 18; g++) {
     var sp = document.createElement('span');
     glyphBox.appendChild(sp);
@@ -733,7 +629,8 @@
   function pad(n) { return String(n).padStart(2, '0'); }
   function ambientTick(t) {
     var d = new Date();
-    clock.textContent = 'UTC ' + pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()) + ':' + pad(d.getUTCSeconds());
+    var cs = 'UTC ' + pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()) + ':' + pad(d.getUTCSeconds());
+    if (clock.textContent !== cs) clock.textContent = cs;
     var step = Math.floor(t * 4);
     gens.forEach(function (el) {
       var k = el.dataset.gen, v;
@@ -745,8 +642,7 @@
     });
     cursor.style.opacity = Math.floor(t * 2.2) % 2 ? '0' : '1';
     dot.style.opacity = Math.floor(t * 1.5) % 2 ? '.35' : '1';
-    var unit = track.firstElementChild.offsetWidth;
-    if (unit) track.style.transform = 'translateX(' + (-((t * 70) % unit)).toFixed(1) + 'px)';
+    if (trackUnit) track.style.transform = 'translateX(' + (-((t * 70) % trackUnit)).toFixed(1) + 'px)';
     ticker.style.setProperty('--sweep', ((t * .3) % 1).toFixed(4));
     for (var i = 0; i < glyphCells.length; i++) {
       var ch = hash(i, 99) < .16 ? '' : GLYPHS[Math.floor(hash(i, Math.floor(t * 5 + hash(i, 9) * 5)) * GLYPHS.length)];
@@ -755,12 +651,13 @@
   }
 
 
-  function prep(c) {
-    var r = c.getBoundingClientRect();
-    if (r.width === 0 || r.bottom < 0 || r.top > window.innerHeight) return null;
-    var dpr = window.devicePixelRatio || 1;
+  function prep(c, r, key) {
+    if (!r || r.width === 0 || r.bottom < 0 || r.top > window.innerHeight) return null;
+    var dpr = cdpr();
     var w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
-    if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+    if (c.width !== w || c.height !== h) { c.width = w; c.height = h; c._key = null; }
+    if (c._key === key) return null;
+    c._key = key;
     var x = c.getContext('2d');
     x.setTransform(dpr, 0, 0, dpr, 0, 0);
     x.clearRect(0, 0, r.width, r.height);
@@ -769,7 +666,7 @@
 
   function withCtx(x, w, sh, fn) {
     var sv = [ix, iw, ih, idpr];
-    ix = x; iw = w; ih = sh; idpr = window.devicePixelRatio || 1;
+    ix = x; iw = w; ih = sh; idpr = cdpr();
     try { fn(); } finally { ix = sv[0]; iw = sv[1]; ih = sv[2]; idpr = sv[3]; }
   }
 
@@ -810,11 +707,10 @@
 
 
   var fxShapes = document.querySelector('.fx-shapes');
-  function fxShapesTick(t) {
+  function fxShapesTick(t, r, sy) {
     if (!fxShapes) return;
-    var c = prep(fxShapes);
+    var c = prep(fxShapes, r, Math.floor(t * 30) + ':' + sy);
     if (!c) return;
-    var sy = window.scrollY;
     withCtx(c.x, c.w, 1080, function () {
       for (var k = 0; k < 18; k++) {
         var par = .25 + hash(k, 3) * .6;
@@ -827,16 +723,16 @@
 
 
   var radar = document.querySelector('.radar');
-  function heroTick(t) {
-    var c = prep(radar);
+  function heroTick(t, r) {
+    var c = prep(radar, r, tqOf(t));
     if (c) heroOverflow(c.x, c.w, c.h, t);
   }
 
   var waves = document.querySelectorAll('.wave');
 
-  function waveTick(t) {
+  function waveTick(t, rs) {
     waves.forEach(function (cv, wi) {
-      var c = prep(cv);
+      var c = prep(cv, rs[wi], Math.floor(t * 30));
       if (!c) return;
       var x = c.x, w = c.w, h = c.h, mid = h / 2;
       x.strokeStyle = INK; x.lineWidth = 1.5;
@@ -900,16 +796,21 @@
 
   /* ── Clock ─────────────────────────────────────── */
 
+  function rectOf(el) { return el ? el.getBoundingClientRect() : null; }
+
   function tick(t) {
     now = t;
     drawIntro(t);
-    bootTick(t);
+    if (t < PAGE_FROM) return;
+    var vh = window.innerHeight, sy = window.scrollY;
+    var rRadar = rectOf(radar), rFx = rectOf(fxShapes), rWaves = Array.prototype.map.call(waves, rectOf);
+    bootTick(t, vh);
     scrambleTick(t);
     countTick(t);
     ambientTick(t);
-    heroTick(t);
-    fxShapesTick(t);
-    waveTick(t);
+    heroTick(t, rRadar);
+    fxShapesTick(t, rFx, sy);
+    waveTick(t, rWaves);
   }
 
   var start = 0, skip = 0, seen = false;
@@ -920,8 +821,10 @@
     if (t < INTRO_END) skip += INTRO_END - t;
   }
 
+  function measureTrack() { trackUnit = track.firstElementChild.offsetWidth; }
+
   fitIntro();
-  window.addEventListener('resize', function () { fitIntro(); drawBarcodes(); });
+  window.addEventListener('resize', function () { fitIntro(); drawBarcodes(); measureTrack(); });
 
   var fonts = document.fonts ? Promise.all([
     document.fonts.load('16px "Space Mono"'), document.fonts.load('700 16px "Space Mono"'),
@@ -932,6 +835,7 @@
   settle(fonts, 2500).then(function () {
     buildLogo();
     drawBarcodes();
+    measureTrack();
     drawIdenticons();
     window.addEventListener('keydown', skipIntro);
     ic.addEventListener('click', skipIntro);
