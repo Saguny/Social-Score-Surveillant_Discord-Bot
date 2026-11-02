@@ -970,10 +970,6 @@ async def _handle_discord_me(request):
     })
 
 
-async def _handle_studio_landing(request):
-    return web.Response(text=await _load_template('studio.html'), content_type='text/html')
-
-
 async def _handle_landing(request):
     return web.Response(text=await _load_template('landing.html'), content_type='text/html')
 
@@ -1354,7 +1350,6 @@ async def _handle_robots(request):
 
 
 _ROUTES = [
-    {"method": "GET",  "path": "/",                                        "auth": "public",  "description": "OFF-BY-ONE studio landing page"},
     {"method": "GET",  "path": "/social-credit",                           "auth": "public",  "description": "Social Credit Bot hub page"},
     {"method": "GET",  "path": "/social-credit/dashboard",                 "auth": "public",  "description": "Public dashboard"},
     {"method": "GET",  "path": "/social-credit/leaderboards",              "auth": "public",  "description": "Guild leaderboard page"},
@@ -2997,7 +2992,6 @@ async def start_web_server(db):
     app.router.add_get("/api/requests/wishlist", _rate_limit_public(_handle_requests_wishlist))
     app.router.add_get("/social-credit/login", _require_admin_ip(_handle_login))
     app.router.add_post("/api/auth", _require_admin_ip(_handle_auth))
-    app.router.add_get("/",                         _rate_limit_public(_handle_studio_landing))
     app.router.add_get("/social-credit",            _rate_limit_public(_handle_landing))
     app.router.add_get("/social-credit/dashboard",  _rate_limit_public(_handle_index))
     app.router.add_get("/social-credit/privacy", _rate_limit_public(_handle_privacy))

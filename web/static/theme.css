@@ -91,7 +91,7 @@
   --content-max:1680px;
   --tap:44px;
 
-  /* Back-compat aliases — account.css / studio.css / submit.css still use these */
+  /* Back-compat aliases — account.css / submit.css still use these */
   --bg:var(--bg-base);
   --bg-panel:var(--surface);
   --bg-recessed:var(--surface-recessed);
